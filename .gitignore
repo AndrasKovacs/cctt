@@ -1,0 +1,9 @@
+*~
+*.hi
+*.o
+/dist
+*.agdai
+*#
+TAGS
+.stack-work/
+*.lock

@@ -1,0 +1,19 @@
+
+- stable val: stable under isub, stores an isub
+- unstable val: can compute under isub, stores an isub + a cof s.t. the if it's true, the
+  value may compute
+
+- eval: goes from syntax to vals. Computes eagerly under interval binder, only stops when it hits
+  a value binder. When evaluating an unstable term, we -∨- recursive unstable cof-s in the result.
+
+- forcing: goes from vals to vals. Computes the head w.r.t. an isub.
+
+  - forcing a stable val composes the stored isub with the new one
+  - forcing an unstable val:
+    - if cof holds under new isub, we force the value
+    - otherwise we compose the stored isub and store the updated cof
+
+Alternative:
+
+  - We only mark in values whether something is stable or unstable, but not the cof.
+    Forcing an unstable thing always walks the value. Simpler but maybe less efficient.
