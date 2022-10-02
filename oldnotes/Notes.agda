@@ -223,6 +223,55 @@ transpⁱ (Glue A α T f) β g : Glue (A 1) (α 1) (T 1) (f 1) [β=1 ↦ g]
                                = t
                                = fst (hcompʲ [β ↦ contr (g, refl (unglue g)) j] fib*)
 
+--------------------------------------------------------------------------------
+
+Γ,i ⊢ A type   Γ ⊢ t : A[r]
+──────────────────────────────────────
+ Γ ⊢ coeⁱ r r' A t : A[r'] [r=r' ↦ t]
+
+
+Γ ⊢ A type   Γ, α, i ⊢ t : A    Γ ⊢ b : A    Γ, α ⊢ t[r] ≡ b
+──────────────────────────────────────────────────────────────
+  Γ ⊢ hcomⁱ r r' A [α ↦ t] b : A [r=r' ↦ b, α ↦ t[r'])
+
+
+Γ,i ⊢ A type   Γ, α, i ⊢ t : A   Γ ⊢ b : A[r]   Γ, α ⊢ t[i↦r] ≡ b
+──────────────────────────────────────────────────────────────────
+   Γ ⊢ comⁱ r r' A [α ↦ t] b : A[r'] [r=r' ↦ b, α ↦ t[r']]
+       comⁱ r r' A [α ↦ t] b :=
+         hcomⁱ r r' A[r'] [α ↦ coeʲ i r' (A[i↦j]) t] (coeⁱ r r' A b)  -- fresh j
+
+
+i ⊢ coeFillⁱ r r' A t : A  [ i=r ↦ t, i=r' ↦ coeⁱ r r' A t ]
+i ⊢ coeFillⁱ r r' A t := coeʲ r i (A[i↦j]) t       -- fresh j
+
+
+⊢ t : A[r']
+───────────────────────────────────────────────────────────
+i ⊢ coeFill⁻¹ r r' A t : A [ i=r ↦ coeⁱ r' r A t, i=r' ↦ t]
+  ⊢ coeFill⁻¹ r r' A t := coeʲ r' i (A[i ↦ j]) t
+
+
+coeⁱ r r' ((a : A) × B) t =
+  (coeⁱ r r' A t.1,
+   coeⁱ r r' (B[a ↦ coeFillⁱ r r' A t.1]) t.2)
+
+
+coeⁱ r r' ((a : A) → B) t =
+  (λ (a' : A[r']).
+     coeⁱ r r' (B[a ↦ coeFill⁻¹ⁱ r r' A a']) (t (coeⁱ r' r A a'))
+
+hcomⁱ ((a : A) × B) [α ↦ t] b              b : (a : A) × B
+  = (hcomⁱ A [α ↦ t.1] b.1,
+     comⁱ (B[a ↦ ?]) [α ↦ t.2] b.2)     TODO
+
+
+
+
+
+
+
+
 -- hcomp for glue
 --------------------------------------------------------------------------------
 
@@ -411,19 +460,26 @@ coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
 
   (topt, fr'topt≡ar') : αr' ⊢ fib fr' ar'
   (topt, fr'topt≡ar') = hcompⁱ 0 1
-    [∀i.α ↦ contr (coeⁱ r r' T gr, refl _) i, r=r' ↦ contr (gr, refl (fr gr)) i] fib*
+    [∀i.α ↦ contr (coeⁱ r r' T gr, refl _) i, r=r' ↦ contr (gr, refl (fr' gr)) i] fib*
 
   Res = glue [αr' ↦ topt]
              (hcompⁱ 1 0 [αr' ↦ fr'topt≡ar' i, ∀i.α ↦ coeⁱ r r' A ar, r=r' ↦ unglue gr] ar')
+
+-- Note:
+  - coeGlue doesn't force system components
+  - we only need to instantiate "f" with "r'"
+    (this is the only non-weakening instantiation!)
+  - comp does eta-expansion. Can we have *eta-short* comp?
+
 
 
 CARTESIAN coe UA
 
 ua (f : A≃B) = λ i. Glue [i=0 ↦ (A, f), i=1 ↦ (B, idEqv)] B
 
-coeⁱ 0 1 (ua f) : A → B
+coeⁱ 0 1 (ua f i) : A → B
 
-coeⁱ 0 1 (Glue [(i=0)∨(i=1) ↦ (T, f)] A) gr
+coeⁱ 0 1 (Glue [(i=0) ↦ (A, f), i=1 ↦ (B,idEqv)] B) gr
 
   Res = hcompⁱ 0 1 [] (hcompⁱ 0 1 [] (f gr))
 
@@ -433,7 +489,7 @@ CARTESIAN hcomp
 hcompⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr : Glue [α ↦ (T, f)] A [β ↦ tr']
 
   glue [α ↦ hcompⁱ r r' T [β ↦ t] gr]
-       (hcompⁱ r r' A [β ↦ unlgue t, α ↦ f (hfillⁱ r r' T [β ↦ t] gr)] (unglue gr))
+       (hcompⁱ r r' A [β ↦ unglue t, α ↦ f (hfillⁱ r r' T [β ↦ t] gr)] (unglue gr))
 
 
 

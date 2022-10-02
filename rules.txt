@@ -1,0 +1,138 @@
+
+Interval vars: i,j,k
+
+Cofibrations:
+  - A cof is a list of atomic cofs, viewed as a *conjunction*.
+  - Atomic cofs: i=0 | i=1 | i=j
+  - Cof vars: α, β, γ
+
+Context:
+  - Γ + interval cxt + one cofibration
+  - In notation, we can just extend Γ with either i:I or α:Cof,
+    but formally we mean extending the appropriate part of the cxt.
+    Extending the cof is just conjunction.
+
+Systems:
+  - list of (cof, term) pairs, can be empty
+  - notation: [α₀ ↦ t₀, α₁ ↦ t₁, ... αᵢ ↦ tᵢ]
+  - typing:
+
+    Γ ⊢ A : U    Γ, αᵢ ⊢ tᵢ : A    Γ, αᵢ ∧ αⱼ ⊢ tᵢ ≡ tⱼ
+    ───────────────────────────────────────────────────
+             Γ ⊢ [αᵢ ↦ tᵢ] is a system
+
+Cubical extension judgement:
+
+    Γ ⊢ t : A[α ↦ u]  means  Γ ⊢ t : A  and  Γ,α ⊢ t ≡ u
+
+Coercion
+
+         Γ,i ⊢ A : U   Γ ⊢ t : A r
+    ────────────────────────────────────
+    Γ ⊢ coeⁱ r r' A t : (A r') [r=r' ↦ t]
+
+Homogeneous composition
+
+
+    Γ ⊢ α cof  Γ ⊢ A : U   Γ, i, α ⊢ t : A    Γ ⊢ b : A    Γ, α ⊢ t r ≡ b
+    ──────────────────────────────────────────────────────────────────────
+         Γ ⊢ hcomⁱ r r' A [α ↦ t] b : A [r=r' ↦ b, α ↦ t r')
+
+Composition (derived)
+
+    Γ ⊢ α cof   Γ, i ⊢ A : U   Γ, i, α ⊢ t : A   Γ ⊢ b : A r   Γ, α ⊢ t r ≡ b
+    ────────────────────────────────────────────────────────────────────────
+       Γ ⊢ comⁱ r r' A [α ↦ t] b : (A r') [r=r' ↦ b, α ↦ t r']
+           comⁱ r r' A [α ↦ t] b :=
+             hcomⁱ r r' (A r') [α ↦ coeʲ i r' (A j) t] (coeⁱ r r' A b)  -- fresh j
+
+-- filling
+--------------------------------------------------------------------------------
+
+Γ, i ⊢ coeFillⁱ r r' A t : A [i=r ↦ t, i=r' ↦ coeⁱ r r' A t ]
+       coeFillⁱ r r' A t := coeʲ r i (A j) t  -- fresh j
+
+Γ, i ⊢ coeFill⁻¹ⁱ r r' A t : A [i=r ↦ coeⁱ r' r A t, i=r' ↦ t]
+       coeFill⁻¹ⁱ r r' A t := coeʲ r' i (A j) t -- fresh j
+
+Γ, i ⊢ hfillⁱ r r' A [α ↦ t] b : A[i=r ↦ b, i=r' ↦ hcomⁱ r r' A [α ↦ t] b]
+       hfillⁱ r r' A [α ↦ t] b := hcomʲ r i A [α ↦ t j] b
+
+Γ, i ⊢ hfill⁻¹ⁱ r r' A [α ↦ t] b : A[i=r ↦ hcomⁱ r' r A [α ↦ t] b, i=r' ↦ b]
+       hfill⁻¹ⁱ r r' A [α ↦ t] b := hcomʲ r' i A [α ↦ t j] b
+
+--------------------------------------------------------------------------------
+
+TODO:
+  - eta-short coe/hcom? Only computes on canonical pair/lam?
+
+coeⁱ r r' ((a : A) × B a) t =
+  (coeⁱ r r' A t.1, coeⁱ r r' (B (coeFillⁱ r r' A t.1)) t.2)
+
+coeⁱ r r' ((a : A) → B a) t =
+  (λ (a' : A r'). coeⁱ r r' (B (coeFill⁻¹ⁱ r r' A a')) (t (coeⁱ r' r A a')))
+
+coeⁱ r r' (Pathʲ A t u) p =
+  (λ j. comⁱ r r' (A i j) [j=0 ↦ t i, j=1 ↦ u i] (p @ j))
+
+coeⁱ r r' ℕ t = t
+coeⁱ r r' U t = t
+coeⁱ r r' (Glue [α ↦ (T, f)] A) gr = TODO
+
+hcomⁱ r r' ((a : A) × B a) [α ↦ t] b =
+  (  hcomⁱ r r' A [α ↦ (t i).1] b.1
+   , comⁱ r r' (B (hfillⁱ r r' A [α ↦ t.1] b.1)) [α ↦ (t i).2] b.2 )
+
+hcomⁱ r r' ((a : A) → B a) [α ↦ t] b =
+  λ a. hcomⁱ r r' (B a) [α ↦ t i a] (b a)
+
+hcomⁱ r r' ℕ [α ↦ zero]  zero    = zero
+hcomⁱ r r' ℕ [α ↦ suc t] (suc b) = suc (hcomⁱ r r' ℕ [α ↦ t] b)
+hcomⁱ r r' U [α ↦ t] b = Glue [α ↦ (t r', (coeⁱ r' r (t i), _)), r=r' ↦ (b, idEqv)] b
+
+
+hcompⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr =
+  glue [α ↦ hcomⁱ r r' T [β ↦ t] gr]
+       (hcomⁱ r r' A [β ↦ unglue t, α ↦ f (hfillⁱ r r' T [β ↦ t] gr)] (unglue gr))
+
+
+-- System
+--------------------------------------------------------------------------------
+- CCTT, coe, hcom, no cof disjunction
+- no (∀i.α), in coeGlue we compute ∀i.α extended systems on the stop
+- parameterized (strict) inductives, HITs, all single-sorted
+- no indexed inductives
+
+-- Eval
+--------------------------------------------------------------------------------
+
+- Defunctionalized closures
+- Lambdas, path lambdas are closures
+- CBV except for system components which are lazy
+- binders that we have to match on are not closures
+  - hcom and coe types are not closures
+  - system components are not closures
+- delayed isubst
+  - no sharing of isubst forcing computation
+  - eager isubst composition: isubst of isubst collapses
+- in the closed eval case, hcom can lazily peel off strict inductive constructors
+   (because of canonicity!!!)
+
+-- Neutrals
+--------------------------------------------------------------------------------
+
+- Neutrals store a bitmask of blocking ivars + delayed isubst
+- we collect blocking ivars during eval/forcing
+- forcing a neutral:
+  - if forcing sub is an injective renaming on blocking vars, then remain blocked
+  - otherwise force the whole thing
+
+NOTE:
+  - Right now I don't want to collect more precise blocking info, e.g. blocking cofs.
+    (potential TODO)
+  - In open eval, if I get to actually force the whole hcom system because of
+    a strict inductive hcom rule, I gather all base+tube blocking ivars
+
+
+-- Delayed unfoldings
+--------------------------------------------------------------------------------

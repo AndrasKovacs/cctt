@@ -1,32 +1,79 @@
 
-name:                cubeval
-version:             0.1.0.0
-github:              "AndrasKovacs/cubeval"
-license:             MIT
-author:              "András Kovács"
-maintainer:          "puttamalac@gmail.com"
-copyright:           "2022 András Kovács"
-category:            Language
-description:         "Experiments on high-performance evaluation for cubical type theories"
+name:         cubeval
+version:      0.1.0.0
+github:       "AndrasKovacs/cubeval"
+license:      MIT
+author:       "András Kovács"
+maintainer:   "puttamalac@gmail.com"
+copyright:    "2022 András Kovács"
+category:     Language
+description:  "Experiments on high-performance evaluation for cubical type theories"
+
+flags:
+  dump:
+    description: dump core, stg and cmm to files
+    default: false
+    manual: true
+  llvm:
+    description: use llvm for codegen
+    default: false
+    manual: true
+  debug:
+    description: turn on debug info printing
+    default: false
+    manual: true
+
+when:
+  - condition: flag(dump)
+    ghc-options:
+      - -ddump-simpl
+      - -ddump-stg
+      - -ddump-cmm
+      - -dsuppress-all
+      - -dno-suppress-type-signatures
+      - -ddump-to-file
+  - condition: flag(llvm)
+    ghc-options:
+      - -fllvm
+  - condition: flag(debug)
+    cpp-options:
+      - -DDEBUG
 
 default-extensions:
-- BangPatterns
-- BlockArguments
-- ConstraintKinds
-- DeriveAnyClass
-- DerivingVia
-- EmptyCase
-- FlexibleContexts
-- GeneralizedNewtypeDeriving
-- LambdaCase
-- OverloadedStrings
-- PatternSynonyms
-- ScopedTypeVariables
-- StandaloneDeriving
-- StandaloneKindSignatures
-- Strict
-- TupleSections
-- ViewPatterns
+  - AllowAmbiguousTypes
+  - BangPatterns
+  - BlockArguments
+  - CPP
+  - ConstraintKinds
+  - DataKinds
+  - DerivingVia
+  - EmptyDataDeriving
+  - ExplicitNamespaces
+  - FlexibleContexts
+  - FlexibleInstances
+  - FunctionalDependencies
+  - GADTs
+  - ImplicitParams
+  - InstanceSigs
+  - KindSignatures
+  - LambdaCase
+  - MagicHash
+  - MultiParamTypeClasses
+  - PackageImports
+  - PatternSynonyms
+  - PolyKinds
+  - QualifiedDo
+  - RankNTypes
+  - ScopedTypeVariables
+  - StandaloneDeriving
+  - StandaloneKindSignatures
+  - Strict
+  - TemplateHaskell
+  - TypeApplications
+  - TypeFamilies
+  - TypeFamilyDependencies
+  - UndecidableInstances
+  - ViewPatterns
 
 ghc-options:
 - -Wall
@@ -34,18 +81,35 @@ ghc-options:
 - -Wno-missing-signatures
 - -Wno-unused-do-bind
 - -Wno-unused-matches
+- -fmax-worker-args=20
 
 dependencies:
 - base >= 4.7 && < 5
 - containers
 - megaparsec
+- ghc-prim
+- strict-impl-params
 
-source-dirs: .
+source-dirs: src
 
 executable:
   main: Main.hs
   ghc-options:
   - -O
+  - -fdicts-strict
+  - -fmax-worker-args=15
   - -rtsopts
   - -threaded
-  - -with-rtsopts= "-A64M"
+  - -with-rtsopts= "-A64M -N4"
+  - -Wall
+  - -Wno-name-shadowing
+  - -Wno-missing-signatures
+  - -Wno-unused-do-bind
+  - -Wno-unused-matches
+  - -Wno-missing-pattern-synonym-signatures
+  - -fmax-relevant-binds=3
+  - -fmax-valid-hole-fits=0
+  - -fplugin StrictImplParams
+  when:
+  - condition: false
+    other-modules: Paths_cubeval

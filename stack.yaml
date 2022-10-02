@@ -1,2 +1,16 @@
 
-resolver: lts-19.4
+resolver: nightly-2022-09-27
+
+packages:
+- .
+
+ghc-options:
+    "$everything": -split-sections
+
+build:
+  library-profiling: true
+  executable-profiling: true
+
+extra-deps:
+- git: https://github.com/AndrasKovacs/ghc-strict-implicit-params.git
+  commit: 215e0353374a61c0f8790371e4826b247c69580f
