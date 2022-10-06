@@ -4,22 +4,17 @@ module Core where
 
 import Common
 import Cube
-import qualified LvlSet as LS
+import qualified IVarSet as IS
 
 
-{-|
-- We need to force w.r.t. a sub!
-- Problem: double forcing + value weakening under cofs
+--------------------------------------------------------------------------------
 
-  1. we can evaluate a term under a sub, which can store the sub in closures
-  2. we can weaken the value to under an extended sub
-     - in which case we want forcing to still make sense, and be idempotent!
-     - stored sub update is *not necessarily* sub composition! It should be taking
-       conjunction of cofibs instead! Is there an operational difference?
-
-  There is some confusion of interval substitution and cofibrations
-
--}
+-- GlueTy is an awkward mix between neutral and non-neutral:
+--   - we match on it
+--   - but it's not stable/canonical
+-- Proposal:
+--   - Have GlueTy in Val as another "neutral" case
+--   - Thus we have overall 2 neutral cases
 
 --------------------------------------------------------------------------------
 
@@ -70,8 +65,9 @@ data VSystem
 
 data Ne
   = NLocalVar Lvl
+  | NSub Ne Sub
   | NApp Ne Val
-  | NPApp Val Val Ne IVar
+  | NPApp Ne Val Val IVar
   | NProj1 Ne
   | NProj2 Ne
   | NCoe I I Name VTy Val
@@ -86,26 +82,56 @@ data Env
 type EnvArg = (?env :: Env)
 
 data Closure
-  = CEval Env Sub Tm
+  = CEval Sub Env Tm
+  | CCoePi I I Name VTy Closure Val
+
+data IClosure
+  = ICEval Sub Env Tm
 
 type VTy = Val
 
--- set of blocking ivars, delayed sub
-data NeForcing = NeForcing LS.LvlSet Sub
-
-addBlockingIVar :: IVar -> NeForcing -> NeForcing
-addBlockingIVar x (NeForcing is s) = NeForcing (LS.insert (coerce x) is) s
-
 data Val
-  = VNe Ne NeForcing
+  = VNe Ne IS.IVarSet
   | VSub Val Sub
   | VPi Name VTy Closure
   | VLam Name Closure
-  | VPathP Name Closure Val Val
-  | VPLam Name Closure
+  | VPathP Name {-# unpack #-} IClosure Val Val
+  | VPLam Name {-# unpack #-} IClosure
   | VSg Name VTy Closure
   | VPair Val Val
   | VU
+
+type IDomArg = (?idom :: Lvl)
+type DomArg  = (?dom  :: Lvl)
+
+instance SubAction Val where
+  sub v s = case v of
+    VSub v s' -> VSub v (sub s' s)
+    v         -> VSub v s
+
+instance SubAction Ne where
+  sub n s = case n of
+    NSub n s' -> NSub n (sub s' s)
+    n         -> NSub n s
+
+instance SubAction Closure where
+
+  -- note: recursive closure sub!! TODO: this is probably fine, but
+  -- think about explicit Sub in Closure and forcing for Closure
+  sub cl s = case cl of
+    CEval s' env t      -> CEval (sub s' s) (sub env s) t
+    CCoePi r r' i a b t -> CCoePi (sub r s) (sub r' s) i (sub a s) (sub b s) (sub t s)
+
+instance SubAction IClosure where
+  sub cl s = case cl of
+    ICEval s' env t -> ICEval (sub s' s) (sub env s) t
+
+instance SubAction Env where
+  sub e s = case e of
+    ENil     -> ENil
+    EDef e v -> EDef (sub e s) (sub v s)
+
+--------------------------------------------------------------------------------
 
 localVar :: EnvArg => Ix -> Val
 localVar x = go ?env x where
@@ -113,53 +139,166 @@ localVar x = go ?env x where
   go (EDef e _) x = go e (x - 1)
   go _          _ = impossible
 
-capp :: LvlArg => Closure -> Val -> Val
+coeFill :: IDomArg => I -> I -> Val -> Val -> Val
+coeFill r r' a t = uf
+
+coeFillBack :: IDomArg => I -> I -> Val -> Val -> Val
+coeFillBack r r' a t = uf
+
+capp :: IDomArg => NCofArg => DomArg => Closure -> Val -> Val
 capp t u = case t of
-  CEval e s t -> let ?env = EDef e u; ?sub = s in eval t
 
-cpapp :: LvlArg => Closure -> I -> Val
-cpapp t i = case t of
-  CEval e s t -> let ?env = e; ?sub = snocSub s i in eval t
+  CEval s env t ->
+    let ?sub = s; ?env = EDef env u in eval t
 
-instance SubAction Val where
-  sub v s = case v of
-    VSub v s' -> VSub v (sub s' s)
-    v         -> VSub v s
+  CCoePi r r' i a b t ->
+    coe r r' i(capp b (coeFillBack r r' a u))
+              (app t (coe r' r i a u))
 
-instance SubAction Closure where
-  sub cl s = case cl of
-    CEval e s' t -> CEval (sub e s) (sub s' s) t
-
-instance SubAction Env where
-  sub e s = case e of
-    ENil     -> ENil
-    EDef e v -> EDef (sub e s) (sub v s)
-
--- forceNe :: LvlArg => Ne -> NeForcing -> Sub -> Val
--- forceNe n (NeForcing is s') s =
---   let s'' = sub s' s
---   in _
-
--- force' :: LvlArg => Sub -> Val -> Val
--- force' s = \case
---   VNe n frc      -> forceNe n frc s
---   VSub v s'      -> force' (sub s' s) v
---   VPi x a b      -> VPi x (sub a s) (sub b s)
---   VLam x t       -> VLam x (sub t s)
---   VPathP x a t u -> VPathP x (sub a s) (sub t s) (sub u s)
---   VPLam x t      -> VPLam x (sub t s)
---   VSg x a b      -> VSg x (sub a s) (sub b s)
---   VPair t u      -> VPair (sub t s) (sub u s)
---   VU             -> VU
--- {-# noinline force' #-}
+-- coeⁱ r r' ((a : A) → B a) t =
+--   (λ (a' : A r'). coeⁱ r r' (B (coeFill⁻¹ⁱ r r' A a')) (t (coeⁱ r' r A a')))
 
 
-force' :: LvlArg => SubArg => Val -> Val
+app :: IDomArg => NCofArg => DomArg => Val -> Val -> Val
+app t u = case t of
+  VLam _ t -> capp t u
+  VNe t is -> VNe (NApp t u) is
+  _        -> impossible
+
+proj1 :: Val -> Val
+proj1 t = case t of
+  VPair t _ -> t
+  VNe t is  -> VNe (NProj1 t) is
+  _         -> impossible
+
+proj2 :: Val -> Val
+proj2 t = case t of
+  VPair _ u -> u
+  VNe t is  -> VNe (NProj2 t) is
+  _         -> impossible
+
+icapp :: IDomArg => NCofArg => DomArg => IClosure -> I -> Val
+icapp t i = case t of
+  ICEval s env t -> let ?env = env; ?sub = snocSub s i in eval t
+
+papp :: IDomArg => NCofArg => DomArg => Val -> Val -> Val -> I -> Val
+papp ~t ~u0 ~u1 i = case i of
+  I0     -> u0
+  I1     -> u1
+  IVar x -> case t of
+    VPLam _ t -> icapp t (IVar x)
+    VNe t is  -> VNe (NPApp t u0 u1 x) (IS.insert x is)
+    _         -> impossible
+{-# inline papp #-}
+
+bindI :: (IDomArg => SubArg => NCofArg => a)
+      -> (IDomArg => SubArg => NCofArg => a)
+bindI act = let ?idom = ?idom + 1
+                ?sub  = liftSub ?sub
+                ?cof  = liftSub ?cof
+            in act
+{-# inline bindI #-}
+
+coe :: IDomArg => NCofArg => DomArg => I -> I -> Name -> Val -> Val -> Val
+coe r r' i a t = case a of
+
+  _ | r == r'  -> t
+
+  VPi x a b    -> VLam x (CCoePi r r' i a b t)
+
+  VSg x a b    -> let t1 = proj1 t; t2 = proj2 t
+                  in VPair (coe r r' i a t1)
+                           (coe r r' i (capp b (coeFill r r' a t1)) t2)
+
+  VU           -> uf
+
+  a@(VNe n is) -> case forceNe n of
+    NGlueTy b sys -> uf
+    n             ->
+
+
+    -- VNe (NCoe r r' i a t) (insertI r $ insertI r' is)
+
+
+
+  VSub{}       -> impossible
+
+
+
+-- coeⁱ r r' ((a : A) × B a) t =
+--   (coeⁱ r r' A t.1, coeⁱ r r' (B (coeFillⁱ r r' A t.1)) t.2)
+
+--   | r == r' = t
+-- coe r r' x a t = case a of
+--   VPi x a b -> uf
+
+
+hcom :: IDomArg => NCofArg => DomArg => I -> I -> Name -> Val -> VSystem -> Val -> Val
+hcom r r' x ~a ~t ~b = uf
+
+evalI :: SubArg => NCofArg => I -> I
+evalI i = i `sub` ?sub `sub` ?cof
+
+evalSystem :: IDomArg => SubArg => NCofArg => DomArg => EnvArg =>
+              System -> VSystem
+evalSystem = uf
+
+glueTy :: Val -> VSystem -> Val
+glueTy = uf
+
+glueTm :: Val -> VSystem -> Val
+glueTm = uf
+
+unglue :: Val -> VSystem -> Val
+unglue = uf
+
+eval :: IDomArg => SubArg => NCofArg => DomArg => EnvArg => Tm -> Val
+eval = \case
+  TopVar _ v        -> coerce v
+  LocalVar x        -> localVar x
+  Let x _ t u       -> let ~v = eval t in let ?env = EDef ?env v in eval u
+  Pi x a b          -> VPi x (eval a) (CEval ?sub ?env b)
+  App t u           -> app (eval t) (eval u)
+  Lam x t           -> VLam x (CEval ?sub ?env t)
+  Sg x a b          -> VSg x (eval a) (CEval ?sub ?env b)
+  Pair t u          -> VPair (eval t) (eval u)
+  Proj1 t           -> proj1 (eval t)
+  Proj2 t           -> proj2 (eval t)
+  U                 -> VU
+  PathP x a t u     -> VPathP x (ICEval ?sub ?env a) (eval t) (eval u)
+  PApp t u0 u1 i    -> papp (eval t) (eval u0) (eval u1) (sub i ?sub)
+  PLam x t          -> VPLam x (ICEval ?sub ?env t)
+  Coe r r' x a t    -> coe (evalI r) (evalI r') x (bindI (eval a)) (eval t)
+  HCom r r' x a t b -> hcom (evalI r) (evalI r') x (eval a) (bindI (evalSystem t)) (eval b)
+  GlueTy a sys      -> glueTy (eval a) (evalSystem sys)
+  GlueTm t sys      -> glueTm (eval t) (evalSystem sys)
+  Unglue t sys      -> unglue (eval t) (evalSystem sys)
+
+force :: IDomArg => NCofArg => DomArg => Val -> Val
+force = \case
+  VSub v s     -> let ?sub = s in force' v
+  v@(VNe t is) -> if isBlocked is then v else forceNe t
+  v            -> v
+{-# inline force #-}
+
+forceI :: NCofArg => I -> I
+forceI i = sub i ?cof
+
+forceI' :: SubArg => NCofArg => I -> I
+forceI' i = i `sub` ?sub `sub` ?cof
+
+forceIVar :: NCofArg => IVar -> I
+forceIVar x = lookupSub x ?cof
+
+forceIVar' :: SubArg => NCofArg => IVar -> I
+forceIVar' x = lookupSub x ?sub `sub` ?cof
+
+force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> Val
 force' = \case
-  VNe n frc      -> _
-
-
-  VSub v s'      -> let ?sub = sub s' ?sub in force' v
+  VSub v s       -> impossible
+  VNe t is       -> if isBlocked' is
+                      then VNe (sub t ?sub) (sub is ?sub)
+                      else forceNe' t
   VPi x a b      -> VPi x (sub a ?sub) (sub b ?sub)
   VLam x t       -> VLam x (sub t ?sub)
   VPathP x a t u -> VPathP x (sub a ?sub) (sub t ?sub) (sub u ?sub)
@@ -167,68 +306,30 @@ force' = \case
   VSg x a b      -> VSg x (sub a ?sub) (sub b ?sub)
   VPair t u      -> VPair (sub t ?sub) (sub u ?sub)
   VU             -> VU
-{-# noinline force' #-}
 
-force :: LvlArg => SubArg => Val -> Val
-force = \case
-  VSub v s -> let ?sub = sub s ?sub in force' v
-  v        -> v
-{-# inline force #-}
+forceNe :: IDomArg => NCofArg => DomArg => Ne -> Val
+forceNe = \case
+  n@(NLocalVar x)      -> VNe n mempty
+  NSub n s             -> let ?sub = s in forceNe' n
+  NApp t u             -> app (forceNe t) u
+  NPApp t l r i        -> papp (forceNe t) l r (forceIVar i)
+  NProj1 t             -> proj1 (forceNe t)
+  NProj2 t             -> proj2 (forceNe t)
+  NCoe r r' x a t      -> coe (forceI r) (forceI r') x uf (force t)
+  NHCom r r' x a sys t -> uf
+  NGlueTy a sys        -> uf
+  NUnglue t sys        -> uf
 
-app :: LvlArg => Val -> Val -> Val
-app t u = case t of
-  VLam _ t  -> capp t u
-  VNe t frc -> VNe (NApp t u) frc
-  _         -> impossible
-
-papp :: LvlArg => Val -> Val -> Val -> I -> Val
-papp ~t ~u0 ~u1 i = case i of
-  I0     -> u0
-  I1     -> u1
-  IVar x -> case t of
-    VPLam _ t -> cpapp t (IVar x)
-    VNe t frc -> VNe (NPApp u0 u1 t x) (addBlockingIVar x frc)
-    _         -> impossible
-{-# inline papp #-}
-
-proj1 :: Val -> Val
-proj1 t = case t of
-  VPair t _ -> t
-  VNe t frc -> VNe (NProj1 t) frc
-  _         -> impossible
-
-proj2 :: Val -> Val
-proj2 t = case t of
-  VPair _ u -> u
-  VNe t frc -> VNe (NProj2 t) frc
-  _         -> impossible
-
-eval :: LvlArg => EnvArg => SubArg => Tm -> Val
-eval = \case
-  TopVar _ v     -> coerce v
-  LocalVar x     -> localVar x
-  Let x _ t u    -> let ~v = eval t in let ?env = EDef ?env v in eval u
-  Pi x a b       -> VPi x (eval a) (CEval ?env ?sub b)
-  App t u        -> app (eval t) (eval u)
-  Lam x t        -> VLam x (CEval ?env ?sub t)
-  Sg x a b       -> VSg x (eval a) (CEval ?env ?sub b)
-  Pair t u       -> VPair (eval t) (eval u)
-  Proj1 t        -> proj1 (eval t)
-  Proj2 t        -> proj2 (eval t)
-  U              -> VU
-  PathP x a t u  -> VPathP x (CEval ?env ?sub a) (eval t) (eval u)
-  PApp t u0 u1 i -> papp (eval t) (eval u0) (eval u1) (sub i ?sub)
-  PLam x t       -> VPLam x (CEval ?env ?sub t)
-
--- cof :: Sub -> Cof -> UpdSub
--- cof s CTrue = USTrue
--- cof s (CAnd (CofEq x i) phi) = case cof s phi of
---   USFalse -> USFalse
---   USTrue -> case updSub (CofEq x i) s of
---     USTrue     -> USTrue
---     USFalse    -> USFalse
---     USUpdate s -> USUpdate s
---   USUpdate s -> case updSub (CofEq x i) s of
---     USTrue     -> USUpdate s
---     USFalse    -> USFalse
---     USUpdate s -> USUpdate s
+forceNe' :: IDomArg => SubArg => NCofArg => DomArg => Ne -> Val
+forceNe' = \case
+  n@(NLocalVar x)      -> VNe n mempty
+  NSub n s             -> let ?sub = sub s ?sub in forceNe' n
+  NApp t u             -> app (forceNe' t) (sub u ?sub)
+  NPApp t l r i        -> papp (forceNe' t) (sub l ?sub) (sub r ?sub)
+                               (forceIVar' i)
+  NProj1 t             -> proj1 (forceNe' t)
+  NProj2 t             -> proj2 (forceNe' t)
+  NCoe r r' x a t      -> coe (forceI' r) (forceI' r') x uf (force' t)
+  NHCom r r' x a sys t -> uf
+  NGlueTy a sys        -> uf
+  NUnglue t sys        -> uf

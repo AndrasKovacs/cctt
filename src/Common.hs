@@ -54,6 +54,14 @@ impossible :: Dbg => a
 impossible = error "impossible"
 {-# noinline impossible #-}
 
+ctzInt :: Int -> Int
+ctzInt (I# n) = I# (word2Int# (ctz64# (int2Word# n)))
+{-# inline ctzInt #-}
+
+clzInt :: Int -> Int
+clzInt (I# n) = I# (word2Int# (clz64# (int2Word# n)))
+{-# inline clzInt #-}
+
 
 -- De Bruijn indices and levels
 --------------------------------------------------------------------------------

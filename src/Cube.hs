@@ -6,11 +6,11 @@ Intervals, interval substitutions, cofibrations.
 
 module Cube where
 
-import Debug.Trace
+-- import Debug.Trace
 
 import Common
 import GHC.Exts
-import qualified LvlSet as LS
+import qualified IVarSet as IS
 
 {-
 Interval expressions are 4 bits (nibbles):
@@ -20,13 +20,16 @@ Interval expressions are 4 bits (nibbles):
  var (level) : 0-12
 
 This makes it possible to represent an interval substitution of at most 13
-dimensions in a single 64-bit word. It should be amenable to SIMD composition
-too.
+dimensions in a single 64-bit word.
 -}
 
 -- data I = I0 | I1 | IVar Lvl
 newtype I = I Int
   deriving Eq
+
+insertI :: I -> IS.IVarSet -> IS.IVarSet
+insertI (IVar x) is = IS.insert x is
+insertI _        is = is
 
 unpackI# :: I -> (# (# #) | (# #) | Int# #)
 unpackI# (I (I# x)) = case x of
@@ -58,8 +61,9 @@ by De Bruijn levels, and the 0 level maps to the least significant nibble.
 -}
 
 newtype Sub = Sub Int
-
 type SubArg = (?sub :: Sub)
+type NCof = Sub
+type NCofArg = (?cof :: NCof)
 
 emptySub :: Sub
 emptySub = Sub 15
@@ -93,27 +97,14 @@ liftSub (Sub s@(I# s')) =
             .|. end'                         -- write new end marker
             .|. unsafeShiftL entry elemBits) -- write new entry
 
--- | Left fold over all (index, I) mappings in a substitution.
-foldlSub :: forall b. (b -> Int -> I -> b) -> b -> Sub -> b
-foldlSub f b (Sub s) = go b 0 s where
-  go :: b -> Int -> Int -> b
-  go b x s = case s .&. 15 of
-    15 -> b
-    i  -> let b' = f b x (coerce i) in go b' (x + 1) (unsafeShiftR s 4)
-{-# inline foldlSub #-}
-
-gfoldlSub :: forall acc res.
-     (acc -> Int -> I -> Either res acc)
-  -> acc -> (acc -> res)
-  -> Sub -> res
-gfoldlSub f b g (Sub s) = go b 0 s where
-  go :: acc -> Int -> Int -> res
-  go b x s = case s .&. 15 of
-    15 -> g b
-    i  -> case f b x (coerce i) of
-      Left  b -> b
-      Right b -> go b (x + 1) (unsafeShiftR s 4)
-{-# inline gfoldlSub #-}
+-- -- | Left fold over all (index, I) mappings in a substitution.
+-- foldlSub :: forall b. (b -> Int -> I -> b) -> b -> Sub -> b
+-- foldlSub f b (Sub s) = go b 0 s where
+--   go :: b -> Int -> Int -> b
+--   go b x s = case s .&. 15 of
+--     15 -> b
+--     i  -> let b' = f b x (coerce i) in go b' (x + 1) (unsafeShiftR s 4)
+-- {-# inline foldlSub #-}
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
 foldrSub :: forall b. (Int -> I -> b -> b) -> b -> Sub -> b
@@ -167,19 +158,37 @@ instance SubAction Sub where
   sub f g = mapSub (\_ i -> sub i g) f
   {-# inline sub #-}
 
--- | Does a substitution potentially unblock any of the given blocking vars?  If
---   the sub is an injective renaming on the blocking vars then applying the sub
---   to a blocked neutral doesn't do anything interesting; neutrals are stable
---   under injective renaming.
-unblock :: LS.LvlSet -> Sub -> Bool
-unblock is s = gfoldlSub go (mempty::LS.LvlSet) (\_ -> False) s where
-  go varset i j
-    | LS.member (coerce i) is =
-        case j of
-          IVar x | not (LS.member (coerce x) varset) -> Right $! LS.insert (coerce x) varset
-          _ -> Left True
-    | True =
-      Right varset
+-- A set of blocking ivars is still blocked under a cofibration
+-- if all vars in the set are represented by distinct vars.
+isBlocked :: NCofArg => IS.IVarSet -> Bool
+isBlocked is =
+  IS.foldr (\x hyp varset -> case lookupSub x ?cof of
+               IVar x | not (IS.member x varset) -> hyp (IS.insert x varset)
+               _ -> False)
+           (\_ -> True)
+           is
+           (mempty @IS.IVarSet)
+
+isBlocked' :: SubArg => NCofArg => IS.IVarSet -> Bool
+isBlocked' is =
+  IS.foldr (\x hyp varset -> case lookupSub x ?sub of
+               IVar x -> case lookupSub x ?cof of
+                 IVar x | not (IS.member x varset) -> hyp (IS.insert x varset)
+                 _ -> False
+               _ -> False)
+           (\_ -> True)
+           is
+           (mempty @IS.IVarSet)
+
+instance SubAction IS.IVarSet where
+  sub is s = IS.foldl
+    (\acc i -> case lookupSub i s of
+        IVar i -> IS.insert i acc
+        _      -> impossible)
+    mempty is
+
+-- Syntactic cofibrations
+--------------------------------------------------------------------------------
 
 -- | Atomic equation.
 data CofEq = CofEq IVar I
@@ -189,27 +198,27 @@ data CofEq = CofEq IVar I
 data Cof = CTrue | CAnd {-# unpack #-} CofEq Cof
   deriving Show
 
--- | Compose a Sub with a CofEq viewed as a single substitution.
-compSubCofEq :: Sub -> CofEq -> Sub
-compSubCofEq s (CofEq x i) = mapSub (\_ j -> if IVar x == j then i else j) s
+-- -- | Compose a Sub with a CofEq viewed as a single substitution.
+-- compSubCofEq :: Sub -> CofEq -> Sub
+-- compSubCofEq s (CofEq x i) = mapSub (\_ j -> if IVar x == j then i else j) s
 
--- | Evaluate a Cof in an environment. We get Nothing if the Cof is false,
---   Just otherwise. We also return the environment which is updated (conjuncted)
---   with the Cof.
-reduceCof :: Sub -> Cof -> (Sub, Maybe Cof)
-reduceCof s cof = go s CTrue cof where
-  go :: Sub -> Cof -> Cof -> (Sub, Maybe Cof)
-  go s acc = \case
-    CTrue                -> (s, Just acc)
-    CAnd (CofEq x i) cof -> case (lookupSub x s, sub i s) of
+-- -- | Evaluate a Cof in an environment. We get Nothing if the Cof is false,
+-- --   Just otherwise. We also return the environment which is updated (conjuncted)
+-- --   with the Cof.
+-- evalCof :: Sub -> Cof -> (Sub, Maybe Cof)
+-- evalCof s cof = go s CTrue cof where
+--   go :: Sub -> Cof -> Cof -> (Sub, Maybe Cof)
+--   go s acc = \case
+--     CTrue                -> (s, Just acc)
+--     CAnd (CofEq x i) cof -> case (lookupSub x s, sub i s) of
 
-      (IVar x, IVar x') ->
-        let eq | x < x' = CofEq x  (IVar x')
-               | True   = CofEq x' (IVar x )
-        in go (compSubCofEq s eq) (CAnd eq acc) cof
+--       (IVar x, IVar x') ->
+--         let eq | x < x' = CofEq x  (IVar x')
+--                | True   = CofEq x' (IVar x )
+--         in go (compSubCofEq s eq) (CAnd eq acc) cof
 
-      (IVar x, j)  -> let eq = CofEq x j  in go (compSubCofEq s eq) (CAnd eq acc) cof
-      (i, IVar x') -> let eq = CofEq x' i in go (compSubCofEq s eq) (CAnd eq acc) cof
-      (I0,     I0) -> go s acc cof
-      (I1,     I1) -> go s acc cof
-      _            -> (s, Nothing)
+--       (IVar x, j)  -> let eq = CofEq x j  in go (compSubCofEq s eq) (CAnd eq acc) cof
+--       (i, IVar x') -> let eq = CofEq x' i in go (compSubCofEq s eq) (CAnd eq acc) cof
+--       (I0,     I0) -> go s acc cof
+--       (I1,     I1) -> go s acc cof
+--       _            -> (s, Nothing)

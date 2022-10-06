@@ -41,6 +41,7 @@ executable cubeval
       Common
       Core
       Cube
+      IVarSet
       LvlSet
   hs-source-dirs:
       src

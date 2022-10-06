@@ -1,0 +1,90 @@
+
+Syntactic context:
+
+   ψ, α, Γ       (ivars, cofib, vars)
+
+Semantic context is a "morphism" into a cxt
+
+   src: (ψ₀, α₀, Γ₀)
+   tgt: (ψ₁, α₁, Γ₁)
+
+consisting of:
+
+   (σ : ISub ψ₀ ψ₁) × (f : α₀ ⊢ α₁[σ]) × (δ : Sub Γ₀ (Γ₁[σ, f]))
+
+We store:
+  - ψ₀ because because we'll have to get fresh ivars for weakening in
+    filling.
+  - σ
+  - α₀, but not "f", because
+
+For "σ", we store σ itself ,
+
+For the "f" component, we only want to store ψ₀.
+
+
+We want to distinguish ISub-s and cofibs
+  - it might not be possible to unify their representation
+  - we want to handle them differently:
+    - ISub-s should be explicitly stored and pushed into sub-values in forcing
+    - cofibs should not be explicitly stored, we should just force w.r.t. cofib weakening
+      when it's needed, in neutral cases
+
+Principles:
+  - only explicit isub are stored
+  - eval does not force anything, just builds neutrals
+
+Closures:
+  - just capture all 4 eval params plus a term
+
+Neutrals:
+  - set of blocking ivars
+
+--------------------------------------------------------------------------------
+
+eval : (σ : ISub ψ₀ ψ₁)(f : α₀ ⊢ α₁[σ])(δ : Env Γ₀ (Γ₁[σ, f]))
+      → Tm (ψ₁,α₁,Γ₁) A
+      → Val (ψ₀,α₀,Γ₀) A[σ,f,δ]
+
+eval ψ σ α δ = \case
+  var x    -> lookup x δ
+  app t u  -> case eval ψ σ α δ t of
+                VLam t  -> apply t (eval ψ σ α δ u)
+	        ne t is -> ne (app t (eval ψ σ α δ u)) is
+  lam x t  -> VLam (x, ψ, σ, α, δ, t)
+  plam x t -> VPlam (x, ψ, σ, α, δ, t)
+  papp t i -> case eval ψ σ α δ t of
+                VPlam t -> papply t (eval Ψ σ α i)
+		ne t is ->
+
+
+isub : Val (ψ,α,Γ) → (σ : ISub ψ' ψ) → Val (ψ',α[σ],Γ[σ])
+isub v σ = case v of
+  ISub δ v -> ISub (δ ∘ σ) v
+  v        -> ISub σ v
+
+force : ∀ α → Val (ψ,α,Γ) → Val (ψ,α,Γ)
+force α v = case v of
+  ISub σ v -> forceWithSub σ α v
+
+  -- we have to check cofib weakening!
+  ne v is σ α'
+    | α == α'                         -> ne v is σ α'
+    | α∘α is injective renaming on is -> ne v is σ α
+    | otherwise                       -> forceNe σ α v
+
+  v -> v
+
+forceNe : (σ : ISub ψ' ψ)(α' : Cof ψ') → Ne (Ψ,α,Γ) A → Val (ψ',α',Γ[σ]) A[σ]
+forceNe σ α = \case
+  TODO
+
+forceWithSub (σ : ISub ψ' ψ) (α' : Cof ψ') → Val (ψ,α,Γ) A → Val (ψ',α',Γ[σ]) A[σ]
+forceWithSub σ α = \case
+  ISub{} -> impossible
+  Ne v is σ' α' -> let
+
+
+
+
+freshvar ψ α Γ = ne (var x) [] α (id : ISub ψ ψ) : Ne (ψ,α,Γ,x:A) A
