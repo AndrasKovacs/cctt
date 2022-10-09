@@ -5,6 +5,7 @@ import Data.Bits
 import qualified LvlSet as LS
 
 import Common
+import Interval
 
 newtype IVarSet = IVarSet LS.LvlSet
   deriving (Eq, Bits, Semigroup, Monoid, Show) via LS.LvlSet
@@ -12,6 +13,10 @@ newtype IVarSet = IVarSet LS.LvlSet
 insert :: IVar -> IVarSet -> IVarSet
 insert = coerce LS.insert
 {-# inline insert #-}
+
+insertI :: I -> IVarSet -> IVarSet
+insertI (IVar x) is = insert x is
+insertI _        is = is
 
 delete :: IVar -> IVarSet -> IVarSet
 delete = coerce LS.delete

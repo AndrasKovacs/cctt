@@ -1,68 +1,26 @@
-{-# language UnboxedSums, UnboxedTuples #-}
 
-{-|
-Intervals, interval substitutions, cofibrations.
--}
-
-module Cube where
-
--- import Debug.Trace
+module Substitution where
 
 import Common
 import GHC.Exts
+
 import qualified IVarSet as IS
+import Interval
 
-{-
-Interval expressions are 4 bits (nibbles):
- reserved    : 15
- 0           : 14
- 1           : 13
- var (level) : 0-12
-
-This makes it possible to represent an interval substitution of at most 13
-dimensions in a single 64-bit word.
--}
-
--- data I = I0 | I1 | IVar Lvl
-newtype I = I Int
-  deriving Eq
-
-insertI :: I -> IS.IVarSet -> IS.IVarSet
-insertI (IVar x) is = IS.insert x is
-insertI _        is = is
-
-unpackI# :: I -> (# (# #) | (# #) | Int# #)
-unpackI# (I (I# x)) = case x of
-  14# -> (# (# #) |       |   #)
-  13# -> (#       | (# #) |   #)
-  x   -> (#       |       | x #)
-{-# inline unpackI# #-}
-
-pattern I0 :: I
-pattern I0 <- (unpackI# -> (# (# #) | | #)) where I0 = I 14
-
-pattern I1 :: I
-pattern I1 <- (unpackI# -> (# | (# #) | #)) where I1 = I 13
-
-pattern IVar :: IVar -> I
-pattern IVar x <- (unpackI# -> (# | | (I# -> (IVar# -> x)) #)) where
-  IVar x = I (coerce x)
-{-# complete I0, I1, IVar #-}
-
-instance Show I where
-  showsPrec _ I0       acc = 'I':'0':acc
-  showsPrec _ I1       acc = 'I':'1':acc
-  showsPrec d (IVar x) acc = showParen (d > 10) (("IVar " ++).showsPrec 11 x) acc
-
-{-
+{-|
 Interval substitutions are packed lists of interval expresssions in a 64-bit
 word. The reserved "15" nibble value marks the end of the list. An ISub is keyed
-by De Bruijn levels, and the 0 level maps to the least significant nibble.
--}
-
+by De Bruijn levels, and the 0 level maps to the least significant nibble. -}
 newtype Sub = Sub Int
 type SubArg = (?sub :: Sub)
+
+{-|
+Normalized cofibrations are also represented as interval substitutions. Here,
+every ivar is mapped to the greatest (as a De Bruijn level) representative of
+its equivalence class.
+-}
 type NCof = Sub
+
 type NCofArg = (?cof :: NCof)
 
 emptySub :: Sub
@@ -96,15 +54,6 @@ liftSub (Sub s@(I# s')) =
   else Sub (s .&. complement end             -- zero out old end marker
             .|. end'                         -- write new end marker
             .|. unsafeShiftL entry elemBits) -- write new entry
-
--- -- | Left fold over all (index, I) mappings in a substitution.
--- foldlSub :: forall b. (b -> Int -> I -> b) -> b -> Sub -> b
--- foldlSub f b (Sub s) = go b 0 s where
---   go :: b -> Int -> Int -> b
---   go b x s = case s .&. 15 of
---     15 -> b
---     i  -> let b' = f b x (coerce i) in go b' (x + 1) (unsafeShiftR s 4)
--- {-# inline foldlSub #-}
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
 foldrSub :: forall b. (Int -> I -> b -> b) -> b -> Sub -> b
@@ -186,39 +135,3 @@ instance SubAction IS.IVarSet where
         IVar i -> IS.insert i acc
         _      -> impossible)
     mempty is
-
--- Syntactic cofibrations
---------------------------------------------------------------------------------
-
--- | Atomic equation.
-data CofEq = CofEq IVar I
-  deriving Show
-
--- | Conjunction of equations.
-data Cof = CTrue | CAnd {-# unpack #-} CofEq Cof
-  deriving Show
-
--- -- | Compose a Sub with a CofEq viewed as a single substitution.
--- compSubCofEq :: Sub -> CofEq -> Sub
--- compSubCofEq s (CofEq x i) = mapSub (\_ j -> if IVar x == j then i else j) s
-
--- -- | Evaluate a Cof in an environment. We get Nothing if the Cof is false,
--- --   Just otherwise. We also return the environment which is updated (conjuncted)
--- --   with the Cof.
--- evalCof :: Sub -> Cof -> (Sub, Maybe Cof)
--- evalCof s cof = go s CTrue cof where
---   go :: Sub -> Cof -> Cof -> (Sub, Maybe Cof)
---   go s acc = \case
---     CTrue                -> (s, Just acc)
---     CAnd (CofEq x i) cof -> case (lookupSub x s, sub i s) of
-
---       (IVar x, IVar x') ->
---         let eq | x < x' = CofEq x  (IVar x')
---                | True   = CofEq x' (IVar x )
---         in go (compSubCofEq s eq) (CAnd eq acc) cof
-
---       (IVar x, j)  -> let eq = CofEq x j  in go (compSubCofEq s eq) (CAnd eq acc) cof
---       (i, IVar x') -> let eq = CofEq x' i in go (compSubCofEq s eq) (CAnd eq acc) cof
---       (I0,     I0) -> go s acc cof
---       (I1,     I1) -> go s acc cof
---       _            -> (s, Nothing)
