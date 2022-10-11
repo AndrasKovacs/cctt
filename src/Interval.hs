@@ -42,3 +42,5 @@ instance Show I where
   showsPrec _ I0       acc = 'I':'0':acc
   showsPrec _ I1       acc = 'I':'1':acc
   showsPrec d (IVar x) acc = showParen (d > 10) (("IVar " ++).showsPrec 11 x) acc
+
+type IDomArg = (?idom :: IVar)   -- fresh IVar

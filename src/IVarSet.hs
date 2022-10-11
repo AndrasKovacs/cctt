@@ -10,6 +10,10 @@ import Interval
 newtype IVarSet = IVarSet LS.LvlSet
   deriving (Eq, Bits, Semigroup, Monoid, Show) via LS.LvlSet
 
+singleton :: IVar -> IVarSet
+singleton = coerce LS.singleton
+{-# inline singleton #-}
+
 insert :: IVar -> IVarSet -> IVarSet
 insert = coerce LS.insert
 {-# inline insert #-}

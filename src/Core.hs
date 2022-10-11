@@ -95,12 +95,6 @@ Semantic ops:
 --------------------------------------------------------------------------------
 
 
-
---------------------------------------------------------------------------------
-
-If we really want to do things nicely, we need 4 variations
-for coe/hcom, and 2 variations for other semantic functions.
-
 -}
 
 
@@ -152,6 +146,7 @@ data Cof = CTrue | CAnd {-# unpack #-} CofEq Cof
 data System = SEmpty | SCons Cof Tm System
   deriving Show
 
+
 -- Values
 --------------------------------------------------------------------------------
 
@@ -159,14 +154,34 @@ data VSystem
   = VSEmpty
   | VSCons Cof ~Val VSystem
 
+data FVSystem'
+  = FVSEmpty
+  | FVSCons Cof NCof ~Val FVSystem'
+
+unFSystem :: FVSystem' -> VSystem
+unFSystem = \case
+  FVSEmpty            -> VSEmpty
+  FVSCons cof _ v sys -> VSCons cof v (unFSystem sys)
+
 -- | An immediate result of system forcing. Marks the case where one branch is
 --   true.
 data FVSystem
   = FVSTakeBranch ~Val
-  | FVSNeutral VSystem
+  | FVSNeutral {-# unpack #-} (FVSystem', IS.IVarSet)
 
-newtype FVal  = FVal {unF :: Val} deriving SubAction
-newtype FI    = FI   {unFI :: I}  deriving SubAction
+mapFVSystem' :: (Cof -> NCof -> Val -> Val) -> FVSystem' -> FVSystem'
+mapFVSystem' f = go where
+  go FVSEmpty                 = FVSEmpty
+  go (FVSCons cof ncof v sys) = FVSCons cof ncof (f cof ncof v) (go sys)
+{-# inline mapFVSystem' #-}
+
+mapFVSystem :: NCofArg => (Cof -> NCof -> Val -> Val) -> FVSystem -> FVSystem
+mapFVSystem f = \case
+  FVSTakeBranch v      -> FVSTakeBranch (f CTrue ?cof v)
+  FVSNeutral (sys, is) -> FVSNeutral (mapFVSystem' f sys, is)
+{-# inline mapFVSystem #-}
+
+newtype F a = F {unF :: a} deriving SubAction
 
 data Ne
   = NLocalVar Lvl
@@ -187,8 +202,8 @@ type EnvArg = (?env :: Env)
 
 -- | Defunctionalized closures.
 data Closure
-  = CEval Sub Env Tm                     -- ^ Body of vanilla term evaluation.
-  | CCoePi FI FI Name VTy Closure FVal   -- ^ Body of function coercions.
+  = CEval Sub Env Tm                 -- ^ Body of vanilla term evaluation.
+  | CCoePi I I Name VTy Closure Val  -- ^ Body of function coercions.
 
 -- | Defunctionalized closures for IVar abstraction.
 data IClosure
@@ -199,10 +214,11 @@ type VTy = Val
 data Val
   = VSub Val Sub
 
-  -- Neutrals. These are annotated with sets of blocking ivars.
-  -- Glue types are also neutral, but they're handled separately, because we
-  -- have to match on them in coe/hcom.
-  | VNe Ne IS.IVarSet
+  -- Neutrals. These are annotated with sets of blocking ivars.  Glue types are
+  -- also neutral, but they're handled separately, because we have to match on
+  -- them in coe/hcom.
+  | VNe Ne IS.IVarSet               -- TODO: can we annotate with NCof (of the last forcing)
+                                    -- if stored NCof == current NCof, shortcut?
   | VGlueTy VTy VSystem IS.IVarSet
 
   -- canonicals
@@ -214,9 +230,7 @@ data Val
   | VPair Val Val
   | VU
 
-type IDomArg = (?idom :: Lvl)
-type DomArg  = (?dom  :: Lvl)
-
+type DomArg  = (?dom  :: Lvl)    -- fresh LocalVar
 
 -- Substitution
 --------------------------------------------------------------------------------
@@ -261,9 +275,10 @@ instance SubAction VSystem where
     VSEmpty          -> VSEmpty
     VSCons cof v sys -> VSCons (sub cof s) (sub v s) (sub sys s)
 
+
+
+-- Evaluation
 --------------------------------------------------------------------------------
-
-
 
 localVar :: EnvArg => Ix -> Val
 localVar x = go ?env x where
@@ -271,122 +286,303 @@ localVar x = go ?env x where
   go (EDef e _) x = go e (x - 1)
   go _          _ = impossible
 
-app :: IDomArg => NCofArg => DomArg => FVal -> Val -> Val
+-- | Apply a function. Note: *strict* in argument.
+app :: IDomArg => NCofArg => DomArg => F Val -> Val -> Val
 app t u = case unF t of
   VLam _ t -> capp t u
   VNe t is -> VNe (NApp t u) is
   _        -> impossible
 
--- | Apply a closure.
+appf  t u = force (app t u); {-# inline appf #-}
+appf' t u = force' (app t u); {-# inline appf' #-}
+
+-- | Apply a closure. Note: *lazy* in argument.
 capp :: IDomArg => NCofArg => DomArg => Closure -> Val -> Val
-capp t u = case t of
+capp t ~u = case t of
 
   CEval s env t ->
     let ?sub = s; ?env = EDef env u in eval t
 
-  CCoePi r r' i a b t ->
-    coe r r' i (force (capp b (coeFillInv r r' (force a) (force u))))
-               (force (app t (coe r' r i (force a) (force u))))
+  CCoePi (forceI -> r) (forceI -> r') i a b t
+    | unF r == unF r' ->
+        app (force t) u
+    | True ->
+        let fa = force a; fu = force u
+        in unF (goCoe r r' i (bindI \_ -> cappf b (unF (coeFillInv r r' (unF fa) fu)))
+                             (appf (force t) (unF (goCoe r' r i fa fu))))
+
+cappf  t ~u = force  (capp t u); {-# inline cappf  #-}
+cappf' t ~u = force' (capp t u); {-# inline cappf' #-}
 
 -- | Apply an ivar closure.
 icapp :: IDomArg => NCofArg => DomArg => IClosure -> I -> Val
 icapp t i = case t of
   ICEval s env t -> let ?env = env; ?sub = snocSub s i in eval t
 
-proj1 :: IDomArg => NCofArg => DomArg => FVal -> Val
+icappf  t i = force  (icapp t i); {-# inline icappf  #-}
+icappf' t i = force' (icapp t i); {-# inline icappf' #-}
+
+proj1 :: F Val -> Val
 proj1 t = case unF t of
   VPair t _ -> t
   VNe t is  -> VNe (NProj1 t) is
   _         -> impossible
 
-proj2 :: IDomArg => NCofArg => DomArg => FVal -> Val
+proj1f  t = force  (proj1 t); {-# inline proj1f  #-}
+proj1f' t = force' (proj1 t); {-# inline proj1f' #-}
+
+proj2 :: F Val -> Val
 proj2 t = case unF t of
   VPair _ u -> u
   VNe t is  -> VNe (NProj2 t) is
   _         -> impossible
 
+proj2f  t = force  (proj2 t); {-# inline proj2f #-}
+proj2f' t = force' (proj2 t); {-# inline proj2f' #-}
+
 -- | Apply a path.
-lazyPapp :: IDomArg => NCofArg => DomArg => FVal -> Val -> Val -> FI -> Val
-lazyPapp ~t ~u0 ~u1 i = case unFI i of
+papp :: IDomArg => NCofArg => DomArg => F Val -> Val -> Val -> F I -> Val
+papp ~t ~u0 ~u1 i = case unF i of
   I0     -> u0
   I1     -> u1
   IVar x -> case unF t of
     VPLam _ t -> icapp t (IVar x)
     VNe t is  -> VNe (NPApp t u0 u1 x) (IS.insert x is)
     _         -> impossible
-{-# inline lazyPapp #-}
+{-# inline papp #-}
 
-coeFill :: IDomArg => FI -> FI -> FVal -> FVal -> Val
-coeFill r r' a t = uf
+pappf  ~t ~u0 ~u1 i = force  (papp t u0 u1 i); {-# inline pappf  #-}
+pappf' ~t ~u0 ~u1 i = force' (papp t u0 u1 i); {-# inline pappf' #-}
 
-coeFillInv :: IDomArg => FI -> FI -> FVal -> FVal -> Val
-coeFillInv r r' a t = uf
+-- Γ, i ⊢ coeFillⁱ r r' A t : A [i=r ↦ t, i=r' ↦ coeⁱ r r' A t ]
+--        coeFillⁱ r r' A t := coeʲ r i (A j) t  -- fresh j
 
-coe :: IDomArg => NCofArg => DomArg => FI -> FI -> Name -> FVal -> FVal -> Val
-coe r r' i a t = case unF a of
+coeFill :: IDomArg => NCofArg => DomArg => F I -> F I -> Val -> F Val -> F Val
+coeFill r r' a t =
+  let i = ?idom - 1 in
+  goCoe r (F (IVar i)) "j" (bindI \j -> forceVSub a (wk i)) t
+{-# inline coeFill #-}
+
+coeFillInv :: IDomArg => NCofArg => DomArg => F I -> F I -> Val -> F Val -> F Val
+coeFillInv r r' a t =
+  let i = ?idom - 1 in
+  goCoe r' (F (IVar i)) "j" (bindI \j -> forceVSub a (wk i)) t
+{-# inline coeFillInv #-}
+
+-- assumption: r /= r'
+goCoe :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val -> F Val -> F Val
+goCoe r r' i a t = case unF a of
   VPi x a b ->
-    VLam x (CCoePi r r' i a b t)
+    F (VLam x (CCoePi (unF r) (unF r') i a b (unF t)))
 
-  VSg x (force -> a) b ->
-    let t1 = force (proj1 t); t2 = force (proj2 t)
-    in VPair (coe r r' i a t1)
-             (coe r r' i (force (capp b (coeFill r r' a t1))) t2)
+  VSg x a b ->
+    let fa    = bindI \_ -> force a
+        t1    = force (proj1 t)
+        t2    = force (proj2 t)
+        bfill = bindI \_ -> cappf b (unF (coeFill r r' (unF fa) t1))
+    in F (VPair (unF (goCoe r r' i fa t1))
+                (unF (goCoe r r' i bfill t2)))
 
-  VU -> uf
+  VU ->
+    t
 
-  a@(VNe n is) -> uf
+  a@(VNe n is) ->
+    F (VNe (NCoe (unF r) (unF r') i a (unF t))
+           (IS.insertI (unF r) $ IS.insertI (unF r') is))
 
-  VSub{} ->
+  VGlueTy a sys is ->
+    uf
+
+  _ ->
     impossible
 
-  _ -> uf
+coe :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val -> F Val -> F Val
+coe r r' i ~a t
+  | unF r == unF r' = t
+  | True            = goCoe r r' i a t
+{-# inline coe #-}
 
-lazyCoe :: IDomArg => NCofArg => DomArg => FI -> FI -> Name -> FVal -> FVal -> Val
-lazyCoe r r' i ~a t
-  | unFI r == unFI r' = unF t
-  | True              = coe r r' i a t
-{-# inline lazyCoe #-}
+-- assumption: r /= r' and system is stuck
+goHCom :: IDomArg => NCofArg => DomArg =>
+          F I -> F I -> Name -> F Val -> (FVSystem', IS.IVarSet) -> F Val -> F Val
+goHCom r r' x a sys b = case unF a of
+  VPi x a b ->
+    uf
 
-lazyHCom :: IDomArg => NCofArg => DomArg => FI -> FI -> Name -> FVal -> FVSystem -> FVal -> Val
-lazyHCom r r' i ~a ~t ~b
-  | unFI r == unFI r'    = unF b
-  | FVSTakeBranch v <- t = v
-  | FVSNeutral t    <- t = hcom r r' i a t b
-{-# inline lazyHCom #-}
+  VSg x a b ->
+    uf
 
-hcom :: IDomArg => NCofArg => DomArg => FI -> FI -> Name -> FVal -> VSystem -> FVal -> Val
-hcom r r' x ~a ~t ~b = uf
+  VU ->
+    uf
 
-evalI :: SubArg => NCofArg => I -> FI
+  a@(VNe n is) ->
+    F (VNe (NHCom (unF r) (unF r') x a (unFSystem (fst sys)) (unF b))
+           (IS.insertI (unF r) $ IS.insertI (unF r') (snd sys <> is)))
+
+  VGlueTy a sys is ->
+    uf
+
+  _ ->
+    impossible
+
+hcom :: IDomArg => NCofArg => DomArg => F I -> F I
+     -> Name -> F Val -> FVSystem -> F Val -> Val
+hcom r r' i ~a ~t ~b
+  | unF r == unF r'      = unF b
+  | FVSTakeBranch v <- t = singleSub v ?idom r'
+  | FVSNeutral sys  <- t = unF (goHCom r r' i a sys b)
+{-# inline hcom #-}
+
+hcomf  r r' i ~a ~t ~b = force  (hcom r r' i a t b); {-# inline hcomf  #-}
+hcomf' r r' i ~a ~t ~b = force' (hcom r r' i a t b); {-# inline hcomf' #-}
+
+inst :: IDomArg => NCofArg => DomArg => Val -> F I -> F Val
+inst v i = forceVSub v (snocSub (idSub ?idom) (unF i))
+{-# inline inst #-}
+
+singleSubf :: IDomArg => NCofArg => DomArg => F Val -> IVar -> F I -> F Val
+singleSubf t x i = forceVSub (unF t) (single x (unF i))
+
+singleSub :: IDomArg => Val -> IVar -> F I -> Val
+singleSub t x i = sub t (single x (unF i))
+
+com :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
+    -> FVSystem -> F Val -> Val
+com r r' x ~a ~sys ~b =
+  hcom r r' x
+    (singleSubf a ?idom r')
+    (mapFVSystem
+       (\cof ncof t ->
+           let ?cof = ncof in
+           bindI \i ->
+           unF (goCoe (F (IVar i)) r' "j"
+                 (bindI \j -> singleSubf a i (F (IVar j)))
+                 (force t)))
+       sys)
+    (coe r r' x a b)
+
+  -- comⁱ r r' A [α ↦ t] b :=
+  --   hcomⁱ r r' (A r') [α ↦ coeʲ i r' (A j) t] (coeⁱ r r' A b)  -- fresh j
+
+evalI :: SubArg => NCofArg => I -> F I
 evalI i = forceI (sub i ?sub)
+
+evalIVar :: SubArg => NCofArg => IVar -> F I
+evalIVar x = forceI (lookupSub x ?sub)
+
+-- Evaluation for cof & systems
+------------------------------------------------------------
+
+data FCof = FCFalse | FCNotFalse Cof NCof IS.IVarSet
+
+iToVarSet :: I -> IS.IVarSet
+iToVarSet = \case
+  IVar x -> IS.singleton x
+  _      -> mempty
+
+cofEqVars :: CofEq -> IS.IVarSet
+cofEqVars (CofEq i j) = iToVarSet i <> iToVarSet j
+
+cofVars :: Cof -> IS.IVarSet
+cofVars cof = go mempty cof where
+  go acc = \case
+    CTrue       -> acc
+    CAnd eq cof -> go (acc <> cofEqVars eq) cof
+
+conjFCof :: CofEq -> FCof -> FCof
+conjFCof eq = \case
+  FCNotFalse cof ncof is -> FCNotFalse (CAnd eq cof) ncof (cofVars cof <> is)
+  FCFalse                -> FCFalse
+
+updNCof :: NCof -> IVar -> I -> NCof
+updNCof cof x i = mapSub go cof where
+  go _ j = case j of
+    IVar y | x == y -> i
+    j               -> j
+
+evalCof :: SubArg => NCofArg => Cof -> FCof
+evalCof = \case
+  CTrue -> FCNotFalse CTrue ?cof mempty
+  CAnd (CofEq i j) alpha -> case (unF (evalI i), unF (evalI j)) of
+    (i, j) | i == j  -> evalCof alpha
+    (IVar x, IVar y) -> let (x, i) = if x < y then (x, IVar y)
+                                              else (y, IVar x) in
+                        let ?cof = updNCof ?cof x i in
+                        conjFCof (CofEq (IVar x) i) (evalCof alpha)
+    (IVar x, j     ) -> let ?cof = updNCof ?cof x j in
+                        conjFCof (CofEq (IVar x) j) (evalCof alpha)
+    (i     , IVar y) -> let ?cof = updNCof ?cof y i in
+                        conjFCof (CofEq (IVar y) i) (evalCof alpha)
+    _                -> FCFalse
+
+fvsCons :: Cof -> NCof -> IS.IVarSet -> Val -> FVSystem -> FVSystem
+fvsCons cof ncof is ~v = \case
+  FVSNeutral (sys, is') -> FVSNeutral (FVSCons cof ncof v sys, is <> is')
+  FVSTakeBranch v'      -> FVSTakeBranch v'
 
 evalSystem :: IDomArg => SubArg => NCofArg => DomArg => EnvArg =>
               System -> FVSystem
-evalSystem = uf
+evalSystem = \case
+  SEmpty -> FVSNeutral (FVSEmpty, mempty)
+  SCons cof t sys ->
+    case evalCof cof of
+      FCFalse                -> evalSystem sys
+      FCNotFalse CTrue _  is -> FVSTakeBranch (eval t)
+      FCNotFalse cof ncof is -> fvsCons cof ncof is (let ?cof = ncof in eval t)
+                                                    (evalSystem sys)
 
-lazyGlueTy :: Val -> FVSystem -> Val
-lazyGlueTy = uf
-{-# inline lazyGlueTy #-}
 
-lazyGlueTm :: Val -> FVSystem -> Val
-lazyGlueTm = uf
-{-# inline lazyGlueTm #-}
+------------------------------------------------------------
 
-lazyUnglue :: Val -> FVSystem -> Val
-lazyUnglue = uf
-{-# inline lazyUnglue #-}
+glueTy :: Val -> FVSystem -> Val
+glueTy ~a sys = uf
+{-# inline glueTy #-}
 
-bindI :: (IDomArg => SubArg => NCofArg => a)
-      -> (IDomArg => SubArg => NCofArg => a)
-bindI act = let ?idom = ?idom + 1
-                ?sub  = liftSub ?sub
-                ?cof  = liftSub ?cof
-            in act
+glueTyf  ~a sys = force  (glueTy a sys); {-# inline glueTyf  #-}
+glueTyf' ~a sys = force' (glueTy a sys); {-# inline glueTyf' #-}
+
+glueTm :: Val -> FVSystem -> Val
+glueTm = uf
+{-# inline glueTm #-}
+
+unglue :: Val -> FVSystem -> Val
+unglue ~a sys = uf
+{-# inline unglue #-}
+
+ungluef  ~a sys = force  (unglue a sys); {-# inline ungluef  #-}
+ungluef' ~a sys = force' (unglue a sys); {-# inline ungluef' #-}
+
+bindI' :: (IDomArg => SubArg => NCofArg => IVar -> a)
+       -> (IDomArg => SubArg => NCofArg => a)
+bindI' act =
+  let fresh = ?idom in
+  let ?idom = ?idom + 1
+      ?sub  = snocSub ?sub (IVar ?idom)
+      ?cof  = snocSub ?cof (IVar ?idom)
+  in act fresh
+{-# inline bindI' #-}
+
+bindI :: (IDomArg => NCofArg => IVar -> a) -> (IDomArg => NCofArg => a)
+bindI act =
+  let fresh = ?idom in
+  let ?idom = ?idom + 1
+      ?cof  = snocSub ?cof (IVar ?idom)
+  in act fresh
 {-# inline bindI #-}
 
-evalF :: IDomArg => SubArg => NCofArg => DomArg => EnvArg => Tm -> FVal
-evalF t = force (eval t)
-{-# inline evalF #-}
+-- conj :: NCof -> Cof -> NCof
+-- conj ncof = \case
+--   CTrue -> ncof
+--   CAnd (CofEq i j) alpha -> case (sub i ncof, sub j ncof) of
+--     (IVar x, IVar y) -> _
+
+-- bindCof :: Cof -> (NCofArg => a) -> (NCofArg => a)
+-- bindCof alpha act =
+--   let ?cof = conj ?cof alpha in act
+
+evalf :: IDomArg => SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
+evalf t = force (eval t)
+{-# inline evalf #-}
 
 eval :: IDomArg => SubArg => NCofArg => DomArg => EnvArg => Tm -> Val
 eval = \case
@@ -394,82 +590,88 @@ eval = \case
   LocalVar x        -> localVar x
   Let x _ t u       -> let ~v = eval t in let ?env = EDef ?env v in eval u
   Pi x a b          -> VPi x (eval a) (CEval ?sub ?env b)
-  App t u           -> app (evalF t) (eval u)
+  App t u           -> app (evalf t) (eval u)
   Lam x t           -> VLam x (CEval ?sub ?env t)
   Sg x a b          -> VSg x (eval a) (CEval ?sub ?env b)
   Pair t u          -> VPair (eval t) (eval u)
-  Proj1 t           -> proj1 (evalF t)
-  Proj2 t           -> proj2 (evalF t)
+  Proj1 t           -> proj1 (evalf t)
+  Proj2 t           -> proj2 (evalf t)
   U                 -> VU
   PathP x a t u     -> VPathP x (ICEval ?sub ?env a) (eval t) (eval u)
-  PApp t u0 u1 i    -> lazyPapp (evalF t) (eval u0) (eval u1) (evalI i)
+  PApp t u0 u1 i    -> papp (evalf t) (eval u0) (eval u1) (evalI i)
   PLam x t          -> VPLam x (ICEval ?sub ?env t)
-  Coe r r' x a t    -> lazyCoe (evalI r) (evalI r') x (bindI (evalF a)) (evalF t)
-  HCom r r' x a t b -> lazyHCom (evalI r) (evalI r') x (evalF a) (evalSystem t) (evalF b)
-  GlueTy a sys      -> lazyGlueTy (eval a) (evalSystem sys)
-  GlueTm t sys      -> lazyGlueTm (eval t) (evalSystem sys)
-  Unglue t sys      -> lazyUnglue (eval t) (evalSystem sys)
+  Coe r r' x a t    -> unF (coe (evalI r) (evalI r') x (bindI' \_ -> evalf a) (evalf t))
+  HCom r r' x a t b -> hcom (evalI r) (evalI r') x (evalf a) (evalSystem t) (evalf b)
+  GlueTy a sys      -> glueTy (eval a) (evalSystem sys)
+  GlueTm t sys      -> glueTm (eval t) (evalSystem sys)
+  Unglue t sys      -> unglue (eval t) (evalSystem sys)
+
+
+
+-- Forcing
+--------------------------------------------------------------------------------
 
 forceSystem :: IDomArg => NCofArg => DomArg => VSystem -> FVSystem
 forceSystem = uf
 
-force :: IDomArg => NCofArg => DomArg => Val -> FVal
+forceSystem' :: IDomArg => SubArg => NCofArg => DomArg => VSystem -> FVSystem
+forceSystem' = uf
+
+forceVSub :: IDomArg => NCofArg => DomArg => Val -> Sub -> F Val
+forceVSub v s = let ?sub = s in force' v
+{-# inline forceVSub #-}
+
+force :: IDomArg => NCofArg => DomArg => Val -> F Val
 force = \case
-  VSub v s             -> let ?sub = s in force' v
-  v@(VNe t is)         -> if isBlocked is then FVal v else forceNe t
-  v@(VGlueTy a sys is) -> if isBlocked is then FVal v else force (lazyGlueTy a (forceSystem sys))
-  v                    -> FVal v
+  VSub v s                          -> forceVSub v s
+  VNe t is         | isUnblocked is -> forceNe t
+  VGlueTy a sys is | isUnblocked is -> glueTyf a (forceSystem sys)
+  v                                 -> F v
 
-forceI :: NCofArg => I -> FI
-forceI i = FI (sub i ?cof)
-
-forceI' :: SubArg => NCofArg => I -> FI
-forceI' i = FI (i `sub` ?sub `sub` ?cof)
-
-forceIVar :: NCofArg => IVar -> FI
-forceIVar x = FI (lookupSub x ?cof)
-
-forceIVar' :: SubArg => NCofArg => IVar -> FI
-forceIVar' x = FI (lookupSub x ?sub `sub` ?cof)
-
-force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> FVal
+force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> F Val
 force' = \case
-  VSub v s         -> impossible
-  VNe t is         -> if isBlocked' is
-                        then FVal (VNe (sub t ?sub) (sub is ?sub))
-                        else forceNe' t
-  VGlueTy a sys is -> if isBlocked' is
-                        then FVal (VGlueTy (sub a ?sub) (sub sys ?sub) (sub is ?sub))
-                        else uf
-  VPi x a b        -> FVal (VPi x (sub a ?sub) (sub b ?sub))
-  VLam x t         -> FVal (VLam x (sub t ?sub))
-  VPathP x a t u   -> FVal (VPathP x (sub a ?sub) (sub t ?sub) (sub u ?sub))
-  VPLam x t        -> FVal (VPLam x (sub t ?sub))
-  VSg x a b        -> FVal (VSg x (sub a ?sub) (sub b ?sub))
-  VPair t u        -> FVal (VPair (sub t ?sub) (sub u ?sub))
-  VU               -> FVal VU
+  VSub v s                           -> impossible
+  VNe t is         | isUnblocked' is -> forceNe' t
+  VGlueTy a sys is | isUnblocked' is -> glueTyf' a (forceSystem' sys)
+  v                                  -> F (sub v ?sub)
 
-forceNe :: IDomArg => NCofArg => DomArg => Ne -> FVal
+forceI :: NCofArg => I -> F I
+forceI i = F (sub i ?cof)
+
+forceI' :: SubArg => NCofArg => I -> F I
+forceI' i = F (i `sub` ?sub `sub` ?cof)
+
+forceIVar :: NCofArg => IVar -> F I
+forceIVar x = F (lookupSub x ?cof)
+
+forceIVar' :: SubArg => NCofArg => IVar -> F I
+forceIVar' x = F (lookupSub x ?sub `sub` ?cof)
+
+forceNSub :: IDomArg => NCofArg => DomArg => Ne -> Sub -> F Val
+forceNSub n s = let ?sub = s in forceNe' n
+{-# inline forceNSub #-}
+
+forceNe :: IDomArg => NCofArg => DomArg => Ne -> F Val
 forceNe = \case
-  n@(NLocalVar x)      -> FVal (VNe n mempty)
-  NSub n s             -> let ?sub = s in forceNe' n
-  NApp t u             -> force (app (forceNe t) u)
-  NPApp t l r i        -> force (lazyPapp (forceNe t) l r (forceIVar i))
-  NProj1 t             -> force (proj1 (forceNe t))
-  NProj2 t             -> force (proj2 (forceNe t))
-  NCoe r r' x a t      -> force (lazyCoe (forceI r) (forceI r') x uf (force t))
-  NHCom r r' x a sys t -> force (lazyHCom (forceI r) (forceI r') x uf uf uf)
-  NUnglue t sys        -> force (lazyUnglue t (forceSystem sys))
+  n@(NLocalVar x)      -> F (VNe n mempty)
+  NSub n s             -> forceNSub n s
+  NApp t u             -> appf (forceNe t) u
+  NPApp t l r i        -> pappf (forceNe t) l r (forceIVar i)
+  NProj1 t             -> proj1f (forceNe t)
+  NProj2 t             -> proj2f (forceNe t)
+  NCoe r r' x a t      -> coe (forceI r) (forceI r') x (bindI \_ -> force a) (force t)
+  NHCom r r' x a sys t -> hcomf (forceI r) (forceI r') x uf uf uf
+  NUnglue t sys        -> ungluef t (forceSystem sys)
 
-forceNe' :: IDomArg => SubArg => NCofArg => DomArg => Ne -> FVal
+forceNe' :: IDomArg => SubArg => NCofArg => DomArg => Ne -> F Val
 forceNe' = \case
-  n@(NLocalVar x)      -> FVal (VNe n mempty)
+  n@(NLocalVar x)      -> F (VNe n mempty)
   NSub n s             -> let ?sub = sub s ?sub in forceNe' n
-  NApp t u             -> force (app (forceNe' t) (sub u ?sub))
-  NPApp t l r i        -> force (lazyPapp (forceNe' t) (sub l ?sub) (sub r ?sub)
-                                         (forceIVar' i))
-  NProj1 t             -> force (proj1 (forceNe' t))
-  NProj2 t             -> force (proj2 (forceNe' t))
-  NCoe r r' x a t      -> force (lazyCoe (forceI' r) (forceI' r') x uf (force' t))
-  NHCom r r' x a sys t -> force (lazyHCom (forceI' r) (forceI' r') x uf uf uf)
-  NUnglue t sys        -> force (lazyUnglue t (forceSystem sys))
+  NApp t u             -> appf' (forceNe' t) (sub u ?sub)
+  NPApp t l r i        -> pappf' (forceNe' t) (sub l ?sub) (sub r ?sub) (forceIVar' i)
+  NProj1 t             -> proj1f' (forceNe' t)
+  NProj2 t             -> proj2f' (forceNe' t)
+  NCoe r r' x a t      -> coe (forceI' r) (forceI' r') x (bindI' \_ -> force' a) (force' t)
+  NHCom r r' x a sys t -> hcomf' (forceI' r) (forceI' r') x (force' a)
+                                 (forceSystem' sys) (force' t)
+  NUnglue t sys        -> ungluef' t (forceSystem' sys)

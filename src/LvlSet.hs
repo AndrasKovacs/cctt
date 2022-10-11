@@ -16,6 +16,10 @@ instance Monoid LvlSet where
   mempty = LvlSet 0
   {-# inline mempty #-}
 
+singleton :: Lvl -> LvlSet
+singleton x = insert x mempty
+{-# inline singleton #-}
+
 insert :: Lvl -> LvlSet -> LvlSet
 insert (Lvl x) (LvlSet s) = LvlSet (unsafeShiftL 1 x .|. s)
 {-# inline insert #-}

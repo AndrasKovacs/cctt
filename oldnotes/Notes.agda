@@ -441,7 +441,6 @@ compⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr
                 r=r' ↦ unglue gr ]
                 ar')
 
-
 CARTESIAN coe
 
 coeⁱ r r' (Glue [α ↦ (T, f)] A) gr :=
@@ -460,17 +459,23 @@ coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
 
   (topt, fr'topt≡ar') : αr' ⊢ fib fr' ar'
   (topt, fr'topt≡ar') = hcompⁱ 0 1
-    [∀i.α ↦ contr (coeⁱ r r' T gr, refl _) i, r=r' ↦ contr (gr, refl (fr' gr)) i] fib*
+    [∀i.α ↦ contr (coeⁱ r r' T gr, refl _) i,
+     r=r' ↦ contr (gr, refl (fr' gr)) i]
+    fib*
 
-  Res = glue [αr' ↦ topt]
-             (hcompⁱ 1 0 [αr' ↦ fr'topt≡ar' i, ∀i.α ↦ coeⁱ r r' A ar, r=r' ↦ unglue gr] ar')
+  Res = glue
+    [αr' ↦ topt]
+    (hcompⁱ 1 0 [
+        αr'  ↦ fr'topt≡ar' i,
+        ∀i.α ↦ coeⁱ r r' A ar,
+        r=r' ↦ ar]
+      ar')
 
 -- Note:
   - coeGlue doesn't force system components
   - we only need to instantiate "f" with "r'"
     (this is the only non-weakening instantiation!)
   - comp does eta-expansion. Can we have *eta-short* comp?
-
 
 
 CARTESIAN coe UA
@@ -500,15 +505,11 @@ p : Path A x y
 
 λ i. hcompʲ 1 0 A [i=0 ↦ y, i=1 ↦ p j] y
 
-
 compⁱ r r' A [β ↦ t] a := hcompⁱ r r' (A r') [β ↦ coefill⁻¹ i r r' A t] (coeⁱ r r' A a)
-
 
 hcompⁱ r r' ((x:A)×B x) [β ↦ t] b =
    ( hcompⁱ r r' A [β ↦ t.1](b.1)
    , compⁱ  r r' (B (hfill i r r' A [β ↦ t.1] (b.1))) [β ↦ t.2] b.2 )
-
-
 
 
 -}

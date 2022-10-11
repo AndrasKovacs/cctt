@@ -1,0 +1,19 @@
+
+- Anders note (coe Glue)
+- ghcomp in CCTT
+   - add negation to cofs
+   - alternative version by Evan?
+
+- ghcomp i=1
+  - transp
+  - hcom
+
+   transpⁱ A ϕ t
+   ϕ,i ⊢ A ≡ A[i/0]
+
+   transpⁱ (Glue [α ↦ (T, f)] B) ϕ t
+
+   transpⁱ ((x : A) → B) ϕ t
+     = ...
+
+   compⁱ

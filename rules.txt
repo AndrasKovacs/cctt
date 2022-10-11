@@ -1,4 +1,21 @@
 
+TODO:
+  - eval computation
+  - conversion checking
+  - Bool, Nat for testing
+  - Inductives & HITs
+     - signatures & eliminators
+  - parser
+  - bidirectional elab
+
+(TODO-ish:
+  - custom bidirectional rules
+  -
+  )
+
+
+--------------------------------------------------------------------------------
+
 Interval vars: i,j,k
 
 Cofibrations:
