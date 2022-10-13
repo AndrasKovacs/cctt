@@ -8,6 +8,9 @@ TODO:
   - parser
   - bidirectional elab
 
+  - extension types?
+  - partial path types (one or more endpoint unspecified)
+
 (TODO-ish:
   - custom bidirectional rules
   -

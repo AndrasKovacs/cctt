@@ -202,8 +202,10 @@ type EnvArg = (?env :: Env)
 
 -- | Defunctionalized closures.
 data Closure
-  = CEval Sub Env Tm                 -- ^ Body of vanilla term evaluation.
-  | CCoePi I I Name VTy Closure Val  -- ^ Body of function coercions.
+  = CEval Sub Env Tm                         -- ^ Body of vanilla term evaluation.
+  | CCoePi I I Name VTy Closure Val          -- ^ Body of function coercions.
+  | CHComPi I I Name VTy Closure VSystem Val  -- ^ Body of function hcom.
+
 
 -- | Defunctionalized closures for IVar abstraction.
 data IClosure
@@ -304,12 +306,24 @@ capp t ~u = case t of
     let ?sub = s; ?env = EDef env u in eval t
 
   CCoePi (forceI -> r) (forceI -> r') i a b t
-    | unF r == unF r' ->
+    | unF r == unF r' ->   -- TODO: "premature optimization"
         app (force t) u
     | True ->
         let fa = force a; fu = force u
         in unF (goCoe r r' i (bindI \_ -> cappf b (unF (coeFillInv r r' (unF fa) fu)))
                              (appf (force t) (unF (goCoe r' r i fa fu))))
+
+  CHComPi (forceI -> r) (forceI -> r') i a b sys base ->
+    hcom r r' i (cappf b u)
+         (mapFVSystem
+            (\_ ncof t ->
+               let ?cof = ncof in
+               bindI \_ -> app (force t) u)
+            (forceSystem sys))
+         (appf (force base) u)
+
+  -- hcomⁱ r r' ((a : A) → B a) [α ↦ t] base =
+  --  λ u. hcomⁱ r r' (B u) [α ↦ t i u] (base u)
 
 cappf  t ~u = force  (capp t u); {-# inline cappf  #-}
 cappf' t ~u = force' (capp t u); {-# inline cappf' #-}
@@ -375,6 +389,7 @@ goCoe r r' i a t = case unF a of
   VPi x a b ->
     F (VLam x (CCoePi (unF r) (unF r') i a b (unF t)))
 
+
   VSg x a b ->
     let fa    = bindI \_ -> force a
         t1    = force (proj1 t)
@@ -405,9 +420,9 @@ coe r r' i ~a t
 -- assumption: r /= r' and system is stuck
 goHCom :: IDomArg => NCofArg => DomArg =>
           F I -> F I -> Name -> F Val -> (FVSystem', IS.IVarSet) -> F Val -> F Val
-goHCom r r' x a sys b = case unF a of
+goHCom r r' ix a sys base = case unF a of
   VPi x a b ->
-    uf
+    F (VLam x (CHComPi (unF r) (unF r') ix a b (unFSystem (fst sys)) (unF base)))
 
   VSg x a b ->
     uf
@@ -416,7 +431,7 @@ goHCom r r' x a sys b = case unF a of
     uf
 
   a@(VNe n is) ->
-    F (VNe (NHCom (unF r) (unF r') x a (unFSystem (fst sys)) (unF b))
+    F (VNe (NHCom (unF r) (unF r') ix a (unFSystem (fst sys)) (unF base))
            (IS.insertI (unF r) $ IS.insertI (unF r') (snd sys <> is)))
 
   VGlueTy a sys is ->
