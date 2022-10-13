@@ -45,9 +45,9 @@ snocSub (Sub s@(I# s')) x =
 
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
-foldrSub :: forall b. (Int -> I -> b -> b) -> b -> Sub -> b
+foldrSub :: forall b. (IVar -> I -> b -> b) -> b -> Sub -> b
 foldrSub f b (Sub s) = go 0 s where
-  go :: Int -> Int -> b
+  go :: IVar -> Int -> b
   go x s = case s .&. 15 of
     15 -> b
     i  -> f x (coerce i) $! go (x + 1) (unsafeShiftR s 4)
@@ -87,6 +87,9 @@ idSub i = Sub (go i 0 0 0) where
     | j < i = go i (j + 1) (shift + 4) (unsafeShiftL (coerce j) shift .|. s)
     | True  = unsafeShiftL 15 shift .|. s
 
+hasAction :: Sub -> Bool
+hasAction = foldrSub (\i j b -> IVar i /= j || b) False
+
 -- | Substitution which maps all vars below `i` to themselves and maps `i` to `i + 1`.
 wk :: IVar -> Sub
 wk i = Sub (go i 0 0 0) where
@@ -99,7 +102,11 @@ instance Show Sub where
   show = show . subToList
 
 class SubAction a where
-  sub :: a -> Sub -> a
+  goSub :: a -> Sub -> a
+
+sub :: SubAction a => a -> Sub -> a
+sub ~a s = if hasAction s then goSub a s else a
+{-# inline sub #-}
 
 lookupSub :: IVar -> Sub -> I
 lookupSub (IVar# x) (Sub s)
@@ -108,14 +115,14 @@ lookupSub (IVar# x) (Sub s)
 {-# inline lookupSub #-}
 
 instance SubAction I where
-  sub (IVar x) s = lookupSub x s
-  sub i        _ = i
-  {-# inline sub #-}
+  goSub (IVar x) s = lookupSub x s
+  goSub i        _ = i
+  {-# inline goSub #-}
 
 -- substitution composition
 instance SubAction Sub where
-  sub f g = mapSub (\_ i -> sub i g) f
-  {-# inline sub #-}
+  goSub f g = mapSub (\_ i -> sub i g) f
+  {-# inline goSub #-}
 
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
@@ -139,7 +146,8 @@ isUnblocked' is =
            is
            (mempty @IS.IVarSet)
 
+-- TODO: if hasAction is very cheap, it makes sense to use it here as well
 instance SubAction IS.IVarSet where
-  sub is s = IS.foldl
+  goSub is s = IS.foldl
     (\acc i -> IS.insertI (lookupSub i s) acc)
     mempty is
