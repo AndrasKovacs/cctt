@@ -225,6 +225,16 @@ evalCof = \case
 sempty :: F (VSystem (F VCof))
 sempty = F (VSNe (NSystem NSEmpty' mempty))
 
+bindI' :: (IDomArg => SubArg => NCofArg => IVar -> a)
+       -> (IDomArg => SubArg => NCofArg => a)
+bindI' act =
+  let fresh = ?idom in
+  let ?idom = ?idom + 1
+      ?sub  = snocSub ?sub (IVar ?idom)
+      ?cof  = snocSub ?cof (IVar ?idom)
+  in act fresh
+{-# inline bindI' #-}
+
 bindI :: (IDomArg => NCofArg => IVar -> a) -> (IDomArg => NCofArg => a)
 bindI act =
   let fresh = ?idom in
@@ -429,20 +439,6 @@ instance SubAction Cof where
     CTrue       -> CTrue
     CAnd eq cof -> CAnd (goSub eq s) (goSub cof s)
 
--- FORWARD
---------------------------------------------------------------------------------
-
-force :: IDomArg => NCofArg => DomArg => Val -> F Val
-force = uf
-
-force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> F Val
-force' = uf
-
-forceI = uf
-eval = uf
-forceSystem = uf
-forceVSub = uf
-
 -- Evaluation
 --------------------------------------------------------------------------------
 
@@ -478,7 +474,7 @@ capp t ~u = case t of
     hcom r r' i (cappf b u)
          (mapVSystem                    -- TODO: map+force can be fused
             (\i t -> app (force t) u)
-            (forceSystem sys))
+            (forceNSystem sys))
          (appf (force base) u)
 
 
@@ -499,7 +495,7 @@ icapp t arg = case t of
         (pappf (force p) lhs rhs farg)
 
   ICHComPathP (forceI -> r) (forceI -> r') ix a lhs rhs
-              (forceSystem -> sys) p ->
+              (forceNSystem -> sys) p ->
 
     let farg = forceI arg in
 
@@ -557,7 +553,7 @@ coeFill r a t =
 {-# inline coeFill #-}
 
 coeFillInv :: IDomArg => NCofArg => DomArg => F I -> Val -> F Val -> F Val
-coeFillInv r' a t = uf
+coeFillInv r' a t =
   let i = ?idom - 1 in
   goCoe r' (F (IVar i)) "j" (bindI \j -> singleSubf (force a) i (F (IVar j))) t
 {-# inline coeFillInv #-}
@@ -686,106 +682,24 @@ goCom r r' x a nsys  b =
        nsys)
     (goCoe r r' x a b)
 
--- Evaluation for cof & systems
-------------------------------------------------------------
-
--- data FCof = FCFalse | FCNotFalse Cof NCof IS.IVarSet
-
--- iToVarSet :: I -> IS.IVarSet
--- iToVarSet = \case
---   IVar x -> IS.singleton x
---   _      -> mempty
-
--- cofEqVars :: CofEq -> IS.IVarSet
--- cofEqVars (CofEq i j) = iToVarSet i <> iToVarSet j
-
--- cofVars :: Cof -> IS.IVarSet
--- cofVars cof = go mempty cof where
---   go acc = \case
---     CTrue       -> acc
---     CAnd eq cof -> go (acc <> cofEqVars eq) cof
-
--- conjFCof :: CofEq -> FCof -> FCof
--- conjFCof eq = \case
---   FCNotFalse cof ncof is -> FCNotFalse (CAnd eq cof) ncof (cofVars cof <> is)
---   FCFalse                -> FCFalse
-
--- updNCof :: NCof -> IVar -> I -> NCof
--- updNCof cof x i = mapSub go cof where
---   go _ j = case j of
---     IVar y | x == y -> i
---     j               -> j
-
--- -- (σ : ISub Γ Δ)(α : Cof Γ) → Cof Δ → FCof Γ
--- evalCof :: SubArg => NCofArg => Cof -> FCof
--- evalCof = \case
---   CTrue -> FCNotFalse CTrue ?cof mempty
---   CAnd (CofEq i j) alpha -> case (unF (evalI i), unF (evalI j)) of
---     (i, j) | i == j  -> evalCof alpha
---     (IVar x, IVar y) -> let (x, i) = if x < y then (x, IVar y)
---                                               else (y, IVar x) in
---                         let ?cof = updNCof ?cof x i in
---                         conjFCof (CofEq (IVar x) i) (evalCof alpha)
---     (IVar x, j     ) -> let ?cof = updNCof ?cof x j in
---                         conjFCof (CofEq (IVar x) j) (evalCof alpha)
---     (i     , IVar y) -> let ?cof = updNCof ?cof y i in
---                         conjFCof (CofEq (IVar y) i) (evalCof alpha)
---     _                -> FCFalse
-
--- fvsCons' :: Cof -> NCof -> IS.IVarSet -> Val -> FVSystem -> FVSystem
--- fvsCons' cof ncof is ~v = \case
---   FVSNeutral (sys, is') -> FVSNeutral (FVSCons cof ncof v sys, is <> is')
---   FVSTakeBranch v'      -> FVSTakeBranch v'
-
--- evalSystem :: IDomArg => SubArg => NCofArg => DomArg => EnvArg =>
---               System -> FVSystem
--- evalSystem = \case
---   SEmpty -> FVSNeutral (FVSEmpty, mempty)
---   SCons cof t sys -> fvsCons' cof t (evalSystem sys)
---     -- case evalCof cof of
---     --   FCFalse                -> evalSystem sys
---     --   FCNotFalse CTrue _  is -> FVSTakeBranch (eval t)
---     --   FCNotFalse cof ncof is -> fvsCons' cof ncof is (let ?cof = ncof in eval t)
---     --                                                  (evalSystem sys)
-
-
-------------------------------------------------------------
-{-
-glueTy :: Val -> FVSystem -> Val
+glueTy :: Val -> F (VSystem (F VCof)) -> Val
 glueTy ~a sys = uf
 {-# inline glueTy #-}
 
 glueTyf  ~a sys = force  (glueTy a sys); {-# inline glueTyf  #-}
 glueTyf' ~a sys = force' (glueTy a sys); {-# inline glueTyf' #-}
 
-glueTm :: Val -> FVSystem -> Val
+glueTm :: Val -> F (VSystem (F VCof)) -> Val
 glueTm = uf
 {-# inline glueTm #-}
 
-unglue :: Val -> FVSystem -> Val
+unglue :: Val -> F (VSystem (F VCof)) -> Val
 unglue ~a sys = uf
 {-# inline unglue #-}
 
 ungluef  ~a sys = force  (unglue a sys); {-# inline ungluef  #-}
 ungluef' ~a sys = force' (unglue a sys); {-# inline ungluef' #-}
 
-bindI' :: (IDomArg => SubArg => NCofArg => IVar -> a)
-       -> (IDomArg => SubArg => NCofArg => a)
-bindI' act =
-  let fresh = ?idom in
-  let ?idom = ?idom + 1
-      ?sub  = snocSub ?sub (IVar ?idom)
-      ?cof  = snocSub ?cof (IVar ?idom)
-  in act fresh
-{-# inline bindI' #-}
-
-bindI :: (IDomArg => NCofArg => IVar -> a) -> (IDomArg => NCofArg => a)
-bindI act =
-  let fresh = ?idom in
-  let ?idom = ?idom + 1
-      ?cof  = snocSub ?cof (IVar ?idom)
-  in act fresh
-{-# inline bindI #-}
 
 evalf :: IDomArg => SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = force (eval t)
@@ -817,32 +731,24 @@ eval = \case
 -- Forcing
 --------------------------------------------------------------------------------
 
-forceCof :: IDomArg => NCofArg => Cof -> FCof
+forceCof :: IDomArg => NCofArg => Cof -> F VCof
 forceCof cof = let ?sub = idSub ?idom in forceCof' cof
 
-forceCof' :: SubArg => NCofArg => Cof -> FCof
+forceCof' :: SubArg => NCofArg => Cof -> F VCof
 forceCof' = evalCof -- for Cof, evaluation and forcing with ISub is the same
 
-fvsCons' :: SubArg => NCofArg => Cof -> Val -> FVSystem -> FVSystem
-fvsCons' cof v ~sys = case forceCof' cof of
-  FCFalse                -> sys
-  FCNotFalse CTrue _  is -> FVSTakeBranch v
-  FCNotFalse cof ncof is -> case sys of
-    FVSNeutral (sys, is') -> FVSNeutral (FVSCons cof ncof v sys, is <> is')
-    FVSTakeBranch v'      -> FVSTakeBranch v'
+forceSystem' :: SubArg => NCofArg => VSystem VCof -> F (VSystem (F VCof))
+forceSystem' = uf
+  -- VSEmpty          -> FVSNeutral (FVSEmpty, mempty)
+  -- VSCons cof v sys -> fvsCons cof v (forceSystem' sys)
 
--- fvsCons' :: Cof -> NCof -> IS.IVarSet -> Val -> FVSystem -> FVSystem
--- fvsCons' cof ncof is ~v = \case
---   FVSNeutral (sys, is') -> FVSNeutral (FVSCons cof ncof v sys, is <> is')
---   FVSTakeBranch v'      -> FVSTakeBranch v'(forceSystem sys)
+forceNSystem' :: SubArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
+forceNSystem' sys = uf
 
+forceNSystem :: IDomArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
+forceNSystem sys = uf
 
-forceSystem' :: SubArg => NCofArg => VSystem -> FVSystem
-forceSystem' = \case
-  VSEmpty          -> FVSNeutral (FVSEmpty, mempty)
-  VSCons cof v sys -> fvsCons cof v (forceSystem' sys)
-
-forceSystem :: IDomArg => NCofArg => VSystem -> FVSystem
+forceSystem :: IDomArg => NCofArg => VSystem VCof -> F (VSystem (F VCof))
 forceSystem sys = let ?sub = idSub ?idom in forceSystem' sys
 
 forceVSub :: IDomArg => NCofArg => DomArg => Val -> Sub -> F Val
@@ -886,6 +792,5 @@ forceNe' = \case
   NProj2 t             -> proj2f' (forceNe' t)
   NCoe r r' x a t      -> coe (forceI' r) (forceI' r') x (bindI' \_ -> force' a) (force' t)
   NHCom r r' x a sys t -> hcomf' (forceI' r) (forceI' r') x (force' a)
-                                 (forceSystem' sys) (force' t)
-  NUnglue t sys        -> ungluef' t (forceSystem' sys)
--}
+                                 (forceNSystem' sys) (force' t)
+  NUnglue t sys        -> ungluef' t (forceNSystem' sys)
