@@ -17,3 +17,146 @@ Alternative:
 
   - We only mark in values whether something is stable or unstable, but not the cof.
     Forcing an unstable thing always walks the value. Simpler but maybe less efficient.
+
+----------------------------------------------------------------------------------------------------
+
+isEquiv : (A → B) → U
+isEquiv f :=
+    (f⁻¹  : B → A)
+  × (linv : ∀ a → a = f⁻¹ (f a))
+  × (rinv : ∀ b → f (f⁻¹ b) = b)
+  × (coh  : ∀ a →
+            PathPⁱ (f (linv a i) = f a)
+                   (refl (f a)) (rinv (f a)))
+
+     refl       : f a = f a
+     rinv (f a) : f (f⁻¹ (f a)) = f a
+
+    -- without PathP
+    ap f (inv a) ◼ rinv (f a) = refl
+
+   with extension type:
+    [i, j] B [i=0 ↦ f a, i=1 ↦ rinv (f a), j=0 ↦ f (linv a i), j=1 ↦ f a]
+
+--------------------------------------------------------------------------------
+
+isEquiv id
+  _⁻¹  = λ a. a
+  linv = λ a i. a
+  rinv = λ b i. b
+  coh  = λ a i j. a
+
+isEquiv (coeⁱ r r' A : Ar → Ar')
+  _⁻¹ = coeⁱ r' r A
+
+  linvFill : ∀ s a → a = coeⁱ s r A (coeⁱ r s A a)
+  linvFill s a = λ j. hcomᵏ r s (A r) [j=0 ↦ a, j=1 ↦ coeⁱ k r A (coeⁱ r k A a)] a
+
+  linv := linvFill r'
+
+  rinvFill : ∀ s b → coeⁱ s r' A (coeⁱ r' s A b) = b
+  rinvFill s b = λ j. hcomᵏ r' s (A r') [j=0 ↦ coeⁱ k r' A (coeⁱ r' k A b), j=1 ↦ b] b
+
+  rinv := rinvFill r
+
+  coh : ∀ a → PathPⁱ (f (linv a i) = f a)
+                     (refl (f a)) (rinv (f a)))
+
+  coh = ...
+
+-- we get degenerate coe by coe isEquivId
+isEquiv (coeⁱ r r' A : Ar → Ar')
+
+        isEquivId : isEquiv (id : Ar → Ar)
+
+  coeʲ r r' (isEquiv (coeⁱ r j A)) isEquivId : isEquiv (coeⁱ r r' A)
+
+  coeʲ r r' (Aj → Ar) (λ x. x) = λ (ar' : Ar'). coeʲ r r' (Ar) (coeʲ r' r (Aj) ar')
+
+  -- coe f = λ x. coe (f (coe x))
+
+-- but we can try to coe just some compoenents (e.g. just the coh component!)
+isEquiv (coeⁱ r r' A : Ar → Ar')
+   _⁻¹ = coeⁱ r' r A
+
+   isEquivIdId : isEquiv' id id
+   goal        : isEquiv' (coeⁱ r r' A) (coeⁱ r' r A)
+
+   coeʲ r r' (isEquiv' (coeⁱ r j A) (coeⁱ j r A)) isEquivIdId : isEquiv' (coeⁱ r r' A) (coeⁱ r' r A)
+
+--------------------------------------------------------------------------------
+
+-- digression: coeFill notation:
+Γ,i ⊢ coeFillⁱ r A t : A
+Γ ⊢ (coeFillⁱ r A t)[r/i] = t
+Γ ⊢ (coeFillⁱ r A t)[r'/i] = coeⁱ r r' A t
+
+
+-- Coe Glue with half-adjoint equivalences
+----------------------------------------------------------------------
+
+coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
+
+  ar' := compⁱ r r' A [∀i.α ↦ f (coeFillⁱ r T gr)] (unglue gr)
+
+  fib* : αr' ⊢ (tr' : Tr') × (fr' tr' = ar')
+  fib* = (fr'⁻¹ ar', fr'.rinv ar')
+
+  (topt, fr'topt≡ar') : αr' ⊢ fib fr' ar'
+  (topt, fr'topt≡ar') = hcompⁱ 1 0 (fib fr' ar')
+     [ ∀i.α ↦ (fr'.linv (coeⁱ r r' T gr) i, fr'.coh (coeⁱ r r' T gr) i)
+     , r=r' ↦ (fr'.linv gr i, fr'.coh gr i)
+     ] fib*
+
+  -- Evan: fully unfolding:
+  --   hcomⁱ fib = (hcomⁱ T, comⁱ PathA)
+                 = (hcomⁱ T, λj.comⁱ A [j=0↦_, j=1↦_])   (A doesn't depend on i)
+                 = (hcomⁱ T, λj.hcomⁱ A [j=0↦_, j=1↦_])
+
+  Res = glue [αr' ↦ topt]
+             (hcompⁱ 1 0 Ar' [αr' ↦ fr'topt≡ar' i, r=r' ↦ unglue gr] ar')
+
+   -- scratch
+   ------------------------------------------------------------
+      (fr'.linv (coeⁱ r r' T gr) 1, fr'.coh (coeⁱ r r' T gr) 1)
+
+      (fr'.linv gr 1  , fr'.coh gr 1)
+    = (fr'⁻¹ (fr' gr) , fr'.rinv ar')
+
+      fr'.linv gr  : gr = fr'⁻¹ (fr' gr)
+      fr'.coh gr i : fr' (fr'.linv gr i) = ar'
+
+      fr'.coh gr :
+                PathPⁱ (fr' (fr'.linv gr i) = fr' gr)
+                       (refl (fr' gr)) (fr'.rinv (fr' gr)))
+
+                PathPⁱ (fr' (fr'.linv gr i) = ar')
+                       (refl ar') (fr'.rinv ar')))
+
+      fr'.coh gr i :
+        (fr' (fr'.linv gr i) = ar')
+  ------------------------------------------------------------
+
+
+
+-- With contr fibers
+--------------------------------------------------------------------------------
+coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
+
+  ar' := compⁱ r r' [∀i.α ↦ f (coeFillⁱ r r' T gr)] (unglue gr)
+
+  (fib*, contr) : αr' ⊢ isContr (fib fr' ar')
+  (fib*, contr) = fr' .isEquiv ar'
+
+  (topt, fr'topt≡ar') : αr' ⊢ fib fr' ar'
+  (topt, fr'topt≡ar') = hcompⁱ 0 1 (fib fr' ar')
+     [ ∀i.α ↦ contr (coeⁱ r r' T gr, refl (fr' _)) i
+     , r=r' ↦ contr (gr, refl (fr' _)) i
+     ] fib*
+
+  Res =
+    glue [αr' ↦ topt]
+         (hcompⁱ 1 0 Ar'
+            [ αr'  ↦ fr'topt≡ar' i
+            , r=r' ↦ unglue gr] ar')
+--------------------------------------------------------------------------------

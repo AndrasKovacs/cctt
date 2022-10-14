@@ -323,8 +323,8 @@ icompⁱ (Glue [α ↦ (T, f)] A) [β ↦ g] g₀
 
 icoe i:r~>r' (Glue [α ↦ (T, f)] A) g₀ : Glue [αr' ↦ (Tr', fr')] Ar' [r=r' ↦ g₀]
 
-   ar' : A r'
-   ar' = coe i r r' (unglue g₀)
+   ar' : Ar'
+   ar' = coeⁱ r r' A (unglue g₀)
 
    (fib*, contr) : αr' ⊢ isContr (fib fr' ar')
    (fib*, contr) = fr' .isEquiv ar'
@@ -335,15 +335,16 @@ icoe i:r~>r' (Glue [α ↦ (T, f)] A) g₀ : Glue [αr' ↦ (Tr', fr')] Ar' [r=r
    g₁ : Glue [αr' ↦ (Tr', fr')] Ar'
    g₁ = glue [αr' ↦ t] (hcomⁱ 1 0 [αr' ↦ fr't=ar' i] ar')
 
+--------------------------------------------------------------------------------
 
    ∀i.α ⊢ g₁ = coeⁱ r r' T g₀
         ⊢ t  = coeⁱ r r' T g₀
-
           t = fst (hcomp j 0 1 [r=r' ↦ contr (g₀, refl (fr g₀)) j] fib*)
 
-
    coeⁱ r r' (Glue [α ↦ (T, f)] A) g₀ :=
-     hcomʲ 0 1 [      (icoeⁱ r r' (Glue [α ↦ (T, f)] A) g₀)
+
+
+     -- hcomʲ 0 1 [      icoeⁱ r r' (Glue [α ↦ (T, f)] A) g₀)
 
 
 icoe i:r~>r' (Glue [α ↦ (T, f)] A) g₀ : Glue [αr' ↦ (Tr', fr')] Ar' [r=r' ↦ g₀]
@@ -413,33 +414,48 @@ icompⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr
   Res = glue [αr' ↦ topt] (hcompⁱ 1 0 [αr' ↦ fr'topt≡ar' i, β ↦ unglue tr', r=r' ↦ unglue gr] ar')
 
   compⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr
-    = icompⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t, ∀i.α ↦ fillⁱ r r' [β ↦ g] gr] gr
-
-
-CARTESIAN comp inline
+    = icompⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t, ∀i.α ↦ fillⁱ r r' T [β ↦ g] gr] gr
 
 compⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr
 
-  ar = unglue gr
-
-  ar' := compⁱ r r' [β ↦ unglue t, ∀i.α ↦ fillⁱ r r' [β ↦ unglue t] ar)] ar
+  ar' := compⁱ r r' [β ↦ unglue t, ∀i.α ↦ unglue (fillⁱ r r' T [β ↦ g] gr)] (unglue gr)
 
   (fib*, contr) : αr' ⊢ isContr (fib fr' ar')
   (fib*, contr) = fr' .isEquiv ar'
 
   (topt, fr'topt≡ar') : αr' ⊢ fib fr' ar'
   (topt, fr'topt≡ar') = hcompⁱ 0 1
-    [β    ↦ contr (tr', refl (fr' tr')) i,
-     ∀i.α ↦ contr (compⁱ r r' [β ↦ t] gr, refl _) i
-     r=r' ↦ contr (gr, refl (fr gr)) i] fib*
+    [  β    ↦ contr (tr', refl (fr' tr')) i
+     , ∀i.α ↦ contr (comⁱ r r' T [β ↦ g] gr, refl (fr' (comⁱ r r' T [β ↦ g] gr))) i
+     , r=r' ↦ contr (gr, refl (fr gr)) i
+     ] fib*
 
-  Res = glue [αr' ↦ topt]
-             (hcompⁱ 1 0 [
-                αr'  ↦ fr'topt≡ar' i,
-                β    ↦ unglue tr',
-                ∀i.α ↦ compⁱ r r' [β ↦ unglue t] ar
-                r=r' ↦ unglue gr ]
-                ar')
+  Res =
+    glue [αr' ↦ topt]
+         (hcompⁱ 1 0 [  αr'  ↦ fr'topt≡ar' i
+                      , β    ↦ unglue tr'
+                      , r=r' ↦ unglue gr] ar')
+
+coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
+
+  ar' := compⁱ r r' [∀i.α ↦ f (coeFillⁱ r r' T gr)] (unglue gr)
+
+  (fib*, contr) : αr' ⊢ isContr (fib fr' ar')
+  (fib*, contr) = fr' .isEquiv ar'
+
+  (topt, fr'topt≡ar') : αr' ⊢ fib fr' ar'
+  (topt, fr'topt≡ar') = hcompⁱ 0 1 (fib fr' ar')
+     [ ∀i.α ↦ contr (coeⁱ r r' T gr, refl (fr' _)) i
+     , r=r' ↦ contr (gr, refl (fr' _)) i
+     ] fib*
+
+  Res =
+    glue [αr' ↦ topt]
+         (hcompⁱ 1 0 Ar'
+            [ αr'  ↦ fr'topt≡ar' i
+            , r=r' ↦ unglue gr] ar')
+
+
 
 CARTESIAN coe
 
@@ -496,9 +512,6 @@ hcompⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr : Glue [α ↦ (T, f)] A [�
   glue [α ↦ hcompⁱ r r' T [β ↦ t] gr]
        (hcompⁱ r r' A [β ↦ unglue t, α ↦ f (hfillⁱ r r' T [β ↦ t] gr)] (unglue gr))
 
-
-
-
 SYM
 
 p : Path A x y
@@ -510,6 +523,34 @@ compⁱ r r' A [β ↦ t] a := hcompⁱ r r' (A r') [β ↦ coefill⁻¹ i r r' 
 hcompⁱ r r' ((x:A)×B x) [β ↦ t] b =
    ( hcompⁱ r r' A [β ↦ t.1](b.1)
    , compⁱ  r r' (B (hfill i r r' A [β ↦ t.1] (b.1))) [β ↦ t.2] b.2 )
+
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 -}

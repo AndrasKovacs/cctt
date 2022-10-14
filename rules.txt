@@ -69,17 +69,17 @@ Composition (derived)
 -- filling
 --------------------------------------------------------------------------------
 
-Γ, i ⊢ coeFillⁱ r r' A t : A [i=r ↦ t, i=r' ↦ coeⁱ r r' A t ]
-       coeFillⁱ r r' A t := coeʲ r i (A j) t  -- fresh j
+Γ, i ⊢ coeFillⁱ r A t : A [i=r ↦ t, i=r' ↦ coeⁱ r r' A t ]
+       coeFillⁱ r A t := coeʲ r i (A j) t  -- fresh j
 
-Γ, i ⊢ coeFill⁻¹ⁱ r r' A t : A [i=r ↦ coeⁱ r' r A t, i=r' ↦ t]
-       coeFill⁻¹ⁱ r r' A t := coeʲ r' i (A j) t -- fresh j
+Γ, i ⊢ coeFill⁻¹ⁱ r' A t : A [i=r ↦ coeⁱ r' r A t, i=r' ↦ t]
+       coeFill⁻¹ⁱ r' A t := coeʲ r' i (A j) t -- fresh j
 
-Γ, i ⊢ hfillⁱ r r' A [α ↦ t] b : A[i=r ↦ b, i=r' ↦ hcomⁱ r r' A [α ↦ t] b]
-       hfillⁱ r r' A [α ↦ t] b := hcomʲ r i A [α ↦ t j] b
+Γ, i ⊢ hfillⁱ r A [α ↦ t] b : A[i=r ↦ b, i=r' ↦ hcomⁱ r r' A [α ↦ t] b]
+       hfillⁱ r A [α ↦ t] b := hcomʲ r i A [α ↦ t j] b
 
-Γ, i ⊢ hfill⁻¹ⁱ r r' A [α ↦ t] b : A[i=r ↦ hcomⁱ r' r A [α ↦ t] b, i=r' ↦ b]
-       hfill⁻¹ⁱ r r' A [α ↦ t] b := hcomʲ r' i A [α ↦ t j] b
+Γ, i ⊢ hfill⁻¹ⁱ r' A [α ↦ t] b : A[i=r ↦ hcomⁱ r' r A [α ↦ t] b, i=r' ↦ b]
+       hfill⁻¹ⁱ r' A [α ↦ t] b := hcomʲ r' i A [α ↦ t j] b
 
 --------------------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ hcomⁱ r r' ((a : A) → B a) [α ↦ t] b =
   λ a. hcomⁱ r r' (B a) [α ↦ t i a] (b a)
 
 hcomⁱ r r' (Pathʲ A lhs rhs) [α ↦ t] base =
-  (λ arg. hcomⁱ r r' A [arg=0 ↦ lhs, arg=1 ↦ rhs, α ↦ t arg] (base@arg))
+  (λ arg. hcomⁱ r r' (A arg) [arg=0 ↦ lhs, arg=1 ↦ rhs, α ↦ t arg] (base arg))
 
 hcomⁱ r r' ℕ [α ↦ zero]  zero    = zero
 hcomⁱ r r' ℕ [α ↦ suc t] (suc b) = suc (hcomⁱ r r' ℕ [α ↦ t] b)
