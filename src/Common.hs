@@ -54,26 +54,34 @@ impossible :: Dbg => a
 impossible = error "impossible"
 {-# noinline impossible #-}
 
-ctzInt :: Int -> Int
-ctzInt (I# n) = I# (word2Int# (ctz64# (int2Word# n)))
-{-# inline ctzInt #-}
+ctz :: Word -> Word
+ctz (W# n) = W# (ctz64# n)
+{-# inline ctz #-}
 
-clzInt :: Int -> Int
-clzInt (I# n) = I# (word2Int# (clz64# (int2Word# n)))
-{-# inline clzInt #-}
+clz :: Word -> Word
+clz (W# n) = W# (clz64# n)
+{-# inline clz #-}
+
+i2w :: Int -> Word
+i2w (I# n) = W# (int2Word# n)
+{-# inline i2w #-}
+
+w2i :: Word -> Int
+w2i (W# n) = I# (word2Int# n)
+{-# inline w2i #-}
 
 
 -- De Bruijn indices and levels
 --------------------------------------------------------------------------------
 
-newtype Ix = Ix {unIx :: Int}
-  deriving (Eq, Ord, Show, Num, Enum, Bits) via Int
+newtype Ix = Ix {unIx :: Word}
+  deriving (Eq, Ord, Show, Num, Enum, Bits) via Word
 
-newtype Lvl = Lvl {unLvl :: Int}
-  deriving (Eq, Ord, Show, Num, Enum, Bits) via Int
+newtype Lvl = Lvl {unLvl :: Word}
+  deriving (Eq, Ord, Show, Num, Enum, Bits) via Word
 
-newtype IVar = IVar# {unIVar :: Int}
-  deriving (Eq, Ord, Show, Num, Enum, Bits) via Int
+newtype IVar = IVar# {unIVar :: Word}
+  deriving (Eq, Ord, Show, Num, Enum, Bits) via Word
 
 lvlToIx :: Lvl -> Lvl -> Ix
 lvlToIx (Lvl envl) (Lvl x) = Ix (envl - x - 1)

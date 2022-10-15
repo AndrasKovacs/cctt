@@ -2,18 +2,18 @@
 module Substitution where
 
 import Common
-import GHC.Exts
-
 import qualified IVarSet as IS
 import Interval
 
-{-|
-Interval substitutions are packed lists of interval expresssions in a 64-bit
-word. The reserved "15" nibble value marks the end of the list. An ISub is keyed
-by De Bruijn levels, and the 0 level maps to the least significant nibble. -}
-newtype Sub = Sub Int
-type SubArg = (?sub :: Sub)  -- ImplicitParams
+-- import Debug.Trace
 
+{-|
+Interval substitutions are length-postfixed lists of interval expressions,
+stored in a 64-bit word. The most significant 4-bit (nibble) is the length. -}
+newtype Sub = Sub Word
+  deriving Eq via Word
+
+type SubArg = (?sub :: Sub)  -- ImplicitParams
 
 {-|
 Normalized cofibrations are also represented as interval substitutions. Here,
@@ -23,83 +23,81 @@ its equivalence class.
 type NCof = Sub
 type NCofArg = (?cof :: NCof)
 
+-- nibblesToWord :: [Word64] -> Word64
+-- nibblesToWord ns = go 0 0 ns where
+--   go shift acc []     = acc
+--   go shift acc (n:ns) = go (shift + 4) (unsafeShiftL n shift .|. acc) ns
+
+-- wordToNibbles :: Word64 -> [Word64]
+-- wordToNibbles = go where
+--   go 0 = []
+--   go n = n .&. 15 : go (unsafeShiftR n 4)
+
+emptySub# :: Word
+emptySub# = 1070935975390360080 -- nibblesToWord [0..14]
+{-# inline emptySub# #-}
+
 emptySub :: Sub
-emptySub = Sub 15
+emptySub = Sub emptySub#
 {-# inline emptySub #-}
 
-subLength :: Sub -> Int
-subLength (Sub (I# x)) = 15 - unsafeShiftR (I# (word2Int# (clz64# (int2Word# x)))) 2
+idSub :: IVar -> Sub
+idSub (IVar# x) = Sub (emptySub# .|. unsafeShiftL x 60)
+{-# inline idSub #-}
+
+subLength :: Sub -> Word
+subLength (Sub n) = unsafeShiftR n 60
 {-# inline subLength #-}
 
-snocSub :: Sub -> I -> Sub
-snocSub (Sub s@(I# s')) x =
-  let elemBits = 60 - I# (word2Int# (clz64# (int2Word# s')))
-      end      = unsafeShiftL 15 elemBits
-      end'     = unsafeShiftL end 4
-  in if elemBits == 60 then
-    impossible
-  else Sub (s .&. complement end                  -- zero out old end marker
-            .|. end'                              -- write new end marker
-            .|. unsafeShiftL (coerce x) elemBits) -- write new entry
-{-# inline snocSub #-}
-
+lookupSub :: IVar -> Sub -> I
+lookupSub (IVar# x) (Sub s) =
+  I (unsafeShiftR s (unsafeShiftL (w2i x) 2) .&. 15)
+{-# inline lookupSub #-}
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
 foldrSub :: forall b. (IVar -> I -> b -> b) -> b -> Sub -> b
-foldrSub f b (Sub s) = go 0 s where
-  go :: IVar -> Int -> b
-  go x s = case s .&. 15 of
-    15 -> b
-    i  -> f x (coerce i) $! go (x + 1) (unsafeShiftR s 4)
+foldrSub f b (Sub s) = go 0 (IVar# (subLength (Sub s))) s where
+  go i l n | i < l = f i (I (n .&. 15)) $! go (i + 1) l (unsafeShiftR n 4)
+  go i l n = b
 {-# inline foldrSub #-}
 
--- TODO: define using direct writing at index
-single :: IDomArg => IVar -> I -> Sub
-single x i = mapSub (\ix _ -> if ix == coerce x then i else coerce ix)
-                    (idSub ?idom)
-
-mapSub :: (Int -> I -> I) -> Sub -> Sub
-mapSub f (Sub s) = Sub (go 0 0 0 s) where
-  go :: Int -> Int -> Int -> Int -> Int
-  go out x shift inp = case inp .&. 15 of
-    15 -> unsafeShiftL 15 shift .|. out
-    i  -> let i' = f x (coerce i) in
-          go (unsafeShiftL (coerce i') shift .|. out)
-             (x + 1)
-             (shift + 4)
-             (unsafeShiftR inp 4)
-{-# inline mapSub #-}
-
 subToList :: Sub -> [I]
-subToList = foldrSub (\_ i acc -> i:acc) []
+subToList = foldrSub (\_ i is -> i:is) []
 
 subFromList :: [I] -> Sub
-subFromList is | length is > 15 = impossible
-               | True = Sub (go is 0 0) where
-  go []     shift s = unsafeShiftL 15 shift .|. s
-  go (i:is) shift s = go is (shift + 4) (unsafeShiftL (coerce i) shift .|. s)
+subFromList is = Sub (go acc 0 is .|. unsafeShiftL (i2w len) 60) where
+  len  = length is
+  blen = unsafeShiftL len 2
+  acc  = unsafeShiftL (unsafeShiftR emptySub# blen) blen
 
--- | Substitution which maps all vars below `i` to themselves.
-idSub :: IVar -> Sub
-idSub i = Sub (go i 0 0 0) where
-  go :: IVar -> IVar -> Int -> Int -> Int
-  go i j shift s
-    | j < i = go i (j + 1) (shift + 4) (unsafeShiftL (coerce j) shift .|. s)
-    | True  = unsafeShiftL 15 shift .|. s
-
-hasAction :: Sub -> Bool
-hasAction = foldrSub (\i j b -> IVar i /= j || b) False
-
--- | Substitution which maps all vars below `i` to themselves and maps `i` to `i + 1`.
-wk :: IVar -> Sub
-wk i = Sub (go i 0 0 0) where
-  go :: IVar -> IVar -> Int -> Int -> Int
-  go i j shift s
-    | j < i  = go i (j + 1) (shift + 4) (unsafeShiftL (coerce j) shift .|. s)
-    | True   = unsafeShiftL (coerce (j + 1)) shift .|. unsafeShiftL 15 (shift + 4) .|. s
+  go :: Word -> Int -> [I] -> Word
+  go acc shift []     = acc
+  go acc shift (i:is) = go (unsafeShiftL (coerce i) shift .|. acc) (shift + 4)  is
 
 instance Show Sub where
   show = show . subToList
+
+mapSub :: (IVar -> I -> I) -> Sub -> Sub
+mapSub f (Sub s) = Sub (go s s' 0 (coerce len)) where
+  len  = subLength (Sub s)
+  blen = unsafeShiftL len 2
+  s'   = unsafeShiftL (unsafeShiftR s (w2i blen)) (w2i blen)
+  go :: Word -> Word -> IVar -> IVar -> Word
+  go inp out ix len
+    | ix < len = let i' = f ix (I (inp .&. 15))
+                 in go (unsafeShiftR inp 4)
+                       (out .|. unsafeShiftL (coerce i') (w2i (coerce (unsafeShiftL ix 2))))
+                       (ix + 1) len
+    | True     = out
+{-# inline mapSub #-}
+
+-- 0 bits where the length is, else 1
+lengthUnMask# :: Word
+lengthUnMask# = 1152921504606846975
+
+hasAction :: Sub -> Bool
+hasAction (Sub s) = (s .&. lengthUnMask#) /= emptySub#
+{-# inline hasAction #-}
 
 class SubAction a where
   goSub :: a -> Sub -> a
@@ -107,12 +105,6 @@ class SubAction a where
 sub :: SubAction a => a -> Sub -> a
 sub ~a s = if hasAction s then goSub a s else a
 {-# inline sub #-}
-
-lookupSub :: IVar -> Sub -> I
-lookupSub (IVar# x) (Sub s)
-  | 0 <= x && x < subLength (Sub s) = I (unsafeShiftR s (unsafeShiftL x 2) .&. 15)
-  | True                            = impossible
-{-# inline lookupSub #-}
 
 instance SubAction I where
   goSub (IVar x) s = lookupSub x s
@@ -122,7 +114,6 @@ instance SubAction I where
 -- substitution composition
 instance SubAction Sub where
   goSub f g = mapSub (\_ i -> sub i g) f
-  {-# inline goSub #-}
 
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
@@ -146,7 +137,6 @@ isUnblocked' is =
            is
            (mempty @IS.IVarSet)
 
--- TODO: if hasAction is very cheap, it makes sense to use it here as well
 instance SubAction IS.IVarSet where
   goSub is s = IS.foldl
     (\acc i -> IS.insertI (lookupSub i s) acc)

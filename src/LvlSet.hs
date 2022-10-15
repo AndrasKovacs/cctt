@@ -6,7 +6,7 @@ module LvlSet where
 import Data.Foldable
 import Common
 
-newtype LvlSet = LvlSet Int deriving (Eq, Bits) via Int
+newtype LvlSet = LvlSet Word deriving (Eq, Bits) via Word
 
 instance Semigroup LvlSet where
   (<>) = (.|.)
@@ -21,15 +21,15 @@ singleton x = insert x mempty
 {-# inline singleton #-}
 
 insert :: Lvl -> LvlSet -> LvlSet
-insert (Lvl x) (LvlSet s) = LvlSet (unsafeShiftL 1 x .|. s)
+insert (Lvl x) (LvlSet s) = LvlSet (unsafeShiftL 1 (w2i x) .|. s)
 {-# inline insert #-}
 
 delete :: Lvl -> LvlSet -> LvlSet
-delete (Lvl x) (LvlSet s) = LvlSet (complement (unsafeShiftL 1 x) .&. s)
+delete (Lvl x) (LvlSet s) = LvlSet (complement (unsafeShiftL 1 (w2i x)) .&. s)
 {-# inline delete #-}
 
 member :: Lvl -> LvlSet -> Bool
-member (Lvl x) (LvlSet s) = (unsafeShiftL 1 x .&. s) /= 0
+member (Lvl x) (LvlSet s) = (unsafeShiftL 1 (w2i x) .&. s) /= 0
 {-# inline member #-}
 
 toList :: LvlSet -> [Lvl]
@@ -41,7 +41,7 @@ fromList = foldl' (flip insert) mempty
 popSmallest :: LvlSet -> (LvlSet -> Lvl -> a) -> a -> a
 popSmallest (LvlSet s) success ~fail = case s of
   0 -> fail
-  s -> let i = Lvl (ctzInt s) in success (delete i (LvlSet s)) i
+  s -> let i = Lvl (ctz s) in success (delete i (LvlSet s)) i
 {-# inline popSmallest #-}
 
 instance Show LvlSet where
