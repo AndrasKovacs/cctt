@@ -10,7 +10,7 @@ import Interval
 {-|
 Interval substitutions are length-postfixed lists of interval expressions,
 stored in a 64-bit word. The most significant 4-bit (nibble) is the length. -}
-newtype Sub = Sub Word
+newtype Sub = Sub {unSub :: Word}
   deriving Eq via Word
 
 type SubArg = (?sub :: Sub)  -- ImplicitParams
@@ -23,18 +23,18 @@ its equivalence class.
 type NCof = Sub
 type NCofArg = (?cof :: NCof)
 
--- nibblesToWord :: [Word64] -> Word64
--- nibblesToWord ns = go 0 0 ns where
---   go shift acc []     = acc
---   go shift acc (n:ns) = go (shift + 4) (unsafeShiftL n shift .|. acc) ns
+nibblesToWord :: [Word] -> Sub
+nibblesToWord ns = Sub (go 0 0 ns) where
+  go shift acc []     = acc
+  go shift acc (n:ns) = go (shift + 4) (unsafeShiftL n shift .|. acc) ns
 
--- wordToNibbles :: Word64 -> [Word64]
--- wordToNibbles = go where
---   go 0 = []
---   go n = n .&. 15 : go (unsafeShiftR n 4)
+wordNibbles :: Sub -> [Word]
+wordNibbles (Sub s) = go s where
+  go 0 = []
+  go n = n .&. 15 : go (unsafeShiftR n 4)
 
 emptySub# :: Word
-emptySub# = 1070935975390360080 -- nibblesToWord [0..14]
+emptySub# = 1070935975390360080 -- nibblesToSub [0..14]
 {-# inline emptySub# #-}
 
 emptySub :: Sub
@@ -94,6 +94,24 @@ mapSub f (Sub s) = Sub (go s s' 0 (coerce len)) where
 -- 0 bits where the length is, else 1
 lengthUnMask# :: Word
 lengthUnMask# = 1152921504606846975
+
+extSub :: Sub -> I -> Sub
+extSub (Sub s) i =
+  let l  = subLength (Sub s)
+      bl = unsafeShiftL l 2
+  in Sub (s .&. lengthUnMask#
+            .&. complement (unsafeShiftL 15 (w2i bl))
+            .|. unsafeShiftL (l + 1) 60
+            .|. unsafeShiftL (coerce i) (w2i bl))
+{-# inline extSub #-}
+
+single :: IDomArg => IVar -> I -> Sub
+single x i =
+  let xbits  = unsafeShiftL (coerce x) 2
+  in Sub (unSub (idSub ?idom)
+            .&. complement (unsafeShiftL 15 (w2i xbits))
+            .|. unsafeShiftL (coerce i) (w2i xbits))
+{-# inline single #-}
 
 hasAction :: Sub -> Bool
 hasAction (Sub s) = (s .&. lengthUnMask#) /= emptySub#

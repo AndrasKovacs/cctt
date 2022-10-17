@@ -165,11 +165,13 @@ data System = SEmpty | SCons Cof Tm System
 data NeCof
   = NCEq I I
   | NCAnd NeCof NeCof
+  deriving Show
 
 data VCof
   = VCTrue
   | VCFalse
   | VCNe NeCof IS.IVarSet
+  deriving Show
 
 ctrue  = F VCTrue
 cfalse = F VCFalse
@@ -194,15 +196,18 @@ ceq c1 c2 = case (unF c1, unF c2) of
   (I1, I0)        -> cfalse
   (i, j)          -> F (VCNe (NCEq i j) (iToVarSet i <> iToVarSet j))
 
-data NSystem' cof
-  = NSEmpty'
-  | NSCons' cof ~Val (NSystem' cof)
+data NSystemComps cof
+  = NSEmpty
+  | NSCons cof ~Val (NSystemComps cof)
+  deriving Show
 
-data NSystem cof = NSystem {_nsys :: NSystem' cof, _ivars :: IS.IVarSet}
+data NSystem cof = NSystem {_nsys :: NSystemComps cof, _ivars :: IS.IVarSet}
+  deriving Show
 
 data VSystem cof
   = VSTotal ~Val
   | VSNe {-# unpack #-} (NSystem cof)
+  deriving Show
 
 unFSystem :: F (VSystem (F VCof)) -> VSystem VCof
 unFSystem = coerce
@@ -223,15 +228,15 @@ evalCof = \case
   CAnd eq cof -> cand (evalEq eq) (evalCof cof)
 
 sempty :: F (VSystem (F VCof))
-sempty = F (VSNe (NSystem NSEmpty' mempty))
+sempty = F (VSNe (NSystem NSEmpty mempty))
 
 bindI' :: (IDomArg => SubArg => NCofArg => IVar -> a)
        -> (IDomArg => SubArg => NCofArg => a)
 bindI' act =
   let fresh = ?idom in
   let ?idom = ?idom + 1
-      ?sub  = snocSub ?sub (IVar ?idom)
-      ?cof  = snocSub ?cof (IVar ?idom)
+      ?sub  = extSub ?sub (IVar ?idom)
+      ?cof  = extSub ?cof (IVar ?idom)
   in act fresh
 {-# inline bindI' #-}
 
@@ -239,7 +244,7 @@ bindI :: (IDomArg => NCofArg => IVar -> a) -> (IDomArg => NCofArg => a)
 bindI act =
   let fresh = ?idom in
   let ?idom = ?idom + 1
-      ?cof  = snocSub ?cof (IVar ?idom)
+      ?cof  = extSub ?cof (IVar ?idom)
   in act fresh
 {-# inline bindI #-}
 
@@ -274,7 +279,7 @@ scons ::
   F VCof -> Val -> F (VSystem (F VCof)) -> F (VSystem (F VCof))
 scons cof ~v sys = case unF sys of
   VSTotal v              -> F (VSTotal v)
-  VSNe (NSystem nsys is) -> F (VSNe (NSystem (NSCons' cof v nsys) uf))
+  VSNe (NSystem nsys is) -> F (VSNe (NSystem (NSCons cof v nsys) uf))
 {-# inline scons #-}
 
 evalSystem :: IDomArg => SubArg => NCofArg => DomArg => EnvArg =>
@@ -285,16 +290,16 @@ evalSystem = \case
     let vcof = evalCof cof in
     scons vcof (bindCof vcof (bindI \_ -> eval t)) (evalSystem sys)
 
-mapNSystem' :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
-               (IDomArg => NCofArg => DomArg => NSystem' (F VCof) -> NSystem' (F VCof))
-mapNSystem' f = go where
-  go NSEmpty'            = NSEmpty'
-  go (NSCons' cof v sys) = NSCons' cof (bindCof cof $ bindI \i -> f i v) (go sys)
-{-# inline mapNSystem' #-}
+mapNSystemComps :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
+               (IDomArg => NCofArg => DomArg => NSystemComps (F VCof) -> NSystemComps (F VCof))
+mapNSystemComps f = go where
+  go NSEmpty            = NSEmpty
+  go (NSCons cof v sys) = NSCons cof (bindCof cof $ bindI \i -> f i v) (go sys)
+{-# inline mapNSystemComps #-}
 
 mapNSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
               (IDomArg => NCofArg => DomArg => NSystem (F VCof) -> NSystem (F VCof))
-mapNSystem f (NSystem nsys is) = NSystem (mapNSystem' f nsys) is
+mapNSystem f (NSystem nsys is) = NSystem (mapNSystemComps f nsys) is
 {-# inline mapNSystem #-}
 
 mapVSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
@@ -314,10 +319,12 @@ data Ne
   | NCoe I I Name VTy Val
   | NHCom I I Name VTy (NSystem VCof) Val
   | NUnglue Val (NSystem VCof)
+  deriving Show
 
 data Env
   = ENil
   | EDef Env ~Val
+  deriving Show
 
 type EnvArg = (?env :: Env)
 
@@ -331,15 +338,19 @@ data Closure
 
   -- ^ Body of function hcom.
   | CHComPi I I Name VTy Closure {-# unpack #-} (NSystem VCof) Val
+  deriving Show
 
 -- | Defunctionalized closures for IVar abstraction.
 data IClosure
   = ICEval Sub Env Tm
   | ICCoePathP I I Name IClosure Val Val Val
   | ICHComPathP I I Name IClosure Val Val {-# unpack #-} (NSystem VCof) Val
+  deriving Show
 
 type VTy = Val
 
+-- TODO: could we index values by forcedness? Then all canonical consructors
+-- could be written without explicit F wrapping.
 data Val
   = VSub Val Sub
 
@@ -358,6 +369,7 @@ data Val
   | VSg Name VTy Closure
   | VPair Val Val
   | VU
+  deriving Show
 
 type DomArg  = (?dom :: Lvl)    -- fresh LocalVar
 
@@ -383,10 +395,10 @@ instance SubAction VCof where
 instance SubAction (NSystem VCof) where
   goSub (NSystem nsys is) s = NSystem (goSub nsys s) (goSub is s)
 
-instance SubAction (NSystem' VCof) where
+instance SubAction (NSystemComps VCof) where
   goSub sys s = case sys of
-    NSEmpty'          -> NSEmpty'
-    NSCons' cof v sys -> NSCons' (goSub cof s) (goSub v s) (goSub sys s)
+    NSEmpty          -> NSEmpty
+    NSCons cof v sys -> NSCons (goSub cof s) (goSub v s) (goSub sys s)
 
 instance SubAction (VSystem VCof) where
   goSub sys s = case sys of
@@ -484,7 +496,7 @@ cappf' t ~u = force' (capp t u); {-# inline cappf' #-}
 -- | Apply an ivar closure.
 icapp :: IDomArg => NCofArg => DomArg => IClosure -> I -> Val
 icapp t arg = case t of
-  ICEval s env t -> let ?env = env; ?sub = snocSub s arg in eval t
+  ICEval s env t -> let ?env = env; ?sub = extSub s arg in eval t
 
   ICCoePathP (forceI -> r) (forceI -> r') ix a lhs rhs p ->
     let farg = forceI arg in
@@ -504,11 +516,8 @@ icapp t arg = case t of
           scons (ceq farg (F I1)) rhs $
           (mapVSystem (\_ t -> papp (force t) lhs rhs farg)  sys)
         )
-
       (pappf (force p) lhs rhs farg)
 
--- hcomⁱ r r' (Pathʲ A lhs rhs) [α ↦ t] base =
---   (λ arg. hcomⁱ r r' (A arg) [arg=0 ↦ lhs, arg=1 ↦ rhs, α ↦ t arg] (base arg))
 
 icappf  t i = force  (icapp t i); {-# inline icappf  #-}
 icappf' t i = force' (icapp t i); {-# inline icappf' #-}
@@ -639,7 +648,7 @@ hcom :: IDomArg => NCofArg => DomArg => F I -> F I
      -> Name -> F Val -> F (VSystem (F VCof)) -> F Val -> Val
 hcom r r' i ~a ~t ~b
   | unF r == unF r'          = unF b
-  | VSTotal v       <- unF t = singleSub v ?idom r'
+  | VSTotal v       <- unF t = topSub v r'
   | VSNe nsys       <- unF t = unF (goHCom r r' i a nsys b)
 {-# inline hcom #-}
 
@@ -647,20 +656,29 @@ hcomf  r r' i ~a ~t ~b = force  (hcom r r' i a t b); {-# inline hcomf  #-}
 hcomf' r r' i ~a ~t ~b = force' (hcom r r' i a t b); {-# inline hcomf' #-}
 
 inst :: IDomArg => NCofArg => DomArg => Val -> F I -> F Val
-inst v i = forceVSub v (snocSub (idSub ?idom) (unF i))
+inst v i = forceVSub v (extSub (idSub ?idom) (unF i))
 {-# inline inst #-}
 
+-- | Identity sub except one var is mapped to
 singleSubf :: IDomArg => NCofArg => DomArg => F Val -> IVar -> F I -> F Val
 singleSubf t x i = forceVSub (unF t) (single x (unF i))
 
 singleSub :: IDomArg => Val -> IVar -> F I -> Val
 singleSub t x i = sub t (single x (unF i))
 
+-- | Instantiate the topmost var.
+topSubf :: IDomArg => NCofArg => DomArg => F Val -> F I -> F Val
+topSubf t i = forceVSub (unF t) (idSub ?idom `extSub` unF i)
+
+-- | Instantiate the topmost var.
+topSub :: IDomArg => Val -> F I -> Val
+topSub t i = sub t (idSub ?idom `extSub` unF i)
+
 com :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
     -> F (VSystem (F VCof)) -> F Val -> Val
 com r r' x ~a ~sys ~b =
   hcom r r' x
-    (singleSubf a ?idom r')
+    (topSubf a r')
     (mapVSystem
        (\i t ->
            unF (goCoe (F (IVar i)) r' "j"
@@ -673,7 +691,7 @@ goCom :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
     -> NSystem (F VCof) -> F Val -> F Val
 goCom r r' x a nsys  b =
   goHCom r r' x
-    (singleSubf a ?idom r')
+    (topSubf a r')
     (mapNSystem
        (\i t ->
            unF (goCoe (F (IVar i)) r' "j"
@@ -731,25 +749,35 @@ eval = \case
 -- Forcing
 --------------------------------------------------------------------------------
 
-forceCof :: IDomArg => NCofArg => Cof -> F VCof
-forceCof cof = let ?sub = idSub ?idom in forceCof' cof
+forceNeCof' :: SubArg => NCofArg => NeCof -> F VCof
+forceNeCof' = \case
+  NCEq i j -> ceq (forceI' i) (forceI' j)
+  NCAnd c1 c2 -> cand (forceNeCof' c1) (forceNeCof' c2)
 
-forceCof' :: SubArg => NCofArg => Cof -> F VCof
-forceCof' = evalCof -- for Cof, evaluation and forcing with ISub is the same
-
-forceSystem' :: SubArg => NCofArg => VSystem VCof -> F (VSystem (F VCof))
-forceSystem' = uf
-  -- VSEmpty          -> FVSNeutral (FVSEmpty, mempty)
-  -- VSCons cof v sys -> fvsCons cof v (forceSystem' sys)
-
-forceNSystem' :: SubArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
-forceNSystem' sys = uf
+forceCof' :: SubArg => NCofArg => VCof -> F VCof
+forceCof' = \case
+  VCTrue       -> ctrue
+  VCFalse      -> cfalse
+  VCNe ncof is -> forceNeCof' ncof
 
 forceNSystem :: IDomArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
-forceNSystem sys = uf
+forceNSystem nsys = let ?sub = idSub ?idom in forceNSystem' nsys
 
 forceSystem :: IDomArg => NCofArg => VSystem VCof -> F (VSystem (F VCof))
 forceSystem sys = let ?sub = idSub ?idom in forceSystem' sys
+
+forceSystem' :: IDomArg => SubArg => NCofArg => VSystem VCof -> F (VSystem (F VCof))
+forceSystem' = \case
+  VSTotal v -> F (VSTotal v)
+  VSNe nsys -> forceNSystem nsys
+
+forceNSystemComps' :: IDomArg => SubArg => NCofArg => NSystemComps VCof -> F (VSystem (F VCof))
+forceNSystemComps' = \case
+  NSEmpty          -> sempty
+  NSCons cof t sys -> scons (forceCof' cof) t (forceNSystemComps' sys)
+
+forceNSystem' :: IDomArg => SubArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
+forceNSystem' (NSystem nsys _) = forceNSystemComps' nsys
 
 forceVSub :: IDomArg => NCofArg => DomArg => Val -> Sub -> F Val
 forceVSub v s = let ?sub = s in force' v
