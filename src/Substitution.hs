@@ -5,7 +5,6 @@ import Common
 import qualified IVarSet as IS
 import Interval
 
--- import Debug.Trace
 
 {-|
 Interval substitutions are length-postfixed lists of interval expressions,
@@ -131,7 +130,7 @@ instance SubAction I where
 
 -- substitution composition
 instance SubAction Sub where
-  goSub f g = mapSub (\_ i -> sub i g) f
+  goSub f g = mapSub (\_ i -> goSub i g) f
 
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.

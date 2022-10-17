@@ -89,7 +89,7 @@ executable cubeval
     , megaparsec
     , strict-impl-params
   if flag(dump)
-    ghc-options: -ddump-simpl -ddump-stg -ddump-cmm -dsuppress-all -dno-suppress-type-signatures -ddump-to-file
+    ghc-options: -ddump-simpl -ddump-stg-final -ddump-cmm -dsuppress-all -dno-suppress-type-signatures -ddump-to-file
   if flag(llvm)
     ghc-options: -fllvm
   if flag(debug)

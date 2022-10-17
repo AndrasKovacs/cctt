@@ -108,7 +108,8 @@ Semantic ops:
 -}
 
 
-newtype F a = F {unF :: a} deriving SubAction
+newtype F a = F {unF :: a}
+  deriving SubAction via a
 
 -- Syntax
 --------------------------------------------------------------------------------
@@ -188,6 +189,13 @@ iToVarSet :: I -> IS.IVarSet
 iToVarSet = \case
   IVar x -> IS.singleton x
   _      -> mempty
+
+vCofToVarSet :: F VCof -> IS.IVarSet
+vCofToVarSet cof = case unF cof of
+  VCTrue    -> mempty
+  VCFalse   -> mempty
+  VCNe _ is -> is
+
 
 ceq :: F I -> F I -> F VCof
 ceq c1 c2 = case (unF c1, unF c2) of
@@ -279,7 +287,7 @@ scons ::
   F VCof -> Val -> F (VSystem (F VCof)) -> F (VSystem (F VCof))
 scons cof ~v sys = case unF sys of
   VSTotal v              -> F (VSTotal v)
-  VSNe (NSystem nsys is) -> F (VSNe (NSystem (NSCons cof v nsys) uf))
+  VSNe (NSystem nsys is) -> F (VSNe (NSystem (NSCons cof v nsys) (vCofToVarSet cof <> is)))
 {-# inline scons #-}
 
 evalSystem :: IDomArg => SubArg => NCofArg => DomArg => EnvArg =>
@@ -319,6 +327,7 @@ data Ne
   | NCoe I I Name VTy Val
   | NHCom I I Name VTy (NSystem VCof) Val
   | NUnglue Val (NSystem VCof)
+  | NGlue Val (NSystem VCof)
   deriving Show
 
 data Env
@@ -359,7 +368,7 @@ data Val
   -- them in coe/hcom.
   | VNe Ne IS.IVarSet         -- TODO: can we annotate with NCof (of the last forcing)
                               -- if stored NCof == current NCof, shortcut?
-  | VGlueTy VTy (VSystem VCof) IS.IVarSet
+  | VGlueTy VTy (NSystem VCof)
 
   -- canonicals
   | VPi Name VTy Closure
@@ -591,7 +600,7 @@ goCoe r r' i a t = case unF a of
     F (VNe (NCoe (unF r) (unF r') i a (unF t))
            (IS.insertI (unF r) $ IS.insertI (unF r') is))
 
-  VGlueTy a sys is ->
+  VGlueTy a sys ->
     uf
 
   _ ->
@@ -638,7 +647,7 @@ goHCom r r' ix a nsys base = case unF a of
   VU ->
     uf
 
-  VGlueTy a sys is ->
+  VGlueTy a sys  ->
     uf
 
   _ ->
@@ -700,19 +709,28 @@ goCom r r' x a nsys  b =
        nsys)
     (goCoe r r' x a b)
 
-glueTy :: Val -> F (VSystem (F VCof)) -> Val
-glueTy ~a sys = uf
+glueTy :: IDomArg => NCofArg => DomArg => Val -> F (VSystem (F VCof)) -> Val
+glueTy a sys = case unF sys of
+  VSTotal b -> proj1 (force b)
+  VSNe nsys -> VGlueTy a (unFNSystem nsys)
 {-# inline glueTy #-}
 
 glueTyf  ~a sys = force  (glueTy a sys); {-# inline glueTyf  #-}
 glueTyf' ~a sys = force' (glueTy a sys); {-# inline glueTyf' #-}
 
-glueTm :: Val -> F (VSystem (F VCof)) -> Val
-glueTm = uf
-{-# inline glueTm #-}
+glue :: Val -> F (VSystem (F VCof)) -> Val
+glue ~t sys = case unF sys of
+  VSTotal v -> v
+  VSNe nsys -> VNe (NGlue t (unFNSystem nsys)) (_ivars nsys)
+{-# inline glue #-}
 
-unglue :: Val -> F (VSystem (F VCof)) -> Val
-unglue ~a sys = uf
+gluef  ~a sys = force  (glue a sys); {-# inline gluef  #-}
+gluef' ~a sys = force' (glue a sys); {-# inline gluef' #-}
+
+unglue :: IDomArg => NCofArg => DomArg => Val -> F (VSystem (F VCof)) -> Val
+unglue t sys = case unF sys of
+  VSTotal teqv -> app (proj1f (proj2f (force teqv))) t
+  VSNe nsys    -> VNe (NUnglue t (unFNSystem nsys)) (_ivars nsys)
 {-# inline unglue #-}
 
 ungluef  ~a sys = force  (unglue a sys); {-# inline ungluef  #-}
@@ -742,7 +760,7 @@ eval = \case
   Coe r r' x a t    -> unF (coe (evalI r) (evalI r') x (bindI' \_ -> evalf a) (evalf t))
   HCom r r' x a t b -> hcom (evalI r) (evalI r') x (evalf a) (evalSystem t) (evalf b)
   GlueTy a sys      -> glueTy (eval a) (evalSystem sys)
-  GlueTm t sys      -> glueTm (eval t) (evalSystem sys)
+  GlueTm t sys      -> glue   (eval t) (evalSystem sys)
   Unglue t sys      -> unglue (eval t) (evalSystem sys)
 
 
@@ -789,10 +807,10 @@ force v = let ?sub = idSub ?idom in force' v
 
 force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> F Val
 force' = \case
-  VSub v s                           -> let ?sub = sub s ?sub in force' v
-  VNe t is         | isUnblocked' is -> forceNe' t
-  VGlueTy a sys is | isUnblocked' is -> glueTyf' a (forceSystem' sys)
-  v                                  -> F (sub v ?sub)
+  VSub v s                                  -> let ?sub = sub s ?sub in force' v
+  VNe t is      | isUnblocked' is           -> forceNe' t
+  VGlueTy a sys | isUnblocked' (_ivars sys) -> glueTyf' a (forceNSystem' sys)
+  v                                         -> F (sub v ?sub)
 
 forceI :: NCofArg => I -> F I
 forceI i = F (sub i ?cof)
@@ -822,3 +840,4 @@ forceNe' = \case
   NHCom r r' x a sys t -> hcomf' (forceI' r) (forceI' r') x (force' a)
                                  (forceNSystem' sys) (force' t)
   NUnglue t sys        -> ungluef' t (forceNSystem' sys)
+  NGlue t sys          -> gluef' t (forceNSystem' sys)
