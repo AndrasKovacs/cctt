@@ -124,37 +124,39 @@ sub ~a s = if hasAction s then goSub a s else a
 {-# inline sub #-}
 
 instance SubAction I where
-  goSub (IVar x) s = lookupSub x s
-  goSub i        _ = i
+  goSub i s = matchIVar i
+    (\x -> lookupSub x s) i
   {-# inline goSub #-}
 
 -- substitution composition
 instance SubAction Sub where
   goSub f g = mapSub (\_ i -> goSub i g) f
+  {-# noinline goSub #-}
 
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
 isUnblocked :: NCofArg => IS.IVarSet -> Bool
-isUnblocked is =
-  IS.foldr (\x hyp varset -> case lookupSub x ?cof of
-               IVar x | not (IS.member x varset) -> hyp (IS.insert x varset)
-               _ -> True)
-           (\_ -> False)
-           is
-           (mempty @IS.IVarSet)
+isUnblocked is = go is mempty where
+  go :: IS.IVarSet -> IS.IVarSet -> Bool
+  go is varset = IS.popSmallest is
+    (\is x -> matchIVar (lookupSub x ?cof)
+       (\x -> not (IS.member x varset) && go is (IS.insert x varset))
+       True)
+    False
 
 isUnblocked' :: SubArg => NCofArg => IS.IVarSet -> Bool
-isUnblocked' is =
-  IS.foldr (\x hyp varset -> case lookupSub x ?sub of
-               IVar x -> case lookupSub x ?cof of
-                 IVar x | not (IS.member x varset) -> hyp (IS.insert x varset)
-                 _ -> True
-               _ -> True)
-           (\_ -> False)
-           is
-           (mempty @IS.IVarSet)
+isUnblocked' is = go is (mempty @IS.IVarSet) where
+  go :: IS.IVarSet -> IS.IVarSet -> Bool
+  go is varset = IS.popSmallest is
+    (\is x -> matchIVar (lookupSub x ?sub)
+      (\x -> matchIVar (lookupSub x ?cof)
+        (\x -> not (IS.member x varset) && go is (IS.insert x varset))
+        True)
+      True)
+    False
 
 instance SubAction IS.IVarSet where
   goSub is s = IS.foldl
     (\acc i -> IS.insertI (lookupSub i s) acc)
     mempty is
+  {-# noinline goSub #-}

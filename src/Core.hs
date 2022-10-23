@@ -196,13 +196,14 @@ vCofToVarSet cof = case unF cof of
   VCFalse   -> mempty
   VCNe _ is -> is
 
-
 ceq :: F I -> F I -> F VCof
 ceq c1 c2 = case (unF c1, unF c2) of
   (i, j) | i == j -> ctrue
-  (I0, I1)        -> cfalse
-  (I1, I0)        -> cfalse
-  (i, j)          -> F (VCNe (NCEq i j) (iToVarSet i <> iToVarSet j))
+  (i, j) -> matchIVar i
+    (\x -> matchIVar j
+     (\y -> F (VCNe (NCEq i j) (IS.singleton x <> IS.singleton y)))
+     cfalse)
+    cfalse
 
 data NSystemComps cof
   = NSEmpty
@@ -298,17 +299,20 @@ evalSystem = \case
     let vcof = evalCof cof in
     scons vcof (bindCof vcof (bindI \_ -> eval t)) (evalSystem sys)
 
+-- TODO: we generally get a runtime closure from this! Try to make GHC lambda-lift function args
+-- instead!
 mapNSystemComps :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
                (IDomArg => NCofArg => DomArg => NSystemComps (F VCof) -> NSystemComps (F VCof))
 mapNSystemComps f = go where
   go NSEmpty            = NSEmpty
-  go (NSCons cof v sys) = NSCons cof (bindCof cof $ bindI \i -> f i v) (go sys)
+  go (NSCons cof v sys) = NSCons cof (bindCof cof (bindI \i -> f i v)) (go sys)
 {-# inline mapNSystemComps #-}
 
 mapNSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
               (IDomArg => NCofArg => DomArg => NSystem (F VCof) -> NSystem (F VCof))
 mapNSystem f (NSystem nsys is) = NSystem (mapNSystemComps f nsys) is
 {-# inline mapNSystem #-}
+
 
 mapVSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
               (IDomArg => NCofArg => DomArg => F (VSystem (F VCof)) -> F (VSystem (F VCof)))
@@ -494,13 +498,20 @@ capp t ~u = case t of
   CHComPi (forceI -> r) (forceI -> r') i a b sys base ->
     hcom r r' i (cappf b u)
          (mapVSystem                    -- TODO: map+force can be fused
-            (\i t -> app (force t) u)
+            (implParams \i t -> app (force t) u)
             (forceNSystem sys))
          (appf (force base) u)
 
 
 cappf  t ~u = force  (capp t u); {-# inline cappf  #-}
 cappf' t ~u = force' (capp t u); {-# inline cappf' #-}
+
+-- This is required to make lambdas with impl params strict. TODO: improve
+-- the plugin!
+-- TODO: can I instead make functions strict at use site in mapVSystem?
+implParams :: (IDomArg => NCofArg => DomArg => a) -> (IDomArg => NCofArg => DomArg => a)
+implParams f = let !_ = ?idom; !_ = ?cof; !_ = ?dom in f
+{-# inline implParams #-}
 
 -- | Apply an ivar closure.
 icapp :: IDomArg => NCofArg => DomArg => IClosure -> I -> Val
@@ -523,7 +534,7 @@ icapp t arg = case t of
     hcom r r' ix (icappf a arg)
         ( scons (ceq farg (F I0)) lhs $
           scons (ceq farg (F I1)) rhs $
-          (mapVSystem (\_ t -> papp (force t) lhs rhs farg)  sys)
+          (mapVSystem (implParams \_ t -> papp (force t) lhs rhs farg)  sys)
         )
       (pappf (force p) lhs rhs farg)
 
@@ -664,10 +675,6 @@ hcom r r' i ~a ~t ~b
 hcomf  r r' i ~a ~t ~b = force  (hcom r r' i a t b); {-# inline hcomf  #-}
 hcomf' r r' i ~a ~t ~b = force' (hcom r r' i a t b); {-# inline hcomf' #-}
 
-inst :: IDomArg => NCofArg => DomArg => Val -> F I -> F Val
-inst v i = forceVSub v (extSub (idSub ?idom) (unF i))
-{-# inline inst #-}
-
 -- | Identity sub except one var is mapped to
 singleSubf :: IDomArg => NCofArg => DomArg => F Val -> IVar -> F I -> F Val
 singleSubf t x i = forceVSub (unF t) (single x (unF i))
@@ -689,12 +696,13 @@ com r r' x ~a ~sys ~b =
   hcom r r' x
     (topSubf a r')
     (mapVSystem
-       (\i t ->
+       (implParams \i t ->
            unF (goCoe (F (IVar i)) r' "j"
                (bindI \j -> singleSubf a i (F (IVar j)))
                (force t)))
        sys)
     (coe r r' x a b)
+{-# inline com #-}
 
 goCom :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
     -> NSystem (F VCof) -> F Val -> F Val
@@ -702,7 +710,7 @@ goCom r r' x a nsys  b =
   goHCom r r' x
     (topSubf a r')
     (mapNSystem
-       (\i t ->
+       (implParams \i t ->
            unF (goCoe (F (IVar i)) r' "j"
                (bindI \j -> singleSubf a i (F (IVar j)))
                (force t)))

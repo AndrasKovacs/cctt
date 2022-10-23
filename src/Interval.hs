@@ -37,6 +37,11 @@ pattern IVar x <- (unpackI# -> (# | | (W# -> (IVar# -> x)) #)) where
   IVar x = I (coerce x)
 {-# complete I0, I1, IVar #-}
 
+matchIVar :: I -> (IVar -> a) -> a -> a
+matchIVar (I x) f ~a | x < 14 = f (IVar# x)
+                     | True   = a
+{-# inline matchIVar #-}
+
 instance Show I where
   showsPrec _ I0       acc = 'I':'0':acc
   showsPrec _ I1       acc = 'I':'1':acc
