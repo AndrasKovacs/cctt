@@ -112,26 +112,26 @@ single x i =
             .|. unsafeShiftL (coerce i) (w2i xbits))
 {-# inline single #-}
 
+class SubAction a where
+  sub :: a -> Sub -> a
+
 hasAction :: Sub -> Bool
 hasAction (Sub s) = (s .&. lengthUnMask#) /= emptySub#
 {-# inline hasAction #-}
 
-class SubAction a where
-  goSub :: a -> Sub -> a
-
-sub :: SubAction a => a -> Sub -> a
-sub ~a s = if hasAction s then goSub a s else a
-{-# inline sub #-}
+subIfHasAction :: SubAction a => a -> Sub -> a
+subIfHasAction ~a s = if hasAction s then sub a s else a
+{-# inline subIfHasAction #-}
 
 instance SubAction I where
-  goSub i s = matchIVar i
+  sub i s = matchIVar i
     (\x -> lookupSub x s) i
-  {-# inline goSub #-}
+  {-# inline sub #-}
 
 -- substitution composition
 instance SubAction Sub where
-  goSub f g = mapSub (\_ i -> goSub i g) f
-  {-# noinline goSub #-}
+  sub f g = mapSub (\_ i -> sub i g) f
+  {-# noinline sub #-}
 
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
@@ -156,7 +156,7 @@ isUnblocked' is = go is (mempty @IS.IVarSet) where
     False
 
 instance SubAction IS.IVarSet where
-  goSub is s = IS.foldl
+  sub is s = IS.foldl
     (\acc i -> IS.insertI (lookupSub i s) acc)
     mempty is
-  {-# noinline goSub #-}
+  {-# noinline sub #-}
