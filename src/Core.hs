@@ -675,18 +675,25 @@ sucSys = \case
 goHComNat :: IDomArg => NCofArg => DomArg =>
              F I -> F I -> Name -> NSystem (F VCof) -> F Val -> F Val
 goHComNat r r' ix (NSystem sys is) base = case unF base of
+
   VZero  -> case zeroSys sys of
               Proj _ ->
                 F VZero
               CantProj is' sys' ->
                 F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem (NSystem sys' is)) VZero)
                   (is <> is'))
+
   VSuc n -> case sucSys sys of
               Proj sys' ->
                 goHComNat r r' ix (NSystem sys' is) (force n)
               CantProj is' sys' ->
                 F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem (NSystem sys' is)) (VSuc n))
                        (is <> is'))
+
+  n@(VNe _ is') -> F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem (NSystem sys is)) n)
+                     (is <> is'))
+
+  _ -> impossible
 
 -- assumption: r /= r' and system is stuck
 goHCom :: IDomArg => NCofArg => DomArg =>
@@ -856,6 +863,9 @@ eval = \case
 -- Forcing
 --------------------------------------------------------------------------------
 
+-- TODO: consider separate forcing with and without subs! Just bit the bullet and duplicate
+-- code.
+
 forceNeCof' :: SubArg => NCofArg => NeCof -> F VCof
 forceNeCof' = \case
   NCEq i j    -> ceq (forceI' i) (forceI' j)
@@ -887,12 +897,27 @@ force :: IDomArg => NCofArg => DomArg => Val -> F Val
 force v = let ?sub = idSub ?idom in force' v
 {-# inline force #-}
 
+pushValSub :: Val -> Sub -> Val
+pushValSub v s = case v of
+  VPi x a b      -> VPi x (goSub a s) (goSub b s)
+  VLam x t       -> VLam x (goSub t s)
+  VPathP x a t u -> VPathP x (goSub a s) (goSub t s) (goSub u s)
+  VPLam x t      -> VPLam x (goSub t s)
+  VSg x a b      -> VSg x (goSub a s) (goSub b s)
+  VPair t u      -> VPair (goSub t s) (goSub u s)
+  VU             -> VU
+  VNat           -> VNat
+  VZero          -> VZero
+  VSuc t         -> VSuc (goSub t s)
+  _              -> impossible
+
 force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> F Val
 force' = \case
   VSub v s                                  -> let ?sub = sub s ?sub in force' v
   VNe t is      | isUnblocked' is           -> forceNe' t
   VGlueTy a sys | isUnblocked' (_ivars sys) -> glueTyf' a (forceNSystemComps' (_nsys sys))
-  v                                         -> F (sub v ?sub)
+  v             | hasAction ?sub            -> F (pushValSub v ?sub)
+  v                                         -> F v
 
 forceI :: NCofArg => I -> F I
 forceI i = F (sub i ?cof)
