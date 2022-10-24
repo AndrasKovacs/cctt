@@ -219,17 +219,17 @@ ceq c1 c2 = case (unF c1, unF c2) of
      cfalse)
     cfalse
 
-data NSystemComps cof
+data NSystem cof
   = NSEmpty
-  | NSCons cof ~Val (NSystemComps cof)
+  | NSCons cof ~Val (NSystem cof)
   deriving Show
 
-data NSystem cof = NSystem {_nsys :: NSystemComps cof, _ivars :: IS.IVarSet}
+data NSystem' cof = NSystem' {_nsys :: NSystem cof, _ivars :: IS.IVarSet}
   deriving Show
 
 data VSystem cof
   = VSTotal ~Val
-  | VSNe {-# unpack #-} (NSystem cof)
+  | VSNe {-# unpack #-} (NSystem' cof)
   deriving Show
 
 unFSystem :: F (VSystem (F VCof)) -> VSystem VCof
@@ -237,6 +237,9 @@ unFSystem = coerce
 
 unFNSystem :: NSystem (F VCof) -> NSystem VCof
 unFNSystem = coerce
+
+unFNSystem' :: NSystem' (F VCof) -> NSystem' VCof
+unFNSystem' = coerce
 
 evalI :: SubArg => NCofArg => I -> F I
 evalI i = F (sub (sub i ?sub) ?cof)
@@ -251,7 +254,7 @@ evalCof = \case
   CAnd eq cof -> cand (evalEq eq) (evalCof cof)
 
 sempty :: F (VSystem (F VCof))
-sempty = F (VSNe (NSystem NSEmpty mempty))
+sempty = F (VSNe (NSystem' NSEmpty mempty))
 
 bindI' :: (IDomArg => SubArg => NCofArg => IVar -> a)
        -> (IDomArg => SubArg => NCofArg => a)
@@ -293,6 +296,7 @@ conjVCof ncof cof = case unF cof of
   VCFalse      -> impossible
   VCTrue       -> ncof
   VCNe necof _ -> conjNeCof ncof (F necof)
+{-# noinline conjVCof #-}
 
 bindCof :: F VCof -> (NCofArg => a) -> (NCofArg => a)
 bindCof cof action = let ?cof = conjVCof ?cof cof in action
@@ -303,7 +307,7 @@ scons ::
   F VCof -> Val -> F (VSystem (F VCof)) -> F (VSystem (F VCof))
 scons cof ~v sys = case unF sys of
   VSTotal v              -> F (VSTotal v)
-  VSNe (NSystem nsys is) -> F (VSNe (NSystem (NSCons cof v nsys) (vCofToVarSet cof <> is)))
+  VSNe (NSystem' sys is) -> F (VSNe (NSystem' (NSCons cof v sys) (vCofToVarSet cof <> is)))
 {-# inline scons #-}
 
 evalSystem :: IDomArg => SubArg => NCofArg => DomArg => EnvArg =>
@@ -316,24 +320,29 @@ evalSystem = \case
 
 -- TODO: we generally get a runtime closure from this! Try to make GHC lambda-lift function args
 -- instead! Actually, CPP looks like a good candidate solution here (LOL).
-mapNSystemComps :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
-                   (IDomArg => NCofArg => DomArg => NSystemComps (F VCof) -> NSystemComps (F VCof))
-mapNSystemComps f = go where
+mapNSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
+                   (IDomArg => NCofArg => DomArg => NSystem (F VCof) -> NSystem (F VCof))
+mapNSystem f = go where
   go NSEmpty            = NSEmpty
   go (NSCons cof v sys) = NSCons cof (bindCof cof (bindI \i -> f i v)) (go sys)
-{-# inline mapNSystemComps #-}
-
-mapNSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
-              (IDomArg => NCofArg => DomArg => NSystem (F VCof) -> NSystem (F VCof))
-mapNSystem f (NSystem nsys is) = NSystem (mapNSystemComps f nsys) is
 {-# inline mapNSystem #-}
 
+rawMapNSystem :: (Val -> Val) -> NSystem (F VCof) -> NSystem (F VCof)
+rawMapNSystem f = go where
+  go NSEmpty            = NSEmpty
+  go (NSCons cof v sys) = NSCons cof (f v) (go sys)
+{-# inline rawMapNSystem #-}
+
+mapNSystem' :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
+              (IDomArg => NCofArg => DomArg => NSystem' (F VCof) -> NSystem' (F VCof))
+mapNSystem' f (NSystem' sys is) = NSystem' (mapNSystem f sys) is
+{-# inline mapNSystem' #-}
 
 mapVSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
               (IDomArg => NCofArg => DomArg => F (VSystem (F VCof)) -> F (VSystem (F VCof)))
 mapVSystem f sys = case unF sys of
   VSTotal v  -> F (VSTotal (bindI \i -> f i v))
-  VSNe nsys  -> F (VSNe (mapNSystem f nsys))
+  VSNe nsys  -> F (VSNe (mapNSystem' f nsys))
 {-# inline mapVSystem #-}
 
 
@@ -367,14 +376,14 @@ data Closure
   | CCoePi I I Name VTy Closure Val
 
   -- ^ Body of function hcom.
-  | CHComPi I I Name VTy Closure {-# unpack #-} (NSystem VCof) Val
+  | CHComPi I I Name VTy Closure (NSystem VCof) Val
   deriving Show
 
 -- | Defunctionalized closures for IVar abstraction.
 data IClosure
   = ICEval Sub Env Tm
   | ICCoePathP I I Name IClosure Val Val Val
-  | ICHComPathP I I Name IClosure Val Val {-# unpack #-} (NSystem VCof) Val
+  | ICHComPathP I I Name IClosure Val Val (NSystem VCof) Val
   deriving Show
 
 type VTy = Val
@@ -389,7 +398,7 @@ data Val
   -- them in coe/hcom.
   | VNe Ne IS.IVarSet         -- TODO: can we annotate with NCof (of the last forcing)
                               -- if stored NCof == current NCof, shortcut?
-  | VGlueTy VTy (NSystem VCof)
+  | VGlueTy VTy (NSystem' VCof)
 
   -- canonicals
   | VPi Name VTy Closure
@@ -426,18 +435,18 @@ instance SubAction VCof where
     VCFalse       -> VCFalse
     VCNe necof is -> VCNe (goSub necof s) (goSub is s)
 
-instance SubAction (NSystem VCof) where
-  goSub (NSystem nsys is) s = NSystem (goSub nsys s) (goSub is s)
+instance SubAction (NSystem' VCof) where
+  goSub (NSystem' nsys is) s = NSystem' (goSub nsys s) (goSub is s)
 
-instance SubAction (NSystemComps VCof) where
+instance SubAction (NSystem VCof) where
   goSub sys s = case sys of
     NSEmpty          -> NSEmpty
     NSCons cof v sys -> NSCons (goSub cof s) (goSub v s) (goSub sys s)
 
 instance SubAction (VSystem VCof) where
   goSub sys s = case sys of
-    VSTotal v              -> VSTotal (goSub v s)
-    VSNe (NSystem nsys is) -> VSNe (NSystem (goSub nsys s) (goSub is s))
+    VSTotal v  -> VSTotal (goSub v s)
+    VSNe nsys  -> VSNe (goSub nsys s)
 
 instance SubAction Ne where
   goSub n s = case n of
@@ -541,15 +550,15 @@ icapp t arg = case t of
           sempty)
         (pappf (force p) lhs rhs farg)
 
-  ICHComPathP (forceI -> r) (forceI -> r') ix a lhs rhs
-              (forceNSystem -> sys) p ->
+  ICHComPathP (forceI -> r) (forceI -> r') ix a lhs rhs sys p ->
 
     let farg = forceI arg in
 
     hcom r r' ix (icappf a arg)
         ( scons (ceq farg (F I0)) lhs $
           scons (ceq farg (F I1)) rhs $
-          (mapVSystem (inCxt \_ t -> papp (force t) lhs rhs farg)  sys)
+          (mapVSystem (inCxt \_ t -> papp (force t) lhs rhs farg)  -- TODO: fuse force & map
+                      (forceNSystem sys))
         )
       (pappf (force p) lhs rhs farg)
 
@@ -646,12 +655,12 @@ coe r r' i ~a t
 --   TODO: later for general ind types we will need to split systems to N copies
 --   for N different constructor fields!
 data ProjSystem
-  = Proj (NSystemComps (F VCof))                 -- ^ Result of projection.
-  | CantProj IS.IVarSet (NSystemComps (F VCof))  -- ^ Return the blocking varset of the first neutral
+  = Proj (NSystem (F VCof))                 -- ^ Result of projection.
+  | CantProj IS.IVarSet (NSystem (F VCof))  -- ^ Return the blocking varset of the first neutral
                                                  --   component + the system which is forced up to
                                                  --   the blocking component.
 
-zeroSys :: IDomArg => NCofArg => DomArg => NSystemComps (F VCof) -> ProjSystem
+zeroSys :: IDomArg => NCofArg => DomArg => NSystem (F VCof) -> ProjSystem
 zeroSys = \case
   NSEmpty -> Proj NSEmpty
   NSCons cof t sys -> case zeroSys sys of
@@ -661,61 +670,61 @@ zeroSys = \case
       _            -> impossible
     CantProj is sys -> CantProj is (NSCons cof t sys)
 
-sucSys :: IDomArg => NCofArg => DomArg => NSystemComps (F VCof) -> ProjSystem
+sucSys :: IDomArg => NCofArg => DomArg => NSystem (F VCof) -> ProjSystem
 sucSys = \case
   NSEmpty -> Proj NSEmpty
-  NSCons cof t sys -> case zeroSys sys of
+  NSCons cof t sys -> case sucSys sys of
     Proj sys -> case bindCof cof (bindI \_ -> unF (force t)) of
       VSuc n       -> Proj (NSCons cof n sys)
-      t@(VNe n is) -> CantProj is (NSCons cof t (mapNSystemComps (inCxt \_ t -> VSuc t) sys))
+      t@(VNe n is) -> CantProj is (NSCons cof t (rawMapNSystem VSuc sys))
       _            -> impossible
     CantProj is sys -> CantProj is (NSCons cof t sys)
 
 -- assumption: r /= r' and system is stuch
 goHComNat :: IDomArg => NCofArg => DomArg =>
-             F I -> F I -> Name -> NSystem (F VCof) -> F Val -> F Val
-goHComNat r r' ix (NSystem sys is) base = case unF base of
+             F I -> F I -> Name -> NSystem' (F VCof) -> F Val -> F Val
+goHComNat r r' ix (NSystem' sys is) base = case unF base of
 
   VZero  -> case zeroSys sys of
               Proj _ ->
                 F VZero
               CantProj is' sys' ->
-                F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem (NSystem sys' is)) VZero)
+                F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem sys') VZero)
                   (is <> is'))
 
   VSuc n -> case sucSys sys of
               Proj sys' ->
-                goHComNat r r' ix (NSystem sys' is) (force n)
+                goHComNat r r' ix (NSystem' sys' is) (force n)
               CantProj is' sys' ->
-                F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem (NSystem sys' is)) (VSuc n))
+                F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem sys') (VSuc n))
                        (is <> is'))
 
-  n@(VNe _ is') -> F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem (NSystem sys is)) n)
+  n@(VNe _ is') -> F (VNe (NHCom (unF r) (unF r') ix VNat (unFNSystem sys) n)
                      (is <> is'))
 
   _ -> impossible
 
 -- assumption: r /= r' and system is stuck
 goHCom :: IDomArg => NCofArg => DomArg =>
-          F I -> F I -> Name -> F Val -> NSystem (F VCof) -> F Val -> F Val
+          F I -> F I -> Name -> F Val -> NSystem' (F VCof) -> F Val -> F Val
 goHCom r r' ix a nsys base = case unF a of
 
   VPi x a b ->
-    F (VLam x (CHComPi (unF r) (unF r') ix a b (unFNSystem nsys) (unF base)))
+    F (VLam x (CHComPi (unF r) (unF r') ix a b (unFNSystem (_nsys nsys)) (unF base)))
 
   VSg x a b ->
 
     let bfill = bindI \i ->
           cappf b (unF (goHCom r (F (IVar i)) ix (force a)
-                               (mapNSystem (inCxt \i t -> proj1 (force t)) nsys)
+                               (mapNSystem' (inCxt \i t -> proj1 (force t)) nsys)
                                (proj1f base))) in
 
     F (VPair
       (unF (goHCom r r' ix (force a)
-                  (mapNSystem (inCxt \i t -> proj1 (force t)) nsys)
+                  (mapNSystem' (inCxt \i t -> proj1 (force t)) nsys)
                   (proj1f base)))
       (unF (goCom r r' ix bfill
-                  (mapNSystem (inCxt \i t -> proj2 (force t)) nsys)
+                  (mapNSystem' (inCxt \i t -> proj2 (force t)) nsys)
                   (proj2f base)))
       )
 
@@ -725,10 +734,10 @@ goHCom r r' ix a nsys base = case unF a of
 
   VPathP j a lhs rhs ->
     F (VPLam j (ICHComPathP (unF r) (unF r')
-                            ix a lhs rhs (unFNSystem nsys) (unF base)))
+                            ix a lhs rhs (unFNSystem (_nsys nsys)) (unF base)))
 
   a@(VNe n is) ->
-    F (VNe (NHCom (unF r) (unF r') ix a (unFNSystem nsys) (unF base))
+    F (VNe (NHCom (unF r) (unF r') ix a (unFNSystem (_nsys nsys)) (unF base))
            (IS.insertI (unF r) $ IS.insertI (unF r') (_ivars nsys <> is)))
 
   VU ->
@@ -781,11 +790,11 @@ com r r' x ~a ~sys ~b =
 {-# inline com #-}
 
 goCom :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
-    -> NSystem (F VCof) -> F Val -> F Val
+    -> NSystem' (F VCof) -> F Val -> F Val
 goCom r r' x a nsys  b =
   goHCom r r' x
     (topSubf a r')
-    (mapNSystem
+    (mapNSystem'
        (inCxt \i t ->
            unF (goCoe (F (IVar i)) r' "j"
                (bindI \j -> singleSubf a i (F (IVar j)))
@@ -796,7 +805,7 @@ goCom r r' x a nsys  b =
 glueTy :: IDomArg => NCofArg => DomArg => Val -> F (VSystem (F VCof)) -> Val
 glueTy a sys = case unF sys of
   VSTotal b -> proj1 (force b)
-  VSNe nsys -> VGlueTy a (unFNSystem nsys)
+  VSNe nsys -> VGlueTy a (unFNSystem' nsys)
 {-# inline glueTy #-}
 
 glueTyf  ~a sys = force  (glueTy a sys); {-# inline glueTyf  #-}
@@ -804,8 +813,8 @@ glueTyf' ~a sys = force' (glueTy a sys); {-# inline glueTyf' #-}
 
 glue :: Val -> F (VSystem (F VCof)) -> Val
 glue ~t sys = case unF sys of
-  VSTotal v -> v
-  VSNe nsys -> VNe (NGlue t (unFNSystem nsys)) (_ivars nsys)
+  VSTotal v              -> v
+  VSNe (NSystem' sys is) -> VNe (NGlue t (unFNSystem sys)) is
 {-# inline glue #-}
 
 gluef  ~a sys = force  (glue a sys); {-# inline gluef  #-}
@@ -813,8 +822,8 @@ gluef' ~a sys = force' (glue a sys); {-# inline gluef' #-}
 
 unglue :: IDomArg => NCofArg => DomArg => Val -> F (VSystem (F VCof)) -> Val
 unglue t sys = case unF sys of
-  VSTotal teqv -> app (proj1f (proj2f (force teqv))) t
-  VSNe nsys    -> VNe (NUnglue t (unFNSystem nsys)) (_ivars nsys)
+  VSTotal teqv           -> app (proj1f (proj2f (force teqv))) t
+  VSNe (NSystem' sys is) -> VNe (NUnglue t (unFNSystem sys)) is
 {-# inline unglue #-}
 
 ungluef  ~a sys = force  (unglue a sys); {-# inline ungluef  #-}
@@ -877,17 +886,21 @@ forceCof' = \case
   VCFalse      -> cfalse
   VCNe ncof is -> forceNeCof' ncof
 
+-- forceNSystem :: IDomArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
+-- forceNSystem nsys = let ?sub = idSub ?idom in forceNSystem' nsys
+
+-- forceNSystem' :: IDomArg => SubArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
+-- forceNSystem' (NSystem sys _) = forceNSystem' sys
+-- {-# inline forceNSystem' #-}
+
 forceNSystem :: IDomArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
-forceNSystem nsys = let ?sub = idSub ?idom in forceNSystem' nsys
+forceNSystem sys = let ?sub = idSub ?idom in forceNSystem' sys
+{-# inline forceNSystem #-}
 
 forceNSystem' :: IDomArg => SubArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
-forceNSystem' (NSystem sys _) = forceNSystemComps' sys
-{-# inline forceNSystem' #-}
-
-forceNSystemComps' :: IDomArg => SubArg => NCofArg => NSystemComps VCof -> F (VSystem (F VCof))
-forceNSystemComps' = \case
+forceNSystem' = \case
   NSEmpty          -> sempty
-  NSCons cof t sys -> scons (forceCof' cof) t (forceNSystemComps' sys)
+  NSCons cof t sys -> scons (forceCof' cof) t (forceNSystem' sys)
 
 forceVSub :: IDomArg => NCofArg => DomArg => Val -> Sub -> F Val
 forceVSub v s = let ?sub = s in force' v
@@ -915,7 +928,7 @@ force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> F Val
 force' = \case
   VSub v s                                  -> let ?sub = sub s ?sub in force' v
   VNe t is      | isUnblocked' is           -> forceNe' t
-  VGlueTy a sys | isUnblocked' (_ivars sys) -> glueTyf' a (forceNSystemComps' (_nsys sys))
+  VGlueTy a sys | isUnblocked' (_ivars sys) -> glueTyf' a (forceNSystem' (_nsys sys))
   v             | hasAction ?sub            -> F (pushValSub v ?sub)
   v                                         -> F v
 
