@@ -227,6 +227,7 @@ data NSystem cof
 data NSystem' cof = NSystem' {_nsys :: NSystem cof, _ivars :: IS.IVarSet}
   deriving Show
 
+-- TODO: unbox
 data VSystem cof
   = VSTotal ~Val
   | VSNe {-# unpack #-} (NSystem' cof)
@@ -654,6 +655,7 @@ coe r r' i ~a t
 -- | Try to project an inductive field from a system.
 --   TODO: later for general ind types we will need to split systems to N copies
 --   for N different constructor fields!
+--   TODO: unbox this
 data ProjSystem
   = Proj (NSystem (F VCof))                 -- ^ Result of projection.
   | CantProj IS.IVarSet (NSystem (F VCof))  -- ^ Return the blocking varset of the first neutral
@@ -869,11 +871,15 @@ eval = \case
   Suc t             -> VSuc (eval t)
   NatElim p z s n   -> natElim (eval p) (eval z) (evalf s) (evalf n)
 
+
 -- Forcing
 --------------------------------------------------------------------------------
 
--- TODO: consider separate forcing with and without subs! Just bit the bullet and duplicate
+-- TODO: consider separate forcing with and without subs! Just bite the bullet and duplicate
 -- code.
+-- In that case, we only have to check for hasAction in a very few number of places, probably
+-- only in coe Glue (otherwise we know that weakenings always have action!)
+
 
 forceNeCof' :: SubArg => NCofArg => NeCof -> F VCof
 forceNeCof' = \case
@@ -885,13 +891,6 @@ forceCof' = \case
   VCTrue       -> ctrue
   VCFalse      -> cfalse
   VCNe ncof is -> forceNeCof' ncof
-
--- forceNSystem :: IDomArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
--- forceNSystem nsys = let ?sub = idSub ?idom in forceNSystem' nsys
-
--- forceNSystem' :: IDomArg => SubArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
--- forceNSystem' (NSystem sys _) = forceNSystem' sys
--- {-# inline forceNSystem' #-}
 
 forceNSystem :: IDomArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
 forceNSystem sys = let ?sub = idSub ?idom in forceNSystem' sys
@@ -910,8 +909,12 @@ force :: IDomArg => NCofArg => DomArg => Val -> F Val
 force v = let ?sub = idSub ?idom in force' v
 {-# inline force #-}
 
+-- | Push a substitution inside a value, so that we don't get explicit sub on the outside.
 pushValSub :: Val -> Sub -> Val
 pushValSub v s = case v of
+  VSub{}         -> impossible
+  VNe n is       -> VNe (goSub n s) (goSub is s)
+  VGlueTy a sys  -> VGlueTy (goSub a s) (goSub sys s)
   VPi x a b      -> VPi x (goSub a s) (goSub b s)
   VLam x t       -> VLam x (goSub t s)
   VPathP x a t u -> VPathP x (goSub a s) (goSub t s) (goSub u s)
@@ -922,7 +925,6 @@ pushValSub v s = case v of
   VNat           -> VNat
   VZero          -> VZero
   VSuc t         -> VSuc (goSub t s)
-  _              -> impossible
 
 force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> F Val
 force' = \case
