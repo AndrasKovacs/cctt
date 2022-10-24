@@ -113,24 +113,28 @@ single x i =
 {-# inline single #-}
 
 class SubAction a where
-  sub :: a -> Sub -> a
+  sub :: SubArg => a -> a
+
+doSub :: SubAction a => a -> Sub -> a
+doSub a s = let ?sub = s in sub a
+{-# inline doSub #-}
 
 hasAction :: Sub -> Bool
 hasAction (Sub s) = (s .&. lengthUnMask#) /= emptySub#
 {-# inline hasAction #-}
 
 subIfHasAction :: SubAction a => a -> Sub -> a
-subIfHasAction ~a s = if hasAction s then sub a s else a
+subIfHasAction ~a s = if hasAction s then doSub a s else a
 {-# inline subIfHasAction #-}
 
 instance SubAction I where
-  sub i s = matchIVar i
-    (\x -> lookupSub x s) i
+  sub i = matchIVar i
+    (\x -> lookupSub x ?sub) i
   {-# inline sub #-}
 
 -- substitution composition
 instance SubAction Sub where
-  sub f g = mapSub (\_ i -> sub i g) f
+  sub f = mapSub (\_ i -> sub i) f
   {-# noinline sub #-}
 
 -- A set of blocking ivars is still blocked under a cofibration
@@ -156,7 +160,7 @@ isUnblocked' is = go is (mempty @IS.IVarSet) where
     False
 
 instance SubAction IS.IVarSet where
-  sub is s = IS.foldl
-    (\acc i -> IS.insertI (lookupSub i s) acc)
+  sub is = IS.foldl
+    (\acc i -> IS.insertI (lookupSub i ?sub) acc)
     mempty is
   {-# noinline sub #-}

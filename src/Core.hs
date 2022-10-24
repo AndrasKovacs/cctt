@@ -243,7 +243,7 @@ unFNSystem' :: NSystem' (F VCof) -> NSystem' VCof
 unFNSystem' = coerce
 
 evalI :: SubArg => NCofArg => I -> F I
-evalI i = F (sub (sub i ?sub) ?cof)
+evalI i = F (doSub (sub i) ?cof)
 
 evalEq :: SubArg => NCofArg => CofEq -> F VCof
 evalEq (CofEq i j) = ceq (evalI i) (evalI j)
@@ -421,79 +421,76 @@ type DomArg  = (?dom :: Lvl)    -- fresh LocalVar
 --------------------------------------------------------------------------------
 
 instance SubAction Val where
-  sub v s = case v of
-    VSub v s' -> VSub v (sub s' s)
-    v         -> VSub v s
+  sub v = case v of
+    VSub v s' -> VSub v (sub s')
+    v         -> VSub v ?sub
 
 instance SubAction NeCof where
-  sub cof s = case cof of
-    NCAnd c1 c2 -> NCAnd (sub c1 s) (sub c2 s)
-    NCEq i j    -> NCEq (sub i s) (sub j s)
+  sub cof = case cof of
+    NCAnd c1 c2 -> NCAnd (sub c1) (sub c2)
+    NCEq i j    -> NCEq (sub i) (sub j)
 
 instance SubAction VCof where
-  sub cof s = case cof of
+  sub cof = case cof of
     VCTrue        -> VCTrue
     VCFalse       -> VCFalse
-    VCNe necof is -> VCNe (sub necof s) (sub is s)
+    VCNe necof is -> VCNe (sub necof) (sub is)
 
 instance SubAction (NSystem' VCof) where
-  sub (NSystem' nsys is) s = NSystem' (sub nsys s) (sub is s)
+  sub (NSystem' nsys is) = NSystem' (sub nsys) (sub is)
 
 instance SubAction (NSystem VCof) where
-  sub sys s = case sys of
+  sub sys = case sys of
     NSEmpty          -> NSEmpty
-    NSCons cof v sys -> NSCons (sub cof s) (sub v s) (sub sys s)
+    NSCons cof v sys -> NSCons (sub cof) (sub v) (sub sys)
 
 instance SubAction (VSystem VCof) where
-  sub sys s = case sys of
-    VSTotal v  -> VSTotal (sub v s)
-    VSNe nsys  -> VSNe (sub nsys s)
+  sub sys = case sys of
+    VSTotal v  -> VSTotal (sub v)
+    VSNe nsys  -> VSNe (sub nsys)
 
 instance SubAction Ne where
-  sub n s = case n of
-    NSub n s' -> NSub n (sub s' s)
-    n         -> NSub n s
+  sub n = case n of
+    NSub n s' -> NSub n (sub s')
+    n         -> NSub n ?sub
 
 instance SubAction Closure where
-  sub cl s = case cl of
+  sub cl = case cl of
     CEval s' env t ->
-      CEval (sub s' s) (sub env s) t
+      CEval (sub s') (sub env) t
 
     -- note: recursive closure sub below! TODO to scrutinize, but this is probably
     -- fine, because recursive depth is bounded by Pi type nesting.
     CCoePi r r' i a b t ->
-      CCoePi (sub r s) (sub r' s) i (sub a s) (sub b s) (sub t s)
+      CCoePi (sub r) (sub r') i (sub a) (sub b) (sub t)
 
     CHComPi r r' i a b sys base ->
-      CHComPi (sub r s) (sub r' s) i (sub a s)
-              (sub b s) (sub sys s) (sub base s)
+      CHComPi (sub r) (sub r') i (sub a) (sub b) (sub sys) (sub base)
 
 instance SubAction IClosure where
-  sub cl s = case cl of
+  sub cl = case cl of
     ICEval s' env t ->
-      ICEval (sub s' s) (sub env s) t
+      ICEval (sub s') (sub env) t
 
     -- recursive sub here as well!
     ICCoePathP r r' i a lhs rhs p ->
-      ICCoePathP (sub r s) (sub r' s) i (sub a s)
-                 (sub lhs s) (sub rhs s) (sub p s)
+      ICCoePathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub p)
 
     ICHComPathP r r' i a lhs rhs sys base ->
-      ICHComPathP (sub r s) (sub r' s) i (sub a s)
-                  (sub lhs s) (sub rhs s) (sub sys s) (sub base s)
+      ICHComPathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
 
 instance SubAction Env where
-  sub e s = case e of
+  sub e = case e of
     ENil     -> ENil
-    EDef e v -> EDef (sub e s) (sub v s)
+    EDef e v -> EDef (sub e) (sub v)
 
 instance SubAction CofEq where
-  sub (CofEq i j) s = CofEq (sub i s) (sub j s)
+  sub (CofEq i j) = CofEq (sub i) (sub j)
 
 instance SubAction Cof where
-  sub cof s = case cof of
+  sub cof = case cof of
     CTrue       -> CTrue
-    CAnd eq cof -> CAnd (sub eq s) (sub cof s)
+    CAnd eq cof -> CAnd (sub eq) (sub cof)
 
 -- Evaluation
 --------------------------------------------------------------------------------
@@ -767,7 +764,7 @@ singleSubf :: IDomArg => NCofArg => DomArg => F Val -> IVar -> F I -> F Val
 singleSubf t x i = forceVSub (unF t) (single x (unF i))
 
 singleSub :: IDomArg => Val -> IVar -> F I -> Val
-singleSub t x i = sub t (single x (unF i))
+singleSub t x i = doSub t (single x (unF i))
 
 -- | Instantiate the topmost var.
 topSubf :: IDomArg => NCofArg => DomArg => F Val -> F I -> F Val
@@ -775,7 +772,7 @@ topSubf t i = forceVSub (unF t) (idSub ?idom `extSub` unF i)
 
 -- | Instantiate the topmost var.
 topSub :: IDomArg => Val -> F I -> Val
-topSub t i = sub t (idSub ?idom `extSub` unF i)
+topSub t i = doSub t (idSub ?idom `extSub` unF i)
 
 com :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
     -> F (VSystem (F VCof)) -> F Val -> Val
@@ -915,35 +912,35 @@ force = \case
 
 force' :: IDomArg => SubArg => NCofArg => DomArg => Val -> F Val
 force' = \case
-  VSub v s                                  -> let ?sub = sub s ?sub in force' v
+  VSub v s                                  -> let ?sub = sub s in force' v
   VNe t is      | isUnblocked' is           -> forceNe' t
-                | True                      -> F (VNe (sub t ?sub) (sub is ?sub))
-  VGlueTy a sys | isUnblocked' (_ivars sys) -> glueTyf' (sub a ?sub) (forceNSystem' (_nsys sys))
-                | True                      -> F (VGlueTy (sub a ?sub) (sub sys ?sub))
+                | True                      -> F (VNe (sub t) (sub is))
+  VGlueTy a sys | isUnblocked' (_ivars sys) -> glueTyf' (sub a) (forceNSystem' (_nsys sys))
+                | True                      -> F (VGlueTy (sub a) (sub sys))
 
-  VPi x a b      -> F (VPi x (sub a ?sub) (sub b ?sub))
-  VLam x t       -> F (VLam x (sub t ?sub))
-  VPathP x a t u -> F (VPathP x (sub a ?sub) (sub t ?sub) (sub u ?sub))
-  VPLam x t      -> F (VPLam x (sub t ?sub))
-  VSg x a b      -> F (VSg x (sub a ?sub) (sub b ?sub))
-  VPair t u      -> F (VPair (sub t ?sub) (sub u ?sub))
-  VU             -> F (VU)
-  VNat           -> F (VNat)
-  VZero          -> F (VZero)
-  VSuc t         -> F (VSuc (sub t ?sub))
+  VPi x a b      -> F (VPi x (sub a) (sub b))
+  VLam x t       -> F (VLam x (sub t))
+  VPathP x a t u -> F (VPathP x (sub a) (sub t) (sub u))
+  VPLam x t      -> F (VPLam x (sub t))
+  VSg x a b      -> F (VSg x (sub a) (sub b))
+  VPair t u      -> F (VPair (sub t) (sub u))
+  VU             -> F VU
+  VNat           -> F VNat
+  VZero          -> F VZero
+  VSuc t         -> F (VSuc (sub t))
 
 
 forceI :: NCofArg => I -> F I
-forceI i = F (sub i ?cof)
+forceI i = F (doSub i ?cof)
 
 forceI' :: SubArg => NCofArg => I -> F I
-forceI' i = F (i `sub` ?sub `sub` ?cof)
+forceI' i = F (sub i `doSub` ?cof)
 
 forceIVar :: NCofArg => IVar -> F I
 forceIVar x = F (lookupSub x ?cof)
 
 forceIVar' :: SubArg => NCofArg => IVar -> F I
-forceIVar' x = F (lookupSub x ?sub `sub` ?cof)
+forceIVar' x = F (lookupSub x ?sub `doSub` ?cof)
 
 forceNe :: IDomArg => NCofArg => DomArg => Ne -> F Val
 forceNe = \case
@@ -963,14 +960,14 @@ forceNe = \case
 forceNe' :: IDomArg => SubArg => NCofArg => DomArg => Ne -> F Val
 forceNe' = \case
   n@(NLocalVar x)      -> F (VNe n mempty)
-  NSub n s             -> let ?sub = sub s ?sub in forceNe' n
-  NApp t u             -> appf' (forceNe' t) (sub u ?sub)
-  NPApp t l r i        -> pappf' (forceNe' t) (sub l ?sub) (sub r ?sub) (forceIVar' i)
+  NSub n s             -> let ?sub = sub s in forceNe' n
+  NApp t u             -> appf' (forceNe' t) (sub u)
+  NPApp t l r i        -> pappf' (forceNe' t) (sub l) (sub r) (forceIVar' i)
   NProj1 t             -> proj1f' (forceNe' t)
   NProj2 t             -> proj2f' (forceNe' t)
   NCoe r r' x a t      -> coe (forceI' r) (forceI' r') x (bindI' \_ -> force' a) (force' t)
   NHCom r r' x a sys t -> hcomf' (forceI' r) (forceI' r') x (force' a)
                                  (forceNSystem' sys) (force' t)
-  NUnglue t sys        -> ungluef' (sub t ?sub) (forceNSystem' sys)
-  NGlue t sys          -> gluef' (sub t ?sub) (forceNSystem' sys)
-  NNatElim p z s n     -> natElimf' (sub p ?sub) (sub z ?sub) (force' s) (forceNe' n)
+  NUnglue t sys        -> ungluef' (sub t) (forceNSystem' sys)
+  NGlue t sys          -> gluef' (sub t) (forceNSystem' sys)
+  NNatElim p z s n     -> natElimf' (sub p) (sub z) (force' s) (forceNe' n)
