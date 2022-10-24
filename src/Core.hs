@@ -159,6 +159,16 @@ data Cof = CTrue | CAnd {-# unpack #-} CofEq Cof
 data System = SEmpty | SCons Cof Tm System
   deriving Show
 
+--------------------------------------------------------------------------------
+
+-- | We need to use this whenever we want to pass a higher-order contextual
+--   argument to some combinator, like to `mapVSystem`. The problem is that
+--   local implicit params are lazy. TODO: improve the strict implicit params plugin
+--   to handle this case as well!
+inCxt :: (IDomArg => NCofArg => DomArg => a) -> (IDomArg => NCofArg => DomArg => a)
+inCxt f = let !_ = ?idom; !_ = ?cof; !_ = ?dom in f
+{-# inline inCxt #-}
+
 
 -- Cof and System semantics
 --------------------------------------------------------------------------------
@@ -302,7 +312,7 @@ evalSystem = \case
 -- TODO: we generally get a runtime closure from this! Try to make GHC lambda-lift function args
 -- instead!
 mapNSystemComps :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
-               (IDomArg => NCofArg => DomArg => NSystemComps (F VCof) -> NSystemComps (F VCof))
+                   (IDomArg => NCofArg => DomArg => NSystemComps (F VCof) -> NSystemComps (F VCof))
 mapNSystemComps f = go where
   go NSEmpty            = NSEmpty
   go (NSCons cof v sys) = NSCons cof (bindCof cof (bindI \i -> f i v)) (go sys)
@@ -320,6 +330,7 @@ mapVSystem f sys = case unF sys of
   VSTotal v  -> F (VSTotal (bindI \i -> f i v))
   VSNe nsys  -> F (VSNe (mapNSystem f nsys))
 {-# inline mapVSystem #-}
+
 
 data Ne
   = NLocalVar Lvl
@@ -496,22 +507,36 @@ capp t ~u = case t of
                    (appf (force t) (unF (coe r' r i a fu))))
 
   CHComPi (forceI -> r) (forceI -> r') i a b sys base ->
+
+   -- let
+   --   mapNSystemComps :: (IDomArg => NCofArg => DomArg => Val -> IVar -> Val -> Val) ->
+   --                      (IDomArg => NCofArg => DomArg => Val -> NSystemComps (F VCof) -> NSystemComps (F VCof))
+   --   mapNSystemComps f u = go where
+   --     go NSEmpty            = NSEmpty
+   --     go (NSCons cof v sys) = NSCons cof (bindCof cof (bindI \i -> f u i v)) (go sys)
+   --   {-# inline mapNSystemComps #-}
+
+   --   mapNSystem :: (IDomArg => NCofArg => DomArg => Val -> IVar -> Val -> Val) ->
+   --                 (IDomArg => NCofArg => DomArg => Val -> NSystem (F VCof) -> NSystem (F VCof))
+   --   mapNSystem f u (NSystem nsys is) = NSystem (mapNSystemComps f u nsys) is
+   --   {-# inline mapNSystem #-}
+
+   --   mapVSystem :: (IDomArg => NCofArg => DomArg => Val -> IVar -> Val -> Val) ->
+   --                 (IDomArg => NCofArg => DomArg => Val -> F (VSystem (F VCof)) -> F (VSystem (F VCof)))
+   --   mapVSystem f u sys = case unF sys of
+   --     VSTotal v  -> F (VSTotal (bindI \i -> f u i v))
+   --     VSNe nsys  -> F (VSNe (mapNSystem f u nsys))
+   --   {-# inline mapVSystem #-} in
+
     hcom r r' i (cappf b u)
          (mapVSystem                    -- TODO: map+force can be fused
-            (implParams \i t -> app (force t) u)
+            (inCxt \i t -> app (force t) u)
             (forceNSystem sys))
          (appf (force base) u)
-
 
 cappf  t ~u = force  (capp t u); {-# inline cappf  #-}
 cappf' t ~u = force' (capp t u); {-# inline cappf' #-}
 
--- This is required to make lambdas with impl params strict. TODO: improve
--- the plugin!
--- TODO: can I instead make functions strict at use site in mapVSystem?
-implParams :: (IDomArg => NCofArg => DomArg => a) -> (IDomArg => NCofArg => DomArg => a)
-implParams f = let !_ = ?idom; !_ = ?cof; !_ = ?dom in f
-{-# inline implParams #-}
 
 -- | Apply an ivar closure.
 icapp :: IDomArg => NCofArg => DomArg => IClosure -> I -> Val
@@ -534,7 +559,7 @@ icapp t arg = case t of
     hcom r r' ix (icappf a arg)
         ( scons (ceq farg (F I0)) lhs $
           scons (ceq farg (F I1)) rhs $
-          (mapVSystem (implParams \_ t -> papp (force t) lhs rhs farg)  sys)
+          (mapVSystem (inCxt \_ t -> papp (force t) lhs rhs farg)  sys)
         )
       (pappf (force p) lhs rhs farg)
 
@@ -635,15 +660,15 @@ goHCom r r' ix a nsys base = case unF a of
 
     let bfill = bindI \i ->
           cappf b (unF (goHCom r (F (IVar i)) ix (force a)
-                               (mapNSystem (\i t -> proj1 (force t)) nsys)
+                               (mapNSystem (inCxt \i t -> proj1 (force t)) nsys)
                                (proj1f base))) in
 
     F (VPair
       (unF (goHCom r r' ix (force a)
-                  (mapNSystem (\i t -> proj1 (force t)) nsys)
+                  (mapNSystem (inCxt \i t -> proj1 (force t)) nsys)
                   (proj1f base)))
       (unF (goCom r r' ix bfill
-                  (mapNSystem (\i t -> proj2 (force t)) nsys)
+                  (mapNSystem (inCxt \i t -> proj2 (force t)) nsys)
                   (proj2f base)))
       )
 
@@ -696,7 +721,7 @@ com r r' x ~a ~sys ~b =
   hcom r r' x
     (topSubf a r')
     (mapVSystem
-       (implParams \i t ->
+       (inCxt \i t ->
            unF (goCoe (F (IVar i)) r' "j"
                (bindI \j -> singleSubf a i (F (IVar j)))
                (force t)))
@@ -710,7 +735,7 @@ goCom r r' x a nsys  b =
   goHCom r r' x
     (topSubf a r')
     (mapNSystem
-       (implParams \i t ->
+       (inCxt \i t ->
            unF (goCoe (F (IVar i)) r' "j"
                (bindI \j -> singleSubf a i (F (IVar j)))
                (force t)))
@@ -777,7 +802,7 @@ eval = \case
 
 forceNeCof' :: SubArg => NCofArg => NeCof -> F VCof
 forceNeCof' = \case
-  NCEq i j -> ceq (forceI' i) (forceI' j)
+  NCEq i j    -> ceq (forceI' i) (forceI' j)
   NCAnd c1 c2 -> cand (forceNeCof' c1) (forceNeCof' c2)
 
 forceCof' :: SubArg => NCofArg => VCof -> F VCof
@@ -789,14 +814,6 @@ forceCof' = \case
 forceNSystem :: IDomArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
 forceNSystem nsys = let ?sub = idSub ?idom in forceNSystem' nsys
 
-forceSystem :: IDomArg => NCofArg => VSystem VCof -> F (VSystem (F VCof))
-forceSystem sys = let ?sub = idSub ?idom in forceSystem' sys
-
-forceSystem' :: IDomArg => SubArg => NCofArg => VSystem VCof -> F (VSystem (F VCof))
-forceSystem' = \case
-  VSTotal v -> F (VSTotal v)
-  VSNe nsys -> forceNSystem nsys
-
 forceNSystemComps' :: IDomArg => SubArg => NCofArg => NSystemComps VCof -> F (VSystem (F VCof))
 forceNSystemComps' = \case
   NSEmpty          -> sempty
@@ -804,6 +821,7 @@ forceNSystemComps' = \case
 
 forceNSystem' :: IDomArg => SubArg => NCofArg => NSystem VCof -> F (VSystem (F VCof))
 forceNSystem' (NSystem nsys _) = forceNSystemComps' nsys
+{-# inline forceNSystem' #-}
 
 forceVSub :: IDomArg => NCofArg => DomArg => Val -> Sub -> F Val
 forceVSub v s = let ?sub = s in force' v
@@ -826,15 +844,8 @@ forceI i = F (sub i ?cof)
 forceI' :: SubArg => NCofArg => I -> F I
 forceI' i = F (i `sub` ?sub `sub` ?cof)
 
-forceIVar :: NCofArg => IVar -> F I
-forceIVar x = F (lookupSub x ?cof)
-
 forceIVar' :: SubArg => NCofArg => IVar -> F I
 forceIVar' x = F (lookupSub x ?sub `sub` ?cof)
-
-forceNSub :: IDomArg => NCofArg => DomArg => Ne -> Sub -> F Val
-forceNSub n s = let ?sub = s in forceNe' n
-{-# inline forceNSub #-}
 
 forceNe' :: IDomArg => SubArg => NCofArg => DomArg => Ne -> F Val
 forceNe' = \case
