@@ -70,6 +70,11 @@ w2i :: Word -> Int
 w2i (W# n) = I# (word2Int# n)
 {-# inline w2i #-}
 
+($$!) :: (a -> b) -> a -> b
+($$!) f a = f $! a
+{-# inline ($$!) #-}
+infixl 9 $$!
+
 
 -- De Bruijn indices and levels
 --------------------------------------------------------------------------------

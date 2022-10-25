@@ -39,6 +39,7 @@ executable cubeval
   main-is: Main.hs
   other-modules:
       Common
+      Conversion
       Core
       Interval
       IVarSet

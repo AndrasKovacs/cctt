@@ -134,7 +134,7 @@ data Tm
 
   | PathP Name Ty Tm Tm         -- PathP i.A x y
   | PApp Tm Tm Tm I             -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
-  | PLam Name Tm
+  | PLam Tm Tm Name Tm          -- endpoints, body
 
   | Coe I I Name Ty Tm          -- coe r r' i.A t
   | HCom I I Name Ty System Tm  -- hcom r r' i.A [α → t] u
@@ -267,6 +267,10 @@ bindI' act =
   in act fresh
 {-# inline bindI' #-}
 
+bind :: (IDomArg => NCofArg => DomArg => Val -> a) -> (IDomArg => NCofArg => DomArg => a)
+bind act = let v = vVar ?dom in let ?dom = ?dom + 1 in act v
+{-# inline bind #-}
+
 bindI :: (IDomArg => NCofArg => IVar -> a) -> (IDomArg => NCofArg => a)
 bindI act =
   let fresh = ?idom in
@@ -351,7 +355,7 @@ data Ne
   = NLocalVar Lvl
   | NSub Ne Sub
   | NApp Ne Val
-  | NPApp Ne Val Val IVar
+  | NPApp Ne ~Val ~Val I
   | NProj1 Ne
   | NProj2 Ne
   | NCoe I I Name VTy Val
@@ -405,7 +409,7 @@ data Val
   | VPi Name VTy Closure
   | VLam Name Closure
   | VPathP Name IClosure Val Val
-  | VPLam Name IClosure
+  | VPLam ~Val ~Val Name IClosure  -- annotated with endpoints
   | VSg Name VTy Closure
   | VPair Val Val
   | VU
@@ -415,7 +419,10 @@ data Val
   | VSuc Val
   deriving Show
 
-type DomArg  = (?dom :: Lvl)    -- fresh LocalVar
+type DomArg = (?dom :: Lvl)    -- fresh LocalVar
+
+vVar :: Lvl -> Val
+vVar x = VNe (NLocalVar x) mempty
 
 -- Substitution
 --------------------------------------------------------------------------------
@@ -526,7 +533,7 @@ capp t ~u = case t of
   CHComPi (forceI -> r) (forceI -> r') i a b sys base ->
 
     hcom r r' i (cappf b u)
-         (mapVSystem                    -- TODO: map+force can be fused
+         (mapVSystem                    -- TODO: fuse force $ map
             (inCxt \i t -> app (force t) u)
             (forceNSystem sys))
          (appf (force base) u)
@@ -588,9 +595,9 @@ papp ~t ~u0 ~u1 i = case unF i of
   I0     -> u0
   I1     -> u1
   IVar x -> case unF t of
-    VPLam _ t -> icapp t (IVar x)
-    VNe t is  -> VNe (NPApp t u0 u1 x) (IS.insert x is)
-    _         -> impossible
+    VPLam _ _ _ t -> icapp t (IVar x)
+    VNe t is      -> VNe (NPApp t u0 u1 (IVar x)) (IS.insert x is)
+    _             -> impossible
 {-# inline papp #-}
 
 pappf  ~t ~u0 ~u1 i = force  (papp t u0 u1 i); {-# inline pappf  #-}
@@ -600,13 +607,14 @@ pappf' ~t ~u0 ~u1 i = force' (papp t u0 u1 i); {-# inline pappf' #-}
 coeFill :: IDomArg => NCofArg => DomArg => F I -> Val -> F Val -> F Val
 coeFill r a t =
   let i = ?idom - 1 in
-  goCoe r (F (IVar i)) "j" (bindI \j -> singleSubf (force a) i (F (IVar j))) t
+  goCoe r (F (IVar i)) "j" (bindI \(IVar -> j) -> singleSubf (force a) i (F j)) t
 {-# inline coeFill #-}
 
+-- Γ, i ⊢ coeFillInvⁱ r' A t : A [i=r ↦ coeⁱ r' r A t, i=r' ↦ t] for all r
 coeFillInv :: IDomArg => NCofArg => DomArg => F I -> Val -> F Val -> F Val
 coeFillInv r' a t =
   let i = ?idom - 1 in
-  goCoe r' (F (IVar i)) "j" (bindI \j -> singleSubf (force a) i (F (IVar j))) t
+  goCoe r' (F (IVar i)) "j" (bindI \(IVar -> j) -> singleSubf (force a) i (F j)) t
 {-# inline coeFillInv #-}
 
 -- assumption: r /= r'
@@ -617,8 +625,8 @@ goCoe r r' i a t = case unF a of
 
   VSg x a b ->
     let fa    = bindI \_ -> force a
-        t1    = force (proj1 t)
-        t2    = force (proj2 t)
+        t1    = proj1f t
+        t2    = proj2f t
         bfill = bindI \_ -> cappf b (unF (coeFill r (unF fa) t1))
     in F (VPair (unF (goCoe r r' i fa t1))
                 (unF (goCoe r r' i bfill t2)))
@@ -627,7 +635,10 @@ goCoe r r' i a t = case unF a of
     t
 
   VPathP j a lhs rhs ->
-    F (VPLam j (ICCoePathP (unF r) (unF r') j a lhs rhs (unF t)))
+    F (VPLam (topSub lhs r')
+             (topSub rhs r')
+             j
+             (ICCoePathP (unF r) (unF r') j a lhs rhs (unF t)))
 
   VU ->
     t
@@ -713,17 +724,17 @@ goHCom r r' ix a nsys base = case unF a of
 
   VSg x a b ->
 
-    let bfill = bindI \i ->
-          cappf b (unF (goHCom r (F (IVar i)) ix (force a)
-                               (mapNSystem' (inCxt \i t -> proj1 (force t)) nsys)
+    let bfill = bindI \(IVar -> i) ->
+          cappf b (unF (goHCom r (F i) ix (force a)
+                               (mapNSystem' (inCxt \_ t -> proj1 (force t)) nsys)
                                (proj1f base))) in
 
     F (VPair
       (unF (goHCom r r' ix (force a)
-                  (mapNSystem' (inCxt \i t -> proj1 (force t)) nsys)
+                  (mapNSystem' (inCxt \_ t -> proj1 (force t)) nsys)
                   (proj1f base)))
       (unF (goCom r r' ix bfill
-                  (mapNSystem' (inCxt \i t -> proj2 (force t)) nsys)
+                  (mapNSystem' (inCxt \_ t -> proj2 (force t)) nsys)
                   (proj2f base)))
       )
 
@@ -732,8 +743,11 @@ goHCom r r' ix a nsys base = case unF a of
     _ -> goHComNat r r' ix nsys base
 
   VPathP j a lhs rhs ->
-    F (VPLam j (ICHComPathP (unF r) (unF r')
-                            ix a lhs rhs (unFNSystem (_nsys nsys)) (unF base)))
+    F (VPLam lhs
+             rhs
+             j
+             (ICHComPathP (unF r) (unF r')
+                          ix a lhs rhs (unFNSystem (_nsys nsys)) (unF base)))
 
   a@(VNe n is) ->
     F (VNe (NHCom (unF r) (unF r') ix a (unFNSystem (_nsys nsys)) (unF base))
@@ -782,7 +796,7 @@ com r r' x ~a ~sys ~b =
     (mapVSystem
        (inCxt \i t ->
            unF (goCoe (F (IVar i)) r' "j"
-               (bindI \j -> singleSubf a i (F (IVar j)))
+               (bindI \(IVar -> j) -> singleSubf a i (F j))
                (force t)))
        sys)
     (coe r r' x a b)
@@ -796,7 +810,7 @@ goCom r r' x a nsys  b =
     (mapNSystem'
        (inCxt \i t ->
            unF (goCoe (F (IVar i)) r' "j"
-               (bindI \j -> singleSubf a i (F (IVar j)))
+               (bindI \(IVar -> j) -> singleSubf a i (F j))
                (force t)))
        nsys)
     (goCoe r r' x a b)
@@ -857,7 +871,7 @@ eval = \case
   U                 -> VU
   PathP x a t u     -> VPathP x (ICEval ?sub ?env a) (eval t) (eval u)
   PApp t u0 u1 i    -> papp (evalf t) (eval u0) (eval u1) (evalI i)
-  PLam x t          -> VPLam x (ICEval ?sub ?env t)
+  PLam l r x t      -> VPLam (eval l) (eval r) x (ICEval ?sub ?env t)
   Coe r r' x a t    -> unF (coe (evalI r) (evalI r') x (bindI' \_ -> evalf a) (evalf t))
   HCom r r' x a t b -> hcom (evalI r) (evalI r') x (evalf a) (evalSystem t) (evalf b)
   GlueTy a sys      -> glueTy (eval a) (evalSystem sys)
@@ -872,11 +886,16 @@ eval = \case
 -- Forcing
 --------------------------------------------------------------------------------
 
--- TODO: consider separate forcing with and without subs! Just bite the bullet and duplicate
--- code.
--- In that case, we only have to check for hasAction in a very few number of places, probably
--- only in coe Glue (otherwise we know that weakenings always have action!)
+forceNeCof :: NCofArg => NeCof -> F VCof
+forceNeCof = \case
+  NCEq i j    -> ceq (forceI i) (forceI j)
+  NCAnd c1 c2 -> cand (forceNeCof c1) (forceNeCof c2)
 
+forceCof :: NCofArg => VCof -> F VCof
+forceCof = \case
+  VCTrue       -> ctrue
+  VCFalse      -> cfalse
+  VCNe ncof is -> forceNeCof ncof
 
 forceNeCof' :: SubArg => NCofArg => NeCof -> F VCof
 forceNeCof' = \case
@@ -902,7 +921,6 @@ forceVSub :: IDomArg => NCofArg => DomArg => Val -> Sub -> F Val
 forceVSub v s = let ?sub = s in force' v
 {-# inline forceVSub #-}
 
-
 force :: IDomArg => NCofArg => DomArg => Val -> F Val
 force = \case
   VSub v s                                 -> let ?sub = s in force' v
@@ -921,7 +939,7 @@ force' = \case
   VPi x a b      -> F (VPi x (sub a) (sub b))
   VLam x t       -> F (VLam x (sub t))
   VPathP x a t u -> F (VPathP x (sub a) (sub t) (sub u))
-  VPLam x t      -> F (VPLam x (sub t))
+  VPLam l r x t  -> F (VPLam (sub l) (sub r) x (sub t))
   VSg x a b      -> F (VSg x (sub a) (sub b))
   VPair t u      -> F (VPair (sub t) (sub u))
   VU             -> F VU
@@ -947,7 +965,7 @@ forceNe = \case
   n@(NLocalVar x)      -> F (VNe n mempty)
   NSub n s             -> let ?sub = s in forceNe' n
   NApp t u             -> appf (forceNe t) u
-  NPApp t l r i        -> pappf (forceNe t) l r (forceIVar i)
+  NPApp t l r i        -> pappf (forceNe t) l r (forceI i)
   NProj1 t             -> proj1f (forceNe t)
   NProj2 t             -> proj2f (forceNe t)
   NCoe r r' x a t      -> coe (forceI r) (forceI r) x (bindI \_ -> force a) (force t)
@@ -962,7 +980,7 @@ forceNe' = \case
   n@(NLocalVar x)      -> F (VNe n mempty)
   NSub n s             -> let ?sub = sub s in forceNe' n
   NApp t u             -> appf' (forceNe' t) (sub u)
-  NPApp t l r i        -> pappf' (forceNe' t) (sub l) (sub r) (forceIVar' i)
+  NPApp t l r i        -> pappf' (forceNe' t) (sub l) (sub r) (forceI' i)
   NProj1 t             -> proj1f' (forceNe' t)
   NProj2 t             -> proj2f' (forceNe' t)
   NCoe r r' x a t      -> coe (forceI' r) (forceI' r') x (bindI' \_ -> force' a) (force' t)
@@ -971,3 +989,27 @@ forceNe' = \case
   NUnglue t sys        -> ungluef' (sub t) (forceNSystem' sys)
   NGlue t sys          -> gluef' (sub t) (forceNSystem' sys)
   NNatElim p z s n     -> natElimf' (sub p) (sub z) (force' s) (forceNe' n)
+
+-- | Eliminate head substitutions.
+unSubNe :: IDomArg => Ne -> Ne
+unSubNe = \case
+  NSub n s -> let ?sub = s in unSubNe' n
+  n        -> n
+
+bindI'' :: (IDomArg => SubArg => a) -> (IDomArg => SubArg => a)
+bindI'' act = let ?idom = ?idom + 1; ?sub = extSub ?sub (IVar ?idom) in act
+{-# inline bindI'' #-}
+
+unSubNe' :: IDomArg => SubArg => Ne -> Ne
+unSubNe' = \case
+  NLocalVar x          -> NLocalVar x
+  NSub n s'            -> let ?sub = sub s' in unSubNe' n
+  NApp t u             -> NApp (sub t) (sub u)
+  NPApp p l r i        -> NPApp (sub p) (sub l) (sub r) (sub i)
+  NProj1 t             -> NProj1 (sub t)
+  NProj2 t             -> NProj2 (sub t)
+  NCoe r r' x a t      -> NCoe (sub r) (sub r') x (bindI'' (sub a)) (sub t)
+  NHCom r r' x a sys t -> NHCom (sub r) (sub r') x (sub a) (sub sys) (sub t)
+  NUnglue a sys        -> NUnglue (sub a) (sub sys)
+  NGlue a sys          -> NGlue (sub a) (sub sys)
+  NNatElim p z s n     -> NNatElim (sub p) (sub z) (sub s) (sub n)

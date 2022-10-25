@@ -94,6 +94,7 @@ coeⁱ r r' ((a : A) → B a) t =
 
 coeⁱ r r' (Pathʲ A t u) p =
   (λ j. comⁱ r r' (A i j) [j=0 ↦ t i, j=1 ↦ u i] (p @ j))
+  : Pathʲ (A[i↦r']) (t[i↦r']) (u[i↦r'])
 
 coeⁱ r r' ℕ t = t
 coeⁱ r r' U t = t
