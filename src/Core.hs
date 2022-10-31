@@ -113,11 +113,10 @@ newtype F a = F {unF :: a}
 -- Syntax
 --------------------------------------------------------------------------------
 
-type Name = String
 type Ty = Tm
 
 data Tm
-  = TopVar Lvl ~(DontPrint Val)
+  = TopVar Lvl ~(DontShow Val)
   | LocalVar Ix
   | Let Name Tm Ty Tm
 

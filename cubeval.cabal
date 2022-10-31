@@ -44,6 +44,8 @@ executable cubeval
       Interval
       IVarSet
       LvlSet
+      Parser
+      Presyntax
       Substitution
   hs-source-dirs:
       src

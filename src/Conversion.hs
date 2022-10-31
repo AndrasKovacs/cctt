@@ -1,8 +1,6 @@
 
 module Conversion where
 
-import Control.Exception
-
 import Common
 import Core
 import Interval
@@ -10,12 +8,9 @@ import Substitution
 
 {-|
 TODO: conversion is not the best possible here, it pushes and stores substitutions on each iteration.
-It would be better to have *two* substitutions as args, one for each side, and force each side under
+It would be better to have *two* substitutions as args, one for each side, and force each side with
 the respective substitution.
 -}
-
-data ConvEx = Inconvertible deriving Show
-instance Exception ConvEx
 
 convCl :: IDomArg => NCofArg => DomArg => Closure -> Closure -> Bool
 convCl t t' = bind \v -> conv (capp t v) (capp t' v)

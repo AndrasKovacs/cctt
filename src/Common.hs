@@ -46,6 +46,8 @@ debugging' act = act
 
 --------------------------------------------------------------------------------
 
+type Name = String
+
 uf :: Dbg => a
 uf = undefined
 {-# noinline uf #-}
@@ -97,7 +99,7 @@ type LvlArg = (?lvl :: Lvl)
 -- Not printing stuff
 --------------------------------------------------------------------------------
 
-newtype DontPrint a = DontPrint a
+newtype DontShow a = DontShow a
 
-instance Show (DontPrint a) where
+instance Show (DontShow a) where
   showsPrec _ _ x = x
