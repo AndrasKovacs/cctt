@@ -6,106 +6,7 @@ import Common
 import Interval
 import Substitution
 
-{-
-
 --------------------------------------------------------------------------------
-
-We adapt ordinary NbE to CTT, with explicit call-by-name interval
-substitutions.
-
-In ordinary NbE
-- we have terms in a var context, t : Tm Γ A
-- semantic values have closures instead of binders
-- eval has type:
-    (Γ Δ : Con)(env : ValSub Γ Δ)(A : Ty Δ) (t : Tm Δ A) → Val Γ (evalTy env A)
-  where evalTy evaluates types, but usually we only have "eval", because of
-  Russell universes and weak typing of definitions. In the simplest case, we
-  only pass "env" and "t" as arguments and nothing else. In some impls, we might
-  also want to pass "Γ" as well, which makes it possible to create "fresh"
-  variables during evaluation.
-- we store (env : ValSub Γ Δ) and (t : Tm (Δ,A) B) in a closure.
-
-In CTT we have terms in a triple context consisting of
- - interval var context
- - a cofibration
- - a fibrant var context
-written as ψ|α|Γ, with t : Tm (ψ|α|Γ) A
-
-In ordinary TT NbE, environments are semantic context morphisms ("ValSub").  We
-try to do the same in CTT. Informally, a morphism between ψ|α|Γ and ψ'|α'|Γ'
-consists of
- - an interval substitution σ : ISub ψ ψ'
- - a cof morphism δ : α ⇒ α'[σ]
- - a substitution ν : ValSub Γ (Γ'[σ,δ])
-
-The full type of eval is:
-
-  eval : ∀ ψ α Γ π' α' Γ' (σ : ISub ψ ψ')(δ : α ⇒ α'[σ])(ν : ValSub Γ (Γ'[σ,δ]))
-           (A : Ty (ψ'|α'|Γ'))
-           (t : Tm (ψ'|α'|Γ') A)
-         → Val (ψ|α|Γ) (eval A)
-
-Now, what's actually relevant from this? We only pass the following data:
-
-  ψ α Γ σ ν t
-
-- ψ is given as a natural number size. It is used to get fresh ivars in
-  filling operations.
-- α is needed in forcing (see later)
-- Γ is given as a size, it's used to distinguish closed and open evaluation;
-  Γ=0 marks the closed case.
-- σ,ν,t are needed in evaluation
-
-
--- Evaluation, substitution, forcing
---------------------------------------------------------------------------------
-
-- Evaluation:   Env  -> Tm  -> Val.
-
-- Substitution: ISub -> Val -> Val. Substitutes ivars. It *does not* perform any
-  expensive operation, it only stores an explicit substitution into values. It does
-  compose explicit substitutions eagerly.
-
-- Forcing: Env -> Val -> Val.
-  Computes values to head normal form w.r.t. explicit substitution and
-  cofibrations. It pushes subs down. It only does expensive computation on
-  neutrals, where the following might happen:
-    1. the sub that's being pushed down creates redexes in the neutral
-    2. the current cofibration creates redexes in the neutral
-
-  More detail on 2. Recall that in vanilla NbE, weakening of values comes for
-  free, we can just use values under extra binders. In CTT, weakening of fibrant
-  contexts is still free, but cofibration weakening is not. If I have a neutral
-  value under some cof, it might not be neutral under a conjuncted cof.
-
-  However, cofs are only every weakened! There's no general "substitution"
-  operation with cof morphisms. For this reason, we don't want to explicitly
-  store cofs; we only pass the "current" cof and do forcing on demand. We also
-  don't have to store cofs in closures!
-
-Semantic ops:
-  - They assume that their inputs are forced!
-  - coe/hcom have two flavors
-
--- neutrals
-
--- coe, hcom
--}
-
-{-
-
-- Should we call VSystem neutral instead, and always pair it up with an ivar set?
-- Better binder ergonomics in coe, hcom, mapVSystem?
-- sub checks for idSub, then we don't have to write duplicate code
-  where there's an extra ISub arg.
-
-- when we make systems, should we instead use "inlined" semantic versions
-  of SCons/SEmpty? (YES)
-
-- TODO: try to get rid of typed forcing! Code should be much cleaner that way
-  and overhead should be tolerable.
-
--}
 
 newtype F a = F {unF :: a}
   deriving SubAction via a
@@ -132,8 +33,8 @@ data Tm
   | U
 
   | PathP Name Ty Tm Tm         -- PathP i.A x y
-  | PApp Tm Tm Tm I             -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
-  | PLam Tm Tm Name Tm          -- endpoints, body
+  | PApp ~Tm ~Tm Tm I           -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
+  | PLam ~Tm ~Tm Name Tm        -- endpoints, body
 
   | Coe I I Name Ty Tm          -- coe r r' i.A t
   | HCom I I Name Ty System Tm  -- hcom r r' i.A [α → t] u
@@ -142,7 +43,7 @@ data Tm
   -- this one is the sensible "dependency" order
 
   | GlueTy Ty System            -- Glue A [α ↦ B]      (B : Σ X (X ≃ A))
-  | GlueTm Tm System            -- glue a [α ↦ b]
+  | Glue   Tm System            -- glue a [α ↦ b]
   | Unglue Tm System            -- unglue g [α ↦ B]
 
   | Nat
@@ -874,13 +775,16 @@ eval = \case
   Coe r r' x a t    -> unF (coe (evalI r) (evalI r') x (bindI' \_ -> evalf a) (evalf t))
   HCom r r' x a t b -> hcom (evalI r) (evalI r') x (evalf a) (evalSystem t) (evalf b)
   GlueTy a sys      -> glueTy (eval a) (evalSystem sys)
-  GlueTm t sys      -> glue   (eval t) (evalSystem sys)
+  Glue t sys        -> glue   (eval t) (evalSystem sys)
   Unglue t sys      -> unglue (eval t) (evalSystem sys)
   Nat               -> VNat
   Zero              -> VZero
   Suc t             -> VSuc (eval t)
   NatElim p z s n   -> natElim (eval p) (eval z) (evalf s) (evalf n)
 
+evalTopSub :: IDomArg => SubArg => NCofArg => DomArg => EnvArg => Tm -> F I -> Val
+evalTopSub t i = let ?sub = extSub ?sub (unF i) in eval t
+{-# inline evalTopSub #-}
 
 -- Forcing
 --------------------------------------------------------------------------------
@@ -1012,3 +916,67 @@ unSubNe' = \case
   NUnglue a sys        -> NUnglue (sub a) (sub sys)
   NGlue a sys          -> NGlue (sub a) (sub sys)
   NNatElim p z s n     -> NNatElim (sub p) (sub z) (sub s) (sub n)
+
+
+-- Quotation
+--------------------------------------------------------------------------------
+
+quoteI :: IDomArg => NCofArg => I -> I
+quoteI = unF . forceI
+
+quoteNe :: IDomArg => NCofArg => DomArg => Ne -> Tm
+quoteNe n = case unSubNe n of
+  NLocalVar x          -> LocalVar (lvlToIx ?dom x)
+  NSub{}               -> impossible
+  NApp t u             -> App (quoteNe t) (quote u)
+  NPApp n l r i        -> PApp (quoteNe n) (quote l) (quote r) (quoteI i)
+  NProj1 t             -> Proj1 (quoteNe t)
+  NProj2 t             -> Proj2 (quoteNe t)
+  NCoe r r' x a t      -> Coe (quoteI r) (quoteI r') x (bindI \_ -> quote a) (quote t)
+  NHCom r r' x a sys t -> HCom (quoteI r) (quoteI r') x (quote a) (quoteSys sys) (quote t)
+  NUnglue a sys        -> Unglue (quote a) (quoteSys sys)
+  NGlue a sys          -> Glue (quote a) (quoteSys sys)
+  NNatElim p z s n     -> NatElim (quote p) (quote z) (quote s) (quoteNe n)
+
+quoteNeCof :: IDomArg => NCofArg => NeCof -> Cof -> Cof
+quoteNeCof ncof acc = case ncof of
+  NCEq i j    -> CAnd (CofEq i j) acc
+  NCAnd c1 c2 -> quoteNeCof c1 (quoteNeCof c2 acc)
+
+quoteCof :: IDomArg => NCofArg => F VCof -> Cof
+quoteCof cof = case unF cof of
+  VCTrue      -> CTrue
+  VCFalse     -> impossible
+  VCNe ncof _ -> quoteNeCof ncof CTrue
+
+quoteSys :: IDomArg => NCofArg => DomArg => NSystem VCof -> System
+quoteSys = \case
+  NSEmpty ->
+    SEmpty
+  NSCons (forceCof -> cof) t sys ->
+    SCons (quoteCof cof) (bindCof cof (bindI \_ -> quote t)) (quoteSys sys)
+
+quoteCl :: IDomArg => NCofArg => DomArg => Closure -> Tm
+quoteCl t = bind \v -> quote (capp t v)
+{-# inline quoteCl #-}
+
+quoteICl :: IDomArg => NCofArg => DomArg => IClosure -> Tm
+quoteICl t = bindI \(IVar -> i) -> quote (icapp t i)
+{-# inline quoteICl #-}
+
+-- TODO: optimized quote' would take an extra subarg
+quote :: IDomArg => NCofArg => DomArg => Val -> Tm
+quote v = case unF (force v) of
+  VSub{}         -> impossible
+  VNe n _        -> quoteNe n
+  VGlueTy a sys  -> GlueTy (quote a) (quoteSys (_nsys sys))
+  VPi x a b      -> Pi x (quote a) (quoteCl b)
+  VLam x t       -> Lam x (quoteCl t)
+  VPathP x a t u -> PathP x (quoteICl a) (quote t) (quote u)
+  VPLam l r x t  -> PLam (quote l) (quote r) x (quoteICl t)
+  VSg x a b      -> Sg x (quote a) (quoteCl b)
+  VPair t u      -> Pair (quote t) (quote u)
+  VU             -> U
+  VNat           -> Nat
+  VZero          -> Zero
+  VSuc n         -> Suc (quote n)

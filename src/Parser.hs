@@ -76,6 +76,8 @@ atom =
   <|> withPos (    (U     <$  keyword "U"   )
                <|> (Nat   <$  keyword "Nat" )
                <|> (Zero  <$  keyword "zero")
+               <|> (I0    <$  keyword  "0"  )
+               <|> (I1    <$  keyword  "1"  )
                <|> (Ident <$> ident         ))
 
 goProj :: Tm -> Parser Tm
@@ -86,11 +88,11 @@ goProj t =
 proj :: Parser Tm
 proj = goProj =<< atom
 
-intLit :: Parser I
+intLit :: Parser Tm
 intLit = (I0 <$ keyword "0") <|> (I1 <$ keyword "1")
 
-int :: Parser I
-int = intLit <|> (IVar <$> ident)
+int :: Parser Tm
+int = intLit <|> (Ident <$> ident)
 
 cofEq :: Parser CofEq
 cofEq = CofEq <$> int <*> (char '=' *> int)
@@ -190,7 +192,7 @@ lamlet :: Parser Tm
 lamlet = lam <|> pLet <|> pi
 
 tm :: Parser Tm
-tm = do
+tm = withPos do
   t <- lamlet
   branch (char ',')
     (\_ -> Pair t <$> lamlet)

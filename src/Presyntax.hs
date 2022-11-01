@@ -4,14 +4,13 @@ module Presyntax where
 import Common
 import Text.Megaparsec (SourcePos)
 
-data I = I0 | I1 | IVar Name
-  deriving Show
-
 type Ty = Tm
 
 data Tm
   = Ident Name
   | Pos (DontShow SourcePos) Tm
+  | I0
+  | I1
   | Let Name (Maybe Ty) Tm Tm
   | Pi Name Ty Ty
   | App Tm Tm
@@ -21,15 +20,13 @@ data Tm
   | Proj1 Tm
   | Proj2 Tm
   | U
-  | Path Tm Tm                  -- PathP _   x y
-  | PathP Name Ty Tm Tm         -- PathP i.A x y
-  | PApp Tm I
-  | PLam Name Tm
+  | Path Tm Tm                    -- PathP _   x y
+  | PathP Name Ty Tm Tm           -- PathP i.A x y
 
-  | Coe I I Name Ty Tm          -- coe r r' i.A t
-  | HCom I I Name Ty System Tm  -- hcom r r' i.A [α → t] u
+  | Coe Tm Tm Name Ty Tm          -- coe r r' i.A t
+  | HCom Tm Tm Name Ty System Tm  -- hcom r r' i.A [α → t] u
 
-  | GlueTy Ty System            -- Glue A [α ↦ B]      (B : Σ X (X ≃ A))
+  | GlueTy Ty System              -- Glue A [α ↦ B]      (B : Σ X (X ≃ A))
   | GlueTm Tm
   | Unglue Tm
 
@@ -39,7 +36,7 @@ data Tm
   | NatElim Tm Tm Tm Tm         -- (P : Nat -> U) -> P z -> ((n:_) -> P n -> P (suc n)) -> (n:_) -> P n
   deriving Show
 
-data CofEq = CofEq I I
+data CofEq = CofEq Tm Tm
   deriving Show
 
 data Cof = CTrue | CAnd {-# unpack #-} CofEq Cof

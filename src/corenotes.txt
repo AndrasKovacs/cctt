@@ -1,0 +1,100 @@
+{-
+
+--------------------------------------------------------------------------------
+
+We adapt ordinary NbE to CTT, with explicit call-by-name interval
+substitutions.
+
+In ordinary NbE
+- we have terms in a var context, t : Tm Γ A
+- semantic values have closures instead of binders
+- eval has type:
+    (Γ Δ : Con)(env : ValSub Γ Δ)(A : Ty Δ) (t : Tm Δ A) → Val Γ (evalTy env A)
+  where evalTy evaluates types, but usually we only have "eval", because of
+  Russell universes and weak typing of definitions. In the simplest case, we
+  only pass "env" and "t" as arguments and nothing else. In some impls, we might
+  also want to pass "Γ" as well, which makes it possible to create "fresh"
+  variables during evaluation.
+- we store (env : ValSub Γ Δ) and (t : Tm (Δ,A) B) in a closure.
+
+In CTT we have terms in a triple context consisting of
+ - interval var context
+ - a cofibration
+ - a fibrant var context
+written as ψ|α|Γ, with t : Tm (ψ|α|Γ) A
+
+In ordinary TT NbE, environments are semantic context morphisms ("ValSub").  We
+try to do the same in CTT. Informally, a morphism between ψ|α|Γ and ψ'|α'|Γ'
+consists of
+ - an interval substitution σ : ISub ψ ψ'
+ - a cof morphism δ : α ⇒ α'[σ]
+ - a substitution ν : ValSub Γ (Γ'[σ,δ])
+
+The full type of eval is:
+
+  eval : ∀ ψ α Γ π' α' Γ' (σ : ISub ψ ψ')(δ : α ⇒ α'[σ])(ν : ValSub Γ (Γ'[σ,δ]))
+           (A : Ty (ψ'|α'|Γ'))
+           (t : Tm (ψ'|α'|Γ') A)
+         → Val (ψ|α|Γ) (eval A)
+
+Now, what's actually relevant from this? We only pass the following data:
+
+  ψ α Γ σ ν t
+
+- ψ is given as a natural number size. It is used to get fresh ivars in
+  filling operations.
+- α is needed in forcing (see later)
+- Γ is given as a size, it's used to distinguish closed and open evaluation;
+  Γ=0 marks the closed case.
+- σ,ν,t are needed in evaluation
+
+
+-- Evaluation, substitution, forcing
+--------------------------------------------------------------------------------
+
+- Evaluation:   Env  -> Tm  -> Val.
+
+- Substitution: ISub -> Val -> Val. Substitutes ivars. It *does not* perform any
+  expensive operation, it only stores an explicit substitution into values. It does
+  compose explicit substitutions eagerly.
+
+- Forcing: Env -> Val -> Val.
+  Computes values to head normal form w.r.t. explicit substitution and
+  cofibrations. It pushes subs down. It only does expensive computation on
+  neutrals, where the following might happen:
+    1. the sub that's being pushed down creates redexes in the neutral
+    2. the current cofibration creates redexes in the neutral
+
+  More detail on 2. Recall that in vanilla NbE, weakening of values comes for
+  free, we can just use values under extra binders. In CTT, weakening of fibrant
+  contexts is still free, but cofibration weakening is not. If I have a neutral
+  value under some cof, it might not be neutral under a conjuncted cof.
+
+  However, cofs are only every weakened! There's no general "substitution"
+  operation with cof morphisms. For this reason, we don't want to explicitly
+  store cofs; we only pass the "current" cof and do forcing on demand. We also
+  don't have to store cofs in closures!
+
+Semantic ops:
+  - They assume that their inputs are forced!
+  - coe/hcom have two flavors
+
+-- neutrals
+
+-- coe, hcom
+-}
+
+{-
+
+- Should we call VSystem neutral instead, and always pair it up with an ivar set?
+- Better binder ergonomics in coe, hcom, mapVSystem?
+- sub checks for idSub, then we don't have to write duplicate code
+  where there's an extra ISub arg.
+
+- when we make systems, should we instead use "inlined" semantic versions
+  of SCons/SEmpty? (YES)
+
+- TODO: try to get rid of typed forcing! Code should be much cleaner that way
+  and overhead should be tolerable.
+
+-}
