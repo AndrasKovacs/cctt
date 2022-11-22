@@ -1,218 +1,220 @@
 
-### cubeval
+## cubeval
 
-(README WIP)
+A small implementation of a cartesian cubical type theory, designed from
+group-up with performance in mind. WIP, doesn't work yet. The immediate project
+goal is to get the implementation in a testable state, and then port a bunch of
+existing benchmarks.
 
-Investigating evaluation efficiency in cubical type theories. There will
-be a prototype implementation here with benchmarks.
+There are numerous examples which can't be checked in any existing cubical type
+theory implementation, like the infamous original definition of Brunerie's
+number. The hope is that we'll be able to check more of these in this implementation.
 
-Currently there's no such thing, but I include here a preliminary analysis. This
-is based on spending some time staring at the computation rules of cubical TTs
-and some benchmark source code. Any of my feelings and expectations could be
-invalidated by eventual benchmarking. I assume that the reader of this document
-is familiar with CTT rules.
+I'm publishing this repo and README because people have been asking for
+it. However, this repo will be a lot more interesting when it actually works. I
+summarize below the design. I assume that readers of this README already know
+some cubical TT.
 
-## Table of Contents
+### Normalization by evaluation
 
-<!-- * [Motivation](#overview) -->
-<!-- * [Installation](#installation) -->
-<!-- * [Language overview](#language-overview) -->
-<!-- * [Design](#design) -->
-<!-- * [GHC-specific optimizations](#ghc-specific-optimizations) -->
-<!-- * [Benchmarks](#benchmarks) -->
+In vanilla type theories, normalization-by-evaluation (NbE) is the standard
+implementation technique. The point is that we need to evaluate terms during
+type checking. It's essentially higher-order functional program evaluation,
+except that free variables can appear in programs which block all computation.
+The basic recipe for implementing NbE:
 
-### Intro
+1. Obtain the definition of runtime values: starting from the data type of
+   syntactic terms, replace all binders with closures. A closure (in its
+   simplest form) contains a syntactic term and a list of runtime values.
+   For example, a syntactic `Pi Name Tm Tm`, where the name is bound in the
+   second field, becomes `Pi Name Val (List Val, Tm)` in values.
+2. Define evaluation, which takes as input a list of values ("environment") and
+   a term, and returns a value. Evaluation is usually a standard eval-apply
+   strategy, where we return a closure when evaluating a binder and apply closures
+   in function application. The extra feature is *neutral values*: these are
+   values blocked by free variables, e.g. a variable with function type applied
+   to some arguments.
+3. Define conversion checking, which takes a "fresh variable" and two values as
+   input, and returns whether the values are convertible. The assumption is that
+   the fresh variable is not free in either of the input values. We recursively
+   compare the values, and when there's a closure on both sides, we apply both
+   to a fresh variable and continue conversion checking on the results.
 
-Existing implementation of cubical type theories all have performance issues.
-In many cases it could be possible, in principle, to prove things by `refl`, but
-in practice it takes too long to check.
+There's also *quotation*, which return a syntactic term from a value, which also
+uses fresh variable passing to go under closures. The name *normalization* in
+NbE comes from this: normalization of terms can be defined as evaluation
+followed by quotation. However, in a minimal type checker, normalization is not
+needed, only conversion checking is.
 
-I have the following approach in this repo. I try to identify & implement a CTT
-variant which is as simple as possible, supports performance optimizations and
-supports enough interesting benchmarks. Having more expressive power generally
-makes optimization more difficult. I start with barebones CTTs, if those can be
-successfully sped up, then we can consider more expressive ones.
+We might have the following informal definitions and types for NbE:
 
-### What are the complications
+- `Γ` and `Δ` are contexts, i.e. lists of types.
+- `Tm Γ` is the set of syntactic terms in `Γ`, of unspecified type. I don't
+  specify types for the sake of brevity. `Val Γ` is the set of runtime values
+  with free variables in `Γ`.
+- `Sub Γ Δ` is the set of parallel term substitutions. `σ : Sub Γ Δ` is a
+  list of terms, where the number and types of terms is given by `Δ`, and
+  each term may have free variables from `Γ`.
+- `Env Γ Δ` is analogous to `Sub Γ Δ`, except that it's a list of values.
+- `eval : Env Γ Δ → Tm Δ → Val Γ` is the evaluation function.
+- `quote : Val Γ → Tm Γ` is quotation. The implicit `Γ` contains enough information
+  for us to get a fresh variable. If we use de Bruijn levels, the length of `Γ` definitely
+  does not occur freely in any `Val Γ`. In implementations we usually only pass the length info.
+- `conv : Val Γ → Val Γ → Bool` is conversion checking, and once again we can grab fresh vars.
 
-In ordinary type theories, we can usually use environment machine evaluation
-in a straightforward way. In cubical TTs, we can't really. The complications
-are the following.
+This scheme is almost the same as standard implementation practices for
+functional programming, extended with the handling of neutral values.
 
-First, **interval substitutions**. Vanilla TTs support evaluation where no
-substitution is ever required, only evaluation of terms in environments. In
-CTTs,
+In particular, there is a separation of program code, which is immutable and
+never created or modified during execution, and runtime values which are
+dynamically created and garbage collected. This separation makes it possible to
+choose between different code representations, such as bytecode, machine code or
+AST, while leaving conversion checking logic essentially the same. The only
+operation that acts on terms is evaluation. There is no substitution or
+renaming.
 
+In cubical type theories we don't have this happy situation. Here, *interval
+substitution* is an inseparable component of evaluation which seemingly cannot
+be eliminated. There is no known abstract machine for cubical TTs which is
+substitution-free. In this repo we also don't have such a thing.
 
-### Picking a CTT
+For example, *filling operations* in CCTT (Cartesian CTT) require weakening
+substitutions on interval variables. These operations may act on *arbitrary*
+terms/values at evaluation time, which are not known to be closures. So it's not
+enough to have closures, we need unrestricted interval substitutions too.
 
-There are many possible variations on CTT rules and features. I pick a concrete
-variation on Cartesian Cubical TT (CCTT), which seems to be the easiest to
-optimize.  I will mostly compare this CCTT variation to CHM cubical type theory,
-which is notable for being the basis of Cubical Agda. I shall use "CCTT" in the
-following to refer to the particular flavor of CCTT that I plan to implement.
+Runtime values don't support efficient substitution, e.g.
 
-#### Metatheory
+    _[x ↦ _] : Val (Γ, x : A) → Val Γ → Val Γ
 
-CCTT has the advantage of having a normalization proof (TOOD), while CHM does
-not have one right now, and it also has some wobbly parts which could make the
-normalization proof difficult (TODO).
+which instantiates the last variable to a value in some value. The problematic
+part is the substitution of closures: here we have some `Env (Γ, x : A) Δ` and a
+`Tm Δ`, so we have to traverse the `Env` and substitute each value therein.
+Sadly, if done eagerly, this deeply and recursively copies every value and every
+closure within a value. The main reason for the efficiency of vanilla NbE is
+*implicit structure sharing* in values and eager substitution destroys all such
+sharing.
 
-#### Interval expressions & substitutions
+So I refine vanilla NbE for CTTs. It does have substitution for values, but the
+evilness of it is mitigated.
 
-In CCTT interval expressions are `0`, `1` or variables. In CHM, we additionally
-have `∧`, `∨` and `~` (reversal/negation) in interval expressions. Thus, the
-CCTT interval language is much simpler, and we can represent CCTT interval
-substitutions more compactly. In principle, CCTT substitution can be bit-packed
-and their composition can be defined using SIMD instructions. This is pretty
-fun, although I doubt that it would make or break overall performance.
+### Cubical NbE
 
-#### Primitives
+In the CCTT that I'm considering here, terms are in triple contexts:
 
-My CCTT has `coe` and `hcom` separately. There's some potential performance
-advantage to CCTT coercion in comparison to CHM `transp`. `coe` can be defined
-for the simply-typed language fragment without interval substitutions, while
-`transp` can't. We write `coe` as follows:
+    ψ;α;Γ ⊢ t : A
 
-    coeⁱ r r' A t
+- The `ψ` part lists interval vars.
+- `α` is a single cofibration; we don't need multiple entries because we can
+  extend the context by conjunction.
+- `Γ` lists ordinary fibrant vars.
 
-where `Γ, i ⊢ A type`, `Γ ⊢ t : A[i↦r]` and `Γ ⊢ coeⁱ r r' A t : A[i↦r']`.
-Consider coercion for non-dependent functions:
+Recalling vanilla NbE, there `Env Γ Δ` can be though of as a semantic context morphism
+which interprets each variable.
 
-    coeⁱ r r' (A → B) t = λ x. coeⁱ r r' B (t (coeⁱ r' r A x))
+Analogously, cubical NbE should take as input a semantic context morphism between
+`ψ₀;α₀;Γ₀` and `ψ₁;α₁;Γ₁`. What should this be? It consists of
 
-Also `transp`:
+- An interval substitution `σ : Subᴵ ψ₀ ψ₁`.
+- A cofibration implication `f : α₀ ⊢ α₁[σ]`.
+- A value environment `δ : Env Γ₀ (Γ₁[σ, f])`.
 
-    transpⁱ (A → B) t = λ x. transpⁱ B (t (transpⁱ (A[i ↦ ~i]) x))
+So the explicit type of evaluation would be:
 
-The direction of CCTT coercion can be reversed "natively", while in `transp` we
-have to reverse the `i` variable by substitution. Assuming that CCTT and CHM are
-both implemented in an optimized way, this probably doesn't change the
-asymptotics, but it looks like a win for CCTT in any case.
+    eval : ∀ ψ₀ α₀ Γ₀ ψ₁ α₁ Γ₁ (σ : Subᴵ ψ₀ ψ₁)(f : α₀ ⊢ α₁[σ])(δ : Env Γ₀ (Γ₁[σ, f]))
+	       (t : Tm (ψ₁;α₁;Γ₁)) → Val (ψ₀;α₀;Γ₀)
 
-For dependent types, we can't avoid interval substitution with `coe`.  For
-example:
+This is a whole bunch of arguments (even ignoring types of terms and values),
+but not all of these will be computationally relevant to us. In the implementation
+we only pass the following:
 
-    coeⁱ r r' ((a : A) × B a) t =
-	  (coeⁱ r r' A (t.1), coeⁱ r r' (B (coeFillⁱ r r' A (t.1))))
+    ψ₀, α₀, Γ₀, σ, δ, t
 
-Here, the definition of `coeFill` requires a weakening substitution.
-Specification of `coeFill`:
+- We only pass ψ₀ as a length. This is the de Bruijn level marking the next fresh interval
+  variable. We need fresh interval vars in several cubical computation rules, such as when
+  we do weakening substitution.
+- We need α₀ for "forcing"; we'll see this later. A faithful representation is passed.
+- Γ₀ is passed as a length. No computation rules really require this, but we use it for
+  *optimization*: if Γ₀ is empty, we can take some shortcuts.
+- σ, δ and `t` are evidently required in evaluation.
 
-    Γ, i ⊢ A type   Γ ⊢ t : A[i ↦ r]
-    ────────────────────────────────────
-    Γ, i ⊢ coeFillⁱ r r' A t : A
-	Γ, i, i=r  ⊢ coeFillⁱ r r' A t ≡ t
-	Γ, i, i=r' ⊢ coeFillⁱ r r' A t ≡ coeⁱ r r' A t
+We introduce two additional basic operations:
 
-Definition:
+- `sub  : (σ : Subᴵ ψ₀ ψ₀) → Val (ψ₀;α₀;Γ₀) → Val (ψ₁;α₀[σ];Γ₀[σ])`. This is
+  interval substitution. However, `sub` is guaranteed to be cheap: it doesn't do
+  any deep computation. It simply stores an explicit interval substitution as
+  shallowly as possible in values. There are analogous `sub` operations for
+  all kinds of semantics constructs besides values.
+- `force : ∀ ψ₀ α₀ Γ₀ → Val (ψ₀;α₀;Γ₀) → Val (ψ₀;α₀;Γ₀)`, where `ψ₀ α₀ Γ₀`
+  denote the same arguments as before. Forcing computes a value to *head normal
+  form*, by pushing interval substitutions down and potentially re-evaluating
+  neutral values until we hit a rigid head. We also have forcing for every kind
+  of semantic values.
 
-    coeFill i r r' A t := coeʲ r i (A[i ↦ j]) t
+We substitute by `sub`, which is always cheap. Moreover, a `sub` of an explicit
+`sub` collapses to a single composed `sub`.
 
-where `j` is a fresh interval variable. Hence, if `i=r` then we get `coeʲ r r
-(A[i ↦ j]) t ≡ t`, and if `i=r'`, then `coeʲ r r' (A[i ↦ j]) t ≡ coeⁱ r r' A t`,
-so the specification is satisfied.
+When we have to match on the head form of a value, we force it. Forcing
+accumulates explicit `sub`-s as it hits them, so generally we have two versions
+of `force` for each semantic value kind: plain forcing and forcing under an
+extra `Subᴵ` parameter.
 
-Substituting a fresh variable for some variable is always a
-*weakening*. Weakenings are quite special, because all neutral values in CTT are
-stable under weakening. More generally, *injective renamings* have the same
-stability property, and we want to take advantage of this in
-implementations. More on this later; let's just note for now that coercion for
-the vanilla MLTT type formers can be implemented using only interval weakenings.
+Forcing is cheap on canonical values. Here it just pushes substitutions down one layer
+to expose the canonical head. On neutral values however, forcing can trigger arbitrary
+computations, because neutrals are not stable under interval substitution. By applying
+a substitution we can unblock coercions and compositions.
 
+Moreover, we don't just force neutrals with respect to the action of a
+substitution.  We also force them w.r.t. the α₀ cofibration. Why is this needed,
+and how can neutrals even be "out of date" w.r.t. cofibrations? It's all because
+of the handling of value weakening. In vanilla NbE, a value `Val Γ` can be
+implicitly used in `Val (Γ,A)`. Weakening is for free, we don't need to shift
+variables or do anything.
 
+In cubical NbE, weakening is *not for free*, because a value under a cofibration
+`α` could be further computed under the cofibration `α ∧ β`. But we don't
+compute weakening eagerly, in fact we still do implicit weakening. We defer the
+cost of weakening until forcing, where we recompute cofibrations and interval
+expression under the forcing cofibration.
 
+The last important ingredient is forcing is **stability annotations**.  We don't
+want to always recompute neutral values on every forcing. Instead, we add small
+annotations to neutral values. These annotations can be cheaply forced, and they
+tell us if the neutral value would change under the current forcing. If it
+wouldn't, we just delay the forcing.
 
+This is inspired by the paper "Normalization for Cubical Type Theory", where
+each neutral is annotated by the cofibration which is true when the neutral can
+be further computed. A false annotation signifies a neutral which can not be
+further computed under any cofibration or interval substitution.
 
-It's a Cartesian CTT, closest to ABCFHL. The alternative would be CHM.
+In my implementation, annotations are *not precise*, they are not cofibrations
+but simple sets (bitmasks) of interval variables which occur in relevant
+positions in a neutral. When forcing, I check whether relevant interval vars
+are mapped to distinct vars by forcing. If so, then forcing has no action on
+the neutral. This is a sound approximation of the precise stability predicate.
 
-- CCTT has more-developed metatheory, e.g. it has a normalization proof.
-- The interval expressions and substitutions in CCTT are simpler than in CHM.
+In semantic values, we generally use closures for binders which are never
+inspected in computations rules:
 
+- Path abstraction
+- Dependent path type binder
+- Ordinary lambda abstraction
 
+We don't use closures when computation rules can "peek under" binders:
 
+- In `coe` types.
+- In partial "systems" in `hcom`, `Glue`, `glue` and `unglue`.
 
-  In CCTT an interval expression is just 0, 1 or a variable, so substitutions
-  can be represented very compactly and also composed efficiently. In principle,
-  we can could even compose packed substitutions with SIMD instructions, but I
-  doubt that this would make a decisive difference in overall performance.
-- CCTT cubical primitives can be implemented with fewer interval substitutions.
-  In particular, coercion for non-dependent type formers can be implemented
-  without interval substitution. For instance:
+The reason is that peeking under closures can be very expensive; it can be only
+done by instantiating it with a fresh variable. Peeking at plain values is
+just forcing.
 
-      coe i:r->r' (A → B)
+Generally speaking, this cubical NbE can be call-by-need or call-by-value in
+"ordinary" reductions, and call-by-name in computation triggered by interval
+substitution and weakening under cofibrations.
 
+In the following I look at considerations on laziness vs strictness and closed
+vs open evaluation.
 
-
-
-<!-- #### Choosing a theory -->
-
-<!-- There are multiple cubical TTs and a bunch of feature variations. I want to -->
-<!-- first pick a simple and highly streamlined configuration for implementation, -->
-<!-- which is however still sufficient to host the classic benchmarks, -->
-<!-- e.g. Brunerie's number. We can work out more fancy features afterwards. -->
-<!-- Summarizing the features: -->
-
-<!-- - I pick Cartesian CTT. This makes interval substitutions simpler, and more -->
-<!--   amenable to compression. However, I do not actually expect that there would be -->
-<!--   a notable performance difference between CCTT and De Morgan CTT solely because -->
-<!--   of the difference in interval substitutions. Both in CCTT and DMCTT interval -->
-<!--   substitutions are tiny compared to value substitutions (and we want to exploit -->
-<!--   this!). At the end of the day, I do not see a major difference between the -->
-<!--   efficiency of CCTT and DMCTT; it's just that I have to pick one. -->
-<!-- - We have `hcom` and `coe` as separate primitives. -->
-<!-- - I do not allow abstraction over intervals and cofibrations, unlike cooltt and -->
-<!--   Agda. -->
-<!-- - There are no first-class partial values. We can only write down partial values -->
-<!--   in `hcom`, `Glue` and `glue`. Unlike cooltt. -->
-<!-- - There are no cubical subtypes. -->
-<!-- - There are no *cofibration disjunctions* in the surface syntax. The syntax for -->
-<!--   partial values has a normalized structure: we have zero or more disjunctive -->
-<!--   "branches" in a partial value, and in each branch the cofibration is a -->
-<!--   conjunction of equations. For example, I can write `[i=0∧j=0 ↦ t₁, i=1∧j=1 ↦ -->
-<!--   t₂]`, but I can't write `[i=0∨i=1 ↦ t]`. The latter can be rewritten as `[i=0 -->
-<!--   ↦ t, i=1 ↦ t]`. Every potential usage of `∨` can be eliminated in this manner. -->
-<!--   Now, this causes partial values to potentially increase in size. On the other hand -->
-<!--   we can simplify the treatment of cofibrations by a fair margin. Now, we only -->
-<!--   every work under a cofibration which is a conjunction of equations. If such a -->
-<!--   cofibration is not `False`, then it can be represented as a "canonical" interval -->
-<!--   substitution which maps each variable to 0, 1 or the greatest representative -->
-<!--   variable of its equivalence class. Overall I do not expect that the potential -->
-<!--   value duplication for unfolded partial values will make or break performance. -->
-<!-- - The `∀` operation of cofibrations is quite obviously also not available in the -->
-<!--   surface syntax. In the `coe` rule for `Glue`, the usage of `∀` is unfolded -->
-<!--   on the fly: if `∀` yields a disjunction cofibration, we immediately rewrite -->
-<!--   `[∀i.ϕ ↦ t]` to the unfolded partial value where each disjunctive case is -->
-<!--   mapped to the same value. -->
-<!-- - Inductive types: not yet pinned down. It would be good to have at least: -->
-<!--   - parameterized single-sorted strict inductive types (with strict `coe` and -->
-<!--     `hcom` reduction rules) -->
-<!--   - parameterized single-sorted HITs. -->
-<!--   Dropping support for parameters is possible at the cost of significant -->
-<!--   boilerplate in code. -->
-
-<!-- Overall, the above language is roughly as expressive as the latest branches of -->
-<!-- `cubicaltt`. -->
-
-
-<!-- #### Canonical and open evaluation -->
-
-<!-- By **canonical evaluation** I mean evaluation in a context which contains interval -->
-<!-- variables and a cofibration (as a conjunction of equations), but no ordinary -->
-<!-- variables. In such contexts, we have canonicity: every value of a strict -->
-<!-- inductive type is definitionally equal to a constructor. This inspires the -->
-<!-- naming "canonical evaluation". In non-cubical TTs, we have canonical evaluation -->
-<!-- only in empty contexts. -->
-
-<!-- This contrasts **open evaluation** where we work under arbitrary contexts. -->
-
-<!-- In CTTs, evaluating a closed value can depend on canonical evaluation (we may -->
-<!-- need to go under interval binders) but not open evaluation. The infamous -->
-<!-- explosive CTT benchmarks are all instances of canonical evaluation. -->
-
-
-<!-- #### Interval substitutions -->
-
-<!-- One crucical problem in cubical evaluation is the necessity of interval -->
-<!-- substitutions. They pretty much make it impossible to implement cubical -->
-<!-- evaluation with straightforward environment machines. -->
+### Closed cubical evaluation

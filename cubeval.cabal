@@ -41,6 +41,7 @@ executable cubeval
       Common
       Conversion
       Core
+      Elaboration
       Interval
       IVarSet
       LvlSet
