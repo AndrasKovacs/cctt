@@ -16,7 +16,7 @@ implementation.
 
 I'm publishing this repo and README because people have been asking for
 it. However, this repo will be a lot more interesting when it actually works. I
-summarize belowthe design. I assume that readers of this README are familiar
+summarize below the design. I assume that readers of this README are familiar
 with rules of cubical TTs.
 
 ### 1. Normalization by evaluation
