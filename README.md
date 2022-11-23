@@ -182,6 +182,14 @@ compute weakening eagerly, in fact we still do implicit weakening. We defer the
 cost of weakening until forcing, where we recompute cofibrations and interval
 expression under the forcing cofibration.
 
+In the implementation, it can get fairly complicated to keep track of which 
+values have been already forced w.r.t. the current context and which haven't.
+So I use a newtype wrapper called `F` to mark anything that is forced. Many functions
+also expect `F`-ed arguments, which can be very useful for avoiding duplicate forcing.
+Now, `F` adds a *significant* amount of noise everywhere in the code. But I find
+it valuable because when I switched to using it I immediately found a handful of forcing-related
+bugs. 
+
 #### Stability annotations
 
 We don't want to always recompute neutral values on every forcing. Instead, we
