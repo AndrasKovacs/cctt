@@ -173,7 +173,7 @@ Moreover, we don't just force neutrals with respect to the action of a
 substitution.  We also force them w.r.t. the α₀ cofibration. Why is this needed,
 and how can neutrals even be "out of date" w.r.t. cofibrations? It's all because
 of the handling of value weakening. In vanilla NbE, a value `Val Γ` can be
-implicitly used in `Val (Γ,A)`. Weakening is for free, we don't need to shift
+implicitly cast to `Val (Γ,A)`. Weakening is for free, we don't need to shift
 variables or do anything.
 
 In cubical NbE, weakening is *not for free*, because a value under a cofibration
