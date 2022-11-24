@@ -257,7 +257,7 @@ cubical evaluation *we have to use defunctionalization*, because interval
 substitution has to act on closures.
 
 Defunctionalization is most convenient when we have few different kinds of
-closures, like in the vanilla NbE case, where have one kind of closure. If we
+closures, like in the vanilla NbE case, where there's just one kind of closure. If we
 have lots of different closures, there's a distance in the implementation code
 between the points where we create closures, and the place where we define the
 actual application logic for each closure (the "generic apply" function). This
