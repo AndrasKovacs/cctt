@@ -180,7 +180,7 @@ In cubical NbE, weakening is *not for free*, because a value under a cofibration
 `α` could be further computed under the cofibration `α ∧ β`. But we don't
 compute weakening eagerly, in fact we still do implicit weakening. We defer the
 cost of weakening until forcing, where we recompute cofibrations and interval
-expression under the forcing cofibration.
+expressions under the forcing cofibration.
 
 In the implementation, it can get fairly complicated to keep track of which 
 values have been already forced w.r.t. the current context and which haven't.
