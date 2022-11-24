@@ -2,7 +2,7 @@
 ## cubeval
 
 A small implementation of a cartesian cubical type theory, designed from
-group-up with performance in mind. WIP, doesn't work yet. The immediate project
+ground-up with performance in mind. WIP, doesn't work yet. The immediate project
 goal is to get the implementation in a testable state and then port over a bunch
 of existing cubical benchmarks.
 
