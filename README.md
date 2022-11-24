@@ -216,6 +216,7 @@ inspected in computations rules:
 - Path abstraction
 - Dependent path type binder
 - Ordinary lambda abstraction
+- Pi/Sigma type binders 
 
 We don't use closures when computation rules can "peek under" binders:
 
