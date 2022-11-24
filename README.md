@@ -114,7 +114,7 @@ In the CCTT that I'm considering here, terms are in triple contexts:
   extend the context by conjunction.
 - `Γ` lists ordinary fibrant vars.
 
-Recalling vanilla NbE, there `Env Γ Δ` can be though of as a semantic context morphism
+Recalling vanilla NbE, there `Env Γ Δ` can be thought of as a semantic context morphism
 which interprets each variable.
 
 Analogously, cubical NbE should take as input a semantic context morphism between
