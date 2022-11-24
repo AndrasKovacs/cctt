@@ -149,7 +149,7 @@ We introduce two additional basic operations:
   interval substitution. However, `sub` is guaranteed to be cheap: it doesn't do
   any deep computation. It simply stores an explicit interval substitution as
   shallowly as possible in values. There are analogous `sub` operations for
-  all kinds of semantics constructs besides values.
+  all kinds of semantic constructs besides values.
 - `force : ∀ ψ₀ α₀ Γ₀ → Val (ψ₀;α₀;Γ₀) → Val (ψ₀;α₀;Γ₀)`, where `ψ₀ α₀ Γ₀`
   denote the same arguments as before. Forcing computes a value to *head normal
   form*, by pushing interval substitutions down and potentially re-evaluating
