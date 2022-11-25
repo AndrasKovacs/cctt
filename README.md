@@ -38,7 +38,7 @@ The informal scheme for "deriving" NbE for a theory is the following.
    in function application. The extra feature is *neutral values*: these are
    values blocked by free variables, e.g. a variable with function type applied
    to some arguments.
-3. Define conversion checking, which takes a "fresh variable" and two values as
+3. Define conversion checking, which takes a "fresh variable" supply and two values as
    input, and returns whether the values are convertible. The assumption is that
    the fresh variable is not free in either of the input values. We recursively
    compare the values, and when there's a closure on both sides, we apply both
