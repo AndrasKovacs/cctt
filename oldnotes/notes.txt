@@ -35,7 +35,7 @@ isEquiv f :=
     ap f (inv a) ◼ rinv (f a) = refl
 
    with extension type:
-    [i, j] B [i=0 ↦ f a, i=1 ↦ rinv (f a), j=0 ↦ f (linv a i), j=1 ↦ f a]
+    [i, j] B [i=0 ↦ f a, i=1 ↦ rinv (f a) j, j=0 ↦ f (linv a i), j=1 ↦ f a]
 
    as a square:
 

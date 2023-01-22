@@ -2,7 +2,7 @@
 ## cubeval
 
 A small implementation of a cartesian cubical type theory, designed from
-group-up with performance in mind. WIP, doesn't work yet. The immediate project
+ground-up with performance in mind. WIP, doesn't work yet. The immediate project
 goal is to get the implementation in a testable state and then port over a bunch
 of existing cubical benchmarks.
 
@@ -16,7 +16,7 @@ implementation.
 
 I'm publishing this repo and README because people have been asking for
 it. However, this repo will be a lot more interesting when it actually works. I
-summarize belowthe design. I assume that readers of this README are familiar
+summarize below the design. I assume that readers of this README are familiar
 with rules of cubical TTs.
 
 ### 1. Normalization by evaluation
@@ -38,7 +38,7 @@ The informal scheme for "deriving" NbE for a theory is the following.
    in function application. The extra feature is *neutral values*: these are
    values blocked by free variables, e.g. a variable with function type applied
    to some arguments.
-3. Define conversion checking, which takes a "fresh variable" and two values as
+3. Define conversion checking, which takes a "fresh variable" supply and two values as
    input, and returns whether the values are convertible. The assumption is that
    the fresh variable is not free in either of the input values. We recursively
    compare the values, and when there's a closure on both sides, we apply both
@@ -114,7 +114,7 @@ In the CCTT that I'm considering here, terms are in triple contexts:
   extend the context by conjunction.
 - `Γ` lists ordinary fibrant vars.
 
-Recalling vanilla NbE, there `Env Γ Δ` can be though of as a semantic context morphism
+Recalling vanilla NbE, there `Env Γ Δ` can be thought of as a semantic context morphism
 which interprets each variable.
 
 Analogously, cubical NbE should take as input a semantic context morphism between
@@ -149,7 +149,7 @@ We introduce two additional basic operations:
   interval substitution. However, `sub` is guaranteed to be cheap: it doesn't do
   any deep computation. It simply stores an explicit interval substitution as
   shallowly as possible in values. There are analogous `sub` operations for
-  all kinds of semantics constructs besides values.
+  all kinds of semantic constructs besides values.
 - `force : ∀ ψ₀ α₀ Γ₀ → Val (ψ₀;α₀;Γ₀) → Val (ψ₀;α₀;Γ₀)`, where `ψ₀ α₀ Γ₀`
   denote the same arguments as before. Forcing computes a value to *head normal
   form*, by pushing interval substitutions down and potentially re-evaluating
@@ -173,14 +173,22 @@ Moreover, we don't just force neutrals with respect to the action of a
 substitution.  We also force them w.r.t. the α₀ cofibration. Why is this needed,
 and how can neutrals even be "out of date" w.r.t. cofibrations? It's all because
 of the handling of value weakening. In vanilla NbE, a value `Val Γ` can be
-implicitly used in `Val (Γ,A)`. Weakening is for free, we don't need to shift
+implicitly cast to `Val (Γ,A)`. Weakening is for free, we don't need to shift
 variables or do anything.
 
 In cubical NbE, weakening is *not for free*, because a value under a cofibration
 `α` could be further computed under the cofibration `α ∧ β`. But we don't
 compute weakening eagerly, in fact we still do implicit weakening. We defer the
 cost of weakening until forcing, where we recompute cofibrations and interval
-expression under the forcing cofibration.
+expressions under the forcing cofibration.
+
+In the implementation, it can get fairly complicated to keep track of which
+values have been already forced w.r.t. the current context and which haven't.
+So I use a newtype wrapper called `F` to mark anything that is forced. Many
+functions also expect `F`-ed arguments, which can be very useful for avoiding
+duplicate forcing.  Now, `F` adds a *significant* amount of noise everywhere in
+the code. But I find it valuable because when I switched to using it I
+immediately found a handful of forcing-related bugs.
 
 #### Stability annotations
 
@@ -208,6 +216,7 @@ inspected in computations rules:
 - Path abstraction
 - Dependent path type binder
 - Ordinary lambda abstraction
+- Pi/Sigma type binders
 
 We don't use closures when computation rules can "peek under" binders:
 
@@ -249,7 +258,7 @@ cubical evaluation *we have to use defunctionalization*, because interval
 substitution has to act on closures.
 
 Defunctionalization is most convenient when we have few different kinds of
-closures, like in the vanilla NbE case, where have one kind of closure. If we
+closures, like in the vanilla NbE case, where there's just one kind of closure. If we
 have lots of different closures, there's a distance in the implementation code
 between the points where we create closures, and the place where we define the
 actual application logic for each closure (the "generic apply" function). This
@@ -271,7 +280,7 @@ values here. In the CTT of this repo and also in cubical Agda, we have that
 In [`cooltt`](https://github.com/RedPRL/cooltt) and
 [ABCFHL](https://www.cambridge.org/core/journals/mathematical-structures-in-computer-science/article/syntax-and-models-of-cartesian-cubical-type-theory/01B9E98DF997F0861E4BA13A34B72A7D)
 this is not the case; instead there's a weaker canonicity property, that every
-closed value can be maximally eta-expanded to a system of canonical values.  The
+closed value can be maximally eta-expanded to a nested system of canonical values.  The
 difference comes from the ability to directly define partial values by
 elimination of cofibration disjunctions.  In ABCFHL an element of `Bool` can be
 defined under `i=1 ∨ i=1` as `[i=1 ↦ true, i=1 ↦ false]`, which is not
