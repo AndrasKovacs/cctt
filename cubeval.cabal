@@ -47,6 +47,7 @@ executable cubeval
       LvlSet
       Parser
       Presyntax
+      Pretty
       Substitution
   hs-source-dirs:
       src

@@ -94,11 +94,31 @@ isEquiv f :=
   × (coh  : ∀ a →
             Pathⁱ (f (linv a i) = f a) (refl (f a)) (rinv (f a)))
 
-idIsEquiv:
+idIsEquiv : (A : U) → isEquiv (λ (a:A). a)
   _⁻¹  = λ a. a
   linv = λ a i. a
   rinv = λ b i. b
   coh  = λ a i j. a
+
+isEquivCoe : (Γ, i ⊢ A : U) (r r' : I) → Γ ⊢ isEquiv (coeⁱ r r' A : Ar → Ar')
+isEquivCoe A r r' =
+
+  _⁻¹ := coeⁱ r' r A
+
+  linvFill : ∀ s a → a = coeⁱ s r A (coeⁱ r s A a)
+  linvFill s a = λ j. hcomᵏ r s (A r) [j=0 ↦ a, j=1 ↦ coeⁱ k r A (coeⁱ r k A a)] a
+
+  linv := linvFill r'
+
+  rinvFill : ∀ s b → coeⁱ s r' A (coeⁱ r' s A b) = b
+  rinvFill s b = λ j. hcomᵏ r' s (A r') [j=0 ↦ coeⁱ k r' A (coeⁱ r' k A b), j=1 ↦ b] b
+
+  rinv := rinvFill r
+
+  coh : ∀ a → PathPⁱ (f (linv a i) = f a)
+                     (refl (f a)) (rinv (f a)))
+
+  coh = TODO
 
 --------------------------------------------------------------------------------
 
@@ -108,6 +128,9 @@ Glue
     ──────────────────────────────────────────────────────────
                   Γ ⊢ Glue [α ↦ eqv] B : U
                  Γ, α ⊢ Glue [α ↦ eqv] B ≡ A
+
+
+   Γ ⊢
 
 
 --------------------------------------------------------------------------------

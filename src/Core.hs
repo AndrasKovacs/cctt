@@ -285,6 +285,14 @@ data Closure
 
   | CConst Val
 
+  | C'λ'a''a        -- λ a. a
+  | C'λ'a'i''a      -- λ a i. a
+  | C'λ'a'i'j''a    -- λ a i j. a
+
+  | CCoeInv Val I I
+  | CCoeLinv0 Val I I
+  | CCoeRinv0 Val I I
+
 
 -- isEquiv : (A → B) → U
 -- isEquiv A B f :=
@@ -416,12 +424,15 @@ instance SubAction Closure where
     CIsEquiv4 a f g           -> CIsEquiv4 (sub a) (sub f) (sub g)
     CIsEquiv5 b f g           -> CIsEquiv5 (sub b) (sub f) (sub g)
     CIsEquiv6 b f g linv rinv -> CIsEquiv6 (sub b) (sub f) (sub g) (sub linv) (sub rinv)
-
-    CEquiv a b -> CEquiv (sub a) (sub b)
-
-    CNatElim p -> CNatElim (sub p)
-
-    CEquivInto a -> CEquivInto (sub a)
+    CEquiv a b                -> CEquiv (sub a) (sub b)
+    CNatElim p                -> CNatElim (sub p)
+    CEquivInto a              -> CEquivInto (sub a)
+    C'λ'a''a                  -> C'λ'a''a
+    C'λ'a'i''a                -> C'λ'a'i''a
+    C'λ'a'i'j''a              -> C'λ'a'i'j''a
+    CCoeInv a r r'            -> CCoeInv   (sub a) (sub r) (sub r')
+    CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
+    CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
 
 instance SubAction IClosure where
   sub cl = case cl of
@@ -519,17 +530,17 @@ capp t ~u = case t of
   CIsEquiv3 a b f g linv -> let ~rinv = u in
     VPi "a" a (CIsEquiv6 b f g linv rinv)
 
-  CIsEquiv4 a f g -> let ~x = u in
-    path a x (force g `app` (force f `app` x))
+  CIsEquiv4 a (force -> f) (force -> g) -> let ~x = u in
+    path a x (g `app` (f `app` x))
 
-  CIsEquiv5 b f g -> let ~x = u in
-    path b (force f `app` (force g `app` x)) x
+  CIsEquiv5 b (force -> f) (force -> g) -> let ~x = u in
+    path b (f `app` (g `app` x)) x
 
   CIsEquiv6 b (force -> f) g linv (force -> rinv) ->
     let ~x  = u
         ~fx = f `app` x in
     VPathP "i" (ICIsEquiv7 b (unF f) g linv x)
-      (refl b fx)
+      (refl fx)
       (rinv `app` fx)
 
   -- equiv A B = (f* : A -> B) × isEquiv a b f
@@ -540,6 +551,28 @@ capp t ~u = case t of
 
   -- [A]  (B* : U) × equiv B A
   CEquivInto a -> let ~b = u in equiv a b
+
+  ------------------------------------------------------------
+
+  C'λ'a''a     -> u
+  C'λ'a'i''a   -> refl u
+  C'λ'a'i'j''a -> let ru = refl u in VPLam ru ru "i" (ICConst ru)
+
+  ------------------------------------------------------------
+
+  -- coeIsEquiv : (Γ, i ⊢ A : U) (r r' : I) → Γ ⊢ isEquiv (coeⁱ r r' A : Ar → Ar')
+  -- coeIsEquiv A r r' =
+  --   _⁻¹  := λ x^1. coeⁱ r' r A x
+  --   linv := λ x^2. λ j. hcomᵏ r r' (A r) [j=0 ↦ a, j=1 ↦ coeⁱ k r A (coeⁱ r k A x)] x
+  --   rinv := λ x^3. λ j. hcomᵏ r' r (A r') [j=0 ↦ coeⁱ k r' A (coeⁱ r' k A x), j=1 ↦ x] x
+  --   coh  := TODO
+
+  CCoeInv (force -> a) (forceI -> r) (forceI -> r') -> let ~x = u in
+    unF (coe r r' "i" a (force x))
+
+  CCoeLinv0 a r r' -> uf
+
+  CCoeRinv0 a r r' -> uf
 
 
 cappf  t ~u = force  (capp t u); {-# inline cappf  #-}
@@ -588,6 +621,7 @@ icapp t arg = case t of
         ~fx  = f `app` x
         ~gfx = g `app` fx  in
     path b (f `app` papp (linv `appf` x) x gfx i) fx
+
 
 
 icappf  t i = force  (icapp t i); {-# inline icappf  #-}
@@ -786,12 +820,13 @@ goHCom r r' ix a nsys base = case unF a of
   VGlueTy a sys  ->
     uf
 
-  _ ->
-    impossible
 
 -- hcomⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr =
 --   glue [α ↦ hcomⁱ r r' T [β ↦ t] gr]
 --        (hcomⁱ r r' A [β ↦ unglue t, α ↦ f (hfillⁱ r r' T [β ↦ t] gr)] (unglue gr))
+
+  _ ->
+    impossible
 
 
 hcom :: IDomArg => NCofArg => DomArg => F I -> F I
@@ -933,9 +968,9 @@ path :: Val -> Val -> Val -> Val
 path a t u = VPathP "_" (ICConst a) t u
 {-# inline path #-}
 
--- | (A : U)(x : A) -> PathP _
-refl :: Val -> Val -> Val
-refl a t = VPLam t t "_" (ICConst t)
+-- | (x : A) -> PathP _ x x
+refl :: Val -> Val
+refl t = VPLam t t "_" (ICConst t)
 {-# inline refl #-}
 
 -- | (A : U)(B : U) -> (A -> B) -> U
@@ -952,6 +987,27 @@ equiv a b = VSg "f" (fun a b) (CEquiv a b)
 equivInto :: Val -> Val
 equivInto a = VSg "b" VU (CEquivInto a)
 {-# inline equivInto #-}
+
+-- | idIsEquiv : (A : U) -> isEquiv (\(x:A).x)
+idIsEquiv :: Val -> Val
+idIsEquiv a =
+  VPair (VLam "a" C'λ'a''a) $
+  VPair (VLam "a" C'λ'a'i''a) $
+  VPair (VLam "b" C'λ'a'i''a) $
+        (VLam "a" C'λ'a'i'j''a)
+
+coeIsEquiv :: IDomArg => NCofArg => DomArg => Val -> I -> I -> Val
+coeIsEquiv a r r' =
+
+  VPair (VLam "x" (CCoeInv   a r r')) $
+  VPair (VLam "x" (CCoeLinv0 a r r')) $
+  VPair (VLam "x" (CCoeRinv0 a r r')) $
+        uf
+
+
+
+
+
 
 
 -- Forcing
