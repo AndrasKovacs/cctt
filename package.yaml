@@ -110,6 +110,7 @@ executable:
   - -fmax-relevant-binds=3
   - -fmax-valid-hole-fits=0
   - -fplugin StrictImplParams
+  - -fworker-wrapper-cbv
   when:
   - condition: false
     other-modules: Paths_cubeval

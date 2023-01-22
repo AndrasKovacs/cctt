@@ -57,11 +57,11 @@ impossible = error "impossible"
 {-# noinline impossible #-}
 
 ctz :: Word -> Word
-ctz (W# n) = W# (ctz64# n)
+ctz (W# n) = W# (ctz# n)
 {-# inline ctz #-}
 
 clz :: Word -> Word
-clz (W# n) = W# (clz64# n)
+clz (W# n) = W# (clz# n)
 {-# inline clz #-}
 
 i2w :: Int -> Word
@@ -77,6 +77,20 @@ w2i (W# n) = I# (word2Int# n)
 {-# inline ($$!) #-}
 infixl 9 $$!
 
+infixl 4 <*!>
+(<*!>) :: Monad m => m (a -> b) -> m a -> m b
+(<*!>) mf ma = do
+  f <- mf
+  a <- ma
+  pure $! f a
+{-# inline (<*!>) #-}
+
+infixl 4 <$!>
+(<$!>) :: Monad m => (a -> b) -> m a -> m b
+(<$!>) f ma = do
+  a <- ma
+  pure $! f a
+{-# inline (<$!>) #-}
 
 -- De Bruijn indices and levels
 --------------------------------------------------------------------------------

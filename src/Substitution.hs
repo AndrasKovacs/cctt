@@ -22,13 +22,13 @@ its equivalence class.
 type NCof = Sub
 type NCofArg = (?cof :: NCof)
 
-nibblesToWord :: [Word] -> Sub
-nibblesToWord ns = Sub (go 0 0 ns) where
+nibblesToSub :: [Word] -> Sub
+nibblesToSub ns = Sub (go 0 0 ns) where
   go shift acc []     = acc
   go shift acc (n:ns) = go (shift + 4) (unsafeShiftL n shift .|. acc) ns
 
-wordNibbles :: Sub -> [Word]
-wordNibbles (Sub s) = go s where
+subToNibbles :: Sub -> [Word]
+subToNibbles (Sub s) = go s where
   go 0 = []
   go n = n .&. 15 : go (unsafeShiftR n 4)
 
@@ -48,9 +48,12 @@ subLength :: Sub -> Word
 subLength (Sub n) = unsafeShiftR n 60
 {-# inline subLength #-}
 
+lookupSub# :: Word -> Sub -> I
+lookupSub# w (Sub s) = I (unsafeShiftR s (unsafeShiftL (w2i w) 2) .&. 15)
+{-# inline lookupSub# #-}
+
 lookupSub :: IVar -> Sub -> I
-lookupSub (IVar# x) (Sub s) =
-  I (unsafeShiftR s (unsafeShiftL (w2i x) 2) .&. 15)
+lookupSub (IVar# x) s = lookupSub# x s
 {-# inline lookupSub #-}
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
@@ -115,21 +118,12 @@ single x i =
 class SubAction a where
   sub :: SubArg => a -> a
 
-doSub :: SubAction a => a -> Sub -> a
-doSub a s = let ?sub = s in sub a
-{-# inline doSub #-}
-
-hasAction :: Sub -> Bool
-hasAction (Sub s) = (s .&. lengthUnMask#) /= emptySub#
-{-# inline hasAction #-}
-
-subIfHasAction :: SubAction a => a -> Sub -> a
-subIfHasAction ~a s = if hasAction s then doSub a s else a
-{-# inline subIfHasAction #-}
+explSub :: SubAction a => Sub -> a -> a
+explSub s a = let ?sub = s in sub a
+{-# inline explSub #-}
 
 instance SubAction I where
-  sub i = matchIVar i
-    (\x -> lookupSub x ?sub) i
+  sub (I w) = lookupSub# w ?sub
   {-# inline sub #-}
 
 -- substitution composition

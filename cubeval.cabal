@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -85,17 +85,17 @@ executable cubeval
       TypeFamilyDependencies
       UndecidableInstances
       ViewPatterns
-  ghc-options: -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -fmax-worker-args=20 -O -fdicts-strict -fmax-worker-args=15 -rtsopts -threaded -with-rtsopts= "-A64M -N4" -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -Wno-missing-pattern-synonym-signatures -fmax-relevant-binds=3 -fmax-valid-hole-fits=0 -fplugin StrictImplParams
+  ghc-options: -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -fmax-worker-args=20 -O -fdicts-strict -fmax-worker-args=15 -rtsopts -threaded -with-rtsopts= "-A64M -N4" -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -Wno-missing-pattern-synonym-signatures -fmax-relevant-binds=3 -fmax-valid-hole-fits=0 -fplugin StrictImplParams -fworker-wrapper-cbv
   build-depends:
       base >=4.7 && <5
     , containers
     , ghc-prim
     , megaparsec
     , strict-impl-params
+  default-language: Haskell2010
   if flag(dump)
     ghc-options: -ddump-simpl -ddump-stg-final -ddump-cmm -dsuppress-all -dno-suppress-type-signatures -ddump-to-file
   if flag(llvm)
     ghc-options: -fllvm
   if flag(debug)
     cpp-options: -DDEBUG
-  default-language: Haskell2010

@@ -66,6 +66,7 @@ Composition (derived)
            comⁱ r r' A [α ↦ t] b :=
              hcomⁱ r r' (A r') [α ↦ coeʲ i r' (A j) t] (coeⁱ r r' A b)  -- fresh j
 
+
 -- filling
 --------------------------------------------------------------------------------
 
@@ -81,10 +82,36 @@ Composition (derived)
 Γ, i ⊢ hfill⁻¹ⁱ r' A [α ↦ t] b : A[i=r ↦ hcomⁱ r' r A [α ↦ t] b, i=r' ↦ b]
        hfill⁻¹ⁱ r' A [α ↦ t] b := hcomʲ r' i A [α ↦ t j] b
 
+
+-- Equivalences
 --------------------------------------------------------------------------------
 
-TODO:
-  - eta-short coe/hcom? Only computes on canonical pair/lam?
+isEquiv : (A → B) → U
+isEquiv f :=
+    (f⁻¹  : B → A)
+  × (linv : ∀ a → a = f⁻¹ (f a))
+  × (rinv : ∀ b → f (f⁻¹ b) = b)
+  × (coh  : ∀ a →
+            Pathⁱ (f (linv a i) = f a) (refl (f a)) (rinv (f a)))
+
+idIsEquiv:
+  _⁻¹  = λ a. a
+  linv = λ a i. a
+  rinv = λ b i. b
+  coh  = λ a i j. a
+
+--------------------------------------------------------------------------------
+
+Glue
+
+    Γ ⊢ B : U   Γ, α ⊢ eqv : (A : U) × (f : A → B) × isEquiv f
+    ──────────────────────────────────────────────────────────
+                  Γ ⊢ Glue [α ↦ eqv] B : U
+                 Γ, α ⊢ Glue [α ↦ eqv] B ≡ A
+
+
+--------------------------------------------------------------------------------
+
 
 coeⁱ r r' ((a : A) × B a) t =
   (coeⁱ r r' A t.1, coeⁱ r r' (B (coeFillⁱ r r' A t.1)) t.2)
@@ -114,10 +141,14 @@ hcomⁱ r r' ℕ [α ↦ zero]  zero    = zero
 hcomⁱ r r' ℕ [α ↦ suc t] (suc b) = suc (hcomⁱ r r' ℕ [α ↦ t] b)
 hcomⁱ r r' U [α ↦ t] b = Glue [α ↦ (t r', (coeⁱ r' r (t i), _)), r=r' ↦ (b, idEqv)] b
 
-
-hcompⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr =
+hcomⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr =
   glue [α ↦ hcomⁱ r r' T [β ↦ t] gr]
        (hcomⁱ r r' A [β ↦ unglue t, α ↦ f (hfillⁱ r r' T [β ↦ t] gr)] (unglue gr))
+
+
+
+
+
 
 
 -- System

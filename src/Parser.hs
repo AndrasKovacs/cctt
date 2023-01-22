@@ -78,7 +78,7 @@ atom =
                <|> (Zero  <$  keyword "zero")
                <|> (I0    <$  keyword  "0"  )
                <|> (I1    <$  keyword  "1"  )
-               <|> (Ident <$> ident         ))
+               <|> (Ident <$!> ident         ))
 
 goProj :: Tm -> Parser Tm
 goProj t =
@@ -92,42 +92,42 @@ intLit :: Parser Tm
 intLit = (I0 <$ keyword "0") <|> (I1 <$ keyword "1")
 
 int :: Parser Tm
-int = intLit <|> (Ident <$> ident)
+int = intLit <|> (Ident <$!> ident)
 
 cofEq :: Parser CofEq
-cofEq = CofEq <$> int <*> (char '=' *> int)
+cofEq = CofEq <$!> int <*!> (char '=' *> int)
 
 -- TODO: do we even need CTrue anywhere?
 cof :: Parser Cof
-cof = CAnd <$> cofEq <*> ((char ',' *> cof) <|> pure CTrue)
+cof = CAnd <$!> cofEq <*!> ((char ',' *> cof) <|> pure CTrue)
 
 goSys :: Parser System
 goSys =
-      (SCons <$> (cof <* arrow) <*> (tm <* char ';') <*> goSys)
+      (SCons <$!> (cof <* arrow) <*!> (tm <* char ';') <*!> goSys)
   <|> pure SEmpty
 
 sys :: Parser System
 sys = char '[' *> goSys <* char ']'
 
 goApp :: Tm -> Parser Tm
-goApp t = (goApp =<< (App t <$> proj)) <|> pure t
+goApp t = (goApp =<< (App t <$!> proj)) <|> pure t
 
 app :: Parser Tm
 app =
-       (keyword "suc"     *> (Suc <$> proj))
-  <|>  (keyword "NatElim" *> (NatElim <$> proj <*> proj <*> proj <*> proj))
-  <|>  (keyword "coe"     *> (Coe <$> int <*> int <*> bind <*> proj <*> proj))
-  <|>  (keyword "hcom"    *> (HCom <$> int <*> int <*> bind <*> proj <*> sys <*> proj))
-  <|>  (keyword "Glue"    *> (GlueTy <$> proj <*> sys))
-  <|>  (keyword "glue"    *> (GlueTm <$> proj))
-  <|>  (keyword "unglue"  *> (Unglue <$> proj))
+       (keyword "suc"     *> (Suc <$!> proj))
+  <|>  (keyword "NatElim" *> (NatElim <$!> proj <*!> proj <*!> proj <*!> proj))
+  <|>  (keyword "coe"     *> (Coe <$!> int <*!> int <*!> bind <*!> proj <*!> proj))
+  <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> bind <*!> optional proj <*!> sys <*!> proj))
+  <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
+  <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
+  <|>  (keyword "unglue"  *> (Unglue <$!> proj))
   <|>  (goApp =<< proj)
 
 eq :: Parser Tm
 eq = do
   t <- app
   branch (char '=')
-    (\_ -> Path t <$> app)
+    (\_ -> Path t <$!> app)
     (pure t)
 
 sigma :: Parser Tm
@@ -141,23 +141,23 @@ sigma =
         pure $ Sg x a b)
     (do t <- eq
         branch prod
-          (\_ -> Sg "_" t <$> sigma)
+          (\_ -> Sg "_" t <$!> sigma)
           (pure t))
 
 piBinder :: Parser ([Name], Ty)
 piBinder =
-  (,) <$> (char '(' *> some bind) <*> (char ':' *> tm <* char ')')
+  (,) <$!> (char '(' *> some bind) <*!> (char ':' *> tm <* char ')')
 
 pi :: Parser Tm
 pi =
   branch (try (some piBinder))
     (\case
         [([x], a)] -> branch arrow
-          (\_ -> Pi x a <$> pi)
+          (\_ -> Pi x a <$!> pi)
           (do prod
-              dom <- Sg x a <$> sigma
+              dom <- Sg x a <$!> sigma
               branch arrow
-                (\_ -> Pi "_" dom <$> pi)
+                (\_ -> Pi "_" dom <$!> pi)
                 (pure dom))
         bs -> do
           arrow
@@ -166,7 +166,7 @@ pi =
 
     (do t <- sigma
         branch arrow
-          (\_ -> Pi "_" t <$> pi)
+          (\_ -> Pi "_" t <$!> pi)
           (pure t))
 
 lam :: Parser Tm
@@ -195,7 +195,7 @@ tm :: Parser Tm
 tm = withPos do
   t <- lamlet
   branch (char ',')
-    (\_ -> Pair t <$> lamlet)
+    (\_ -> Pair t <$!> lamlet)
     (pure t)
 
 top :: Parser Top

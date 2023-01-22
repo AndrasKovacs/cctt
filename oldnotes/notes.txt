@@ -26,8 +26,7 @@ isEquiv f :=
   × (linv : ∀ a → a = f⁻¹ (f a))
   × (rinv : ∀ b → f (f⁻¹ b) = b)
   × (coh  : ∀ a →
-            PathPⁱ (f (linv a i) = f a)
-                   (refl (f a)) (rinv (f a)))
+            PathP i (f (linv a i) = f a) (refl (f a)) (rinv (f a)))
 
      refl       : f a = f a
      rinv (f a) : f (f⁻¹ (f a)) = f a
@@ -37,6 +36,16 @@ isEquiv f :=
 
    with extension type:
     [i, j] B [i=0 ↦ f a, i=1 ↦ rinv (f a), j=0 ↦ f (linv a i), j=1 ↦ f a]
+
+   as a square:
+
+                           refl
+              f a --------------------- f a
+               |                         |
+  f (linv a i) |                         | refl
+               |                         |
+         f (f⁻¹ (f a))----------------- f a
+                         rinv (f a)
 
 --------------------------------------------------------------------------------
 
@@ -62,7 +71,7 @@ isEquiv (coeⁱ r r' A : Ar → Ar')
   coh : ∀ a → PathPⁱ (f (linv a i) = f a)
                      (refl (f a)) (rinv (f a)))
 
-  coh = ...
+  coh = TODO
 
 -- we get degenerate coe by coe isEquivId
 isEquiv (coeⁱ r r' A : Ar → Ar')
@@ -75,7 +84,7 @@ isEquiv (coeⁱ r r' A : Ar → Ar')
 
   -- coe f = λ x. coe (f (coe x))
 
--- but we can try to coe just some compoenents (e.g. just the coh component!)
+-- but we can try to coe just some components (e.g. just the coh component!)
 isEquiv (coeⁱ r r' A : Ar → Ar')
    _⁻¹ = coeⁱ r' r A
 

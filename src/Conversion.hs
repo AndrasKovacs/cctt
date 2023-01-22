@@ -7,9 +7,13 @@ import Interval
 import Substitution
 
 {-|
-TODO: conversion is not the best possible here, it pushes and stores substitutions on each iteration.
-It would be better to have *two* substitutions as args, one for each side, and force each side with
-the respective substitution.
+TODO: conversion is not the best possible here, it pushes and stores
+substitutions on each iteration.  It would be better to have *two* substitutions
+as args, one for each side, and force each side with the respective
+substitution.
+
+Since we're mostly interested in closed evaluation benchmarks which compute to
+small values, this doesn't matter much.
 -}
 
 convCl :: IDomArg => NCofArg => DomArg => Closure -> Closure -> Bool
@@ -49,9 +53,8 @@ convNSys sys sys' = case (sys, sys') of
     && bindI (\_ -> bindCof (forceCof cof) (conv t t')) && convNSys sys sys'
   _ -> False
 
--- | Assumption: takes stuck neutrals. But note:
---   values in stuck neutrals are *not* forced! Only
---   the head computation is stuck in a neutral.
+-- | Assumption: takes stuck neutrals. But note: values in stuck neutrals are
+--   *not* forced! Only the head computation is stuck in a neutral.
 convNe :: IDomArg => NCofArg => DomArg => Ne -> Ne -> Bool
 convNe t t' = case (,) $$! unSubNe t $$! unSubNe t' of
   (NLocalVar x   , NLocalVar x'      ) -> x == x'

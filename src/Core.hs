@@ -32,19 +32,19 @@ data Tm
 
   | U
 
-  | PathP Name Ty Tm Tm         -- PathP i.A x y
-  | PApp ~Tm ~Tm Tm I           -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
-  | PLam ~Tm ~Tm Name Tm        -- endpoints, body
+  | PathP Name Ty Tm Tm          -- PathP i.A x y
+  | PApp ~Tm ~Tm Tm I            -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
+  | PLam ~Tm ~Tm Name Tm         -- endpoints, body
 
-  | Coe I I Name Ty Tm          -- coe r r' i.A t
-  | HCom I I Name Ty System Tm  -- hcom r r' i.A [α → t] u
+  | Coe I I Name Ty Tm           -- coe r r' i.A t
+  | HCom I I Name ~Ty System Tm  -- hcom r r' i.A [α → t] u
 
   -- we switch the field orders here compared to the papers, because
   -- this one is the sensible "dependency" order
 
   | GlueTy Ty System            -- Glue A [α ↦ B]      (B : Σ X (X ≃ A))
-  | Glue   Tm System            -- glue a [α ↦ b]
-  | Unglue Tm System            -- unglue g [α ↦ B]
+  | Glue   Tm ~System           -- glue a [α ↦ b]
+  | Unglue Tm ~System           -- unglue g [α ↦ B]
 
   | Nat
   | Zero
@@ -143,7 +143,7 @@ unFNSystem' :: NSystem' (F VCof) -> NSystem' VCof
 unFNSystem' = coerce
 
 evalI :: SubArg => NCofArg => I -> F I
-evalI i = F (doSub (sub i) ?cof)
+evalI i = F (explSub ?cof (sub i))
 
 evalEq :: SubArg => NCofArg => CofEq -> F VCof
 evalEq (CofEq i j) = ceq (evalI i) (evalI j)
@@ -226,7 +226,7 @@ evalSystem = \case
 -- TODO: we generally get a runtime closure from this! Try to make GHC lambda-lift function args
 -- instead! Actually, CPP looks like a good candidate solution here (LOL).
 mapNSystem :: (IDomArg => NCofArg => DomArg => IVar -> Val -> Val) ->
-                   (IDomArg => NCofArg => DomArg => NSystem (F VCof) -> NSystem (F VCof))
+              (IDomArg => NCofArg => DomArg => NSystem (F VCof) -> NSystem (F VCof))
 mapNSystem f = go where
   go NSEmpty            = NSEmpty
   go (NSCons cof v sys) = NSCons cof (bindCof cof (bindI \i -> f i v)) (go sys)
@@ -282,6 +282,38 @@ data Closure
 
   -- ^ Body of function hcom.
   | CHComPi I I Name VTy Closure (NSystem VCof) Val
+
+  | CConst Val
+
+
+-- isEquiv : (A → B) → U
+-- isEquiv A B f :=
+--     (g^1    : B → A)
+--   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+--   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
+--   × (coh    : (x^6 : A) →
+--             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+--                   (refl B (f x))
+--                   (rinv (f x)))
+
+  | CIsEquiv1 Val Val Val         -- A B f
+  | CIsEquiv2 Val Val Val Val     -- A B f g
+  | CIsEquiv3 Val Val Val Val Val -- A B f g linv
+  | CIsEquiv4 Val Val Val         -- A f g
+  | CIsEquiv5 Val Val Val         -- B f g
+  | CIsEquiv6 Val Val Val Val Val -- B f g linv rinv
+
+
+  -- [A, B]  equiv A B = (f* : A -> B) × isEquiv A B f
+  | CEquiv Val Val
+
+  -- [P]  (n* : VNat) → P n → P (suc n)
+  | CNatElim Val
+
+  -- [A]  (B* : U) × equiv B A
+  | CEquivInto Val
+
+
   deriving Show
 
 -- | Defunctionalized closures for IVar abstraction.
@@ -289,6 +321,8 @@ data IClosure
   = ICEval Sub Env Tm
   | ICCoePathP I I Name IClosure Val Val Val
   | ICHComPathP I I Name IClosure Val Val (NSystem VCof) Val
+  | ICConst Val
+  | ICIsEquiv7 Val Val Val Val Val
   deriving Show
 
 type VTy = Val
@@ -374,6 +408,21 @@ instance SubAction Closure where
     CHComPi r r' i a b sys base ->
       CHComPi (sub r) (sub r') i (sub a) (sub b) (sub sys) (sub base)
 
+    CConst t -> CConst (sub t)
+
+    CIsEquiv1 a b f           -> CIsEquiv1 (sub a) (sub b) (sub f)
+    CIsEquiv2 a b f g         -> CIsEquiv2 (sub a) (sub b) (sub f) (sub g)
+    CIsEquiv3 a b f g linv    -> CIsEquiv3 (sub a) (sub b) (sub f) (sub g) (sub linv)
+    CIsEquiv4 a f g           -> CIsEquiv4 (sub a) (sub f) (sub g)
+    CIsEquiv5 b f g           -> CIsEquiv5 (sub b) (sub f) (sub g)
+    CIsEquiv6 b f g linv rinv -> CIsEquiv6 (sub b) (sub f) (sub g) (sub linv) (sub rinv)
+
+    CEquiv a b -> CEquiv (sub a) (sub b)
+
+    CNatElim p -> CNatElim (sub p)
+
+    CEquivInto a -> CEquivInto (sub a)
+
 instance SubAction IClosure where
   sub cl = case cl of
     ICEval s' env t ->
@@ -385,6 +434,10 @@ instance SubAction IClosure where
 
     ICHComPathP r r' i a lhs rhs sys base ->
       ICHComPathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
+
+    ICConst t -> ICConst (sub t)
+
+    ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
 
 instance SubAction Env where
   sub e = case e of
@@ -415,6 +468,13 @@ app t u = case unF t of
   VNe t is -> VNe (NApp t u) is
   _        -> impossible
 
+-- | Apply a function.
+appLazy :: IDomArg => NCofArg => DomArg => F Val -> Val -> Val
+appLazy t ~u = case unF t of
+  VLam _ t -> capp t u
+  VNe t is -> VNe (NApp t u) is
+  _        -> impossible
+
 appf  t u = force (app t u); {-# inline appf #-}
 appf' t u = force' (app t u); {-# inline appf' #-}
 
@@ -437,6 +497,50 @@ capp t ~u = case t of
             (inCxt \i t -> app (force t) u)
             (forceNSystem sys))
          (appf (force base) u)
+
+  CConst t -> t
+
+-- isEquiv : (A → B) → U
+-- isEquiv A B f :=
+--     (g^1    : B → A)
+--   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+--   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
+--   × (coh    : (x^6 : A) →
+--             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+--                   (refl B (f x))
+--                   (rinv (f x)))
+
+  CIsEquiv1 a b f -> let ~g = u in
+    VSg "linv" (VPi "a" a (CIsEquiv4 a f g)) (CIsEquiv2 a b f g)
+
+  CIsEquiv2 a b f g -> let ~linv = u in
+    VSg "rinv" (VPi "a" a (CIsEquiv5 b f g)) (CIsEquiv3 a b f g linv)
+
+  CIsEquiv3 a b f g linv -> let ~rinv = u in
+    VPi "a" a (CIsEquiv6 b f g linv rinv)
+
+  CIsEquiv4 a f g -> let ~x = u in
+    path a x (force g `app` (force f `app` x))
+
+  CIsEquiv5 b f g -> let ~x = u in
+    path b (force f `app` (force g `app` x)) x
+
+  CIsEquiv6 b (force -> f) g linv (force -> rinv) ->
+    let ~x  = u
+        ~fx = f `app` x in
+    VPathP "i" (ICIsEquiv7 b (unF f) g linv x)
+      (refl b fx)
+      (rinv `app` fx)
+
+  -- equiv A B = (f* : A -> B) × isEquiv a b f
+  CEquiv a b -> let ~f = u in isEquiv a b f
+
+  -- [P]  (n* : VNat) → P n → P (suc n)
+  CNatElim (force -> p) -> let ~n = u in fun (p `app` n) (p `app` VSuc n)
+
+  -- [A]  (B* : U) × equiv B A
+  CEquivInto a -> let ~b = u in equiv a b
+
 
 cappf  t ~u = force  (capp t u); {-# inline cappf  #-}
 cappf' t ~u = force' (capp t u); {-# inline cappf' #-}
@@ -466,6 +570,24 @@ icapp t arg = case t of
                       (forceNSystem sys))
         )
       (pappf (force p) lhs rhs farg)
+
+  ICConst t -> t
+
+-- isEquiv : (A → B) → U
+-- isEquiv A B f :=
+--     (g^1    : B → A)
+--   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+--   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
+--   × (coh    : (x^6 : A) →
+--             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+--                   (refl B (f x))
+--                   (rinv (f x)))
+
+  ICIsEquiv7 b (force -> f) (force -> g)(force -> linv) x ->
+    let ~i   = forceI arg
+        ~fx  = f `app` x
+        ~gfx = g `app` fx  in
+    path b (f `app` papp (linv `appf` x) x gfx i) fx
 
 
 icappf  t i = force  (icapp t i); {-# inline icappf  #-}
@@ -560,6 +682,9 @@ coe r r' i ~a t
 {-# inline coe #-}
 
 
+-- Nat hcom
+--------------------------------------------------------------------------------
+
 -- | Try to project an inductive field from a system.
 --   TODO: later for general ind types we will need to split systems to N copies
 --   for N different constructor fields!
@@ -590,7 +715,7 @@ sucSys = \case
       _            -> impossible
     CantProj is sys -> CantProj is (NSCons cof t sys)
 
--- assumption: r /= r' and system is stuch
+-- Assumption: r /= r' and system is stuck
 goHComNat :: IDomArg => NCofArg => DomArg =>
              F I -> F I -> Name -> NSystem' (F VCof) -> F Val -> F Val
 goHComNat r r' ix (NSystem' sys is) base = case unF base of
@@ -614,7 +739,9 @@ goHComNat r r' ix (NSystem' sys is) base = case unF base of
 
   _ -> impossible
 
--- assumption: r /= r' and system is stuck
+--------------------------------------------------------------------------------
+
+-- Assumption: r /= r' and system is stuck
 goHCom :: IDomArg => NCofArg => DomArg =>
           F I -> F I -> Name -> F Val -> NSystem' (F VCof) -> F Val -> F Val
 goHCom r r' ix a nsys base = case unF a of
@@ -662,6 +789,11 @@ goHCom r r' ix a nsys base = case unF a of
   _ ->
     impossible
 
+-- hcomⁱ r r' (Glue [α ↦ (T, f)] A) [β ↦ t] gr =
+--   glue [α ↦ hcomⁱ r r' T [β ↦ t] gr]
+--        (hcomⁱ r r' A [β ↦ unglue t, α ↦ f (hfillⁱ r r' T [β ↦ t] gr)] (unglue gr))
+
+
 hcom :: IDomArg => NCofArg => DomArg => F I -> F I
      -> Name -> F Val -> F (VSystem (F VCof)) -> F Val -> Val
 hcom r r' i ~a ~t ~b
@@ -678,7 +810,7 @@ singleSubf :: IDomArg => NCofArg => DomArg => F Val -> IVar -> F I -> F Val
 singleSubf t x i = forceVSub (unF t) (single x (unF i))
 
 singleSub :: IDomArg => Val -> IVar -> F I -> Val
-singleSub t x i = doSub t (single x (unF i))
+singleSub t x i = explSub (single x (unF i)) t
 
 -- | Instantiate the topmost var.
 topSubf :: IDomArg => NCofArg => DomArg => F Val -> F I -> F Val
@@ -686,7 +818,7 @@ topSubf t i = forceVSub (unF t) (idSub ?idom `extSub` unF i)
 
 -- | Instantiate the topmost var.
 topSub :: IDomArg => Val -> F I -> Val
-topSub t i = doSub t (idSub ?idom `extSub` unF i)
+topSub t i = explSub (idSub ?idom `extSub` unF i) t
 
 com :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
     -> F (VSystem (F VCof)) -> F Val -> Val
@@ -702,6 +834,7 @@ com r r' x ~a ~sys ~b =
     (coe r r' x a b)
 {-# inline com #-}
 
+-- Assumption: r /= r'
 goCom :: IDomArg => NCofArg => DomArg => F I -> F I -> Name -> F Val
     -> NSystem' (F VCof) -> F Val -> F Val
 goCom r r' x a nsys  b =
@@ -782,9 +915,44 @@ eval = \case
   Suc t             -> VSuc (eval t)
   NatElim p z s n   -> natElim (eval p) (eval z) (evalf s) (evalf n)
 
+-- | Evaluate a term in an extended ivar context, instantiate top ivar to something.
 evalTopSub :: IDomArg => SubArg => NCofArg => DomArg => EnvArg => Tm -> F I -> Val
 evalTopSub t i = let ?sub = extSub ?sub (unF i) in eval t
 {-# inline evalTopSub #-}
+
+
+-- Definitions
+--------------------------------------------------------------------------------
+
+fun :: Val -> Val -> Val
+fun a b = VPi "_" a (CConst b)
+{-# inline fun #-}
+
+-- | (A : U) -> A -> A -> U
+path :: Val -> Val -> Val -> Val
+path a t u = VPathP "_" (ICConst a) t u
+{-# inline path #-}
+
+-- | (A : U)(x : A) -> PathP _
+refl :: Val -> Val -> Val
+refl a t = VPLam t t "_" (ICConst t)
+{-# inline refl #-}
+
+-- | (A : U)(B : U) -> (A -> B) -> U
+isEquiv :: Val -> Val -> Val -> Val
+isEquiv a b f = VSg "g" (fun b a) (CIsEquiv1 a b f)
+{-# inline isEquiv #-}
+
+-- | U -> U -> U
+equiv :: Val -> Val -> Val
+equiv a b = VSg "f" (fun a b) (CEquiv a b)
+{-# inline equiv #-}
+
+-- | U -> U
+equivInto :: Val -> Val
+equivInto a = VSg "b" VU (CEquivInto a)
+{-# inline equivInto #-}
+
 
 -- Forcing
 --------------------------------------------------------------------------------
@@ -852,16 +1020,16 @@ force' = \case
 
 
 forceI :: NCofArg => I -> F I
-forceI i = F (doSub i ?cof)
+forceI i = F (explSub ?cof i)
 
 forceI' :: SubArg => NCofArg => I -> F I
-forceI' i = F (sub i `doSub` ?cof)
+forceI' i = F (explSub ?cof (sub i))
 
 forceIVar :: NCofArg => IVar -> F I
 forceIVar x = F (lookupSub x ?cof)
 
 forceIVar' :: SubArg => NCofArg => IVar -> F I
-forceIVar' x = F (lookupSub x ?sub `doSub` ?cof)
+forceIVar' x = F (explSub ?cof (lookupSub x ?sub))
 
 forceNe :: IDomArg => NCofArg => DomArg => Ne -> F Val
 forceNe = \case
@@ -899,9 +1067,9 @@ unSubNe = \case
   NSub n s -> let ?sub = s in unSubNe' n
   n        -> n
 
-bindI'' :: (IDomArg => SubArg => a) -> (IDomArg => SubArg => a)
-bindI'' act = let ?idom = ?idom + 1; ?sub = extSub ?sub (IVar ?idom) in act
-{-# inline bindI'' #-}
+unSubNeBindI :: (IDomArg => SubArg => a) -> (IDomArg => SubArg => a)
+unSubNeBindI act = let ?idom = ?idom + 1; ?sub = extSub ?sub (IVar ?idom) in act
+{-# inline unSubNeBindI #-}
 
 unSubNe' :: IDomArg => SubArg => Ne -> Ne
 unSubNe' = \case
@@ -911,7 +1079,7 @@ unSubNe' = \case
   NPApp p l r i        -> NPApp (sub p) (sub l) (sub r) (sub i)
   NProj1 t             -> NProj1 (sub t)
   NProj2 t             -> NProj2 (sub t)
-  NCoe r r' x a t      -> NCoe (sub r) (sub r') x (bindI'' (sub a)) (sub t)
+  NCoe r r' x a t      -> NCoe (sub r) (sub r') x (unSubNeBindI (sub a)) (sub t)
   NHCom r r' x a sys t -> NHCom (sub r) (sub r') x (sub a) (sub sys) (sub t)
   NUnglue a sys        -> NUnglue (sub a) (sub sys)
   NGlue a sys          -> NGlue (sub a) (sub sys)
