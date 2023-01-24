@@ -1,11 +1,13 @@
 module Common (
     module Common
   , module Data.Bits
+  , module Lens.Micro.Platform
   , coerce) where
 
 import GHC.Exts
 import Data.List
 import Data.Bits
+import Lens.Micro.Platform
 
 #ifdef DEBUG
 import GHC.Stack
