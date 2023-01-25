@@ -170,3 +170,11 @@ instance SubAction IS.IVarSet where
     (\acc i -> IS.insertI (lookupSub i ?sub) acc)
     mempty is
   {-# noinline sub #-}
+
+instance (SubAction a, SubAction b) => SubAction (a, b) where
+  sub (a, b) = let x = sub a; y = sub b in (x, y)
+  {-# inline sub #-}
+
+instance (SubAction a, SubAction b, SubAction c) => SubAction (a, b, c) where
+  sub (a, b, c) = let x = sub a; y = sub b; z = sub c in (x, y, z)
+  {-# inline sub #-}

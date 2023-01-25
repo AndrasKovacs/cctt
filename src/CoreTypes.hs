@@ -121,10 +121,10 @@ data Closure
   = CEval Sub Env Tm
 
   -- ^ Body of function coercions.
-  | CCoePi I I Name (Bind VTy) (Bind Closure) Val
+  | CCoePi I I (Bind (VTy, Closure)) Val
 
---   -- ^ Body of function hcom.
---   -- | CHComPi I I Name VTy Closure (NSys VCof) Val
+  -- ^ Body of function hcom.
+  | CHComPi I I VTy Closure NeSysBind Val
 
 --   | CConst Val
 
@@ -169,8 +169,8 @@ data Closure
 -- | Defunctionalized closures for IVar abstraction.
 data IClosure
   = ICEval Sub Env Tm
-  -- | ICCoePathP I I Name IClosure Val Val Val
-  -- | ICHComPathP I I Name IClosure Val Val (NSys VCof) Val
+  | ICCoePathP I I (Bind (IClosure, Val, Val)) Val
+  -- | ICHComPathP I I Name IClosure Val Val NeSys Val
   -- | ICConst Val
   -- | ICIsEquiv7 Val Val Val Val Val
   deriving Show
@@ -196,31 +196,53 @@ data Env
 type EnvArg = (?env :: Env)
 
 data Bind a = Bind {
-    bindBinds :: IVar
+    bindName  :: Name
+  , bindBinds :: IVar
   , bindBody  :: a}
   deriving Show
 
 rebind :: F (Bind a) -> b -> Bind b
-rebind (F (Bind i _)) b = Bind i b
+rebind (F (Bind x i _)) b = Bind x i b
 {-# inline rebind #-}
 
+rebindf :: F (Bind a) -> b -> F (Bind b)
+rebindf (F (Bind x i _)) b = F (Bind x i b)
+{-# inline rebindf #-}
+
+packBind2 :: Bind a -> Bind b -> Bind (a, b)
+packBind2 (Bind x i a) (Bind _ _ b) = Bind x i (a, b)
+{-# inline packBind2 #-}
+
+unpackBind2 :: Bind (a, b) -> (Bind a, Bind b)
+unpackBind2 (Bind x i (a, b)) = (Bind x i a, Bind x i b)
+{-# inline unpackBind2 #-}
+
+packBind3 :: Bind a -> Bind b -> Bind c -> Bind (a, b, c)
+packBind3 (Bind x i a) (Bind _ _ b) (Bind _ _ c) = Bind x i (a, b, c)
+{-# inline packBind3 #-}
+
+unpackBind3 :: Bind (a, b, c) -> (Bind a, Bind b, Bind c)
+unpackBind3 (Bind x i (a, b, c)) = (Bind x i a, Bind x i b, Bind x i c)
+{-# inline unpackBind3 #-}
+
 inst :: SubAction a => NCofArg => Bind a -> I -> a
-inst (Bind i a) j =
+inst (Bind x i a) j =
   let s = setCod i (idSub (dom ?cof)) `ext` j
   in doSub s a
 {-# inline inst #-}
 
 data BindLazy a = BindLazy  {
-    bindLazyBinds :: IVar
-  , bindLazyBody :: ~a}
+    bindLazyName  :: Name
+  , bindLazyBinds :: IVar
+  , bindLazyBody  :: ~a}
   deriving Show
 
 rebindLazy :: BindLazy a -> b -> BindLazy b
-rebindLazy (BindLazy i _) ~b = BindLazy i b
+rebindLazy (BindLazy x i _) ~b = BindLazy x i b
 {-# inline rebindLazy #-}
 
 instLazy :: SubAction a => NCofArg => BindLazy a -> I -> a
-instLazy (BindLazy i a) j =
+instLazy (BindLazy x i a) j =
   let s = setCod i (idSub (dom ?cof)) `ext` j
   in doSub s a
 {-# inline instLazy #-}
@@ -256,11 +278,6 @@ data VSysBind
   = VSBTotal (BindLazy Val)
   | VSBNe NeSysBind'
   deriving Show
-
-makeFields ''NeSysBind'
-makeFields ''NeSys'
-makeFields ''Bind
-makeFields ''BindLazy
 
 
 -- Substitution
@@ -306,34 +323,39 @@ instance SubAction Env where
     EDef e v -> EDef (sub e) (sub v)
 
 instance SubAction a => SubAction (Bind a) where
-  sub (Bind i a) =
+  sub (Bind x i a) =
     let fresh = dom ?sub in
     let ?sub  = setCod i ?sub `ext` IVar fresh in
-    Bind i (sub a)
+    Bind x fresh (sub a)
   {-# inline sub #-}
 
 instance SubAction a => SubAction (BindLazy a) where
-  sub (BindLazy i a) =
+  sub (BindLazy x i a) =
     let fresh = dom ?sub in
     let ?sub  = setCod i ?sub `ext` IVar fresh in
-    BindLazy i (sub a)
+    BindLazy x fresh (sub a)
   {-# inline sub #-}
+
+instance SubAction NeSysBind where
+  sub = \case
+    NSBEmpty -> NSBEmpty
+    NSBCons cof t sys -> uf
 
 instance SubAction Closure where
   sub cl = case cl of
     CEval s' env t ->
       CEval (sub s') (sub env) t
 
-    -- note: recursive closure sub below! TODO to scrutinize, but this is probably
+    -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.
-    CCoePi r r' i a b t ->
-      CCoePi (sub r) (sub r') i (sub a) (sub b) (sub t)
+    CCoePi r r' ab t ->
+      CCoePi (sub r) (sub r') (sub ab) (sub t)
 
-    -- -- CHComPi r r' i a b sys base ->
-    -- --   CHComPi (sub r) (sub r') i (sub a) (sub b) (sub sys) (sub base)
+    CHComPi r r' a b sys base ->
+      CHComPi (sub r) (sub r') (sub a) (sub b) (sub sys) (sub base)
 
-    -- CConst t -> CConst (sub t)
 
+    -- CConst t                  -> CConst (sub t)
     -- CIsEquiv1 a b f           -> CIsEquiv1 (sub a) (sub b) (sub f)
     -- CIsEquiv2 a b f g         -> CIsEquiv2 (sub a) (sub b) (sub f) (sub g)
     -- CIsEquiv3 a b f g linv    -> CIsEquiv3 (sub a) (sub b) (sub f) (sub g) (sub linv)
@@ -350,14 +372,12 @@ instance SubAction Closure where
     -- CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
     -- CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
 
--- instance SubAction IClosure where
---   sub cl = case cl of
---     ICEval s' env t ->
---       ICEval (sub s') (sub env) t
+instance SubAction IClosure where
+  sub cl = case cl of
+    ICEval s' env t -> ICEval (sub s') (sub env) t
 
---     -- -- recursive sub here as well!
---     -- ICCoePathP r r' i a lhs rhs p ->
---     --   ICCoePathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub p)
+    -- recursive sub here as well!
+    ICCoePathP r r' alr p -> ICCoePathP (sub r) (sub r') (sub alr) (sub p)
 
 --     -- -- ICHComPathP r r' i a lhs rhs sys base ->
 --     -- --   ICHComPathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
@@ -365,3 +385,10 @@ instance SubAction Closure where
 --     -- ICConst t -> ICConst (sub t)
 
 --     -- ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
+
+--------------------------------------------------------------------------------
+
+makeFields ''NeSysBind'
+makeFields ''NeSys'
+makeFields ''Bind
+makeFields ''BindLazy

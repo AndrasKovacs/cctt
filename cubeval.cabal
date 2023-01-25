@@ -41,6 +41,7 @@ executable cubeval
       Common
       Conversion
       Core
+      CoreTypes
       Elaboration
       Interval
       IVarSet
@@ -85,6 +86,7 @@ executable cubeval
       TypeFamilies
       TypeFamilyDependencies
       UndecidableInstances
+      UnicodeSyntax
       ViewPatterns
   ghc-options: -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -fmax-worker-args=20 -O -fdicts-strict -fmax-worker-args=15 -rtsopts -threaded -with-rtsopts= "-A64M -N4" -Wall -Wno-name-shadowing -Wno-missing-signatures -Wno-unused-do-bind -Wno-unused-matches -Wno-missing-pattern-synonym-signatures -fmax-relevant-binds=3 -fmax-valid-hole-fits=0 -fplugin StrictImplParams -fworker-wrapper-cbv
   build-depends:

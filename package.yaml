@@ -73,6 +73,7 @@ default-extensions:
   - TypeFamilies
   - TypeFamilyDependencies
   - UndecidableInstances
+  - UnicodeSyntax
   - ViewPatterns
 
 ghc-options:
