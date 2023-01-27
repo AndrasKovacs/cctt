@@ -129,7 +129,7 @@ bindNeCof cof action = let ?cof = conjNeCof ?cof cof in action
 {-# inline bindNeCof #-}
 
 emptySys :: F VSys
-emptySys = F (VSNe (NeSys' NSEmpty mempty))
+emptySys = F (VSNe (F (NeSys' NSEmpty mempty)))
 {-# inline emptySys #-}
 
 consSys :: F VCof -> Val -> F VSys -> F VSys
@@ -137,8 +137,10 @@ consSys cof ~v ~sys = case unF cof of
   VCTrue      -> F (VSTotal v)
   VCFalse     -> sys
   VCNe cof is -> case unF sys of
-    VSTotal v'            -> F (VSTotal v')
-    VSNe (NeSys' sys is') -> F (VSNe (NeSys' (NSCons cof v sys) (is <> is')))
+    VSTotal v' ->
+      F (VSTotal v')
+    VSNe (F (NeSys' sys is')) ->
+      F (VSNe (F (NeSys' (NSCons (VCNe cof is) v sys) (is <> is'))))
 {-# inline consSys #-}
 
 evalSys :: SubArg => NCofArg => DomArg => EnvArg => Sys -> F VSys
@@ -147,7 +149,7 @@ evalSys = \case
   SCons (evalCof -> cof) t sys -> consSys cof (bindCof cof (eval t)) (evalSys sys)
 
 emptySysBind :: F VSysBind
-emptySysBind = F (VSBNe (NeSysBind' NSBEmpty mempty))
+emptySysBind = F (VSBNe (F (NeSysBind' NSBEmpty mempty)))
 {-# inline emptySysBind #-}
 
 consSysBind :: F VCof -> BindLazy Val -> F VSysBind -> F VSysBind
@@ -155,8 +157,10 @@ consSysBind cof ~v ~sys = case unF cof of
   VCTrue      -> F (VSBTotal v)
   VCFalse     -> sys
   VCNe cof is -> case unF sys of
-    VSBTotal v'                -> F (VSBTotal v')
-    VSBNe (NeSysBind' sys is') -> F (VSBNe (NeSysBind' (NSBCons cof v sys) (is <> is')))
+    VSBTotal v' ->
+      F (VSBTotal v')
+    VSBNe (F (NeSysBind' sys is')) ->
+      F (VSBNe (F (NeSysBind' (NSBCons (VCNe cof is) v sys) (is <> is'))))
 {-# inline consSysBind #-}
 
 evalBinder :: SubArg => NCofArg => DomArg => EnvArg => Name -> Tm -> Bind Val
@@ -205,6 +209,9 @@ appLazy t ~u = case unF t of
   VNe t is -> VNe (NApp t u) is
   _        -> impossible
 
+
+
+
 -- | Apply a closure. Note: *lazy* in argument.
 capp :: NCofArg => DomArg => Closure -> Val -> Val
 capp t ~u = case t of
@@ -212,8 +219,25 @@ capp t ~u = case t of
 
   CCoePi (frc -> r) (frc -> r') (unpackBind2 -> (frc -> a, b)) (frc -> t) ->
     let x = frc u in
-    unF (coe r r' (bind "j" \j -> b ∙ unF j ∘ unF (coe r' j a x))
-                  (t ∘ unF (coe r' r a x)))
+    coenf r r' (bind "j" \j -> b ∙ unF j ∘ coenf r' j a x) (t ∘ coenf r' r a x)
+
+  CHComPi (frc -> r) (frc -> r') a b sys base ->
+    hcom r r'
+      (b ∘ u)
+      uf
+      uf
+
+-- more precise forcing type for systems!
+--   frc :: SysNe VCof -> VSys
+
+  -- CHComPi (forceI -> r) (forceI -> r') i a b sys base ->
+
+  --   hcom r r' i (cappf b u)
+  --        (mapVSystem                    -- TODO: fuse force $ map
+  --           (inCxt \i t -> app (force t) u)
+  --           (forceNSystem sys))
+  --        (appf (force base) u)
+
 
 bind :: Name -> (NCofArg => F I -> F a) -> NCofArg => F (Bind a)
 bind x act = freshI \i -> F (Bind x i (unF (act (F (IVar i)))))
@@ -359,10 +383,10 @@ goCoe r r' topA t = case unF topA ^. body of
     F (VLam x (CCoePi (unF r) (unF r') (packBind2 a b) (unF t)))
 
   VSg x (rebindf topA -> a) (rebindf topA -> b) ->
-    let t1 = frc $ proj1 t
-        t2 = frc $ proj2 t
-    in F (VPair (unF (goCoe r r' a t1))
-                (unF (goCoe r r' (bind "j" \j -> coe r j a t1) t2)))
+    let t1 = proj1f t
+        t2 = proj2f t
+    in F (VPair (goCoenf r r' a t1)
+                (goCoenf r r' (bind "j" \j -> coe r j a t1) t2))
 
   VNat ->
     t
@@ -376,7 +400,7 @@ goCoe r r' topA t = case unF topA ^. body of
   -- Note: I don't need to rebind the "is"! It can be immediately weakened
   -- to the outer context.
   a@(VNe (rebind topA -> n) is) ->
-    F (VNe (NCoe (unF r) (unF r') (unF topA ^.name) (unF topA) (unF t))
+    F (VNe (NCoe (unF r) (unF r') (unF topA) (unF t))
            (IS.insertI (unF r) $ IS.insertI (unF r') is))
 
   VGlueTy a sys ->
@@ -385,30 +409,41 @@ goCoe r r' topA t = case unF topA ^. body of
   _ ->
     impossible
 
+goCoenf r r' a t = unF (goCoe r r' a t); {-# inline goCoenf #-}
+
 coe :: NCofArg => DomArg => F I -> F I -> F (Bind Val) -> F Val -> F Val
 coe r r' ~a t
   | unF r == unF r' = t
   | True            = goCoe r r' a t
 {-# inline coe #-}
 
-mapNeSysBind :: (NeCof -> BindLazy Val -> BindLazy Val) -> NeSysBind -> NeSysBind
+coenf r r' a t = unF (coe r r' a t); {-# inline coenf #-}
+
+mapNeSysBind :: (VCof -> BindLazy Val -> BindLazy Val) -> NeSysBind -> NeSysBind
 mapNeSysBind f = \case
   NSBEmpty          -> NSBEmpty
   NSBCons cof t sys -> NSBCons cof (f cof t) (mapNeSysBind f sys)
 {-# inline mapNeSysBind #-}
 
+mapVSysBind :: (VCof -> BindLazy Val -> BindLazy Val) -> VSysBind -> VSysBind
+mapVSysBind f = \case
+  VSBTotal v -> VSBTotal (f VCTrue v)
+  VSBNe nsys -> uf -- VSBNe (mapNeSysBind f nsys)
+
+{-# inline mapVSysBind #-}
+
 -- | Precondition: the mapping function does not remove occurrences of blocking ivars!
-mapNeSysBind' :: (NeCof -> BindLazy Val -> BindLazy Val) -> NeSysBind' -> NeSysBind'
-mapNeSysBind' f (NeSysBind' sys is) = NeSysBind' (mapNeSysBind f sys) is
+mapNeSysBind' :: (VCof -> BindLazy Val -> BindLazy Val) -> F NeSysBind' -> F NeSysBind'
+mapNeSysBind' f (F (NeSysBind' sys is)) = F (NeSysBind' (mapNeSysBind f sys) is)
 {-# inline mapNeSysBind' #-}
 
 -- | Assumption: r /= r'
-goCom :: NCofArg => DomArg => F I -> F I -> F (Bind Val) -> NeSysBind' -> F Val -> F Val
+goCom :: NCofArg => DomArg => F I -> F I -> F (Bind Val) -> F NeSysBind' -> F Val -> F Val
 goCom r r' ~a ~sys ~b =
   goHCom r r'
     (unF a ∘ unF r')
     (mapNeSysBind'
-       (\cof t -> bindNeCof cof $ bindLazy "i" \i -> unF (coe i r' a (t ∘ unF i)))
+       (\cof t -> bindCof (F cof) $ bindLazy "i" \i -> unF (coe i r' a (t ∘ unF i)))
        sys)
     (goCoe r r' a b)
 {-# noinline goCom #-}
@@ -421,7 +456,7 @@ com r r' ~a ~sys ~b
 {-# inline com #-}
 
 -- | Assumption: r /= r'
-goHCom :: NCofArg => DomArg => F I -> F I -> F Val -> NeSysBind' -> F Val -> F Val
+goHCom :: NCofArg => DomArg => F I -> F I -> F Val -> F NeSysBind' -> F Val -> F Val
 goHCom r r' a nsys base = case unF a of
 
 --   VPi x a b ->
@@ -498,7 +533,8 @@ eval = \case
   PApp t u0 u1 i    -> papp (evalf t) (eval u0) (eval u1) (evalI i)
   PLam l r x t      -> VPLam (eval l) (eval r) x (ICEval ?sub ?env t)
   Coe r r' x a t    -> unF (coe (evalI r) (evalI r') (evalfBinder x a) (evalf t))
-  -- HCom r r' x a t b -> hcom (evalI r) (evalI r') x (evalf a) (evalSys t) (evalf b)
+  HCom r r' x a t b -> hcom (evalI r) (evalI r') (evalf a) (evalSysBind x t) (evalf b)
+
   -- GlueTy a sys      -> glueTy (eval a) (evalSys sys)
   -- Glue t sys        -> glue   (eval t) (evalSys sys)
   -- Unglue t sys      -> unglue (eval t) (evalSys sys)

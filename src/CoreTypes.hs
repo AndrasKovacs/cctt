@@ -62,6 +62,78 @@ data Sys = SEmpty | SCons Cof Tm Sys
 -- Values
 --------------------------------------------------------------------------------
 
+data NamedClosure = NamedClosure {
+    namedClosureName :: Name
+  , namedClosureClosure :: Closure }
+  deriving Show
+
+data NamedIClosure = NamedIClosure {
+    namedIClosureName :: Name
+  , namedIClosureClosure :: IClosure }
+  deriving Show
+
+data NeCof
+  = NCEq I I
+  | NCAnd NeCof NeCof
+  deriving Show
+
+data VCof
+  = VCTrue
+  | VCFalse
+  | VCNe NeCof IS.IVarSet
+  deriving Show
+
+data Env
+  = ENil
+  | EDef Env ~Val
+  deriving Show
+
+type EnvArg = (?env :: Env)
+
+data BindI a = BindI {
+    bindIName  :: Name
+  , bindIBinds :: IVar
+  , bindIBody  :: a}
+  deriving Show
+
+data BindILazy a = BindILazy {
+    bindILazyName  :: Name
+  , bindILazyBinds :: IVar
+  , bindILazyBody  :: ~a}
+  deriving Show
+
+data BindCof = BindCof {
+    bindCofBinds :: NeCof
+  , bindCofBody  :: ~Val}
+  deriving Show
+
+data BindCofI = BindCofI {
+    bindCofIBindsCof :: NeCof
+  , bindCofIName     :: Name
+  , bindCofIBindsI   :: IVar
+  , bindCofIBody     :: ~Val}
+  deriving Show
+
+data NeSys
+  = NSEmpty
+  | NSCons BindCof NeSys
+  deriving Show
+
+data NeSysSub
+  = NSSNe NeSys
+  | NSSSub NeSys Sub
+  deriving Show
+
+data NeSysHCom
+  = NSHEmpty
+  | NSHCons BindCofI NeSysHCom
+  deriving Show
+
+data NeSysHComSub
+  = NSHSNe NeSysHCom
+  | NSHSSub NeSysHCom Sub
+  deriving Show
+
 type VTy = Val
 
 data Val
@@ -71,15 +143,14 @@ data Val
   -- also neutral, but they're handled separately, because we have to match on
   -- them in coe/hcom.
   | VNe Ne IS.IVarSet
-
-  | VGlueTy VTy NeSys'
+  | VGlueTy VTy NeSysSub IS.IVarSet
 
   -- canonicals
-  | VPi Name VTy Closure
-  | VLam Name Closure
-  | VPathP Name IClosure Val Val
-  | VPLam ~Val ~Val Name IClosure  -- annotated with endpoints
-  | VSg Name VTy Closure
+  | VPi VTy NamedClosure
+  | VLam NamedClosure
+  | VPathP NamedIClosure Val Val
+  | VPLam ~Val ~Val NamedIClosure  -- annotated with endpoints
+  | VSg VTy NamedClosure
   | VPair Val Val
   | VU
 
@@ -95,10 +166,10 @@ data Ne
   | NPApp Ne ~Val ~Val I
   | NProj1 Ne
   | NProj2 Ne
-  | NCoe I I Name (Bind Val) Val
-  | NHCom I I Name VTy NeSysBind Val
-  | NUnglue Val NeSys
-  | NGlue Val NeSys
+  | NCoe I I (BindI Val) Val
+  | NHCom I I VTy NeSysHComSub Val
+  | NUnglue Val NeSysSub
+  | NGlue Val NeSysSub
   | NNatElim Val Val Val Ne
   deriving Show
 
@@ -109,7 +180,7 @@ vVar x = VNe (NLocalVar x) mempty
 {-# inline vVar #-}
 
 newtype F a = F {unF :: a}
-  deriving SubAction via a
+  deriving (SubAction, Show) via a
 
 type DomArg = (?dom :: Lvl)    -- fresh LocalVar
 
@@ -121,10 +192,10 @@ data Closure
   = CEval Sub Env Tm
 
   -- ^ Body of function coercions.
-  | CCoePi I I (Bind (VTy, Closure)) Val
+  | CCoePi I I (BindI (VTy, Closure)) Val
 
   -- ^ Body of function hcom.
-  | CHComPi I I VTy Closure NeSysBind Val
+  | CHComPi I I VTy Closure NeSysHComSub Val
 
 --   | CConst Val
 
@@ -169,7 +240,7 @@ data Closure
 -- | Defunctionalized closures for IVar abstraction.
 data IClosure
   = ICEval Sub Env Tm
-  | ICCoePathP I I (Bind (IClosure, Val, Val)) Val
+  -- | ICCoePathP I I (BindI (IClosure, Val, Val)) Val
   -- | ICHComPathP I I Name IClosure Val Val NeSys Val
   -- | ICConst Val
   -- | ICIsEquiv7 Val Val Val Val Val
@@ -177,80 +248,52 @@ data IClosure
 
 --------------------------------------------------------------------------------
 
-data NeCof
-  = NCEq I I
-  | NCAnd NeCof NeCof
-  deriving Show
 
-data VCof
-  = VCTrue
-  | VCFalse
-  | VCNe NeCof IS.IVarSet
-  deriving Show
 
-data Env
-  = ENil
-  | EDef Env ~Val
-  deriving Show
+--------------------------------------------------------------------------------
 
-type EnvArg = (?env :: Env)
 
-data Bind a = Bind {
-    bindName  :: Name
-  , bindBinds :: IVar
-  , bindBody  :: a}
-  deriving Show
+-- rebind :: F (BindI a) -> b -> BindI b
+-- rebind (F (BindI x i _)) b = BindI x i b
+-- {-# inline rebind #-}
 
-rebind :: F (Bind a) -> b -> Bind b
-rebind (F (Bind x i _)) b = Bind x i b
-{-# inline rebind #-}
+-- rebindf :: F (BindI a) -> b -> F (BindI b)
+-- rebindf (F (BindI x i _)) b = F (BindI x i b)
+-- {-# inline rebindf #-}
 
-rebindf :: F (Bind a) -> b -> F (Bind b)
-rebindf (F (Bind x i _)) b = F (Bind x i b)
-{-# inline rebindf #-}
+-- packBindI2 :: BindI a -> BindI b -> BindI (a, b)
+-- packBindI2 (BindI x i a) (BindI _ _ b) = BindI x i (a, b)
+-- {-# inline packBindI2 #-}
 
-packBind2 :: Bind a -> Bind b -> Bind (a, b)
-packBind2 (Bind x i a) (Bind _ _ b) = Bind x i (a, b)
-{-# inline packBind2 #-}
+-- unpackBindI2 :: BindI (a, b) -> (BindI a, BindI b)
+-- unpackBindI2 (BindI x i (a, b)) = (BindI x i a, BindI x i b)
+-- {-# inline unpackBindI2 #-}
 
-unpackBind2 :: Bind (a, b) -> (Bind a, Bind b)
-unpackBind2 (Bind x i (a, b)) = (Bind x i a, Bind x i b)
-{-# inline unpackBind2 #-}
+-- packBindI3 :: BindI a -> BindI b -> BindI c -> BindI (a, b, c)
+-- packBindI3 (BindI x i a) (BindI _ _ b) (BindI _ _ c) = BindI x i (a, b, c)
+-- {-# inline packBindI3 #-}
 
-packBind3 :: Bind a -> Bind b -> Bind c -> Bind (a, b, c)
-packBind3 (Bind x i a) (Bind _ _ b) (Bind _ _ c) = Bind x i (a, b, c)
-{-# inline packBind3 #-}
+-- unpackBindI3 :: BindI (a, b, c) -> (BindI a, BindI b, BindI c)
+-- unpackBindI3 (BindI x i (a, b, c)) = (BindI x i a, BindI x i b, BindI x i c)
+-- {-# inline unpackBindI3 #-}
 
-unpackBind3 :: Bind (a, b, c) -> (Bind a, Bind b, Bind c)
-unpackBind3 (Bind x i (a, b, c)) = (Bind x i a, Bind x i b, Bind x i c)
-{-# inline unpackBind3 #-}
+-- inst :: SubAction a => NCofArg => Bind a -> I -> a
+-- inst (Bind x i a) j =
+--   let s = setCod i (idSub (dom ?cof)) `ext` j
+--   in doSub s a
+-- {-# inline inst #-}
 
-inst :: SubAction a => NCofArg => Bind a -> I -> a
-inst (Bind x i a) j =
-  let s = setCod i (idSub (dom ?cof)) `ext` j
-  in doSub s a
-{-# inline inst #-}
+-- rebindLazy :: BindLazy a -> b -> BindLazy b
+-- rebindLazy (BindLazy x i _) ~b = BindLazy x i b
+-- {-# inline rebindLazy #-}
 
-data BindLazy a = BindLazy  {
-    bindLazyName  :: Name
-  , bindLazyBinds :: IVar
-  , bindLazyBody  :: ~a}
-  deriving Show
+-- instLazy :: SubAction a => NCofArg => BindLazy a -> I -> a
+-- instLazy (BindLazy x i a) j =
+--   let s = setCod i (idSub (dom ?cof)) `ext` j
+--   in doSub s a
+-- {-# inline instLazy #-}
 
-rebindLazy :: BindLazy a -> b -> BindLazy b
-rebindLazy (BindLazy x i _) ~b = BindLazy x i b
-{-# inline rebindLazy #-}
-
-instLazy :: SubAction a => NCofArg => BindLazy a -> I -> a
-instLazy (BindLazy x i a) j =
-  let s = setCod i (idSub (dom ?cof)) `ext` j
-  in doSub s a
-{-# inline instLazy #-}
-
-data NeSys
-  = NSEmpty
-  | NSCons NeCof ~Val NeSys
-  deriving Show
+--------------------------------------------------------------------------------
 
 data NeSys' = NeSys' {
     neSys'Nsys  :: NeSys
@@ -260,86 +303,48 @@ data NeSys' = NeSys' {
 -- TODO: unbox
 data VSys
   = VSTotal ~Val
-  | VSNe NeSys'
+  | VSNe NeSys IS.IVarSet
   deriving Show
 
-data NeSysBind
-  = NSBEmpty
-  | NSBCons NeCof (BindLazy Val) NeSysBind
+data VSysHCom
+  = VSHTotal (BindILazy Val)
+  | VSHNe NeSysHCom IS.IVarSet
   deriving Show
-
-data NeSysBind' = NeSysBind' {
-     neSysBind'Nsys  :: NeSysBind
-  ,  neSysBind'Ivars :: IS.IVarSet
-  } deriving Show
-
--- TODO: unbox
-data VSysBind
-  = VSBTotal (BindLazy Val)
-  | VSBNe NeSysBind'
-  deriving Show
-
 
 -- Substitution
 ----------------------------------------------------------------------------------------------------
 
 instance SubAction Val where
-  sub v = case v of
+  sub = \case
     VSub v s' -> VSub v (sub s')
     v         -> VSub v ?sub
-
-instance SubAction NeCof where
-  sub cof = case cof of
-    NCAnd c1 c2 -> NCAnd (sub c1) (sub c2)
-    NCEq i j    -> NCEq (sub i) (sub j)
-
-instance SubAction VCof where
-  sub cof = case cof of
-    VCTrue        -> VCTrue
-    VCFalse       -> VCFalse
-    VCNe necof is -> VCNe (sub necof) (sub is)
-
-instance SubAction NeSys where
-  sub sys = case sys of
-    NSEmpty          -> NSEmpty
-    NSCons cof v sys -> NSCons (sub cof) (sub v) (sub sys)
-
-instance SubAction NeSys' where
-  sub (NeSys' nsys is) = NeSys' (sub nsys) (sub is)
-
-instance SubAction VSys where
-  sub sys = case sys of
-    VSTotal v  -> VSTotal (sub v)
-    VSNe nsys  -> VSNe (sub nsys)
 
 instance SubAction Ne where
   sub n = case n of
     NSub n s' -> NSub n (sub s')
     n         -> NSub n ?sub
 
+instance SubAction NeSysSub where
+  sub = \case
+    NSSNe sys    -> NSSSub sys ?sub
+    NSSSub sys s -> NSSSub sys (sub s)
+
+instance SubAction NeSysHComSub where
+  sub = \case
+    NSHSNe sys    -> NSHSSub sys ?sub
+    NSHSSub sys s -> NSHSSub sys (sub s)
+
 instance SubAction Env where
   sub e = case e of
     ENil     -> ENil
     EDef e v -> EDef (sub e) (sub v)
 
-instance SubAction a => SubAction (Bind a) where
-  sub (Bind x i a) =
+instance SubAction a => SubAction (BindI a) where
+  sub (BindI x i a) =
     let fresh = dom ?sub in
     let ?sub  = setCod i ?sub `ext` IVar fresh in
-    Bind x fresh (sub a)
+    BindI x fresh (sub a)
   {-# inline sub #-}
-
-instance SubAction a => SubAction (BindLazy a) where
-  sub (BindLazy x i a) =
-    let fresh = dom ?sub in
-    let ?sub  = setCod i ?sub `ext` IVar fresh in
-    BindLazy x fresh (sub a)
-  {-# inline sub #-}
-
-instance SubAction NeSysBind where
-  sub = \case
-    NSBEmpty -> NSBEmpty
-    NSBCons cof t sys -> uf
 
 instance SubAction Closure where
   sub cl = case cl of
@@ -376,8 +381,8 @@ instance SubAction IClosure where
   sub cl = case cl of
     ICEval s' env t -> ICEval (sub s') (sub env) t
 
-    -- recursive sub here as well!
-    ICCoePathP r r' alr p -> ICCoePathP (sub r) (sub r') (sub alr) (sub p)
+    -- -- recursive sub here as well!
+    -- ICCoePathP r r' alr p -> ICCoePathP (sub r) (sub r') (sub alr) (sub p)
 
 --     -- -- ICHComPathP r r' i a lhs rhs sys base ->
 --     -- --   ICHComPathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
@@ -388,7 +393,9 @@ instance SubAction IClosure where
 
 --------------------------------------------------------------------------------
 
-makeFields ''NeSysBind'
+-- makeFields ''NeSysBind'
 makeFields ''NeSys'
-makeFields ''Bind
-makeFields ''BindLazy
+makeFields ''BindI
+-- makeFields ''BindLazy
+-- makeFields ''BindCof
+-- makeFields ''BindCofLazy

@@ -1,21 +1,7 @@
 
-IBind:
-- new construction, stores ivar + value
-- the value only depends on vars <= ivar (explicit weakening!)
-- the ivar is the "abstracted" variable, others are "free" vars
-- substitution:
-  1. we trim down the subst to only the free vars of the IBind
-  2. we map the abstracted var to the next fresh var in Dom
-     - apply the subst to body value
-     - the new abstracted var is the next fresh var
-- forcing:
-  1. we trim down the ncof to the IBind free vars
-  2. we force the body
+Add Cof binder, like Bind. Make its field lazy, for consSys laziness, but force
+the field in consSys on the neutral branch.
 
-Substitutions:
-- store dom + cod
-- reduce range to 12 possible ivars
-- the dom will be needed when substituting ibinders
-
-NCofs:
-- each ivar is mapped to the *least* representative ivar
+Now NeSys could be parameterized over content
+   NeSys (BindCof Val)
+   NeSys (BindCof (BindLazy Val))
