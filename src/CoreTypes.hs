@@ -62,13 +62,13 @@ data Sys = SEmpty | SCons Cof Tm Sys
 -- Values
 --------------------------------------------------------------------------------
 
-data NamedClosure = NamedClosure {
-    namedClosureName :: Name
+data NamedClosure = NCl {
+    namedClosureName    :: Name
   , namedClosureClosure :: Closure }
   deriving Show
 
-data NamedIClosure = NamedIClosure {
-    namedIClosureName :: Name
+data NamedIClosure = NICl {
+    namedIClosureName    :: Name
   , namedIClosureClosure :: IClosure }
   deriving Show
 
@@ -102,33 +102,19 @@ data BindILazy a = BindILazy {
   , bindILazyBody  :: ~a}
   deriving Show
 
-data BindNeCof = BindNeCof {
-    bindNeCofBinds :: NeCof
-  , bindNeCofBody  :: ~Val}
+data BindCof a = BindCof {
+    bindCofBinds :: NeCof
+  , bindCofBody  :: a}
   deriving Show
 
-data BindNeCofI = BindNeCofI {
-    bindNeCofIBindsCof :: NeCof
-  , bindNeCofIName     :: Name
-  , bindNeCofIBindsI   :: IVar
-  , bindNeCofIBody     :: ~Val}
+data BindCofLazy a = BindCofLazy {
+    bindCofLazyBinds :: NeCof
+  , bindCofLazyBody  :: ~a}
   deriving Show
-
--- data BindVCof = BindVCof {
---     bindCofBinds :: VCof
---   , bindCofBody  :: ~Val}
---   deriving Show
-
--- data BindVCofI = BindVCofI {
---     bindCofIBindsCof :: VCof
---   , bindCofIName     :: Name
---   , bindCofIBindsI   :: IVar
---   , bindCofIBody     :: ~Val}
---   deriving Show
 
 data NeSys
   = NSEmpty
-  | NSCons BindNeCof NeSys
+  | NSCons (BindCofLazy Val) NeSys
   deriving Show
 
 data NeSysSub
@@ -138,7 +124,7 @@ data NeSysSub
 
 data NeSysHCom
   = NSHEmpty
-  | NSHCons BindNeCofI NeSysHCom
+  | NSHCons (BindCof (BindILazy Val)) NeSysHCom
   deriving Show
 
 data NeSysHComSub
@@ -216,10 +202,10 @@ data Closure
   = CEval Sub Env Tm
 
   -- ^ Body of function coercions.
-  | CCoePi I I (BindI (VTy, Closure)) Val
+  | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
 
   -- ^ Body of function hcom.
-  | CHComPi I I VTy Closure NeSysHComSub Val
+  | CHComPi I I VTy NamedClosure NeSysHComSub Val
 
 --   | CConst Val
 
@@ -264,7 +250,7 @@ data Closure
 -- | Defunctionalized closures for IVar abstraction.
 data IClosure
   = ICEval Sub Env Tm
-  -- | ICCoePathP I I (BindI (IClosure, Val, Val)) Val
+  | ICCoePathP I I (BindI NamedIClosure) (BindI Val) (BindI Val) Val
   -- | ICHComPathP I I Name IClosure Val Val NeSys Val
   -- | ICConst Val
   -- | ICIsEquiv7 Val Val Val Val Val
@@ -279,6 +265,10 @@ rebind (F (BindI x i _)) b = BindI x i b
 rebindf :: F (BindI a) -> b -> F (BindI b)
 rebindf (F (BindI x i _)) b = F (BindI x i b)
 {-# inline rebindf #-}
+
+reclose :: NamedClosure -> (Closure -> Closure) -> NamedClosure
+reclose (NCl x a) f = NCl x (f a)
+{-# inline reclose #-}
 
 packBindI2 :: BindI a -> BindI b -> BindI (a, b)
 packBindI2 (BindI x i a) (BindI _ _ b) = BindI x i (a, b)
@@ -295,18 +285,6 @@ packBindI3 (BindI x i a) (BindI _ _ b) (BindI _ _ c) = BindI x i (a, b, c)
 unpackBindI3 :: BindI (a, b, c) -> (BindI a, BindI b, BindI c)
 unpackBindI3 (BindI x i (a, b, c)) = (BindI x i a, BindI x i b, BindI x i c)
 {-# inline unpackBindI3 #-}
-
--- inst :: SubAction a => NCofArg => Bind a -> I -> a
--- inst (Bind x i a) j =
---   let s = setCod i (idSub (dom ?cof)) `ext` j
---   in doSub s a
--- {-# inline inst #-}
-
--- instLazy :: SubAction a => NCofArg => BindLazy a -> I -> a
--- instLazy (BindLazy x i a) j =
---   let s = setCod i (idSub (dom ?cof)) `ext` j
---   in doSub s a
--- {-# inline instLazy #-}
 
 -- Substitution
 ----------------------------------------------------------------------------------------------------
@@ -343,6 +321,14 @@ instance SubAction a => SubAction (BindI a) where
     BindI x fresh (sub a)
   {-# inline sub #-}
 
+instance SubAction NamedClosure where
+  sub (NCl x cl) = NCl x (sub cl)
+  {-# inline sub #-}
+
+instance SubAction NamedIClosure where
+  sub (NICl x cl) = NICl x (sub cl)
+  {-# inline sub #-}
+
 instance SubAction Closure where
   sub cl = case cl of
     CEval s' env t ->
@@ -350,8 +336,8 @@ instance SubAction Closure where
 
     -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.
-    CCoePi r r' ab t ->
-      CCoePi (sub r) (sub r') (sub ab) (sub t)
+    CCoePi r r' a b t ->
+      CCoePi (sub r) (sub r') (sub a) (sub b) (sub t)
 
     CHComPi r r' a b sys base ->
       CHComPi (sub r) (sub r') (sub a) (sub b) (sub sys) (sub base)
@@ -379,7 +365,7 @@ instance SubAction IClosure where
     ICEval s' env t -> ICEval (sub s') (sub env) t
 
     -- -- recursive sub here as well!
-    -- ICCoePathP r r' alr p -> ICCoePathP (sub r) (sub r') (sub alr) (sub p)
+    ICCoePathP r r' a lh rh p -> ICCoePathP (sub r) (sub r') (sub a) (sub lh) (sub rh) (sub p)
 
 --     -- -- ICHComPathP r r' i a lhs rhs sys base ->
 --     -- --   ICHComPathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
@@ -392,5 +378,7 @@ instance SubAction IClosure where
 
 makeFields ''BindI
 makeFields ''BindILazy
-makeFields ''BindNeCof
-makeFields ''BindNeCofI
+makeFields ''BindCof
+makeFields ''BindCofLazy
+makeFields ''NamedClosure
+makeFields ''NamedIClosure
