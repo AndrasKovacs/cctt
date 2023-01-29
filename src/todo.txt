@@ -5,3 +5,9 @@ the field in consSys on the neutral branch.
 Now NeSys could be parameterized over content
    NeSys (BindCof Val)
    NeSys (BindCof (BindLazy Val))
+
+i : ℚ
+
+Product : (ℕ → Tyᵢ Γ) → Tyᵢ Γ
+lam     : ((n : ℕ) → Tmᵢ Γ (A n)) → Tmᵢ Γ (Product A)
+app     : Tmᵢ Γ (Product A) → (n : ℕ) → Tmᵢ Γ (A n)

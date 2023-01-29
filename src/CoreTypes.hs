@@ -102,21 +102,33 @@ data BindILazy a = BindILazy {
   , bindILazyBody  :: ~a}
   deriving Show
 
-data BindCof = BindCof {
-    bindCofBinds :: NeCof
-  , bindCofBody  :: ~Val}
+data BindNeCof = BindNeCof {
+    bindNeCofBinds :: NeCof
+  , bindNeCofBody  :: ~Val}
   deriving Show
 
-data BindCofI = BindCofI {
-    bindCofIBindsCof :: NeCof
-  , bindCofIName     :: Name
-  , bindCofIBindsI   :: IVar
-  , bindCofIBody     :: ~Val}
+data BindNeCofI = BindNeCofI {
+    bindNeCofIBindsCof :: NeCof
+  , bindNeCofIName     :: Name
+  , bindNeCofIBindsI   :: IVar
+  , bindNeCofIBody     :: ~Val}
   deriving Show
+
+-- data BindVCof = BindVCof {
+--     bindCofBinds :: VCof
+--   , bindCofBody  :: ~Val}
+--   deriving Show
+
+-- data BindVCofI = BindVCofI {
+--     bindCofIBindsCof :: VCof
+--   , bindCofIName     :: Name
+--   , bindCofIBindsI   :: IVar
+--   , bindCofIBody     :: ~Val}
+--   deriving Show
 
 data NeSys
   = NSEmpty
-  | NSCons BindCof NeSys
+  | NSCons BindNeCof NeSys
   deriving Show
 
 data NeSysSub
@@ -126,12 +138,24 @@ data NeSysSub
 
 data NeSysHCom
   = NSHEmpty
-  | NSHCons BindCofI NeSysHCom
+  | NSHCons BindNeCofI NeSysHCom
   deriving Show
 
 data NeSysHComSub
   = NSHSNe NeSysHCom
   | NSHSSub NeSysHCom Sub
+  deriving Show
+
+-- TODO: unbox
+data VSys
+  = VSTotal ~Val
+  | VSNe NeSys IS.IVarSet
+  deriving Show
+
+-- TODO: unbox
+data VSysHCom
+  = VSHTotal (BindILazy Val)
+  | VSHNe NeSysHCom IS.IVarSet
   deriving Show
 
 type VTy = Val
@@ -248,34 +272,29 @@ data IClosure
 
 --------------------------------------------------------------------------------
 
+rebind :: F (BindI a) -> b -> BindI b
+rebind (F (BindI x i _)) b = BindI x i b
+{-# inline rebind #-}
 
+rebindf :: F (BindI a) -> b -> F (BindI b)
+rebindf (F (BindI x i _)) b = F (BindI x i b)
+{-# inline rebindf #-}
 
---------------------------------------------------------------------------------
+packBindI2 :: BindI a -> BindI b -> BindI (a, b)
+packBindI2 (BindI x i a) (BindI _ _ b) = BindI x i (a, b)
+{-# inline packBindI2 #-}
 
+unpackBindI2 :: BindI (a, b) -> (BindI a, BindI b)
+unpackBindI2 (BindI x i (a, b)) = (BindI x i a, BindI x i b)
+{-# inline unpackBindI2 #-}
 
--- rebind :: F (BindI a) -> b -> BindI b
--- rebind (F (BindI x i _)) b = BindI x i b
--- {-# inline rebind #-}
+packBindI3 :: BindI a -> BindI b -> BindI c -> BindI (a, b, c)
+packBindI3 (BindI x i a) (BindI _ _ b) (BindI _ _ c) = BindI x i (a, b, c)
+{-# inline packBindI3 #-}
 
--- rebindf :: F (BindI a) -> b -> F (BindI b)
--- rebindf (F (BindI x i _)) b = F (BindI x i b)
--- {-# inline rebindf #-}
-
--- packBindI2 :: BindI a -> BindI b -> BindI (a, b)
--- packBindI2 (BindI x i a) (BindI _ _ b) = BindI x i (a, b)
--- {-# inline packBindI2 #-}
-
--- unpackBindI2 :: BindI (a, b) -> (BindI a, BindI b)
--- unpackBindI2 (BindI x i (a, b)) = (BindI x i a, BindI x i b)
--- {-# inline unpackBindI2 #-}
-
--- packBindI3 :: BindI a -> BindI b -> BindI c -> BindI (a, b, c)
--- packBindI3 (BindI x i a) (BindI _ _ b) (BindI _ _ c) = BindI x i (a, b, c)
--- {-# inline packBindI3 #-}
-
--- unpackBindI3 :: BindI (a, b, c) -> (BindI a, BindI b, BindI c)
--- unpackBindI3 (BindI x i (a, b, c)) = (BindI x i a, BindI x i b, BindI x i c)
--- {-# inline unpackBindI3 #-}
+unpackBindI3 :: BindI (a, b, c) -> (BindI a, BindI b, BindI c)
+unpackBindI3 (BindI x i (a, b, c)) = (BindI x i a, BindI x i b, BindI x i c)
+{-# inline unpackBindI3 #-}
 
 -- inst :: SubAction a => NCofArg => Bind a -> I -> a
 -- inst (Bind x i a) j =
@@ -283,33 +302,11 @@ data IClosure
 --   in doSub s a
 -- {-# inline inst #-}
 
--- rebindLazy :: BindLazy a -> b -> BindLazy b
--- rebindLazy (BindLazy x i _) ~b = BindLazy x i b
--- {-# inline rebindLazy #-}
-
 -- instLazy :: SubAction a => NCofArg => BindLazy a -> I -> a
 -- instLazy (BindLazy x i a) j =
 --   let s = setCod i (idSub (dom ?cof)) `ext` j
 --   in doSub s a
 -- {-# inline instLazy #-}
-
---------------------------------------------------------------------------------
-
-data NeSys' = NeSys' {
-    neSys'Nsys  :: NeSys
-  , neSys'Ivars :: IS.IVarSet
-  } deriving Show
-
--- TODO: unbox
-data VSys
-  = VSTotal ~Val
-  | VSNe NeSys IS.IVarSet
-  deriving Show
-
-data VSysHCom
-  = VSHTotal (BindILazy Val)
-  | VSHNe NeSysHCom IS.IVarSet
-  deriving Show
 
 -- Substitution
 ----------------------------------------------------------------------------------------------------
@@ -393,9 +390,7 @@ instance SubAction IClosure where
 
 --------------------------------------------------------------------------------
 
--- makeFields ''NeSysBind'
-makeFields ''NeSys'
 makeFields ''BindI
--- makeFields ''BindLazy
--- makeFields ''BindCof
--- makeFields ''BindCofLazy
+makeFields ''BindILazy
+makeFields ''BindNeCof
+makeFields ''BindNeCofI
