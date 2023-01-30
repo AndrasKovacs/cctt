@@ -157,7 +157,7 @@ hcomⁱ r r' ((a : A) × B a) [α ↦ t] b =
 hcomⁱ r r' ((a : A) → B a) [α ↦ t] b =
   λ a. hcomⁱ r r' (B a) [α ↦ t i a] (b a)
 
-hcomⁱ r r' (Pathʲ A lhs rhs) [α ↦ t] base =
+hcomⁱ r r' (PathPʲ A lhs rhs) [α ↦ t] base =
   (λ arg. hcomⁱ r r' (A arg) [arg=0 ↦ lhs, arg=1 ↦ rhs, α ↦ t arg] (base arg))
 
 hcomⁱ r r' ℕ [α ↦ zero]  zero    = zero

@@ -251,7 +251,7 @@ data Closure
 data IClosure
   = ICEval Sub Env Tm
   | ICCoePathP I I (BindI NamedIClosure) (BindI Val) (BindI Val) Val
-  -- | ICHComPathP I I Name IClosure Val Val NeSys Val
+  | ICHComPathP I I NamedIClosure Val Val NeSysHComSub Val
   -- | ICConst Val
   -- | ICIsEquiv7 Val Val Val Val Val
   deriving Show
@@ -362,17 +362,19 @@ instance SubAction Closure where
 
 instance SubAction IClosure where
   sub cl = case cl of
-    ICEval s' env t -> ICEval (sub s') (sub env) t
+    ICEval s' env t ->
+      ICEval (sub s') (sub env) t
 
     -- -- recursive sub here as well!
-    ICCoePathP r r' a lh rh p -> ICCoePathP (sub r) (sub r') (sub a) (sub lh) (sub rh) (sub p)
+    ICCoePathP r r' a lh rh p ->
+      ICCoePathP (sub r) (sub r') (sub a) (sub lh) (sub rh) (sub p)
 
---     -- -- ICHComPathP r r' i a lhs rhs sys base ->
---     -- --   ICHComPathP (sub r) (sub r') i (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
+    ICHComPathP r r' a lhs rhs sys base ->
+      ICHComPathP (sub r) (sub r') (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
 
---     -- ICConst t -> ICConst (sub t)
+    -- ICConst t -> ICConst (sub t)
 
---     -- ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
+    -- ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
 
 --------------------------------------------------------------------------------
 

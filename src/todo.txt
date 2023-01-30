@@ -1,2 +1,6 @@
 
-should be a version of hcom where sys is known to be neutral but I args can be diagonal
+- Separate binders in each hcom component in core and presyntax
+- Quote without unSubNe
+- Conversion without unSubNe
+- Adjust elaboration
+- Finish comp rules (Glue)

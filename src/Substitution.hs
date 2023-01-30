@@ -154,8 +154,8 @@ isUnblocked is = go is (mempty @IS.IVarSet) where
        True)
     False
 
-isUnblocked' :: SubArg => NCofArg => IS.IVarSet -> Bool
-isUnblocked' is = go is (mempty @IS.IVarSet) where
+isUnblockedS :: SubArg => NCofArg => IS.IVarSet -> Bool
+isUnblockedS is = go is (mempty @IS.IVarSet) where
   go :: IS.IVarSet -> IS.IVarSet -> Bool
   go is varset = IS.popSmallest is
     (\is x -> matchIVar (lookupSub x ?sub)
