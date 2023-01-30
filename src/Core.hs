@@ -204,6 +204,8 @@ evalSysHCom x = \case
   SEmpty          -> vshempty
   SCons cof t sys -> vshconsS (evalCof cof) x (\_ -> evalf t) (evalSysHCom x sys)
 
+--------------------------------------------------------------------------------
+
 mapBindCof :: NCofArg => BindCof a -> (NCofArg => a -> a) -> BindCof a
 mapBindCof t f = bindCof (t^.binds) (f (t^.body))
 {-# inline mapBindCof #-}
@@ -212,9 +214,7 @@ mapBindILazy :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> 
 mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ unF i)
 {-# inline mapBindILazy #-}
 
-mapBindILazynf :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> BindILazy Val
-mapBindILazynf t f = unF (mapBindILazy t f)
-{-# inline mapBindILazynf #-}
+mapBindILazynf t f = unF (mapBindILazy t f); {-# inline mapBindILazynf #-}
 
 mapNeSysHCom :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F NeSysHCom -> F NeSysHCom
 mapNeSysHCom f sys = F (go (unF sys)) where
@@ -224,9 +224,7 @@ mapNeSysHCom f sys = F (go (unF sys)) where
     NSHCons t sys -> NSHCons (mapBindCof t \t -> mapBindILazynf t f) (go sys)
 {-# inline mapNeSysHCom #-}
 
-mapNeSysHComnf :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F NeSysHCom -> NeSysHCom
-mapNeSysHComnf f sys = unF (mapNeSysHCom f sys)
-{-# inline mapNeSysHComnf #-}
+mapNeSysHComnf f sys = unF (mapNeSysHCom f sys); {-# inline mapNeSysHComnf #-}
 
 mapNeSysHCom' :: NCofArg => (NCofArg => F I -> Val -> F Val)
               -> F (NeSysHCom, IS.IVarSet)
@@ -466,32 +464,51 @@ com r r' ~a ~sys ~b
   | VSHNe nsys is   <- unF sys = goComnf r r' a (F (nsys, is)) b
 {-# inline com #-}
 
+storeSysHCom :: F (NeSysHCom, IS.IVarSet) -> NeSysHComSub
+storeSysHCom (F (sys, _)) = NSHSNe sys; {-# inline storeSysHCom #-}
+
+
+-- loadSys ::
+
 -- | Assumption: r /= r'
 goHCom :: NCofArg => DomArg => F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> F Val
-goHCom r r' a (F (!nsys, !is)) base = case unF a of
+goHCom r r' a sys base = case unF a of
 
---   VPi x a b ->
---     F (VLam x (CHComPi (unF r) (unF r') ix a b (unFNSystem (_nsys nsys)) (unF base)))
+  VPi a b ->
+    F $ VLam $ NCl (b^.name) $ CHComPi (unF r) (unF r') a b (storeSysHCom sys) (unF base)
 
---   VSg x a b ->
+  VSg a b ->
 
---     let bfill = bindI \(IVar -> i) ->
---           cappf b (unF (goHCom r (F i) ix (force a)
---                                (mapNSystem' (inCxt \_ t -> proj1 (force t)) nsys)
---                                (proj1f base))) in
+    -- let bfill = bindI \(IVar -> i) ->
+    --       cappf b (unF (goHCom r (F i) ix (force a)
+    --                            (mapNSystem' (inCxt \_ t -> proj1 (force t)) nsys)
+    --                            (proj1f base))) in
 
---     F (VPair
---       (unF (goHCom r r' ix (force a)
---                   (mapNSystem' (inCxt \_ t -> proj1 (force t)) nsys)
---                   (proj1f base)))
---       (unF (goCom r r' ix bfill
---                   (mapNSystem' (inCxt \_ t -> proj2 (force t)) nsys)
---                   (proj2f base)))
---       )
+    -- F (VPair
+    --   (unF (goHCom r r' ix (force a)
+    --               (mapNSystem' (inCxt \_ t -> proj1 (force t)) nsys)
+    --               (proj1f base)))
+    --   (unF (goCom r r' ix bfill
+    --               (mapNSystem' (inCxt \_ t -> proj2 (force t)) nsys)
+    --               (proj2f base)))
+    --   )
 
---   VNat -> case ?dom of
---     0 -> base
---     _ -> goHComNat r r' ix nsys base
+    F $ VPair
+      (goHComnf r r' (frc a)
+                     (mapNeSysHCom' (\_ t -> proj1f (frc t)) sys)
+                     (proj1f base))
+      (goComnf r r' (bindIf "i" \i -> hcomf r i (frc a) _ (proj1f base))
+                    (mapNeSysHCom' (\_ t -> proj2f (frc t)) sys)
+                    (proj2f base))
+
+-- hcomⁱ r r' ((a : A) × B a) [α ↦ t] b =
+--   (  hcomⁱ r r' A [α ↦ (t i).1] b.1
+--    , comⁱ r r' (B (hfillⁱ r r' A [α ↦ t.1] b.1)) [α ↦ (t i).2] b.2 )
+
+
+  -- VNat -> case ?dom of
+  --   0 -> base
+  --   _ -> goHComNat r r' ix nsys base
 
 --   VPathP j a lhs rhs ->
 --     F (VPLam lhs
