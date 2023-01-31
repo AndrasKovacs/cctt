@@ -1,4 +1,3 @@
-{-# language PostfixOperators #-}
 
 module Core where
 
@@ -9,14 +8,14 @@ import Substitution
 import CoreTypes
 
 
--- Context manipulation
+-- Context manipulation primitives
 ----------------------------------------------------------------------------------------------------
 
--- | Get a fresh ivar, when not working under a Sub.
+-- | Get a fresh ivar when not working under a Sub.
 freshI :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshI act =
   let fresh = dom ?cof in
-  let ?cof  = mapDom (+1) ?cof `ext` IVar fresh in
+  let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   act fresh
 {-# inline freshI #-}
 
@@ -24,8 +23,8 @@ freshI act =
 freshIS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
 freshIS act =
   let fresh = dom ?cof in
-  let ?sub  = mapDom (+1) ?sub `ext` IVar fresh in
-  let ?cof  = mapDom (+1) ?cof `ext` IVar fresh in
+  let ?sub  = setDom (fresh+1) ?sub `ext` IVar fresh in
+  let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   act fresh
 {-# inline freshIS #-}
 
@@ -114,16 +113,16 @@ conjVCof ncof cof = case unF cof of
   VCNe necof _ -> conjNeCof ncof necof
 {-# noinline conjVCof #-}
 
-bindCof :: NeCof -> (NCofArg => a) -> NCofArg => BindCof a
-bindCof cof act = let ?cof = conjNeCof ?cof cof in BindCof cof act
+bindCof :: NeCof -> (NCofArg => a) -> NCofArg => BindNeCof a
+bindCof cof act = let ?cof = conjNeCof ?cof cof in BindNeCof cof act
 {-# inline bindCof #-}
 
-bindCoff :: NeCof -> (NCofArg => F a) -> NCofArg => F (BindCof a)
-bindCoff cof act = let ?cof = conjNeCof ?cof cof in F (BindCof cof (unF act))
+bindCoff :: NeCof -> (NCofArg => F a) -> NCofArg => F (BindNeCof a)
+bindCoff cof act = let ?cof = conjNeCof ?cof cof in F (BindNeCof cof (unF act))
 {-# inline bindCoff #-}
 
-bindCofLazy :: NeCof -> (NCofArg => a) -> NCofArg => BindCofLazy a
-bindCofLazy cof act = let ?cof = conjNeCof ?cof cof in BindCofLazy cof act
+bindCofLazy :: NeCof -> (NCofArg => a) -> NCofArg => BindNeCofLazy a
+bindCofLazy cof act = let ?cof = conjNeCof ?cof cof in BindNeCofLazy cof act
 {-# inline bindCofLazy #-}
 
 bindI :: Name -> (NCofArg => F I -> a) -> NCofArg => BindI a
@@ -138,10 +137,6 @@ bindILazy :: Name -> (NCofArg => F I -> F a) -> NCofArg => F (BindILazy a)
 bindILazy x act = freshI \i -> F (BindILazy x i (unF (act (F (IVar i)))))
 {-# inline bindILazy #-}
 
-bindILazynf :: Name -> (NCofArg => F I -> F a) -> NCofArg => BindILazy a
-bindILazynf x act = unF (bindILazy x act)
-{-# inline bindILazynf #-}
-
 bindIS :: Name -> (SubArg => NCofArg => F I -> F a) -> SubArg => NCofArg => F (BindI a)
 bindIS x act = freshIS \i -> F (BindI x i (unF (act (F (IVar i)))))
 {-# inline bindIS #-}
@@ -150,9 +145,8 @@ bindILazyS :: Name -> (SubArg => NCofArg => F I -> F a) -> SubArg => NCofArg => 
 bindILazyS x act = freshIS \i -> F (BindILazy x i (unF (act (F (IVar i)))))
 {-# inline bindILazyS #-}
 
-bindILazySnf :: Name -> (SubArg => NCofArg => F I -> F a) -> SubArg => NCofArg => BindILazy a
-bindILazySnf x act = unF (bindILazyS x act)
-{-# inline bindILazySnf #-}
+bindILazySnf x act = unF (bindILazyS x act); {-# inline bindILazySnf #-}
+bindILazynf x act = unF (bindILazy x act); {-# inline bindILazynf #-}
 
 vsempty :: F VSys
 vsempty = F (VSNe NSEmpty mempty)
@@ -195,18 +189,17 @@ vshconsS cof i v ~sys = case unF cof of
     VSHNe sys is' -> F (VSHNe (NSHCons (bindCof cof (bindILazySnf i v)) sys) (is <> is'))
 {-# inline vshconsS #-}
 
-evalSysHCom :: SubArg => NCofArg => DomArg => EnvArg => Name -> Sys -> F VSysHCom
-evalSysHCom x = \case
-  SEmpty          -> vshempty
-  SCons cof t sys -> vshconsS (evalCof cof) x (\_ -> evalf t) (evalSysHCom x sys)
-
+evalSysHCom :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom
+evalSysHCom = \case
+  SHEmpty            -> vshempty
+  SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> evalf t) (evalSysHCom sys)
 
 -- Mapping
 ----------------------------------------------------------------------------------------------------
 
-mapBindCof :: NCofArg => BindCof a -> (NCofArg => a -> a) -> BindCof a
-mapBindCof t f = bindCof (t^.binds) (f (t^.body))
-{-# inline mapBindCof #-}
+mapBindNeCof :: NCofArg => BindNeCof a -> (NCofArg => a -> a) -> BindNeCof a
+mapBindNeCof t f = bindCof (t^.binds) (f (t^.body))
+{-# inline mapBindNeCof #-}
 
 mapBindILazy :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> F (BindILazy Val)
 mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ unF i)
@@ -219,7 +212,7 @@ mapNeSysHCom f sys = F (go (unF sys)) where
   go :: NeSysHCom -> NeSysHCom
   go = \case
     NSHEmpty      -> NSHEmpty
-    NSHCons t sys -> NSHCons (mapBindCof t \t -> mapBindILazynf t f) (go sys)
+    NSHCons t sys -> NSHCons (mapBindNeCof t \t -> mapBindILazynf t f) (go sys)
 {-# inline mapNeSysHCom #-}
 
 mapNeSysHComnf f sys = unF (mapNeSysHCom f sys); {-# inline mapNeSysHComnf #-}
@@ -236,113 +229,7 @@ mapVSysHCom f sys = case unF sys of
   VSHNe sys is -> F (VSHNe (mapNeSysHComnf f (F sys)) is)
 {-# inline mapVSysHCom #-}
 
-
 ----------------------------------------------------------------------------------------------------
-
-localVar :: EnvArg => Ix -> Val
-localVar x = go ?env x where
-  go (EDef _ v) 0 = v
-  go (EDef e _) x = go e (x - 1)
-  go _          _ = impossible
-
--- | Apply a closure. Note: *lazy* in argument.
-capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
-capp (NCl _ t) ~u = case t of
-  CEval s env t -> let ?env = EDef env u; ?sub = s in eval t
-
-  CCoePi (frc -> r) (frc -> r') (frc -> a) b (frc -> t) ->
-    let x = frc u in
-    coenf r r' (bindIf "j" \j -> b ∙ unF j ∘ coenf r' j a x) (t ∘ coenf r' r a x)
-
-  CHComPi (frc -> r) (frc -> r') a b sys base ->
-    hcom r r'
-      (b ∘ u)
-      (mapVSysHCom (\i t -> frc t ∘ u) (frc sys))
-      (frc base ∘ u)
-
-
--- | Apply an ivar closure.
-icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
-icapp (NICl _ t) arg = case t of
-  ICEval s env t -> let ?env = env; ?sub = ext s arg in eval t
-
-  ICCoePathP (frc -> r) (frc -> r') a lhs rhs p ->
-    let j = frc arg in
-    com r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
-             (vshcons (ceq j (F I0)) "i" (\i -> lhs ∘ unF i) $
-              vshcons (ceq j (F I1)) "i" (\i -> rhs ∘ unF i) $
-              vshempty)
-             (pappf (frc p) (lhs ∙ unF r') (rhs ∙ unF r') j)
-
-  ICHComPathP (frc -> r) (frc -> r') a lhs rhs sys p ->
-    let farg = frc arg in
-    hcom r r' (a ∘ unF farg)
-      (vshcons (ceq farg (F I0)) "i" (\i -> frc lhs) $
-       vshcons (ceq farg (F I1)) "i" (\i -> frc rhs) $
-       mapVSysHCom (\_ t -> pappf (frc t) lhs rhs farg) (frc sys))
-      (pappf (frc p) lhs rhs farg)
-
--- isEquiv : (A → B) → U
--- isEquiv A B f :=
---     (g^1    : B → A)
---   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
---   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
---   × (coh    : (x^6 : A) →
---             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
---                   (refl B (f x))
---                   (rinv (f x)))
-
---   ICIsEquiv7 b (force -> f) (force -> g)(force -> linv) x ->
---     let ~i   = forceI arg
---         ~fx  = f `app` x
---         ~gfx = g `app` fx  in
---     path b (f `app` papp (linv `appf` x) x gfx i) fx
-
-proj1 :: F Val -> Val
-proj1 t = case unF t of
-  VPair t _ -> t
-  VNe t is  -> VNe (NProj1 t) is
-  _         -> impossible
-{-# inline proj1 #-}
-
-proj1f  t = frc  (proj1 t); {-# inline proj1f  #-}
-proj1fS t = frcS (proj1 t); {-# inline proj1fS #-}
-
-proj2 :: F Val -> Val
-proj2 t = case unF t of
-  VPair _ u -> u
-  VNe t is  -> VNe (NProj2 t) is
-  _         -> impossible
-{-# inline proj2 #-}
-
-proj2f  t = frc  (proj2 t); {-# inline proj2f #-}
-proj2fS t = frcS (proj2 t); {-# inline proj2fS #-}
-
-natElim :: NCofArg => DomArg => Val -> Val -> F Val -> F Val -> Val
-natElim p z s n = case unF n of
-  VZero             -> z
-  VSuc (frc -> n)   -> s ∘ unF n ∙ natElim p z s n
-  VNe n is          -> VNe (NNatElim p z (unF s) n) is
-  _                 -> impossible
-
-natElimf  p z s n = frc  (natElim p z s n); {-# inline natElimf  #-}
-natElimfS p z s n = frcS (natElim p z s n); {-# inline natElimfS #-}
-
--- | Apply a path.
-papp :: NCofArg => DomArg => F Val -> Val -> Val -> F I -> Val
-papp ~t ~u0 ~u1 i = case unF i of
-  I0     -> u0
-  I1     -> u1
-  IVar x -> case unF t of
-    VPLam _ _ t -> t ∙ IVar x
-    VNe t is    -> VNe (NPApp t u0 u1 (IVar x)) (IS.insert x is)
-    _           -> impossible
-{-# inline papp #-}
-
-pappf  ~t ~u0 ~u1 i = frc  (papp t u0 u1 i); {-# inline pappf  #-}
-pappfS ~t ~u0 ~u1 i = frcS (papp t u0 u1 i); {-# inline pappfS #-}
-
---------------------------------------------------------------------------------
 
 infixl 8 ∙
 class Apply a b c a1 a2 | a -> b c a1 a2 where
@@ -392,6 +279,110 @@ instance Force a fa => ApplyF (BindILazy a) I fa (SubAction a) NCofArg DomArg wh
 instance ApplyF NamedIClosure I Val NCofArg DomArg () where
   (∘) x y = frc (x ∙ y); {-# inline (∘) #-}
 
+
+----------------------------------------------------------------------------------------------------
+
+localVar :: EnvArg => Ix -> Val
+localVar x = go ?env x where
+  go (EDef _ v) 0 = v
+  go (EDef e _) x = go e (x - 1)
+  go _          _ = impossible
+
+-- | Apply a closure. Note: *lazy* in argument.
+capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
+capp (NCl _ t) ~u = case t of
+  CEval s env t -> let ?env = EDef env u; ?sub = s in eval t
+
+  CCoePi (frc -> r) (frc -> r') (frc -> a) b (frc -> t) ->
+    let x = frc u in
+    coenf r r' (bindIf "j" \j -> b ∙ unF j ∘ coenf r' j a x) (t ∘ coenf r' r a x)
+
+  CHComPi (frc -> r) (frc -> r') a b sys base ->
+    hcom r r'
+      (b ∘ u)
+      (mapVSysHCom (\i t -> frc t ∘ u) (frc sys))
+      (frc base ∘ u)
+
+
+-- | Apply an ivar closure.
+icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
+icapp (NICl _ t) arg = case t of
+  ICEval s env t ->
+    let ?env = env; ?sub = ext s arg in eval t
+
+  ICCoePathP (frc -> r) (frc -> r') a lhs rhs p ->
+    let j = frc arg in
+    com r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
+             (vshcons (ceq j (F I0)) "i" (\i -> lhs ∘ unF i) $
+              vshcons (ceq j (F I1)) "i" (\i -> rhs ∘ unF i) $
+              vshempty)
+             (pappf (frc p) (lhs ∙ unF r') (rhs ∙ unF r') j)
+
+  ICHComPathP (frc -> r) (frc -> r') a lhs rhs sys p ->
+    let farg = frc arg in
+    hcom r r' (a ∘ unF farg)
+      (vshcons (ceq farg (F I0)) "i" (\i -> frc lhs) $
+       vshcons (ceq farg (F I1)) "i" (\i -> frc rhs) $
+       mapVSysHCom (\_ t -> pappf (frc t) lhs rhs farg) (frc sys))
+      (pappf (frc p) lhs rhs farg)
+
+-- isEquiv : (A → B) → U
+-- isEquiv A B f :=
+--     (g^1    : B → A)
+--   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+--   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
+--   × (coh    : (x^6 : A) →
+--             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+--                   (refl B (f x))
+--                   (rinv (f x)))
+
+--   ICIsEquiv7 b (force -> f) (force -> g)(force -> linv) x ->
+--     let ~i   = forceI arg
+--         ~fx  = f `app` x
+--         ~gfx = g `app` fx  in
+--     path b (f `app` papp (linv `appf` x) x gfx i) fx
+
+proj1 :: F Val -> Val
+proj1 t = case unF t of
+  VPair t _ -> t
+  VNe t is  -> VNe (NProj1 t) is
+  _         -> impossible
+{-# inline proj1 #-}
+
+proj1f  t = frc  (proj1 t); {-# inline proj1f  #-}
+
+proj2 :: F Val -> Val
+proj2 t = case unF t of
+  VPair _ u -> u
+  VNe t is  -> VNe (NProj2 t) is
+  _         -> impossible
+{-# inline proj2 #-}
+
+proj2f t = frc (proj2 t); {-# inline proj2f #-}
+
+natElim :: NCofArg => DomArg => Val -> Val -> F Val -> F Val -> Val
+natElim p z s n = case unF n of
+  VZero           -> z
+  VSuc (frc -> n) -> s ∘ unF n ∙ natElim p z s n
+  VNe n is        -> VNe (NNatElim p z (unF s) n) is
+  _               -> impossible
+
+natElimf  p z s n = frc  (natElim p z s n); {-# inline natElimf  #-}
+
+-- | Apply a path.
+papp :: NCofArg => DomArg => F Val -> Val -> Val -> F I -> Val
+papp ~t ~u0 ~u1 i = case unF i of
+  I0     -> u0
+  I1     -> u1
+  IVar x -> case unF t of
+    VPLam _ _ t -> t ∙ IVar x
+    VNe t is    -> VNe (NPApp t u0 u1 (IVar x)) (IS.insert x is)
+    _           -> impossible
+{-# inline papp #-}
+
+pappf  ~t ~u0 ~u1 i = frc  (papp t u0 u1 i); {-# inline pappf  #-}
+
+
 --------------------------------------------------------------------------------
 
 -- assumption: r /= r'
@@ -433,8 +424,8 @@ coednf r r' a t = unF (coed r r' a t); {-# inline coednf #-}
 
 coe :: NCofArg => DomArg => F I -> F I -> F (BindI Val) -> F Val -> F Val
 coe r r' ~a t
-  | unF r == unF r' = t
-  | True            = coed r r' a t
+  | r == r' = t
+  | True    = coed r r' a t
 {-# inline coe #-}
 
 coenf r r' a t = unF (coe r r' a t); {-# inline coenf #-}
@@ -452,9 +443,9 @@ comdnnf r r' ~a sys ~b = unF (comdn r r' a sys b); {-# inline comdnnf #-}
 
 com :: NCofArg => DomArg => F I -> F I -> F (BindI Val) -> F VSysHCom -> F Val -> Val
 com r r' ~a ~sys ~b
-  | unF r == unF r'            = unF b
-  | VSHTotal v      <- unF sys = v ∙ unF r'
-  | VSHNe nsys is   <- unF sys = comdnnf r r' a (F (nsys, is)) b
+  | r == r'                  = unF b
+  | VSHTotal v    <- unF sys = v ∙ unF r'
+  | VSHNe nsys is <- unF sys = comdnnf r r' a (F (nsys, is)) b
 {-# inline com #-}
 
 storeSysHCom :: F (NeSysHCom, IS.IVarSet) -> NeSysHComSub
@@ -469,13 +460,18 @@ hcomdn r r' a ts base = case unF a of
 
   VSg a b ->
     F $ VPair
-      (hcomdnnf r r' (frc a)
-                     (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
-                     (proj1f base))
-      (comdnnf r r' (bindIf "i" \i -> hcomn r i (frc a) (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
-                                                        (proj1f base))
-                    (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
-                    (proj2f base))
+      (hcomdnnf r r'
+        (frc a)
+        (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
+        (proj1f base))
+      (comdnnf r r'
+        (bindIf "i" \i ->
+          hcomn r i
+            (frc a)
+            (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
+            (proj1f base))
+        (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
+        (proj2f base))
 
   VNat -> uf
 
@@ -499,21 +495,20 @@ hcomdn r r' a ts base = case unF a of
 -- | HCom with nothing known about semantic arguments.
 hcom :: NCofArg => DomArg => F I -> F I -> F Val -> F VSysHCom -> F Val -> Val
 hcom r r' ~a ~t ~b
-  | unF r == unF r'          = unF b
-  | VSHTotal v      <- unF t = v ∙ unF r'
-  | VSHNe nsys is   <- unF t = hcomdnnf r r' a (F (nsys, is)) b
+  | r == r'                = unF b
+  | VSHTotal v    <- unF t = v ∙ unF r'
+  | VSHNe nsys is <- unF t = hcomdnnf r r' a (F (nsys, is)) b
 {-# inline hcom #-}
 
 -- | HCom with neutral system input.
 hcomn :: NCofArg => DomArg => F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> F Val
 hcomn r r' ~a ~sys ~b
-  | unF r == unF r' = b
-  | True            = hcomdn r r' a sys b
+  | r == r' = b
+  | True    = hcomdn r r' a sys b
 {-# inline hcomn #-}
 
 hcomdnnf r r' a sys base = unF (hcomdn r r' a sys base); {-# inline hcomdnnf #-}
 hcomf r r' ~a ~t ~b = frc (hcom r r' a t b); {-# inline hcomf  #-}
-hcomfS r r' ~a ~t ~b = frcS (hcom r r' a t b); {-# inline hcomfS  #-}
 
 glueTy :: NCofArg => DomArg => Val -> F VSys -> Val
 glueTy a sys = case unF sys of
@@ -522,7 +517,6 @@ glueTy a sys = case unF sys of
 {-# inline glueTy #-}
 
 glueTyf a sys = frc (glueTy a sys); {-# inline glueTyf #-}
-glueTyfS a sys = frcS (glueTy a sys); {-# inline glueTyfS #-}
 
 glue :: Val -> F VSys -> Val
 glue t sys = case unF sys of
@@ -531,7 +525,6 @@ glue t sys = case unF sys of
 {-# inline glue #-}
 
 gluef t sys = frc (glue t sys); {-# inline gluef #-}
-gluefS t sys = frcS (glue t sys); {-# inline gluefS #-}
 
 unglue :: NCofArg => DomArg => Val -> F VSys -> Val
 unglue t sys = case unF sys of
@@ -540,33 +533,32 @@ unglue t sys = case unF sys of
 {-# inline unglue #-}
 
 ungluef t sys = frc (unglue t sys); {-# inline ungluef #-}
-ungluefS t sys = frcS (unglue t sys); {-# inline ungluefS #-}
 
 eval :: SubArg => NCofArg => DomArg => EnvArg => Tm -> Val
 eval = \case
-  TopVar _ v        -> coerce v
-  LocalVar x        -> localVar x
-  Let x _ t u       -> define (eval t) (eval u)
-  Pi x a b          -> VPi (eval a) (NCl x (CEval ?sub ?env b))
-  App t u           -> evalf t ∙ eval u
-  Lam x t           -> VLam (NCl x (CEval ?sub ?env t))
-  Sg x a b          -> VSg (eval a) (NCl x (CEval ?sub ?env b))
-  Pair t u          -> VPair (eval t) (eval u)
-  Proj1 t           -> proj1 (evalf t)
-  Proj2 t           -> proj2 (evalf t)
-  U                 -> VU
-  PathP x a t u     -> VPathP (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
-  PApp t u0 u1 i    -> papp (evalf t) (eval u0) (eval u1) (evalI i)
-  PLam l r x t      -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
-  Coe r r' x a t    -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
-  HCom r r' x a t b -> hcom (evalI r) (evalI r') (evalf a) (evalSysHCom x t) (evalf b)
-  GlueTy a sys      -> glueTy (eval a) (evalSys sys)
-  Glue t sys        -> glue (eval t) (evalSys sys)
-  Unglue t sys      -> unglue (eval t) (evalSys sys)
-  Nat               -> VNat
-  Zero              -> VZero
-  Suc t             -> VSuc (eval t)
-  NatElim p z s n   -> natElim (eval p) (eval z) (evalf s) (evalf n)
+  TopVar _ v      -> coerce v
+  LocalVar x      -> localVar x
+  Let x _ t u     -> define (eval t) (eval u)
+  Pi x a b        -> VPi (eval a) (NCl x (CEval ?sub ?env b))
+  App t u         -> evalf t ∙ eval u
+  Lam x t         -> VLam (NCl x (CEval ?sub ?env t))
+  Sg x a b        -> VSg (eval a) (NCl x (CEval ?sub ?env b))
+  Pair t u        -> VPair (eval t) (eval u)
+  Proj1 t         -> proj1 (evalf t)
+  Proj2 t         -> proj2 (evalf t)
+  U               -> VU
+  PathP x a t u   -> VPathP (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
+  PApp t u0 u1 i  -> papp (evalf t) (eval u0) (eval u1) (evalI i)
+  PLam l r x t    -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
+  Coe r r' x a t  -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
+  HCom r r' a t b -> hcom (evalI r) (evalI r') (evalf a) (evalSysHCom t) (evalf b)
+  GlueTy a sys    -> glueTy (eval a) (evalSys sys)
+  Glue t sys      -> glue (eval t) (evalSys sys)
+  Unglue t sys    -> unglue (eval t) (evalSys sys)
+  Nat             -> VNat
+  Zero            -> VZero
+  Suc t           -> VSuc (eval t)
+  NatElim p z s n -> natElim (eval p) (eval z) (evalf s) (evalf n)
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)
@@ -599,7 +591,7 @@ instance Force Val Val where
     VSub v s                           -> let ?sub = sub s in frcS v
     VNe t is         | isUnblockedS is -> frcS t
                      | True            -> F (VNe (sub t) (sub is))
-    VGlueTy a sys is | isUnblockedS is -> glueTyfS (sub a) (frcS sys)
+    VGlueTy a sys is | isUnblockedS is -> glueTyf (sub a) (frcS sys)
                      | True            -> F (VGlueTy (sub a) (sub sys) (sub is))
 
     VPi a b      -> F (VPi (sub a) (sub b))
@@ -630,15 +622,15 @@ instance Force Ne Val where
   frcS = \case
     t@NLocalVar{}     -> F (VNe t mempty)
     NSub n s          -> let ?sub = sub s in frcS n
-    NApp t u          -> frcS (frcS t ∙ u)
-    NPApp t l r i     -> pappfS (frcS t) l r (frcS i)
-    NProj1 t          -> proj1fS (frcS t)
-    NProj2 t          -> proj2fS (frcS t)
+    NApp t u          -> frcS t ∘ sub u
+    NPApp t l r i     -> pappf (frcS t) (sub l) (sub r) (frcS i)
+    NProj1 t          -> proj1f (frcS t)
+    NProj2 t          -> proj2f (frcS t)
     NCoe r r' a t     -> coe (frcS r) (frcS r') (frcS a) (frcS t)
-    NHCom r r' a ts t -> hcomfS (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t)
-    NUnglue t sys     -> ungluefS t (frcS sys)
-    NGlue t sys       -> gluefS t (frcS sys)
-    NNatElim p z s n  -> natElimfS p z (frcS s) (frcS n)
+    NHCom r r' a ts t -> hcomf (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t)
+    NUnglue t sys     -> ungluef (sub t) (frcS sys)
+    NGlue t sys       -> gluef (sub t) (frcS sys)
+    NNatElim p z s n  -> natElimf (sub p) (sub z) (frcS s) (frcS n)
 
 instance Force NeSys VSys where
   frc = \case
@@ -666,15 +658,15 @@ instance Force a fa => Force (BindI a) (BindI fa) where
 
   -- TODO: review
   frc (BindI x i a) =
-    let ?cof = setDom (i + 1) (setCod i ?cof) `ext` IVar i in
+    let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
     F (BindI x i (unF (frc a)))
   {-# inline frc #-}
 
   -- TODO: review
   frcS (BindI x i a) =
     let fresh = dom ?cof in
-    let ?sub  = mapDom (+1) (setCod i ?sub) `ext` IVar fresh in
-    let ?cof  = mapDom (+1) ?cof `ext` IVar fresh in
+    let ?sub  = setCod i ?sub `ext` IVar fresh in
+    let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
     F (BindI x fresh (unF (frcS a)))
   {-# inline frcS #-}
 
@@ -711,68 +703,138 @@ class Quote a b | a -> b where
   quoteS :: SubArg => NCofArg => DomArg => a -> b
 
 instance Quote I I where
-  quote  = unF . frc
-  quoteS = unF . frcS
+  quote  = unF . frc  ; {-# inline quote #-}
+  quoteS = unF . frcS ; {-# inline quoteS #-}
 
 instance Quote Ne Tm where
-  quote = uf
-  quoteS = uf
+  quote = \case
+    NLocalVar x       -> LocalVar (lvlToIx ?dom x)
+    NSub n s          -> let ?sub = s in quoteS n
+    NApp t u          -> App (quote t) (quote u)
+    NPApp t l r i     -> PApp (quote t) (quote l) (quote r) (quote i)
+    NProj1 t          -> Proj1 (quote t)
+    NProj2 t          -> Proj2 (quote t)
+    NCoe r r' a t     -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+    NHCom r r' a ts t -> HCom (quote r) (quote r') (quote a) (quote ts) (quote t)
+    NUnglue t sys     -> Unglue (quote t) (quote sys)
+    NGlue t sys       -> Glue (quote t) (quote sys)
+    NNatElim p z s n  -> NatElim (quote p) (quote z) (quote s) (quote n)
 
+  quoteS = \case
+    NLocalVar x       -> LocalVar (lvlToIx ?dom x)
+    NSub n s          -> let ?sub = sub s in quoteS n
+    NApp t u          -> App (quoteS t) (quoteS u)
+    NPApp t l r i     -> PApp (quoteS t) (quoteS l) (quoteS r) (quoteS i)
+    NProj1 t          -> Proj1 (quoteS t)
+    NProj2 t          -> Proj2 (quoteS t)
+    NCoe r r' a t     -> Coe (quoteS r) (quoteS r') (a^.name) (quoteS a) (quoteS t)
+    NHCom r r' a ts t -> HCom (quoteS r) (quoteS r') (quoteS a) (quoteS ts) (quoteS t)
+    NUnglue t sys     -> Unglue (quoteS t) (quoteS sys)
+    NGlue t sys       -> Glue (quoteS t) (quoteS sys)
+    NNatElim p z s n  -> NatElim (quoteS p) (quoteS z) (quoteS s) (quoteS n)
 
--- quoteNe :: IDomArg => NCofArg => DomArg => Ne -> Tm
--- quoteNe n = case unSubNe n of
---   NLocalVar x          -> LocalVar (lvlToIx ?dom x)
---   NSub{}               -> impossible
---   NApp t u             -> App (quoteNe t) (quote u)
---   NPApp n l r i        -> PApp (quoteNe n) (quote l) (quote r) (quoteI i)
---   NProj1 t             -> Proj1 (quoteNe t)
---   NProj2 t             -> Proj2 (quoteNe t)
---   -- NCoe r r' x a t      -> Coe (quoteI r) (quoteI r') x (bindI \_ -> quote a) (quote t)
---   -- NHCom r r' x a sys t -> HCom (quoteI r) (quoteI r') x (quote a) (quoteSys sys) (quote t)
---   NUnglue a sys        -> Unglue (quote a) (quoteSys sys)
---   NGlue a sys          -> Glue (quote a) (quoteSys sys)
---   NNatElim p z s n     -> NatElim (quote p) (quote z) (quote s) (quoteNe n)
+instance Quote Val Tm where
+  quote t = case unF (frc t) of
+    VSub{}           -> impossible
+    VNe n _          -> quote n
+    VGlueTy a sys _  -> GlueTy (quote a) (quote sys)
+    VPi a b          -> Pi (b^.name) (quote a) (quote b)
+    VLam t           -> Lam (t^.name) (quote t)
+    VPathP a lhs rhs -> PathP (a^.name) (quote a) (quote lhs) (quote rhs)
+    VPLam lhs rhs t  -> PLam (quote lhs) (quote rhs) (t^.name) (quote t)
+    VSg a b          -> Sg (b^.name) (quote a) (quote b)
+    VPair t u        -> Pair (quote t) (quote u)
+    VU               -> U
+    VNat             -> Nat
+    VZero            -> Zero
+    VSuc t           -> Suc (quote t)
 
--- quoteNeCof :: IDomArg => NCofArg => NeCof -> Cof -> Cof
--- quoteNeCof ncof acc = case ncof of
---   NCEq i j    -> CAnd (CofEq i j) acc
---   NCAnd c1 c2 -> quoteNeCof c1 (quoteNeCof c2 acc)
+  quoteS t = case unF (frcS t) of
+    VSub{}           -> impossible
+    VNe n _          -> quoteS n
+    VGlueTy a sys _  -> GlueTy (quoteS a) (quoteS sys)
+    VPi a b          -> Pi (b^.name) (quoteS a) (quoteS b)
+    VLam t           -> Lam (t^.name) (quoteS t)
+    VPathP a lhs rhs -> PathP (a^.name) (quoteS a) (quoteS lhs) (quoteS rhs)
+    VPLam lhs rhs t  -> PLam (quoteS lhs) (quoteS rhs) (t^.name) (quoteS t)
+    VSg a b          -> Sg (b^.name) (quoteS a) (quoteS b)
+    VPair t u        -> Pair (quoteS t) (quoteS u)
+    VU               -> U
+    VNat             -> Nat
+    VZero            -> Zero
+    VSuc t           -> Suc (quoteS t)
 
--- quoteCof :: IDomArg => NCofArg => F VCof -> Cof
--- quoteCof cof = case unF cof of
---   VCTrue      -> CTrue
---   VCFalse     -> impossible
---   VCNe ncof _ -> quoteNeCof ncof CTrue
+instance Quote (BindNeCofLazy Val) Tm where
+  quote  t = let ?cof = conjNeCof ?cof (t^.binds) in quote t ; {-# inline quote #-}
+  quoteS t = let ?cof = conjVCof ?cof (frcS (t^.binds)) in quoteS t; {-# inline quoteS #-}
 
--- quoteSys :: IDomArg => NCofArg => DomArg => NSys VCof -> Sys
--- quoteSys = \case
---   NSEmpty ->
---     SEmpty
---   NSCons (forceCof -> cof) t sys ->
---     SCons (quoteCof cof) (bindCof cof (bindI \_ -> quote t)) (quoteSys sys)
+instance Quote a b => Quote (BindNeCof a) b where
+  quote  t = let ?cof = conjNeCof ?cof (t^.binds) in quote t ; {-# inline quote #-}
+  quoteS t = let ?cof = conjVCof ?cof (frcS (t^.binds)) in quoteS t; {-# inline quoteS #-}
 
--- quoteCl :: IDomArg => NCofArg => DomArg => Closure -> Tm
--- quoteCl t = bind \v -> quote (capp t v)
--- {-# inline quoteCl #-}
+instance Quote NeCof Cof where
+  quote c = go c CTrue where
+    go c acc = case c of
+      NCEq i j    -> CAnd (CofEq (quote i) (quote j)) acc
+      NCAnd c1 c2 -> go c1 (go c2 acc)
 
--- quoteICl :: IDomArg => NCofArg => DomArg => IClosure -> Tm
--- quoteICl t = bindI \(IVar -> i) -> quote (icapp t i)
--- {-# inline quoteICl #-}
+  quoteS c = go c CTrue where
+    go c acc = case c of
+      NCEq i j    -> CAnd (CofEq (quoteS i) (quoteS j)) acc
+      NCAnd c1 c2 -> go c1 (go c2 acc)
 
--- -- TODO: optimized quote' would take an extra subarg
--- quote :: IDomArg => NCofArg => DomArg => Val -> Tm
--- quote v = case unF (force v) of
---   VSub{}         -> impossible
---   VNe n _        -> quoteNe n
---   VGlueTy a sys  -> GlueTy (quote a) (quoteSys (_nsys sys))
---   VPi x a b      -> Pi x (quote a) (quoteCl b)
---   VLam x t       -> Lam x (quoteCl t)
---   VPathP x a t u -> PathP x (quoteICl a) (quote t) (quote u)
---   VPLam l r x t  -> PLam (quote l) (quote r) x (quoteICl t)
---   VSg x a b      -> Sg x (quote a) (quoteCl b)
---   VPair t u      -> Pair (quote t) (quote u)
---   VU             -> U
---   VNat           -> Nat
---   VZero          -> Zero
---   VSuc n         -> Suc (quote n)
--- -}
+instance Quote (BindI Val) Tm where
+  quote  t = freshI  \i -> quote  (t ∙ IVar i); {-# inline quote #-}
+  quoteS t = freshIS \i -> quoteS (t ∙ IVar i); {-# inline quoteS #-}
+
+instance Quote (BindILazy Val) Tm where
+  quote  t = freshI  \i -> quote  (t ∙ IVar i); {-# inline quote #-}
+  quoteS t = freshIS \i -> quoteS (t ∙ IVar i); {-# inline quoteS #-}
+
+instance Quote NeSys Sys where
+  quote = \case
+    NSEmpty      -> SEmpty
+    NSCons t sys -> SCons (quote (t^.binds)) (quote t) (quote sys)
+
+  quoteS = \case
+    NSEmpty      -> SEmpty
+    NSCons t sys -> SCons (quoteS (t^.binds)) (quoteS t) (quoteS sys)
+
+instance Quote NeSysHCom SysHCom where
+  quote = \case
+    NSHEmpty      -> SHEmpty
+    NSHCons t sys -> SHCons (quote (t^.binds)) (t^.body.name) (quote t) (quote sys)
+
+  quoteS = \case
+    NSHEmpty      -> SHEmpty
+    NSHCons t sys -> SHCons (quoteS (t^.binds)) (t^.body.name) (quoteS t) (quoteS sys)
+
+instance Quote NeSysHComSub SysHCom where
+  quote = \case
+    NSHSNe sys    -> quote sys
+    NSHSSub sys s -> let ?sub = s in quoteS sys
+  {-# inline quote #-}
+
+  quoteS = \case
+    NSHSNe sys    -> quoteS sys
+    NSHSSub sys s -> let ?sub = sub s in quoteS sys
+  {-# inline quoteS #-}
+
+instance Quote NeSysSub Sys where
+  quote = \case
+    NSSNe sys    -> quote sys
+    NSSSub sys s -> let ?sub = s in quoteS sys
+  {-# inline quote #-}
+
+  quoteS = \case
+    NSSNe sys    -> quoteS sys
+    NSSSub sys s -> let ?sub = sub s in quoteS sys
+  {-# inline quoteS #-}
+
+instance Quote NamedClosure Tm where
+  quote  t = fresh \x -> quote (t ∙ x); {-# inline quote #-}
+  quoteS t = fresh \x -> quoteS (t ∙ x); {-# inline quoteS #-}
+
+instance Quote NamedIClosure Tm where
+  quote  t = freshI  \i -> quote  (t ∙ IVar i); {-# inline quote #-}
+  quoteS t = freshIS \i -> quoteS (t ∙ IVar i); {-# inline quoteS #-}

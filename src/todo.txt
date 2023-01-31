@@ -1,5 +1,7 @@
 
 - Separate binders in each hcom component in core and presyntax
+  - Syntactic binder type? For I, BindI can be reused
+  - For Cof, we need another one
 - Quote without unSubNe
 - Conversion without unSubNe
 - Adjust elaboration

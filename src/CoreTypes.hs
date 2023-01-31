@@ -28,12 +28,12 @@ data Tm
 
   | U
 
-  | PathP Name Ty Tm Tm       -- PathP i.A x y
-  | PApp ~Tm ~Tm Tm I         -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
-  | PLam ~Tm ~Tm Name Tm      -- endpoints, body
+  | PathP Name Ty Tm Tm    -- PathP i.A x y
+  | PApp ~Tm ~Tm Tm I      -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
+  | PLam ~Tm ~Tm Name Tm   -- endpoints, body
 
-  | Coe I I Name Ty Tm        -- coe r r' i.A t
-  | HCom I I Name ~Ty Sys Tm  -- hcom r r' i A [α → t] u
+  | Coe I I Name Ty Tm      -- coe r r' i.A t
+  | HCom I I Ty SysHCom Tm  -- hcom r r' i A [α → t] u
 
   -- we switch the field orders here compared to the papers, because
   -- this one is the sensible "dependency" order
@@ -56,6 +56,9 @@ data Cof = CTrue | CAnd CofEq Cof
   deriving Show
 
 data Sys = SEmpty | SCons Cof Tm Sys
+  deriving Show
+
+data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
   deriving Show
 
 
@@ -90,6 +93,8 @@ data Env
 
 type EnvArg = (?env :: Env)
 
+--------------------------------------------------------------------------------
+
 data BindI a = BindI {
     bindIName  :: Name
   , bindIBinds :: IVar
@@ -103,18 +108,30 @@ data BindILazy a = BindILazy {
   deriving Show
 
 data BindCof a = BindCof {
-    bindCofBinds :: NeCof
+    bindCofBinds :: Cof
   , bindCofBody  :: a}
   deriving Show
 
 data BindCofLazy a = BindCofLazy {
-    bindCofLazyBinds :: NeCof
+    bindCofLazyBinds :: Cof
   , bindCofLazyBody  :: ~a}
   deriving Show
 
+data BindNeCof a = BindNeCof {
+    bindNeCofBinds :: NeCof
+  , bindNeCofBody  :: a}
+  deriving Show
+
+data BindNeCofLazy a = BindNeCofLazy {
+    bindNeCofLazyBinds :: NeCof
+  , bindNeCofLazyBody  :: ~a}
+  deriving Show
+
+--------------------------------------------------------------------------------
+
 data NeSys
   = NSEmpty
-  | NSCons (BindCofLazy Val) NeSys
+  | NSCons (BindNeCofLazy Val) NeSys
   deriving Show
 
 data NeSysSub
@@ -124,7 +141,7 @@ data NeSysSub
 
 data NeSysHCom
   = NSHEmpty
-  | NSHCons (BindCof (BindILazy Val)) NeSysHCom
+  | NSHCons (BindNeCof (BindILazy Val)) NeSysHCom
   deriving Show
 
 data NeSysHComSub
@@ -190,7 +207,7 @@ vVar x = VNe (NLocalVar x) mempty
 {-# inline vVar #-}
 
 newtype F a = F {unF :: a}
-  deriving (SubAction, Show) via a
+  deriving (SubAction, Show, Eq) via a
 
 type DomArg = (?dom :: Lvl)    -- fresh LocalVar
 
@@ -321,6 +338,13 @@ instance SubAction a => SubAction (BindI a) where
     BindI x fresh (sub a)
   {-# inline sub #-}
 
+instance SubAction a => SubAction (BindILazy a) where
+  sub (BindILazy x i a) =
+    let fresh = dom ?sub in
+    let ?sub  = setCod i ?sub `ext` IVar fresh in
+    BindILazy x fresh (sub a)
+  {-# inline sub #-}
+
 instance SubAction NamedClosure where
   sub (NCl x cl) = NCl x (sub cl)
   {-# inline sub #-}
@@ -380,7 +404,7 @@ instance SubAction IClosure where
 
 makeFields ''BindI
 makeFields ''BindILazy
-makeFields ''BindCof
-makeFields ''BindCofLazy
+makeFields ''BindNeCof
+makeFields ''BindNeCofLazy
 makeFields ''NamedClosure
 makeFields ''NamedIClosure

@@ -70,6 +70,11 @@ setDom :: IVar -> Sub -> Sub
 setDom i (Sub n) = Sub (n .&. 1152921504606846975 .|. unsafeShiftL (coerce i) 60)
 {-# inline setDom #-}
 
+setDomCod :: IVar -> IVar -> Sub -> Sub
+setDomCod d c (Sub n) = Sub (
+  n .&. 72057594037927935 .|. unsafeShiftL (coerce d) 60 .|. unsafeShiftL (coerce c) 56)
+{-# inline setDomCod #-}
+
 lookupSub# :: Word -> Sub -> I
 lookupSub# w (Sub s) = I (unsafeShiftR s (unsafeShiftL (w2i w) 2) .&. 15)
 {-# inline lookupSub# #-}
@@ -103,7 +108,7 @@ subFromList is =
   in foldl' ext (emptySub dom) is
 
 instance Show Sub where
-  show = show . subToList
+  show s = show (dom s, cod s, subToList s)
 
 mapDom :: (IVar -> IVar) -> Sub -> Sub
 mapDom f s = setDom (f (dom s)) s
