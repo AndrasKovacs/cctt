@@ -108,45 +108,25 @@ data BindILazy a = BindILazy {
   deriving Show
 
 data BindCof a = BindCof {
-    bindCofBinds :: Cof
+    bindCofBinds :: NeCof
   , bindCofBody  :: a}
   deriving Show
 
 data BindCofLazy a = BindCofLazy {
-    bindCofLazyBinds :: Cof
+    bindCofLazyBinds :: NeCof
   , bindCofLazyBody  :: ~a}
-  deriving Show
-
-data BindNeCof a = BindNeCof {
-    bindNeCofBinds :: NeCof
-  , bindNeCofBody  :: a}
-  deriving Show
-
-data BindNeCofLazy a = BindNeCofLazy {
-    bindNeCofLazyBinds :: NeCof
-  , bindNeCofLazyBody  :: ~a}
   deriving Show
 
 --------------------------------------------------------------------------------
 
 data NeSys
   = NSEmpty
-  | NSCons (BindNeCofLazy Val) NeSys
-  deriving Show
-
-data NeSysSub
-  = NSSNe NeSys
-  | NSSSub NeSys Sub
+  | NSCons (BindCofLazy Val) NeSys
   deriving Show
 
 data NeSysHCom
   = NSHEmpty
-  | NSHCons (BindNeCof (BindILazy Val)) NeSysHCom
-  deriving Show
-
-data NeSysHComSub
-  = NSHSNe NeSysHCom
-  | NSHSSub NeSysHCom Sub
+  | NSHCons (BindCof (BindILazy Val)) NeSysHCom
   deriving Show
 
 -- TODO: unbox
@@ -170,7 +150,7 @@ data Val
   -- also neutral, but they're handled separately, because we have to match on
   -- them in coe/hcom.
   | VNe Ne IS.IVarSet
-  | VGlueTy VTy NeSysSub IS.IVarSet
+  | VGlueTy VTy NeSys IS.IVarSet
 
   -- canonicals
   | VPi VTy NamedClosure
@@ -194,9 +174,9 @@ data Ne
   | NProj1 Ne
   | NProj2 Ne
   | NCoe I I (BindI Val) Val
-  | NHCom I I VTy NeSysHComSub Val
-  | NUnglue Val NeSysSub
-  | NGlue Val NeSysSub
+  | NHCom I I VTy NeSysHCom Val
+  | NUnglue Val NeSys
+  | NGlue Val NeSys
   | NNatElim Val Val Val Ne
   deriving Show
 
@@ -222,7 +202,7 @@ data Closure
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
 
   -- ^ Body of function hcom.
-  | CHComPi I I VTy NamedClosure NeSysHComSub Val
+  | CHComPi I I VTy NamedClosure NeSysHCom Val
 
 --   | CConst Val
 
@@ -268,7 +248,7 @@ data Closure
 data IClosure
   = ICEval Sub Env Tm
   | ICCoePathP I I (BindI NamedIClosure) (BindI Val) (BindI Val) Val
-  | ICHComPathP I I NamedIClosure Val Val NeSysHComSub Val
+  | ICHComPathP I I NamedIClosure Val Val NeSysHCom Val
   -- | ICConst Val
   -- | ICIsEquiv7 Val Val Val Val Val
   deriving Show
@@ -306,25 +286,38 @@ unpackBindI3 (BindI x i (a, b, c)) = (BindI x i a, BindI x i b, BindI x i c)
 -- Substitution
 ----------------------------------------------------------------------------------------------------
 
+instance SubAction NeCof where
+  sub = \case
+    NCEq i j    -> NCEq (sub i) (sub j)
+    NCAnd c1 c2 -> NCAnd (sub c1) (sub c2)
+
+instance SubAction a => SubAction (BindCofLazy a) where
+  sub (BindCofLazy cof a) = BindCofLazy (sub cof) (sub a); {-# inline sub #-}
+
+instance SubAction a => SubAction (BindCof a) where
+  sub (BindCof cof a) = BindCof (sub cof) (sub a); {-# inline sub #-}
+
 instance SubAction Val where
   sub = \case
     VSub v s' -> VSub v (sub s')
     v         -> VSub v ?sub
+  {-# inline sub #-}
 
 instance SubAction Ne where
-  sub n = case n of
+  sub = \case
     NSub n s' -> NSub n (sub s')
     n         -> NSub n ?sub
+  {-# inline sub #-}
 
-instance SubAction NeSysSub where
+instance SubAction NeSys where
   sub = \case
-    NSSNe sys    -> NSSSub sys ?sub
-    NSSSub sys s -> NSSSub sys (sub s)
+    NSEmpty      -> NSEmpty
+    NSCons t sys -> NSCons (sub t) (sub sys)
 
-instance SubAction NeSysHComSub where
+instance SubAction NeSysHCom where
   sub = \case
-    NSHSNe sys    -> NSHSSub sys ?sub
-    NSHSSub sys s -> NSHSSub sys (sub s)
+    NSHEmpty      -> NSHEmpty
+    NSHCons t sys -> NSHCons (sub t) (sub sys)
 
 instance SubAction Env where
   sub e = case e of
@@ -335,14 +328,14 @@ instance SubAction a => SubAction (BindI a) where
   sub (BindI x i a) =
     let fresh = dom ?sub in
     let ?sub  = setCod i ?sub `ext` IVar fresh in
-    BindI x fresh (sub a)
+    seq ?sub (BindI x fresh (sub a))
   {-# inline sub #-}
 
 instance SubAction a => SubAction (BindILazy a) where
   sub (BindILazy x i a) =
     let fresh = dom ?sub in
     let ?sub  = setCod i ?sub `ext` IVar fresh in
-    BindILazy x fresh (sub a)
+    seq ?sub (BindILazy x fresh (sub a))
   {-# inline sub #-}
 
 instance SubAction NamedClosure where
@@ -404,7 +397,7 @@ instance SubAction IClosure where
 
 makeFields ''BindI
 makeFields ''BindILazy
-makeFields ''BindNeCof
-makeFields ''BindNeCofLazy
+makeFields ''BindCof
+makeFields ''BindCofLazy
 makeFields ''NamedClosure
 makeFields ''NamedIClosure
