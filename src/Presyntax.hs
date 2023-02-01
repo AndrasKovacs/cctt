@@ -20,14 +20,14 @@ data Tm
   | Proj1 Tm
   | Proj2 Tm
   | U
-  | Path Tm Tm                           -- PathP _   x y
-  | PathP Name Ty Tm Tm                  -- PathP i.A x y
+  | Path Tm Tm                        -- PathP _   x y
+  | PathP Name Ty Tm Tm               -- PathP i.A x y
 
-  | Coe Tm Tm Name Ty Tm                 -- coe r r' i.A t
-  | HCom Tm Tm Name (Maybe Ty) System Tm -- hcom r r' i.A [α → t] u
+  | Coe Tm Tm Name Ty Tm              -- coe r r' i.A t
+  | HCom Tm Tm (Maybe Ty) SysHCom Tm  -- hcom r r' A [α x. t] u
 
-  | GlueTy Ty System                     -- Glue A [α ↦ B]      (B : Σ X (X ≃ A))
-  | GlueTm Tm System                     -- glue a [α ↦ t]
+  | GlueTy Ty Sys                     -- Glue A [α. B]      (B : Σ X (X ≃ A))
+  | GlueTm Tm Sys                     -- glue a [α. t]
   | Unglue Tm
 
   | Nat
@@ -42,9 +42,11 @@ data CofEq = CofEq Tm Tm
 data Cof = CTrue | CAnd {-# unpack #-} CofEq Cof
   deriving Show
 
-data System = SEmpty | SCons Cof Tm System
+data Sys = SEmpty | SCons Cof Tm Sys
   deriving Show
 
-data Top = TDef Name (Maybe Ty) Tm Top
-         | TEmpty
+data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
+  deriving Show
+
+data Top = TDef Name (Maybe Ty) Tm Top | TEmpty
   deriving Show

@@ -60,9 +60,9 @@ instance Conv Ne where
     (NGlue a sys      , NGlue a' sys'        ) -> conv a a' && conv sys sys'
     (NNatElim p z s n , NNatElim p' z' s' n' ) -> conv p p' && conv z z' && conv s s' && conv n n'
 
-    (NSub t s , t'        ) -> impossible
-    (t        , NSub t' s ) -> impossible
-    _                       -> False
+    (NSub{} , _      ) -> impossible
+    (t      , NSub{} ) -> impossible
+    _                  -> False
 
 instance Conv NeCof where
   conv c c' = case (c, c') of
@@ -106,3 +106,11 @@ instance Conv NamedClosure where
 
 instance Conv NamedIClosure where
   conv t t' = freshI \(IVar -> i) -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
+
+instance Conv VCof where
+  conv c c' = case (c, c') of
+    (VCTrue   , VCTrue    ) -> True
+    (VCFalse  , VCFalse   ) -> True
+    (VCNe c _ , VCNe c' _ ) -> conv c c'
+    _                       -> False
+  {-# inline conv #-}

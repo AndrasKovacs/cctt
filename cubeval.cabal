@@ -49,6 +49,7 @@ executable cubeval
       Parser
       Presyntax
       Pretty
+      Quotation
       Substitution
   hs-source-dirs:
       src

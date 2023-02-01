@@ -101,13 +101,31 @@ cofEq = CofEq <$!> int <*!> (char '=' *> int)
 cof :: Parser Cof
 cof = CAnd <$!> cofEq <*!> ((char ',' *> cof) <|> pure CTrue)
 
-goSys :: Parser System
-goSys =
-      (SCons <$!> (cof <* arrow) <*!> (tm <* char ';') <*!> goSys)
+goSys' :: Parser Sys
+goSys' =
+      (SCons <$!> (char ';' *> cof <* arrow) <*!> tm <*!> goSys)
   <|> pure SEmpty
 
-sys :: Parser System
+goSys :: Parser Sys
+goSys =
+      (SCons <$!> (cof <* arrow) <*!> tm <*!> goSys')
+  <|> pure SEmpty
+
+goSysHCom' :: Parser SysHCom
+goSysHCom' =
+      (SHCons <$!> (char ';' *> cof) <*!> (bind <* arrow) <*!> tm <*!> goSysHCom')
+  <|> pure SHEmpty
+
+goSysHCom :: Parser SysHCom
+goSysHCom =
+      (SHCons <$!> cof <*!> (bind <* arrow) <*!> tm <*!> goSysHCom')
+  <|> pure SHEmpty
+
+sys :: Parser Sys
 sys = char '[' *> goSys <* char ']'
+
+sysHCom :: Parser SysHCom
+sysHCom = char '[' *> goSysHCom <* char ']'
 
 goApp :: Tm -> Parser Tm
 goApp t = (goApp =<< (App t <$!> proj)) <|> pure t
@@ -117,7 +135,7 @@ app =
        (keyword "suc"     *> (Suc <$!> proj))
   <|>  (keyword "NatElim" *> (NatElim <$!> proj <*!> proj <*!> proj <*!> proj))
   <|>  (keyword "coe"     *> (Coe <$!> int <*!> int <*!> bind <*!> proj <*!> proj))
-  <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> bind <*!> optional proj <*!> sys <*!> proj))
+  <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
   <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))

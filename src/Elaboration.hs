@@ -1,21 +1,50 @@
-{-# options_ghc -Wno-unused-imports #-}
 
 module Elaboration where
 
-import qualified Data.Map.Strict as M
-import Text.Megaparsec (SourcePos)
 import Control.Exception
+import Text.Megaparsec (SourcePos)
+import qualified Data.Map.Strict as M
 
 import Common
-import Conversion hiding (conv, convCof)
-import Core hiding (bind, bindI, bindCof)
+import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalf)
+import CoreTypes
 import Interval
+import Quotation
 import Substitution
 
-import qualified IVarSet   as IS
-import qualified Presyntax as P
-import qualified Core
 import qualified Conversion
+import qualified Core
+import qualified Presyntax as P
+
+--------------------------------------------------------------------------------
+
+conv :: Elab (Val -> Val -> IO ())
+conv t u = if Conversion.conv t u
+  then pure ()
+  else err CantConvert
+
+convCof :: Elab (F VCof -> F VCof -> IO ())
+convCof c c' = if Conversion.conv (unF c) (unF c')
+  then pure ()
+  else err CantConvertCof
+
+eval :: NCofArg => DomArg => EnvArg => Tm -> Val
+eval t = let ?sub = idSub (dom ?cof) in Core.eval t
+
+evalf :: NCofArg => DomArg => EnvArg => Tm -> F Val
+evalf t = let ?sub = idSub (dom ?cof) in frc (Core.eval t)
+
+evalTopSub :: NCofArg => DomArg => EnvArg => Tm -> F I -> Val
+evalTopSub t i = let ?sub = idSub (dom ?cof) `ext` unF i in Core.eval t
+
+evalCof :: NCofArg => Cof -> F VCof
+evalCof cof = let ?sub = idSub (dom ?cof) in Core.evalCof cof
+
+evalI :: NCofArg => I -> F I
+evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
+
+evalInf :: NCofArg => I -> I
+evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
 
 -- Context
 --------------------------------------------------------------------------------
@@ -25,10 +54,12 @@ data Entry
   | Local Lvl VTy         -- level, type
   | LocalInt IVar
 
-type TableArg = (?tbl    :: M.Map Name Entry)
+type Table = M.Map Name Entry
+
+type TableArg = (?tbl    :: Table)
 type PosArg   = (?srcPos :: SourcePos)
 
-type Elab a = IDomArg => SubArg => NCofArg => DomArg => EnvArg => TableArg => PosArg => a
+type Elab a = NCofArg => DomArg => EnvArg => TableArg => PosArg => a
 
 -- | Bind a fibrant variable.
 bind :: Name -> VTy -> Elab (Val -> a) -> Elab a
@@ -53,11 +84,10 @@ define x a ~v act =
 -- | Bind an ivar.
 bindI :: Name -> Elab (IVar -> a) -> Elab a
 bindI x act =
-  let fresh = ?idom in
-  let ?idom = ?idom + 1
-      ?sub  = extSub ?sub (IVar ?idom)
-      ?cof  = extSub ?cof (IVar ?idom)
+  let fresh = dom ?cof in
+  let ?cof  = setDom (fresh + 1) ?cof `ext` IVar fresh
       ?tbl  = M.insert x (LocalInt fresh) ?tbl in
+  let _ = ?cof; _ = ?tbl in
   act fresh
 {-# inline bindI #-}
 
@@ -75,18 +105,6 @@ bindVCof cof act =
   in seq ?cof act
 {-# inline bindVCof #-}
 
---------------------------------------------------------------------------------
-
-conv :: Elab (Val -> Val -> IO ())
-conv t u = if Conversion.conv t u
-  then pure ()
-  else err CantConvert
-
-convCof :: Elab (F VCof -> F VCof -> IO ())
-convCof c c' = if Conversion.convCof c c'
-  then pure ()
-  else err CantConvertCof
-
 -- Errors
 --------------------------------------------------------------------------------
 
@@ -100,17 +118,17 @@ data Error
   | CantInferLam
   | CantInferPair
   | CantInferGlueTm
-  | CantConvert      -- TODO: add info
+  | CantConvert      -- TODO: add infos
   | CantConvertCof
   | GlueTmSystemMismatch
   deriving Show
 
 instance Exception Error where
 
-data ErrInCxt = ErrInCxt SourcePos Error
+data ErrInCxt = ErrInCxt SourcePos Error -- TODO: pretty error
   deriving Show
 
-instance Exception ErrInCxt where
+instance Exception ErrInCxt
 
 err :: PosArg => Error -> IO a
 err e = throwIO $ ErrInCxt ?srcPos e
@@ -137,51 +155,31 @@ check t topA = case t of
     let ~vt = eval t
     define x va vt $ check u topA
 
-  t -> case (t, unF (force topA)) of
+  t -> case (t, unF (frc topA)) of
 
-    (P.Lam x t, VPi _ a b) -> do
+    (P.Lam x t, VPi a b) -> do
       Lam x <$!> bind x a (\v -> check t (capp b v))
 
-    (P.Lam x t, VPathP _ a l r) -> do
+    (P.Lam x t, VPathP a l r) -> do
       t <- bindI x \r -> check t (icapp a (IVar r))
       conv (evalTopSub t (F I0)) l
       conv (evalTopSub t (F I1)) r
       pure $! PLam (quote l) (quote r) x t
 
-    (P.Pair t u, VSg x a b) -> do
+    (P.Pair t u, VSg a b) -> do
       t <- check t a
-      u <- check u (capp b (eval t))
+      u <- check u (b ∙ eval t)
       pure $! Pair t u
 
-    (P.GlueTm base ts, VGlueTy a equivs) -> do
+    (P.GlueTm base ts, VGlueTy a equivs _) -> do
       base <- check base a
-      ts   <- checkGlueTmSys base ts a (_nsys equivs)
+      ts   <- elabGlueTmSys base ts a equivs
       pure $ Glue base ts
 
     (t, topA) -> do
       Infer t a <- infer t
       conv a topA
       pure t
-
-checkGlueTmSys :: Elab (Tm -> P.System -> VTy -> NSystem VCof -> IO System)
-checkGlueTmSys base ts a equivs = case (ts, equivs) of
-  (P.SEmpty, NSEmpty) ->
-    pure SEmpty
-  (P.SCons cof t ts, NSCons (forceCof -> cof') (force -> equiv) equivs) -> do
-    cof <- checkCof cof
-    let vcof = evalCof cof
-    convCof vcof cof'
-    let b  = proj1 equiv
-        f  = proj1f (proj2f equiv)
-    t <- bindVCof vcof do
-      t <- check t b
-      conv (app f (eval t)) (eval base)
-      pure t
-    ts <- checkGlueTmSys base ts a equivs
-    checkBoundaries vcof t ts
-    pure $ SCons cof t ts
-  (_, _) ->
-    err GlueTmSystemMismatch
 
 infer :: Elab (P.Tm -> IO Infer)
 infer = \case
@@ -223,13 +221,13 @@ infer = \case
 
   P.App t u -> do
     Infer t a <- infer t
-    case unF (force a) of
-      VPi x a b -> do
+    case unF (frc a) of
+      VPi a b -> do
         u <- check u a
-        pure $! Infer (App t u) (capp b (eval u))
-      VPathP x a l r -> do
+        pure $! Infer (App t u) (b ∙ eval u)
+      VPathP a l r -> do
         u <- checkI u
-        pure $! Infer (PApp (quote l) (quote r) t u) (icapp a (unF (evalI u)))
+        pure $! Infer (PApp (quote l) (quote r) t u) (a ∙ evalInf u)
       _ ->
         err ExpectedPi
 
@@ -246,19 +244,15 @@ infer = \case
 
   P.Proj1 t -> do
     Infer t a <- infer t
-    case unF (force a) of
-      VSg x a b -> do
-        pure $ Infer (Proj1 t) a
-      _ ->
-        err ExpectedSg
+    case unF (frc a) of
+      VSg a b -> pure $ Infer (Proj1 t) a
+      _       -> err ExpectedSg
 
   P.Proj2 t -> do
     Infer t a <- infer t
-    case unF (force a) of
-      VSg x a b -> do
-        pure $! Infer (Proj2 t) (capp b (proj1 (evalf t)))
-      _ ->
-        err ExpectedSg
+    case unF (frc a) of
+      VSg a b -> pure $! Infer (Proj2 t) (b ∙ proj1 (evalf t))
+      _       -> err ExpectedSg
 
   P.U ->
     pure $ Infer U VU
@@ -266,30 +260,30 @@ infer = \case
   P.Path t u -> do
     Infer t a <- infer t
     u <- check u a
-    pure $ Infer (PathP "_" (Core.bindI \_ -> quote a) t u) VU
+    pure $ Infer (PathP "_" (Core.freshI \_ -> quote a) t u) VU
 
-  P.Coe r r' x a t -> do
+  P.Coe r r' x a t -> do --
     r  <- checkI r
     r' <- checkI r'
     a  <- bindI x \_ -> check a VU
     t  <- check t (evalTopSub a (evalI r))
     pure $! Infer (Coe r r' x a t) (evalTopSub a (evalI r'))
 
-  P.HCom r r' x Nothing sys t -> do
+  P.HCom r r' Nothing sys t -> do
     r  <- checkI r
     r' <- checkI r'
     Infer t a <- infer t
-    sys <- checkHComSys r r' x a sys t
-    pure $! Infer (HCom r r' x (quote a) sys t) a
+    sys <- elabSysHCom a r t sys
+    pure $! Infer (HCom r r' (quote a) sys t) a
 
-  P.HCom r r' x (Just a) sys t -> do
+  P.HCom r r' (Just a) sys t -> do
     r   <- checkI r
     r'  <- checkI r'
     a   <- check a VU
     let va = eval a
     t   <- check t va
-    sys <- checkHComSys r r' x va sys t
-    pure $! Infer (HCom r r' x a sys t) va
+    sys <- elabSysHCom va r t sys
+    pure $! Infer (HCom r r' a sys t) va
 
   P.GlueTy a sys -> do
     a   <- check a VU
@@ -301,12 +295,9 @@ infer = \case
 
   P.Unglue t -> do
     Infer t a <- infer t
-    case unF (force a) of
-      VGlueTy a sys -> do
-        let ~qsys = quoteSys (_nsys sys)
-        pure $! Infer (Unglue t qsys) a
-      _ ->
-        err ExpectedGlueTy
+    case unF (frc a) of
+      VGlueTy a sys _ -> pure $! Infer (Unglue t (quote sys)) a
+      _               -> err ExpectedGlueTy
 
   P.Nat ->
     pure $! Infer Nat VU
@@ -322,10 +313,10 @@ infer = \case
   P.NatElim p s z n -> do
     p <- check p (fun VNat VU)
     let vp = evalf p
-    s <- check s (VPi "n" VNat (CNatElim (unF vp)))
-    z <- check z (vp `app` VZero)
+    s <- check s (VPi VNat $ NCl "n" $ CNatElim (unF vp))
+    z <- check z (vp ∙ VZero)
     n <- check n VNat
-    pure $! Infer (NatElim p s z n) (vp `appLazy` eval n)
+    pure $! Infer (NatElim p s z n) (vp ∙~ eval n)
 
 checkI :: Elab (P.Tm -> IO I)
 checkI = \case
@@ -333,7 +324,7 @@ checkI = \case
   P.I1 -> pure I1
 
   P.Ident x -> case M.lookup x ?tbl of
-    Nothing           -> err (NameNotInScope x)
+    Nothing           -> err $ NameNotInScope x
     Just (LocalInt l) -> pure $ IVar l
     Just _            -> err ExpectedI
 
@@ -349,43 +340,108 @@ checkCof = \case
   P.CTrue       -> pure CTrue
   P.CAnd eq cof -> CAnd <$!> checkCofEq eq <*!> checkCof cof
 
-goCheckBoundaries :: Elab (Tm -> System -> IO ())
-goCheckBoundaries t = \case
-  SEmpty            -> pure ()
-  SCons cof' t' sys -> do bindCof cof' $ conv (eval t) (eval t')
-                          goCheckBoundaries t sys
+------------------------------------------------------------
 
-checkBoundaries :: Elab (F VCof -> Tm -> System -> IO ())
-checkBoundaries cof t sys = bindVCof cof $ goCheckBoundaries t sys
+goSysCompatHCom :: Elab (Tm -> SysHCom -> IO ())
+goSysCompatHCom t = \case
+  SHEmpty              -> pure ()
+  SHCons cof' x t' sys -> do bindCof cof' $ bindI x \_ -> conv (eval t) (eval t')
+                             goSysCompatHCom t sys
 
--- | Elaborate hcom system, don't yet check base boundary condition.
-elabHComSys :: Elab (Name -> VTy -> P.System -> IO System)
-elabHComSys x a = \case
-  P.SEmpty ->
-    pure SEmpty
-  P.SCons cof t sys -> do
+sysCompatHCom :: Elab (F VCof -> Tm -> SysHCom -> IO ())
+sysCompatHCom cof t sys = bindVCof cof $ goSysCompatHCom t sys
+
+elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
+elabSysHCom a r base = \case
+  P.SHEmpty ->
+    pure SHEmpty
+  P.SHCons cof x t sys -> do
     cof <- checkCof cof
     let vcof = evalCof cof
-    t   <- bindI x \_ -> bindVCof vcof (check t a)
-    sys <- elabHComSys x a sys
-    -- NOTE: here we implicitly weaken all cofs under the ivar binder
-    bindI x \_ -> checkBoundaries vcof t sys
-    pure $ SCons cof t sys
 
-checkHComSys :: Elab (I -> I -> Name -> VTy -> P.System -> Tm -> IO System)
-checkHComSys r r' x a sys t = do
-  sys <- elabHComSys x a sys
-  bindI x \v -> checkBoundaries (evalCof (CofEq (IVar v) r `CAnd` CTrue)) t sys
-  pure sys
+    t <- bindVCof vcof do
+      t <- bindI x \_ -> check t a
+      conv (evalTopSub t (frc r)) (eval base) -- check base boundary
+      pure t
 
-elabGlueTySys :: Elab (VTy -> P.System -> IO System)
+    sys <- elabSysHCom a r base sys
+    sysCompatHCom vcof t sys -- check system compatibility
+    pure $ SHCons cof x t sys
+
+------------------------------------------------------------
+
+elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
+elabGlueTmSys base ts a equivs = case (ts, equivs) of
+  (P.SEmpty, NSEmpty) ->
+    pure SEmpty
+
+  (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> do
+    cof <- checkCof cof
+    let vcof = evalCof cof
+    convCof vcof (frc cof')
+
+    t <- bindVCof vcof do
+      let fequiv = frc equiv
+      t <- check t (proj1 fequiv)
+      conv (proj1f (proj2f fequiv) ∙ eval t) (eval base)
+      pure t
+
+    ts <- elabGlueTmSys base ts a equivs
+    sysCompat vcof t ts
+    pure $ SCons cof t ts
+
+  (_, _) ->
+    err GlueTmSystemMismatch
+
+------------------------------------------------------------
+
+goSysCompat :: Elab (Tm -> Sys -> IO ())
+goSysCompat t = \case
+  SEmpty            -> pure ()
+  SCons cof' t' sys -> do bindCof cof' $ conv (eval t) (eval t')
+                          goSysCompat t sys
+
+sysCompat :: Elab (F VCof -> Tm -> Sys -> IO ())
+sysCompat cof t sys = bindVCof cof $ goSysCompat t sys
+
+elabGlueTySys :: Elab (VTy -> P.Sys -> IO Sys)
 elabGlueTySys a = \case
   P.SEmpty ->
     pure SEmpty
   P.SCons cof t sys -> do
     cof <- checkCof cof
     let vcof = evalCof cof
-    t   <- bindVCof vcof $ check t (equivInto a)
+    t <- bindVCof vcof $ check t (equivInto a)
     sys <- elabGlueTySys a sys
-    checkBoundaries vcof t sys
+    sysCompat vcof t sys
     pure $ SCons cof t sys
+
+
+------------------------------------------------------------
+
+inferTop :: Elab (P.Top -> IO Top)
+inferTop = \case
+
+  P.TDef x Nothing t top -> do
+    Infer t a <- infer t
+    let ~vt = eval t
+    define x a vt $ inferTop top
+
+  P.TDef x (Just a) t top -> do
+    a <- check a VU
+    let va = eval a
+    t <- check t va
+    let ~vt = eval t
+    define x va vt $ inferTop top
+
+  P.TEmpty ->
+    pure TEmpty
+
+elabTop :: SourcePos -> P.Top -> IO Top
+elabTop pos top = do
+  let ?cof    = idSub 0
+      ?dom    = 0
+      ?env    = ENil
+      ?tbl    = mempty
+      ?srcPos = pos
+  inferTop top

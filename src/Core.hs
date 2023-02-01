@@ -16,7 +16,8 @@ freshI :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshI act =
   let fresh = dom ?cof in
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
-  seq ?cof $ act fresh
+  let _     = ?cof in
+  act fresh
 {-# inline freshI #-}
 
 -- | Get a fresh ivar, when working under a Sub.
@@ -85,7 +86,7 @@ ceq c1 c2 = case (unF c1, unF c2) of
     cfalse
 
 evalI :: SubArg => NCofArg => I -> F I
-evalI i = F (doSub ?cof (sub i))
+evalI i = F (doSub ?cof (doSub ?sub i))
 
 evalCofEq :: SubArg => NCofArg => CofEq -> F VCof
 evalCofEq (CofEq i j) = ceq (evalI i) (evalI j)
@@ -247,7 +248,7 @@ instance Apply NamedClosure Val Val NCofArg DomArg where
 
 instance Apply (F Val) Val Val NCofArg DomArg where
   (∙) t u = case unF t of
-    VLam t   -> capp t u
+    VLam t   -> t ∙ u
     VNe t is -> VNe (NApp t u) is
     _        -> impossible
   {-# inline (∙) #-}
@@ -286,6 +287,12 @@ instance Force a fa => ApplyF (BindILazy a) I fa (SubAction a) NCofArg DomArg wh
 instance ApplyF NamedIClosure I Val NCofArg DomArg () where
   (∘) x y = frc (x ∙ y); {-# inline (∘) #-}
 
+infixl 8 ∙~
+(∙~) :: NCofArg => DomArg => F Val -> Val -> Val
+(∙~) t ~u = case unF t of
+  VLam t   -> t ∙ u
+  VNe t is -> VNe (NApp t u) is
+  _        -> impossible
 
 ----------------------------------------------------------------------------------------------------
 
@@ -310,6 +317,65 @@ capp (NCl _ t) ~u = case t of
       (mapVSysHCom (\i t -> frc t ∘ u) (frc sys))
       (frc base ∘ u)
 
+  CConst v -> v
+
+  -- isEquiv : (A → B) → U
+  -- isEquiv A B f :=
+  --     (g^1    : B → A)
+  --   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+  --   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
+  --   × (coh    : (x^6 : A) →
+  --             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+  --                   (refl B (f x))
+  --                   (rinv (f x)))
+
+  CIsEquiv1 a b f -> let ~g = u in
+    VSg (VPi a $ NCl "a" $ CIsEquiv4 a f g) $ NCl "linv" $ CIsEquiv2 a b f g
+
+  CIsEquiv2 a b f g -> let ~linv = u in
+    VSg (VPi a $ NCl "a" $ CIsEquiv5 b f g) $ NCl "rinv" $ CIsEquiv3 a b f g linv
+
+  CIsEquiv3 a b f g linv -> let ~rinv = u in
+    VPi a $ NCl "a" $ CIsEquiv6 b f g linv rinv
+
+  CIsEquiv4 a (frc -> f) (frc -> g) -> let ~x = u in path a x (g ∙ (f ∙ x))
+  CIsEquiv5 b (frc -> f) (frc -> g) -> let ~x = u in path b (f ∙ (g ∙ x)) x
+
+  CIsEquiv6 b (frc -> f) g linv (frc -> rinv) ->
+    let ~x  = u
+        ~fx = f ∙ x in
+    VPathP (NICl "i" $ ICIsEquiv7 b (unF f) g linv x)
+      (refl fx)
+      (rinv ∙ fx)
+
+  ------------------------------------------------------------
+
+  -- equiv A B = (f* : A -> B) × isEquiv a b f
+  CEquiv a b -> let ~f = u in isEquiv a b f
+
+  -- [P]  (n* : VNat) → P n → P (suc n)
+  CNatElim (frc -> p) -> let ~n = u in fun (p ∙ n) (p ∙ VSuc n)
+
+  -- [A]  (B* : U) × equiv B A
+  CEquivInto a -> let ~b = u in equiv a b
+
+  -- ------------------------------------------------------------
+
+  C'λ'a''a     -> u
+  C'λ'a'i''a   -> refl u
+  C'λ'a'i'j''a -> let ru = refl u in VPLam ru ru $ NICl "i" $ ICConst ru
+
+  -- coeIsEquiv : (Γ, i ⊢ A : U) (r r' : I) → Γ ⊢ isEquiv (coeⁱ r r' A : Ar → Ar')
+  -- coeIsEquiv A r r' =
+  --   _⁻¹  := λ x^1. coeⁱ r' r A x
+  --   linv := λ x^2. λ j. hcomᵏ r r' (A r) [j=0 ↦ a, j=1 ↦ coeⁱ k r A (coeⁱ r k A x)] x
+  --   rinv := λ x^3. λ j. hcomᵏ r' r (A r') [j=0 ↦ coeⁱ k r' A (coeⁱ r' k A x), j=1 ↦ x] x
+  --   coh  := TODO
+
+  CCoeInv (frc -> a) (frc -> r) (frc -> r') -> let ~x = u in coenf r r' a (frc x)
+  CCoeLinv0 a r r' -> uf
+  CCoeRinv0 a r r' -> uf
+
 
 -- | Apply an ivar closure.
 icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
@@ -333,21 +399,23 @@ icapp (NICl _ t) arg = case t of
        mapVSysHCom (\_ t -> pappf (frc t) lhs rhs farg) (frc sys))
       (pappf (frc p) lhs rhs farg)
 
--- isEquiv : (A → B) → U
--- isEquiv A B f :=
---     (g^1    : B → A)
---   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
---   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
---   × (coh    : (x^6 : A) →
---             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
---                   (refl B (f x))
---                   (rinv (f x)))
+  ICConst t -> t
 
---   ICIsEquiv7 b (force -> f) (force -> g)(force -> linv) x ->
---     let ~i   = forceI arg
---         ~fx  = f `app` x
---         ~gfx = g `app` fx  in
---     path b (f `app` papp (linv `appf` x) x gfx i) fx
+  -- isEquiv : (A → B) → U
+  -- isEquiv A B f :=
+  --     (g^1    : B → A)
+  --   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+  --   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
+  --   × (coh    : (x^6 : A) →
+  --             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+  --                   (refl B (f x))
+  --                   (rinv (f x)))
+
+  ICIsEquiv7 b (frc -> f) (frc -> g)(frc -> linv) x ->
+    let ~i   = frc arg
+        ~fx  = f ∙ x
+        ~gfx = g ∙ fx  in
+    path b (f ∙ papp (linv ∘ x) x gfx i) fx
 
 proj1 :: F Val -> Val
 proj1 t = case unF t of
@@ -458,7 +526,7 @@ com r r' ~a ~sys ~b
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: NCofArg => DomArg => F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> F Val
-hcomdn r r' a ts@(F (nts, is)) base = case unF a of
+hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 
   VPi a b ->
     F $ VLam $ NCl (b^.name) $ CHComPi (unF r) (unF r') a b nts (unF base)
@@ -731,3 +799,45 @@ unSubNeS = \case
   NUnglue a sys        -> NUnglue (sub a) (sub sys)
   NGlue a sys          -> NGlue (sub a) (sub sys)
   NNatElim p z s n     -> NNatElim (sub p) (sub z) (sub s) (sub n)
+
+
+-- Definitions
+--------------------------------------------------------------------------------
+
+fun :: Val -> Val -> Val
+fun a b = VPi a $ NCl "_" $ CConst b
+
+-- | (A : U) -> A -> A -> U
+path :: Val -> Val -> Val -> Val
+path a t u = VPathP (NICl "_" (ICConst a)) t u
+
+-- | (x : A) -> PathP _ x x
+refl :: Val -> Val
+refl t = VPLam t t $ NICl "_" $ ICConst t
+
+-- | (A : U)(B : U) -> (A -> B) -> U
+isEquiv :: Val -> Val -> Val -> Val
+isEquiv a b f = VSg (fun b a) $ NCl "g" $ CIsEquiv1 a b f
+
+-- | U -> U -> U
+equiv :: Val -> Val -> Val
+equiv a b = VSg (fun a b) $ NCl "g" $ CEquiv a b
+
+-- | U -> U
+equivInto :: Val -> Val
+equivInto a = VSg VU $ NCl "b" $ CEquivInto a
+
+-- | idIsEquiv : (A : U) -> isEquiv (\(x:A).x)
+idIsEquiv :: Val -> Val
+idIsEquiv a =
+  VPair (VLam $ NCl "a" C'λ'a''a) $
+  VPair (VLam $ NCl "a" C'λ'a'i''a) $
+  VPair (VLam $ NCl "b" C'λ'a'i''a) $
+        (VLam $ NCl "a" C'λ'a'i'j''a)
+
+coeIsEquiv :: NCofArg => DomArg => BindI Val -> I -> I -> Val
+coeIsEquiv a r r' =
+  VPair (VLam $ NCl "x" (CCoeInv   a r r')) $
+  VPair (VLam $ NCl "x" (CCoeLinv0 a r r')) $
+  VPair (VLam $ NCl "x" (CCoeRinv0 a r r')) $
+        uf

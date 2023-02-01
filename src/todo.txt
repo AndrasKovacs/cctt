@@ -1,5 +1,4 @@
 
-- Remove NeSysSub et al
-- Conversion without unSubNe
-- Adjust elaboration
 - Finish comp rules (Glue)
+- Pretty print
+- User interaction

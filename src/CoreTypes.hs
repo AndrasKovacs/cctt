@@ -61,6 +61,8 @@ data Sys = SEmpty | SCons Cof Tm Sys
 data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
   deriving Show
 
+data Top = TDef Name Ty Tm Top | TEmpty
+  deriving Show
 
 -- Values
 --------------------------------------------------------------------------------
@@ -204,43 +206,42 @@ data Closure
   -- ^ Body of function hcom.
   | CHComPi I I VTy NamedClosure NeSysHCom Val
 
---   | CConst Val
+  | CConst Val
 
---   | C'λ'a''a        -- λ a. a
---   | C'λ'a'i''a      -- λ a i. a
---   | C'λ'a'i'j''a    -- λ a i j. a
+  | C'λ'a''a        -- λ a. a
+  | C'λ'a'i''a      -- λ a i. a
+  | C'λ'a'i'j''a    -- λ a i j. a
 
---   | CCoeInv Val I I
---   | CCoeLinv0 Val I I
---   | CCoeRinv0 Val I I
+  | CCoeInv   (BindI Val) I I
+  | CCoeLinv0 (BindI Val) I I
+  | CCoeRinv0 (BindI Val) I I
+
+-- isEquiv : (A → B) → U
+-- isEquiv A B f :=
+--     (g^1    : B → A)
+--   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+--   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
+--   × (coh    : (x^6 : A) →
+--             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+--                   (refl B (f x))
+--                   (rinv (f x)))
+
+  | CIsEquiv1 Val Val Val         -- A B f
+  | CIsEquiv2 Val Val Val Val     -- A B f g
+  | CIsEquiv3 Val Val Val Val Val -- A B f g linv
+  | CIsEquiv4 Val Val Val         -- A f g
+  | CIsEquiv5 Val Val Val         -- B f g
+  | CIsEquiv6 Val Val Val Val Val -- B f g linv rinv
 
 
--- -- isEquiv : (A → B) → U
--- -- isEquiv A B f :=
--- --     (g^1    : B → A)
--- --   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
--- --   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
--- --   × (coh    : (x^6 : A) →
--- --             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
--- --                   (refl B (f x))
--- --                   (rinv (f x)))
+  -- [A, B]  equiv A B = (f* : A -> B) × isEquiv A B f
+  | CEquiv Val Val
 
---   | CIsEquiv1 Val Val Val         -- A B f
---   | CIsEquiv2 Val Val Val Val     -- A B f g
---   | CIsEquiv3 Val Val Val Val Val -- A B f g linv
---   | CIsEquiv4 Val Val Val         -- A f g
---   | CIsEquiv5 Val Val Val         -- B f g
---   | CIsEquiv6 Val Val Val Val Val -- B f g linv rinv
+  -- [P]  (n* : VNat) → P n → P (suc n)
+  | CNatElim Val
 
-
---   -- [A, B]  equiv A B = (f* : A -> B) × isEquiv A B f
---   | CEquiv Val Val
-
---   -- [P]  (n* : VNat) → P n → P (suc n)
---   | CNatElim Val
-
---   -- [A]  (B* : U) × equiv B A
---   | CEquivInto Val
+  -- [A]  (B* : U) × equiv B A
+  | CEquivInto Val
 
   deriving Show
 
@@ -249,8 +250,8 @@ data IClosure
   = ICEval Sub Env Tm
   | ICCoePathP I I (BindI NamedIClosure) (BindI Val) (BindI Val) Val
   | ICHComPathP I I NamedIClosure Val Val NeSysHCom Val
-  -- | ICConst Val
-  -- | ICIsEquiv7 Val Val Val Val Val
+  | ICConst Val
+  | ICIsEquiv7 Val Val Val Val Val
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -360,38 +361,37 @@ instance SubAction Closure where
       CHComPi (sub r) (sub r') (sub a) (sub b) (sub sys) (sub base)
 
 
-    -- CConst t                  -> CConst (sub t)
-    -- CIsEquiv1 a b f           -> CIsEquiv1 (sub a) (sub b) (sub f)
-    -- CIsEquiv2 a b f g         -> CIsEquiv2 (sub a) (sub b) (sub f) (sub g)
-    -- CIsEquiv3 a b f g linv    -> CIsEquiv3 (sub a) (sub b) (sub f) (sub g) (sub linv)
-    -- CIsEquiv4 a f g           -> CIsEquiv4 (sub a) (sub f) (sub g)
-    -- CIsEquiv5 b f g           -> CIsEquiv5 (sub b) (sub f) (sub g)
-    -- CIsEquiv6 b f g linv rinv -> CIsEquiv6 (sub b) (sub f) (sub g) (sub linv) (sub rinv)
-    -- CEquiv a b                -> CEquiv (sub a) (sub b)
-    -- CNatElim p                -> CNatElim (sub p)
-    -- CEquivInto a              -> CEquivInto (sub a)
-    -- C'λ'a''a                  -> C'λ'a''a
-    -- C'λ'a'i''a                -> C'λ'a'i''a
-    -- C'λ'a'i'j''a              -> C'λ'a'i'j''a
-    -- CCoeInv a r r'            -> CCoeInv   (sub a) (sub r) (sub r')
-    -- CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
-    -- CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
+    CConst t                  -> CConst (sub t)
+    CIsEquiv1 a b f           -> CIsEquiv1 (sub a) (sub b) (sub f)
+    CIsEquiv2 a b f g         -> CIsEquiv2 (sub a) (sub b) (sub f) (sub g)
+    CIsEquiv3 a b f g linv    -> CIsEquiv3 (sub a) (sub b) (sub f) (sub g) (sub linv)
+    CIsEquiv4 a f g           -> CIsEquiv4 (sub a) (sub f) (sub g)
+    CIsEquiv5 b f g           -> CIsEquiv5 (sub b) (sub f) (sub g)
+    CIsEquiv6 b f g linv rinv -> CIsEquiv6 (sub b) (sub f) (sub g) (sub linv) (sub rinv)
+    CEquiv a b                -> CEquiv (sub a) (sub b)
+    CNatElim p                -> CNatElim (sub p)
+    CEquivInto a              -> CEquivInto (sub a)
+    C'λ'a''a                  -> C'λ'a''a
+    C'λ'a'i''a                -> C'λ'a'i''a
+    C'λ'a'i'j''a              -> C'λ'a'i'j''a
+    CCoeInv a r r'            -> CCoeInv   (sub a) (sub r) (sub r')
+    CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
+    CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
 
 instance SubAction IClosure where
   sub cl = case cl of
     ICEval s' env t ->
       ICEval (sub s') (sub env) t
 
-    -- -- recursive sub here as well!
+    -- recursive sub here as well!
     ICCoePathP r r' a lh rh p ->
       ICCoePathP (sub r) (sub r') (sub a) (sub lh) (sub rh) (sub p)
 
     ICHComPathP r r' a lhs rhs sys base ->
       ICHComPathP (sub r) (sub r') (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
 
-    -- ICConst t -> ICConst (sub t)
-
-    -- ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
+    ICConst t               -> ICConst (sub t)
+    ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
 
 --------------------------------------------------------------------------------
 
