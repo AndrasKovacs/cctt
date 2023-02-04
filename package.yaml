@@ -100,6 +100,10 @@ executable:
   - -O
   - -fdicts-strict
   - -fmax-worker-args=15
+  - -fspecialise-aggressively
+  - -fexpose-all-unfoldings
+  - -fplugin StrictImplParams
+  - -fworker-wrapper-cbv
   - -rtsopts
   - -threaded
   - -with-rtsopts= "-A64M -N4"
@@ -111,8 +115,6 @@ executable:
   - -Wno-missing-pattern-synonym-signatures
   - -fmax-relevant-binds=3
   - -fmax-valid-hole-fits=0
-  - -fplugin StrictImplParams
-  - -fworker-wrapper-cbv
   when:
   - condition: false
     other-modules: Paths_cubeval

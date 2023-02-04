@@ -65,17 +65,6 @@ cand c1 ~c2 = case (unF c1, unF c2) of
   (VCNe n1 is1, VCNe n2 is2) -> F (VCNe (NCAnd n1 n2) (is1 <> is2))
 {-# inline cand #-}
 
-iToVarSet :: I -> IS.IVarSet
-iToVarSet = \case
-  IVar x -> IS.singleton x
-  _      -> mempty
-
-vCofToVarSet :: F VCof -> IS.IVarSet
-vCofToVarSet cof = case unF cof of
-  VCTrue    -> mempty
-  VCFalse   -> mempty
-  VCNe _ is -> is
-
 ceq :: F I -> F I -> F VCof
 ceq c1 c2 = case (unF c1, unF c2) of
   (i, j) | i == j -> ctrue

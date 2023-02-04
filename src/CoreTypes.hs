@@ -264,26 +264,6 @@ rebindf :: F (BindI a) -> b -> F (BindI b)
 rebindf (F (BindI x i _)) b = F (BindI x i b)
 {-# inline rebindf #-}
 
-reclose :: NamedClosure -> (Closure -> Closure) -> NamedClosure
-reclose (NCl x a) f = NCl x (f a)
-{-# inline reclose #-}
-
-packBindI2 :: BindI a -> BindI b -> BindI (a, b)
-packBindI2 (BindI x i a) (BindI _ _ b) = BindI x i (a, b)
-{-# inline packBindI2 #-}
-
-unpackBindI2 :: BindI (a, b) -> (BindI a, BindI b)
-unpackBindI2 (BindI x i (a, b)) = (BindI x i a, BindI x i b)
-{-# inline unpackBindI2 #-}
-
-packBindI3 :: BindI a -> BindI b -> BindI c -> BindI (a, b, c)
-packBindI3 (BindI x i a) (BindI _ _ b) (BindI _ _ c) = BindI x i (a, b, c)
-{-# inline packBindI3 #-}
-
-unpackBindI3 :: BindI (a, b, c) -> (BindI a, BindI b, BindI c)
-unpackBindI3 (BindI x i (a, b, c)) = (BindI x i a, BindI x i b, BindI x i c)
-{-# inline unpackBindI3 #-}
-
 -- Substitution
 ----------------------------------------------------------------------------------------------------
 
