@@ -300,7 +300,7 @@ this is not the case; instead there's a weaker canonicity property, that every
 closed value can be maximally eta-expanded to a nested system of canonical values.  The
 difference comes from the ability to directly define partial values by
 elimination of cofibration disjunctions.  In ABCFHL an element of `Bool` can be
-defined under `i=1 ∨ i=1` as `[i=1 ↦ true, i=1 ↦ false]`, which is not
+defined under `i=1 ∨ i=1` as `[i=1 ↦ true, i=0 ↦ false]`, which is not
 canonical, but is a partial system of canonical values. In cubical Agda a
 partial `Bool` value is explicitly typed as `Partial i Bool`, so the plain
 `Bool` type cannot have partial inhabitants.
