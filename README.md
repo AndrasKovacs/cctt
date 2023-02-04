@@ -208,7 +208,7 @@ positions in a neutral. When forcing, I check whether relevant interval vars
 are mapped to distinct vars by forcing. If so, then forcing has no action on
 the neutral. This is a sound approximation of the precise stability predicate.
 
-#### Closures vs. values
+#### Closures vs. transparent binders
 
 In semantic values, we generally use closures for binders which are never
 inspected in computations rules:
@@ -218,18 +218,22 @@ inspected in computations rules:
 - Ordinary lambda abstraction
 - Pi/Sigma type binders
 
-We don't use closures when computation rules can "peek under" binders:
+Peeking under closures can be expensive; it can be only
+done by instantiating it with a fresh variable, which can trigger arbitrarily expensive
+evaluation of the closure code. Where we need to peek under binders, we don't use closures:
 
 - In `coe` types.
 - In partial "systems" in `hcom`, `Glue`, `glue` and `unglue`.
 
-The reason is that peeking under closures can be expensive; it can be only
-done by instantiating it with a fresh variable. Peeking at plain values only
-requires forcing.
-
-Generally speaking, this cubical NbE can be call-by-need or call-by-value in
-"ordinary" reductions, and call-by-name in computation triggered by interval
-substitution and weakening under cofibrations.
+We represent a "transparent" binder as a value packed together with
+a delayed weakening. This is stored as a value together with the size of the
+context of the value, including the abstracted variable (which is the innermost one).
+When we create a binder, the size of the current context is saved. This binder
+can be implicitly weakened to a larger context. We can instantiate a binder by applying a substitution
+which renames the abstracted variable to a fresh variable. This yields a nice higher-order
+interface to transparent binders where binder creation and binder application behave
+like meta-level functions. However, sometimes we want to use specialized code for efficiency. 
+For example, forcing a binder w.r.t. a cofibration can elide explicit substitution. 
 
 #### Defunctionalization
 
@@ -261,9 +265,22 @@ Defunctionalization is most convenient when we have few different kinds of
 closures, like in the vanilla NbE case, where there's just one kind of closure. If we
 have lots of different closures, there's a distance in the implementation code
 between the points where we create closures, and the place where we define the
-actual application logic for each closure (the "generic apply" function). This
-can make code less readable. However, I did not find this problematic at all in
-CTT. In the codebase right now there are only six different closures.
+actual application logic for each closure (the "generic apply" function). 
+
+Generally speaking, we have a choice about how pervasive defunctionalization is.
+All definitions which can be internalized in the theory can be defined as plain
+terms. This can be *much* more convenient than defunctionalizing by hand; we can
+also implement a bootstrapping setup where the internal definitions can be checked
+and elaborated by the system itself. Cubical Agda uses some of this AFAIK. However,
+internal definitions are less efficient than semantic definitions. The former are
+interpreted, the latter are natively compiled. There could be a framework where
+defunctionalization is done by metaprogramming, but that'd
+be a lot of work (if it's even feasible in Haskell). 
+
+Going further, there could be a logical framework that checks and efficiently compiles all cubical computation
+rules. Going even further, the entirety of elaboration could be written in a type-safe logical 
+framework. These sound nice but look pretty damn hard to implement. In this repo I stick
+to handcrafted defunctionalization and untyped (but, to some extent, *well-scoped*) semantics. 
 
 ### 3. Closed cubical evaluation
 
