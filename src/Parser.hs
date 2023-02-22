@@ -103,22 +103,22 @@ cof = CAnd <$!> cofEq <*!> ((char ',' *> cof) <|> pure CTrue)
 
 goSys' :: Parser Sys
 goSys' =
-      (SCons <$!> (char ';' *> cof <* arrow) <*!> tm <*!> goSys)
+      (SCons <$!> (char ';' *> cof <* char '.') <*!> tm <*!> goSys)
   <|> pure SEmpty
 
 goSys :: Parser Sys
 goSys =
-      (SCons <$!> (cof <* arrow) <*!> tm <*!> goSys')
+      (SCons <$!> (cof <* char '.') <*!> tm <*!> goSys')
   <|> pure SEmpty
 
 goSysHCom' :: Parser SysHCom
 goSysHCom' =
-      (SHCons <$!> (char ';' *> cof) <*!> (bind <* arrow) <*!> tm <*!> goSysHCom')
+      (SHCons <$!> (char ';' *> cof) <*!> (bind <* char '.') <*!> tm <*!> goSysHCom')
   <|> pure SHEmpty
 
 goSysHCom :: Parser SysHCom
 goSysHCom =
-      (SHCons <$!> cof <*!> (bind <* arrow) <*!> tm <*!> goSysHCom')
+      (SHCons <$!> cof <*!> (bind <* char '.') <*!> tm <*!> goSysHCom')
   <|> pure SHEmpty
 
 sys :: Parser Sys
@@ -150,7 +150,7 @@ eq = do
 
 sigma :: Parser Tm
 sigma =
-  branch (char '(' *> bind <* char ':')
+  branch (try (char '(' *> bind <* char ':'))
     (\x -> do
         a <- tm
         char ')'
@@ -190,10 +190,10 @@ pi =
 lam :: Parser Tm
 lam = do
   lambda
-  bs <- some bind
+  bs <- some ((,) <$!> getSourcePos <*!> bind)
   char '.'
   t <- lamlet
-  pure $! foldr' Lam t bs
+  pure $! foldr' (\(pos, x) t -> Pos (coerce pos) (Lam x t)) t bs
 
 pLet :: Parser Tm
 pLet = do
@@ -217,14 +217,14 @@ tm = withPos do
     (pure t)
 
 top :: Parser Top
-top = branch ident
-  (\x -> do
+top = branch ((,) <$!> getSourcePos <*!> ident)
+  (\(pos, x) -> do
     ma <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
     symbol ":="
     t <- tm
     char ';'
     u <- top
-    pure $ TDef x ma t u)
+    pure $ TDef (coerce pos) x ma t u)
   (pure TEmpty)
 
 src :: Parser Top

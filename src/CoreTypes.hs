@@ -45,6 +45,8 @@ data Tm
   | Zero
   | Suc Tm
   | NatElim Tm Tm Tm Tm      -- (P : Nat -> U) -> P z -> ((n:_) -> P n -> P (suc n)) -> (n:_) -> P n
+
+  | TODO -- placeholder for TODO definitions
   deriving Show
 
 -- | Atomic equation.
@@ -166,6 +168,8 @@ data Val
   | VNat
   | VZero
   | VSuc Val
+
+  | VTODO -- placeholder
   deriving Show
 
 data Ne

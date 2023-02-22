@@ -72,7 +72,7 @@ var ns topIx = Txt (go ns topIx) where
   go (n:ns) 0 acc = case n of "_" -> '@': (show topIx ++ acc)
                               n   -> freshen ns n ++ acc
   go (n:ns) x acc = go ns (x - 1) acc
-  go _      _ _   = impossible
+  go _      _ acc = "(INVALID " ++ show topIx ++ ")" ++ acc
 
 fresh :: Name -> (Names => Txt -> a) -> Names => a
 fresh x act = let x' = freshen ?names x in
@@ -132,10 +132,10 @@ cof = \case
 goSysH :: TopNames => Names => INames => SysHCom -> Txt
 goSysH = \case
   SHEmpty              -> mempty
-  SHCons c x t SHEmpty -> let pc = cof c in fresh x \x ->
-                          pc <> " " <> x <> " → " <> pair t
-  SHCons c x t sys     -> let pc = cof c; psys = goSysH sys in fresh x \x ->
-                          pc <> " " <> x <> " → " <> pair t <> ";" <> psys
+  SHCons c x t SHEmpty -> let pc = cof c in freshI x \x ->
+                          pc <> " " <> x <> ". " <> pair t
+  SHCons c x t sys     -> let pc = cof c; psys = goSysH sys in freshI x \x ->
+                          pc <> " " <> x <> ". " <> pair t <> "; " <> psys
 
 sysH :: TopNames => Names => INames => SysHCom -> Txt
 sysH s = "[" <> goSysH s <> "]"
@@ -143,8 +143,8 @@ sysH s = "[" <> goSysH s <> "]"
 goSys :: TopNames => Names => INames => Sys -> Txt
 goSys = \case
   SEmpty           -> mempty
-  SCons c t SEmpty -> cof c <> " ↦ " <> pair t
-  SCons c t sys    -> cof c <> " ↦ " <> pair t <> "; " <> goSys sys
+  SCons c t SEmpty -> cof c <> ". " <> pair t
+  SCons c t sys    -> cof c <> ". " <> pair t <> "; " <> goSys sys
 
 sys :: TopNames => Names => INames => Sys -> Txt
 sys s = "[" <> goSys s <> "]"
@@ -164,7 +164,7 @@ tm = \case
   Sg "_" a b      -> let pa = eq a in fresh "_" \_ ->
                      pa <> " × " <> sigma b
   Sg x a b        -> let pa = pair a in fresh x \x ->
-                     "(" <> pa <> ":" <> ") ×" <> sigma b
+                     "(" <> x <> " : " <> pa <> ") × " <> sigma b
   Pair t u        -> pairp (let_ t <> ", " <> pair u)
   Proj1 t         -> projp (proj t <> ".1")
   Proj2 t         -> projp (proj t <> ".2")
@@ -184,6 +184,7 @@ tm = \case
   Zero            -> "zero"
   Suc t           -> appp ("suc " <> proj t)
   NatElim p s z n -> appp ("NatElim " <> proj p <> " " <> proj s <> " " <> proj z <> " " <> proj n)
+  TODO            -> "TODO"
 
 --------------------------------------------------------------------------------
 

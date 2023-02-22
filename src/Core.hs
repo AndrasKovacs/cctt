@@ -7,6 +7,8 @@ import Interval
 import Substitution
 import CoreTypes
 
+import Debug.Trace
+
 
 -- Context manipulation primitives
 ----------------------------------------------------------------------------------------------------
@@ -23,10 +25,12 @@ freshI act =
 -- | Get a fresh ivar, when working under a Sub.
 freshIS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
 freshIS act =
+  let oldsub = ?sub in
   let fresh = dom ?cof in
   let ?sub  = setDom (fresh+1) ?sub `ext` IVar fresh in
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
-  seq ?sub $ seq?cof $ act fresh
+  traceShow ("FRESHIS", oldsub, ?sub) $
+  seq ?sub $ seq ?cof $ act fresh
 {-# inline freshIS #-}
 
 -- | Define the next fresh ivar to an expression.
@@ -70,9 +74,11 @@ ceq c1 c2 = case (unF c1, unF c2) of
   (i, j) | i == j -> ctrue
   (i, j) -> matchIVar i
     (\x -> matchIVar j
-     (\y -> F (VCNe (NCEq i j) (IS.singleton x <> IS.singleton y)))
-     cfalse)
-    cfalse
+      (\y -> F (VCNe (NCEq i j) (IS.singleton x <> IS.singleton y)))
+      (F (VCNe (NCEq i j) (IS.singleton x))))
+    (matchIVar j
+      (\y -> F (VCNe (NCEq i j) (IS.singleton y)))
+      cfalse)
 
 evalI :: SubArg => NCofArg => I -> F I
 evalI i = F (doSub ?cof (doSub ?sub i))
@@ -140,7 +146,9 @@ bindIS x act = freshIS \i -> F (BindI x i (unF (act (F (IVar i)))))
 {-# inline bindIS #-}
 
 bindILazyS :: Name -> (SubArg => NCofArg => F I -> F a) -> SubArg => NCofArg => F (BindILazy a)
-bindILazyS x act = freshIS \i -> F (BindILazy x i (unF (act (F (IVar i)))))
+bindILazyS x act =
+  traceShow ("PRE", ?sub) $
+  freshIS \i -> traceShow ("POST", ?sub) $ F (BindILazy x i (unF (act (F (IVar i)))))
 {-# inline bindILazyS #-}
 
 bindILazySnf x act = unF (bindILazyS x act); {-# inline bindILazySnf #-}
@@ -179,7 +187,7 @@ vshcons cof i v ~sys = case unF cof of
 vshconsS :: SubArg => NCofArg => F VCof -> Name -> (SubArg => NCofArg => F I -> F Val)
          -> F VSysHCom -> F VSysHCom
 vshconsS cof i v ~sys = case unF cof of
-  VCTrue      -> F (VSHTotal (bindILazySnf i v))
+  VCTrue      -> let x = F (VSHTotal (bindILazySnf i v)) in traceShow ("KEL", x) x
   VCFalse     -> sys
   VCNe cof is -> case unF sys of
     VSHTotal v'   -> F (VSHTotal v')
@@ -189,7 +197,8 @@ vshconsS cof i v ~sys = case unF cof of
 evalSysHCom :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom
 evalSysHCom = \case
   SHEmpty            -> vshempty
-  SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> evalf t) (evalSysHCom sys)
+  SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> traceShow ("OO", t, ?sub, evalf t) (evalf t))
+                                                 (evalSysHCom sys)
 
 -- Mapping
 ----------------------------------------------------------------------------------------------------
@@ -281,6 +290,7 @@ infixl 8 ∙~
 (∙~) t ~u = case unF t of
   VLam t   -> t ∙ u
   VNe t is -> VNe (NApp t u) is
+  VTODO    -> VTODO
   _        -> impossible
 
 ----------------------------------------------------------------------------------------------------
@@ -362,8 +372,8 @@ capp (NCl _ t) ~u = case t of
   --   coh  := TODO
 
   CCoeInv (frc -> a) (frc -> r) (frc -> r') -> let ~x = u in coenf r r' a (frc x)
-  CCoeLinv0 a r r' -> uf
-  CCoeRinv0 a r r' -> uf
+  CCoeLinv0 a r r' -> VTODO
+  CCoeRinv0 a r r' -> VTODO
 
 
 -- | Apply an ivar closure.
@@ -410,6 +420,7 @@ proj1 :: F Val -> Val
 proj1 t = case unF t of
   VPair t _ -> t
   VNe t is  -> VNe (NProj1 t) is
+  VTODO     -> VTODO
   _         -> impossible
 {-# inline proj1 #-}
 
@@ -419,6 +430,7 @@ proj2 :: F Val -> Val
 proj2 t = case unF t of
   VPair _ u -> u
   VNe t is  -> VNe (NProj2 t) is
+  VTODO     -> VTODO
   _         -> impossible
 {-# inline proj2 #-}
 
@@ -429,6 +441,7 @@ natElim p z s n = case unF n of
   VZero           -> z
   VSuc (frc -> n) -> s ∘ unF n ∙ natElim p z s n
   VNe n is        -> VNe (NNatElim p z (unF s) n) is
+  VTODO           -> VTODO
   _               -> impossible
 
 natElimf  p z s n = frc  (natElim p z s n); {-# inline natElimf  #-}
@@ -479,7 +492,7 @@ coed r r' topA t = case unF topA ^. body of
            (IS.insertI (unF r) $ IS.insertI (unF r') is))
 
   VGlueTy a sys is ->
-    uf
+    F VTODO
 
   _ ->
     impossible
@@ -548,7 +561,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 
   VNat -> case ?dom of
     0 -> base
-    _ -> uf -- hcomNatdn r r' (F nts) base
+    _ -> F VTODO -- hcomNatdn r r' (F nts) base
 
   VPathP a lhs rhs ->
     F $ VPLam lhs rhs
@@ -559,10 +572,10 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     F $ VNe (NHCom (unF r) (unF r') a nts (unF base)) (is <> is')
 
   VU ->
-    uf
+    F VTODO
 
   VGlueTy a sys is' ->
-    uf
+    F VTODO
 
   _ ->
     impossible
@@ -571,7 +584,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 hcom :: NCofArg => DomArg => F I -> F I -> F Val -> F VSysHCom -> F Val -> Val
 hcom r r' ~a ~t ~b
   | r == r'                = unF b
-  | VSHTotal v    <- unF t = v ∙ unF r'
+  | VSHTotal v    <- unF t = (v ∙ unF r')
   | VSHNe nsys is <- unF t = hcomdnnf r r' a (F (nsys, is)) b
 {-# inline hcom #-}
 
@@ -634,6 +647,7 @@ eval = \case
   Zero            -> VZero
   Suc t           -> VSuc (eval t)
   NatElim p z s n -> natElim (eval p) (eval z) (evalf s) (evalf n)
+  TODO            -> VTODO
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)
@@ -683,6 +697,7 @@ instance Force Val Val where
     VNat              -> F VNat
     VZero             -> F VZero
     VSuc t            -> F (VSuc (sub t))
+    VTODO             -> F VTODO
 
 instance Force Ne Val where
   frc = \case
@@ -842,4 +857,4 @@ coeIsEquiv a r r' =
   VPair (VLam $ NCl "x" (CCoeInv   a r r')) $
   VPair (VLam $ NCl "x" (CCoeLinv0 a r r')) $
   VPair (VLam $ NCl "x" (CCoeRinv0 a r r')) $
-        uf
+        VTODO

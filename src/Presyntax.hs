@@ -48,5 +48,5 @@ data Sys = SEmpty | SCons Cof Tm Sys
 data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
   deriving Show
 
-data Top = TDef Name (Maybe Ty) Tm Top | TEmpty
+data Top = TDef (DontShow SourcePos) Name (Maybe Ty) Tm Top | TEmpty
   deriving Show

@@ -1,4 +1,7 @@
 
-- Finish comp rules (Glue)
-- Pretty print
-- User interaction
+- test stuff
+- Add Undefined value for placeholding
+
+- User interaction, copy from sett
+- add parametrized strict inductives (then perhaps remove Nat)
+- add weak HITs

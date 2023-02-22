@@ -44,6 +44,7 @@ instance Quote Val Tm where
     VNat             -> Nat
     VZero            -> Zero
     VSuc t           -> Suc (quote t)
+    VTODO            -> TODO
 
 instance Quote a b => Quote (BindCofLazy a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}

@@ -8,18 +8,21 @@ import qualified Data.IntMap.Strict as IM
 import System.Exit
 import Data.List
 
-import Common
+import Common hiding (debug)
 import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalf)
 import CoreTypes
 import Interval
 import Quotation
 import Substitution
 
+import qualified Common
 import qualified Conversion
 import qualified Core
 import qualified Presyntax as P
 
 import Pretty
+
+-- import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -50,6 +53,9 @@ evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
 
 evalInf :: NCofArg => I -> I
 evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
+
+debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
+debug x = withNames (Common.debug x)
 
 -- Context
 --------------------------------------------------------------------------------
@@ -96,13 +102,6 @@ bindI x act =
   let _ = ?cof; _ = ?tbl in
   act fresh
 {-# inline bindI #-}
-
--- | Extend cxt with a cof (by conjunction)
-bindCof :: Cof -> Elab a -> Elab a
-bindCof cof act =
-  let ?cof = conjVCof ?cof (evalCof cof)
-  in seq ?cof act
-{-# inline bindCof #-}
 
 -- | Extend cxt with a cof (by conjunction)
 bindVCof :: F VCof -> Elab a -> Elab a
@@ -164,7 +163,7 @@ displayErrInCxt file (ErrInCxt e) = withNames do
   let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
       lnum = show linum
       lpad = map (const ' ') lnum
-      msg = case e of
+      msg  = case e of
         CantConvert t u ->
           ("Cannot convert expected type\n\n" ++
            "  " ++ showTm u ++ "\n\n" ++
@@ -172,6 +171,8 @@ displayErrInCxt file (ErrInCxt e) = withNames do
            "  " ++ showTm t)
         NameNotInScope x ->
            "Name not in scope: " ++ x
+        TopShadowing ->
+           "Duplicate top-level name"
         e -> show e
 
   putStrLn (show path ++ ":" ++ lnum ++ ":" ++ show colnum)
@@ -183,13 +184,16 @@ displayErrInCxt file (ErrInCxt e) = withNames do
 
 --------------------------------------------------------------------------------
 
+setPos :: DontShow SourcePos -> (PosArg => a) -> a
+setPos pos act = let ?srcPos = coerce pos in act; {-# inline setPos #-}
+
 data Infer = Infer Tm ~VTy
 
 check :: Elab (P.Tm -> VTy -> IO Tm)
 check t topA = case t of
 
-  P.Pos pos t -> do
-    let ?srcPos = coerce pos in check t topA
+  P.Pos pos t ->
+    setPos pos $ check t topA
 
   P.Let x Nothing t u -> do
     Infer t a <- infer t
@@ -209,9 +213,16 @@ check t topA = case t of
       Lam x <$!> bind x a (\v -> check t (capp b v))
 
     (P.Lam x t, VPathP a l r) -> do
+      debug ["PLAM CHECK START"]
       t <- bindI x \r -> check t (icapp a (IVar r))
+      bindI x \r -> debug ["PLAM body", showTm t, showTm (quote (icapp a (IVar r)))]
+      debug ["PLAM sides", showTm (quote l), showTm (quote r)]
+      -- debug [show (evalTopSub t (F I0)), show l]
       conv (evalTopSub t (F I0)) l
-      conv (evalTopSub t (F I1)) r
+      debug ["foo"]
+      debug ["ELLLL", show (evalTopSub t (F I1)), show r]
+      conv (evalTopSub t (F I1)) r -- PROBLEMO
+      debug ["bar"]
       pure $! PLam (quote l) (quote r) x t
 
     (P.Pair t u, VSg a b) -> do
@@ -248,7 +259,7 @@ infer = \case
     pure $! Infer (PathP x a t u) VU
 
   P.Pos pos t ->
-    let ?srcPos = coerce pos in infer t
+    setPos pos $ infer t
 
   P.Let x Nothing t u -> do
     Infer t a <- infer t
@@ -369,7 +380,7 @@ infer = \case
 checkI :: Elab (P.Tm -> IO I)
 checkI = \case
   P.Pos pos t ->
-    let ?srcPos = coerce pos in checkI t
+    setPos pos $ checkI t
 
   P.I0 -> pure I0
   P.I1 -> pure I1
@@ -398,8 +409,11 @@ checkCof = \case
 goSysCompatHCom :: Elab (Tm -> SysHCom -> IO ())
 goSysCompatHCom t = \case
   SHEmpty              -> pure ()
-  SHCons cof' x t' sys -> do bindCof cof' $ bindI x \_ -> conv (eval t) (eval t')
-                             goSysCompatHCom t sys
+  SHCons cof' x t' sys -> do
+    case unF (evalCof cof') of
+      VCFalse     -> pure ()
+      (F -> cof') -> bindVCof cof' $ bindI x \_ -> conv (eval t) (eval t')
+    goSysCompatHCom t sys
 
 sysCompatHCom :: Elab (F VCof -> Tm -> SysHCom -> IO ())
 sysCompatHCom cof t sys = bindVCof cof $ goSysCompatHCom t sys
@@ -451,8 +465,11 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
 goSysCompat :: Elab (Tm -> Sys -> IO ())
 goSysCompat t = \case
   SEmpty            -> pure ()
-  SCons cof' t' sys -> do bindCof cof' $ conv (eval t) (eval t')
-                          goSysCompat t sys
+  SCons cof' t' sys -> do
+    case unF (evalCof cof') of
+      VCFalse     -> pure ()
+      (F -> cof') -> bindVCof cof' $ conv (eval t) (eval t')
+    goSysCompat t sys
 
 sysCompat :: Elab (F VCof -> Tm -> Sys -> IO ())
 sysCompat cof t sys = bindVCof cof $ goSysCompat t sys
@@ -490,20 +507,20 @@ noTopShadowing x = case M.lookup x ?tbl of
 inferTop :: ElabTop (P.Top -> IO Top)
 inferTop = \case
 
-  P.TDef x Nothing t top -> do
+  P.TDef pos x ma t top -> setPos pos do
     noTopShadowing x
-    Infer t a <- infer t
-    let ~vt = eval t
-    withNames $ debug ["NF", showTm (quote vt)]
-    top <- defineTop x a vt $ inferTop top
-    pure $! TDef x (quote a) t top
+    (a, va, t) <- case ma of
+      Nothing -> do
+        Infer t va <- infer t
+        pure (quote va, va, t)
+      Just a -> do
+        a <- check a VU
+        let ~va = eval a
+        t <- check t va
+        pure (a, va, t)
 
-  P.TDef x (Just a) t top -> do
-    noTopShadowing x
-    a <- check a VU
-    let va = eval a
-    t <- check t va
     let ~vt = eval t
+    withNames $ debug ["TOPNF", x, show t, showTm (quote vt)]
     top <- defineTop x va vt $ inferTop top
     pure $! TDef x a t top
 
