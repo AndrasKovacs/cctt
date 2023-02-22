@@ -1,9 +1,12 @@
 
-module Elaboration where
+module Elaboration (elabTop) where
 
 import Control.Exception
-import Text.Megaparsec (SourcePos)
+import Text.Megaparsec (SourcePos(..), unPos, initialPos)
 import qualified Data.Map.Strict as M
+import qualified Data.IntMap.Strict as IM
+import System.Exit
+import Data.List
 
 import Common
 import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalf)
@@ -16,12 +19,14 @@ import qualified Conversion
 import qualified Core
 import qualified Presyntax as P
 
+import Pretty
+
 --------------------------------------------------------------------------------
 
 conv :: Elab (Val -> Val -> IO ())
 conv t u = if Conversion.conv t u
   then pure ()
-  else err CantConvert
+  else err $ CantConvert (quote t) (quote u)
 
 convCof :: Elab (F VCof -> F VCof -> IO ())
 convCof c c' = if Conversion.conv (unF c) (unF c')
@@ -53,6 +58,7 @@ data Entry
   = Top Lvl VTy ~Val      -- level, type, value
   | Local Lvl VTy         -- level, type
   | LocalInt IVar
+  deriving Show
 
 type Table = M.Map Name Entry
 
@@ -118,20 +124,62 @@ data Error
   | CantInferLam
   | CantInferPair
   | CantInferGlueTm
-  | CantConvert      -- TODO: add infos
+  | CantConvert Tm Tm
   | CantConvertCof
   | GlueTmSystemMismatch
+  | TopShadowing
   deriving Show
 
 instance Exception Error where
 
-data ErrInCxt = ErrInCxt SourcePos Error -- TODO: pretty error
-  deriving Show
+data ErrInCxt where
+  ErrInCxt :: (TableArg, PosArg) => Error -> ErrInCxt
+
+instance Show ErrInCxt where
+  show (ErrInCxt e) = show e
 
 instance Exception ErrInCxt
 
-err :: PosArg => Error -> IO a
-err e = throwIO $ ErrInCxt ?srcPos e
+err :: TableArg => PosArg => Error -> IO a
+err e = throwIO $ ErrInCxt e
+
+-- | Convert the symbol table to a printing environment.
+withNames :: TableArg => (TopNames => Names => INames => a) -> a
+withNames act =
+  let go (!top, !ns, !ins) n = \case
+        Top x _ _  -> let x' :: Int = fromIntegral x in ((x',n):top, ns, ins)
+        Local x _  -> (top, (x,n):ns, ins)
+        LocalInt x -> (top, ns, (x,n):ins)
+      (top, ns, ins) = M.foldlWithKey' go ([], [], []) ?tbl in
+
+  let ?top    = IM.fromList top
+      ?names  = map snd $ sortBy (\(x, _) (y, _) -> compare y x) ns
+      ?inames = map snd $ sortBy (\(x, _) (y, _) -> compare y x) ins in
+  act
+{-# inline withNames #-}
+
+displayErrInCxt :: String -> ErrInCxt -> IO ()
+displayErrInCxt file (ErrInCxt e) = withNames do
+
+  let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
+      lnum = show linum
+      lpad = map (const ' ') lnum
+      msg = case e of
+        CantConvert t u ->
+          ("Cannot convert expected type\n\n" ++
+           "  " ++ showTm u ++ "\n\n" ++
+           "and inferred type\n\n" ++
+           "  " ++ showTm t)
+        NameNotInScope x ->
+           "Name not in scope: " ++ x
+        e -> show e
+
+  putStrLn (show path ++ ":" ++ lnum ++ ":" ++ show colnum)
+  putStrLn (lpad ++ " |")
+  putStrLn (lnum ++ " | " ++ (lines file !! (linum - 1)))
+  putStrLn (lpad ++ " | " ++ replicate (colnum - 1) ' ' ++ "^")
+  putStrLn msg
+  putStrLn ""
 
 --------------------------------------------------------------------------------
 
@@ -320,15 +368,20 @@ infer = \case
 
 checkI :: Elab (P.Tm -> IO I)
 checkI = \case
+  P.Pos pos t ->
+    let ?srcPos = coerce pos in checkI t
+
   P.I0 -> pure I0
   P.I1 -> pure I1
 
-  P.Ident x -> case M.lookup x ?tbl of
-    Nothing           -> err $ NameNotInScope x
-    Just (LocalInt l) -> pure $ IVar l
-    Just _            -> err ExpectedI
+  P.Ident x -> do
+    case M.lookup x ?tbl of
+      Nothing           -> err $ NameNotInScope x
+      Just (LocalInt l) -> pure $ IVar l
+      Just _            -> err ExpectedI
 
-  _ -> err ExpectedI
+  t -> do
+    err ExpectedI
 
 --------------------------------------------------------------------------------
 
@@ -419,29 +472,52 @@ elabGlueTySys a = \case
 
 ------------------------------------------------------------
 
-inferTop :: Elab (P.Top -> IO Top)
+type ElabTop a = (?topLvl :: Lvl) => Elab a
+
+defineTop :: Name -> VTy -> Val -> ElabTop a -> ElabTop a
+defineTop x a ~v act =
+  let ?topLvl = ?topLvl + 1
+      ?tbl    = M.insert x (Top ?topLvl a v) ?tbl in
+  let _ = ?topLvl; _ = ?tbl in
+  act
+{-# inline defineTop #-}
+
+noTopShadowing :: ElabTop (Name -> IO ())
+noTopShadowing x = case M.lookup x ?tbl of
+  Just{} -> err TopShadowing
+  _      -> pure ()
+
+inferTop :: ElabTop (P.Top -> IO Top)
 inferTop = \case
 
   P.TDef x Nothing t top -> do
+    noTopShadowing x
     Infer t a <- infer t
     let ~vt = eval t
-    define x a vt $ inferTop top
+    withNames $ debug ["NF", showTm (quote vt)]
+    top <- defineTop x a vt $ inferTop top
+    pure $! TDef x (quote a) t top
 
   P.TDef x (Just a) t top -> do
+    noTopShadowing x
     a <- check a VU
     let va = eval a
     t <- check t va
     let ~vt = eval t
-    define x va vt $ inferTop top
+    top <- defineTop x va vt $ inferTop top
+    pure $! TDef x a t top
 
   P.TEmpty ->
     pure TEmpty
 
-elabTop :: SourcePos -> P.Top -> IO Top
-elabTop pos top = do
+elabTop :: FilePath -> String -> P.Top -> IO Top
+elabTop path file top = do
   let ?cof    = idSub 0
       ?dom    = 0
       ?env    = ENil
       ?tbl    = mempty
-      ?srcPos = pos
-  inferTop top
+      ?srcPos = initialPos path
+      ?topLvl = 0
+  catch (inferTop top) \(e :: ErrInCxt) -> do
+    displayErrInCxt file e
+    exitSuccess

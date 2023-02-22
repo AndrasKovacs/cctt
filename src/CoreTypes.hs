@@ -172,7 +172,7 @@ data Ne
   = NLocalVar Lvl
   | NSub Ne Sub
   | NApp Ne Val
-  | NPApp Ne ~Val ~Val I
+  | NPApp ~Val ~Val Ne I
   | NProj1 Ne
   | NProj2 Ne
   | NCoe I I (BindI Val) Val

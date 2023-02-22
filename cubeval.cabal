@@ -86,6 +86,7 @@ executable cubeval
       TypeApplications
       TypeFamilies
       TypeFamilyDependencies
+      OverloadedStrings
       UndecidableInstances
       UnicodeSyntax
       ViewPatterns

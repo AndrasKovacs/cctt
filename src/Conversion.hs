@@ -34,8 +34,8 @@ instance Conv Val where
     (F -> t         , VLam t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
     (VPair t u      , F -> t'           ) -> conv t (proj1 t') && conv u (proj2 t')
     (F -> t         , VPair t' u'       ) -> conv (proj1 t) t' && conv (proj2 t) u'
-    (VPLam l r t    , F -> t'           ) -> freshI \(IVar -> i) -> conv (t ∙ i) (papp t' l r (F i))
-    (F -> t         , VPLam l r t'      ) -> freshI \(IVar -> i) -> conv (papp t l r (F i)) (t' ∙ i)
+    (VPLam l r t    , F -> t'           ) -> freshI \(IVar -> i) -> conv (t ∙ i) (papp l r t' (F i))
+    (F -> t         , VPLam l r t'      ) -> freshI \(IVar -> i) -> conv (papp l r t (F i)) (t' ∙ i)
 
     (VSub{}         , _                 ) -> impossible
     (_              , VSub{}            ) -> impossible

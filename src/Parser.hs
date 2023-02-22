@@ -230,9 +230,9 @@ top = branch ident
 src :: Parser Top
 src = ws *> top <* eof
 
-parseString :: String -> IO Top
-parseString s =
-  case parse src "(stdin)" s of
+parseString :: FilePath -> String -> IO Top
+parseString path s =
+  case parse src path s of
     Left e -> do
       putStrLn $ errorBundlePretty e
       exitFailure
@@ -242,5 +242,5 @@ parseString s =
 parseStdin :: IO (Top, String)
 parseStdin = do
   s <- getContents
-  t <- parseString s
+  t <- parseString "(stdin)" s
   pure (t, s)

@@ -378,15 +378,15 @@ icapp (NICl _ t) arg = case t of
              (vshcons (ceq j (F I0)) "i" (\i -> lhs ∘ unF i) $
               vshcons (ceq j (F I1)) "i" (\i -> rhs ∘ unF i) $
               vshempty)
-             (pappf (frc p) (lhs ∙ unF r') (rhs ∙ unF r') j)
+             (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j)
 
   ICHComPathP (frc -> r) (frc -> r') a lhs rhs sys p ->
     let farg = frc arg in
     hcom r r' (a ∘ unF farg)
       (vshcons (ceq farg (F I0)) "i" (\i -> frc lhs) $
        vshcons (ceq farg (F I1)) "i" (\i -> frc rhs) $
-       mapVSysHCom (\_ t -> pappf (frc t) lhs rhs farg) (frc sys))
-      (pappf (frc p) lhs rhs farg)
+       mapVSysHCom (\_ t -> pappf lhs rhs (frc t) farg) (frc sys))
+      (pappf lhs rhs (frc p) farg)
 
   ICConst t -> t
 
@@ -404,7 +404,7 @@ icapp (NICl _ t) arg = case t of
     let ~i   = frc arg
         ~fx  = f ∙ x
         ~gfx = g ∙ fx  in
-    path b (f ∙ papp (linv ∘ x) x gfx i) fx
+    path b (f ∙ papp x gfx (linv ∘ x) i) fx
 
 proj1 :: F Val -> Val
 proj1 t = case unF t of
@@ -434,13 +434,13 @@ natElim p z s n = case unF n of
 natElimf  p z s n = frc  (natElim p z s n); {-# inline natElimf  #-}
 
 -- | Apply a path.
-papp :: NCofArg => DomArg => F Val -> Val -> Val -> F I -> Val
-papp ~t ~u0 ~u1 i = case unF i of
-  I0     -> u0
-  I1     -> u1
+papp :: NCofArg => DomArg => Val -> Val -> F Val -> F I -> Val
+papp ~l ~r ~t i = case unF i of
+  I0     -> l
+  I1     -> r
   IVar x -> case unF t of
     VPLam _ _ t -> t ∙ IVar x
-    VNe t is    -> VNe (NPApp t u0 u1 (IVar x)) (IS.insert x is)
+    VNe t is    -> VNe (NPApp l r t (IVar x)) (IS.insert x is)
     _           -> impossible
 {-# inline papp #-}
 
@@ -512,6 +512,17 @@ com r r' ~a ~sys ~b
   | VSHNe nsys is <- unF sys = comdnnf r r' a (F (nsys, is)) b
 {-# inline com #-}
 
+-- projZero :: NCofArg => DomArg => F I -> F I -> F NeSysHCom -> F Val
+-- projZero r r' sys = case unF sys of
+
+-- projSuc :: NCofArg => DomArg => F I -> F I -> F NeSysHCom -> F Val -> F Val
+-- projSuc = uf
+
+-- -- | HCom Nat with off-diagonal I args ("d") and neutral system arg ("n").
+-- hcomNatdn :: NCofArg => DomArg => F I -> F I -> F NeSysHCom -> F Val -> F Val
+-- hcomNatdn r r' sys base = case unF base of
+--   VZero  -> projZero r r' sys
+--   VSuc n -> hcomNatdn r r'
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: NCofArg => DomArg => F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> F Val
@@ -535,7 +546,9 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
         (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
         (proj2f base))
 
-  VNat -> uf
+  VNat -> case ?dom of
+    0 -> base
+    _ -> uf -- hcomNatdn r r' (F nts) base
 
   VPathP a lhs rhs ->
     F $ VPLam lhs rhs
@@ -610,7 +623,7 @@ eval = \case
   Proj2 t         -> proj2 (evalf t)
   U               -> VU
   PathP x a t u   -> VPathP (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
-  PApp t u0 u1 i  -> papp (evalf t) (eval u0) (eval u1) (evalI i)
+  PApp l r t i    -> papp (eval l) (eval r) (evalf t) (evalI i)
   PLam l r x t    -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
   Coe r r' x a t  -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
   HCom r r' a t b -> hcom (evalI r) (evalI r') (evalf a) (evalSysHCom t) (evalf b)
@@ -676,7 +689,7 @@ instance Force Ne Val where
     t@NLocalVar{}     -> F (VNe t mempty)
     NSub n s          -> let ?sub = s in frcS n
     NApp t u          -> frc t ∘ u
-    NPApp t l r i     -> pappf (frc t) l r (frc i)
+    NPApp l r t i     -> pappf l r (frc t) (frc i)
     NProj1 t          -> proj1f (frc t)
     NProj2 t          -> proj2f (frc t)
     NCoe r r' a t     -> coe (frc r) (frc r') (frc a) (frc t)
@@ -689,7 +702,7 @@ instance Force Ne Val where
     t@NLocalVar{}     -> F (VNe t mempty)
     NSub n s          -> let ?sub = sub s in frcS n
     NApp t u          -> frcS t ∘ sub u
-    NPApp t l r i     -> pappf (frcS t) (sub l) (sub r) (frcS i)
+    NPApp l r t i     -> pappf (sub l) (sub r) (frcS t) (frcS i)
     NProj1 t          -> proj1f (frcS t)
     NProj2 t          -> proj2f (frcS t)
     NCoe r r' a t     -> coe (frcS r) (frcS r') (frcS a) (frcS t)
@@ -780,7 +793,7 @@ unSubNeS = \case
   NSub n s             -> let ?sub = sub s in unSubNeS n
   NLocalVar x          -> NLocalVar x
   NApp t u             -> NApp (sub t) (sub u)
-  NPApp p l r i        -> NPApp (sub p) (sub l) (sub r) (sub i)
+  NPApp l r p i        -> NPApp (sub l) (sub r) (sub p) (sub i)
   NProj1 t             -> NProj1 (sub t)
   NProj2 t             -> NProj2 (sub t)
   NCoe r r' a t        -> NCoe (sub r) (sub r') (sub a) (sub t)

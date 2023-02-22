@@ -9,14 +9,14 @@ import Data.List
 import Data.Bits
 import Lens.Micro.Platform
 
-#ifdef DEBUG
-import GHC.Stack
-#endif
-
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
 
--- define DEBUG
+#define DEBUG
+
+#ifdef DEBUG
+import GHC.Stack
+#endif
 
 #ifdef DEBUG
 type Dbg = HasCallStack
@@ -98,13 +98,13 @@ infixl 4 <$!>
 --------------------------------------------------------------------------------
 
 newtype Ix = Ix {unIx :: Word}
-  deriving (Eq, Ord, Show, Num, Enum, Bits) via Word
+  deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real) via Word
 
 newtype Lvl = Lvl {unLvl :: Word}
-  deriving (Eq, Ord, Show, Num, Enum, Bits) via Word
+  deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real) via Word
 
 newtype IVar = IVar# {unIVar :: Word}
-  deriving (Eq, Ord, Show, Num, Enum, Bits) via Word
+  deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real) via Word
 
 lvlToIx :: Lvl -> Lvl -> Ix
 lvlToIx (Lvl envl) (Lvl x) = Ix (envl - x - 1)
