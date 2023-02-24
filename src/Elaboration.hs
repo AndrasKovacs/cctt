@@ -213,16 +213,9 @@ check t topA = case t of
       Lam x <$!> bind x a (\v -> check t (capp b v))
 
     (P.Lam x t, VPathP a l r) -> do
-      debug ["PLAM CHECK START"]
       t <- bindI x \r -> check t (icapp a (IVar r))
-      bindI x \r -> debug ["PLAM body", showTm t, showTm (quote (icapp a (IVar r)))]
-      debug ["PLAM sides", showTm (quote l), showTm (quote r)]
-      -- debug [show (evalTopSub t (F I0)), show l]
       conv (evalTopSub t (F I0)) l
-      debug ["foo"]
-      debug ["ELLLL", show (evalTopSub t (F I1)), show r]
-      conv (evalTopSub t (F I1)) r -- PROBLEMO
-      debug ["bar"]
+      conv (evalTopSub t (F I1)) r
       pure $! PLam (quote l) (quote r) x t
 
     (P.Pair t u, VSg a b) -> do
@@ -520,7 +513,7 @@ inferTop = \case
         pure (a, va, t)
 
     let ~vt = eval t
-    withNames $ debug ["TOPNF", x, show t, showTm (quote vt)]
+    withNames $ debug ["TOPNF", x, showTm (quote vt)]
     top <- defineTop x va vt $ inferTop top
     pure $! TDef x a t top
 

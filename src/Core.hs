@@ -7,9 +7,10 @@ import Interval
 import Substitution
 import CoreTypes
 
-import Debug.Trace
+-- import Debug.Trace
 
 
+----------------------------------------------------------------------------------------------------
 -- Context manipulation primitives
 ----------------------------------------------------------------------------------------------------
 
@@ -18,19 +19,16 @@ freshI :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshI act =
   let fresh = dom ?cof in
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
-  let _     = ?cof in
-  act fresh
+  seq ?cof (act fresh)
 {-# inline freshI #-}
 
 -- | Get a fresh ivar, when working under a Sub.
 freshIS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
 freshIS act =
-  let oldsub = ?sub in
   let fresh = dom ?cof in
   let ?sub  = setDom (fresh+1) ?sub `ext` IVar fresh in
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
-  traceShow ("FRESHIS", oldsub, ?sub) $
-  seq ?sub $ seq ?cof $ act fresh
+  seq ?sub (seq ?cof (act fresh))
 {-# inline freshIS #-}
 
 -- | Define the next fresh ivar to an expression.
@@ -53,6 +51,57 @@ assumeCof cof act = let ?cof = conjNeCof ?cof cof in seq ?cof act
 {-# inline assumeCof #-}
 
 
+----------------------------------------------------------------------------------------------------
+-- Creating semantic binders
+----------------------------------------------------------------------------------------------------
+
+
+bindCof :: NeCof -> (NCofArg => a) -> (NCofArg => BindCof a)
+bindCof cof act = assumeCof cof (BindCof cof act)
+{-# inline bindCof #-}
+
+bindCoff :: NeCof -> (NCofArg => F a) -> (NCofArg => F (BindCof a))
+bindCoff cof act = assumeCof cof (F (BindCof cof (unF act)))
+{-# inline bindCoff #-}
+
+bindCofLazy :: NeCof -> (NCofArg => F a) -> (NCofArg => F (BindCofLazy a))
+bindCofLazy cof act = assumeCof cof (F (BindCofLazy cof (unF act)))
+{-# inline bindCofLazy #-}
+
+bindCofLazynf :: NeCof -> (NCofArg => F a) -> (NCofArg => BindCofLazy a)
+bindCofLazynf cof act = unF (bindCofLazy cof act)
+{-# inline bindCofLazynf #-}
+
+bindI :: Name -> (NCofArg => F I -> a) -> (NCofArg => BindI a)
+bindI x act = freshI \i -> BindI x i (act (F (IVar i)))
+{-# inline bindI #-}
+
+bindIf :: Name -> (NCofArg => F I -> F a) -> (NCofArg => F (BindI a))
+bindIf x act = freshI \i -> F (BindI x i (unF (act (F (IVar i)))))
+{-# inline bindIf #-}
+
+bindILazy :: Name -> (NCofArg => F I -> F a) -> (NCofArg => F (BindILazy a))
+bindILazy x act = freshI \i -> F (BindILazy x i (unF (act (F (IVar i)))))
+{-# inline bindILazy #-}
+
+bindILazynf :: Name -> (NCofArg => F I -> F a) -> (NCofArg => BindILazy a)
+bindILazynf x act = unF (bindILazy x act)
+{-# inline bindILazynf #-}
+
+bindIS :: Name -> (SubArg => NCofArg => F I -> F a) -> (SubArg => NCofArg => F (BindI a))
+bindIS x act = freshIS \i -> F (BindI x i (unF (act (F (IVar i)))))
+{-# inline bindIS #-}
+
+bindILazyS :: Name -> (SubArg => NCofArg => F I -> F a) -> (SubArg => NCofArg => F (BindILazy a))
+bindILazyS x act = freshIS \i -> F (BindILazy x i (unF (act (F (IVar i)))))
+{-# inline bindILazyS #-}
+
+bindILazySnf :: Name -> (SubArg => NCofArg => F I -> F a) -> (SubArg => NCofArg => BindILazy a)
+bindILazySnf x act = unF (bindILazyS x act)
+{-# inline bindILazySnf #-}
+
+
+----------------------------------------------------------------------------------------------------
 -- Cof and Sys semantics
 ----------------------------------------------------------------------------------------------------
 
@@ -111,47 +160,7 @@ conjVCof ncof cof = case unF cof of
   VCFalse      -> impossible
   VCTrue       -> ncof
   VCNe necof _ -> conjNeCof ncof necof
-{-# noinline conjVCof #-}
-
-bindCof :: NeCof -> (NCofArg => a) -> NCofArg => BindCof a
-bindCof cof act = assumeCof cof (BindCof cof act)
-{-# inline bindCof #-}
-
-bindCoff :: NeCof -> (NCofArg => F a) -> NCofArg => F (BindCof a)
-bindCoff cof act = assumeCof cof (F (BindCof cof (unF act)))
-{-# inline bindCoff #-}
-
-bindCofLazy :: NeCof -> (NCofArg => F a) -> NCofArg => F (BindCofLazy a)
-bindCofLazy cof act = assumeCof cof (F (BindCofLazy cof (unF act)))
-{-# inline bindCofLazy #-}
-
-bindCofLazynf cof act = unF (bindCofLazy cof act); {-# inline bindCofLazynf #-}
-
-bindI :: Name -> (NCofArg => F I -> a) -> NCofArg => BindI a
-bindI x act = freshI \i -> BindI x i (act (F (IVar i)))
-{-# inline bindI #-}
-
-bindIf :: Name -> (NCofArg => F I -> F a) -> NCofArg => F (BindI a)
-bindIf x act = freshI \i -> F (BindI x i (unF (act (F (IVar i)))))
-{-# inline bindIf #-}
-
-bindILazy :: Name -> (NCofArg => F I -> F a) -> NCofArg => F (BindILazy a)
-bindILazy x act = freshI \i -> F (BindILazy x i (unF (act (F (IVar i)))))
-{-# inline bindILazy #-}
-
-bindILazynf x act = unF (bindILazy x act); {-# inline bindILazynf #-}
-
-bindIS :: Name -> (SubArg => NCofArg => F I -> F a) -> SubArg => NCofArg => F (BindI a)
-bindIS x act = freshIS \i -> F (BindI x i (unF (act (F (IVar i)))))
-{-# inline bindIS #-}
-
-bindILazyS :: Name -> (SubArg => NCofArg => F I -> F a) -> SubArg => NCofArg => F (BindILazy a)
-bindILazyS x act =
-  traceShow ("PRE", ?sub) $
-  freshIS \i -> traceShow ("POST", ?sub) $ F (BindILazy x i (unF (act (F (IVar i)))))
-{-# inline bindILazyS #-}
-
-bindILazySnf x act = unF (bindILazyS x act); {-# inline bindILazySnf #-}
+{-# inline conjVCof #-}
 
 vsempty :: F VSys
 vsempty = F (VSNe NSEmpty mempty)
@@ -187,7 +196,7 @@ vshcons cof i v ~sys = case unF cof of
 vshconsS :: SubArg => NCofArg => F VCof -> Name -> (SubArg => NCofArg => F I -> F Val)
          -> F VSysHCom -> F VSysHCom
 vshconsS cof i v ~sys = case unF cof of
-  VCTrue      -> let x = F (VSHTotal (bindILazySnf i v)) in traceShow ("KEL", x) x
+  VCTrue      -> F (VSHTotal (bindILazySnf i v))
   VCFalse     -> sys
   VCNe cof is -> case unF sys of
     VSHTotal v'   -> F (VSHTotal v')
@@ -197,9 +206,10 @@ vshconsS cof i v ~sys = case unF cof of
 evalSysHCom :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom
 evalSysHCom = \case
   SHEmpty            -> vshempty
-  SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> traceShow ("OO", t, ?sub, evalf t) (evalf t))
-                                                 (evalSysHCom sys)
+  SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> evalf t) (evalSysHCom sys)
 
+
+----------------------------------------------------------------------------------------------------
 -- Mapping
 ----------------------------------------------------------------------------------------------------
 
@@ -211,6 +221,7 @@ mapBindILazy :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> 
 mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ unF i)
 {-# inline mapBindILazy #-}
 
+mapBindILazynf :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> BindILazy Val
 mapBindILazynf t f = unF (mapBindILazy t f); {-# inline mapBindILazynf #-}
 
 mapNeSysHCom :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F NeSysHCom -> F NeSysHCom
@@ -221,6 +232,7 @@ mapNeSysHCom f sys = F (go (unF sys)) where
     NSHCons t sys -> NSHCons (mapBindCof t \t -> mapBindILazynf t f) (go sys)
 {-# inline mapNeSysHCom #-}
 
+mapNeSysHComnf :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F NeSysHCom -> NeSysHCom
 mapNeSysHComnf f sys = unF (mapNeSysHCom f sys); {-# inline mapNeSysHComnf #-}
 
 mapNeSysHCom' :: NCofArg => (NCofArg => F I -> Val -> F Val)
@@ -235,6 +247,9 @@ mapVSysHCom f sys = case unF sys of
   VSHNe sys is -> F (VSHNe (mapNeSysHComnf f (F sys)) is)
 {-# inline mapVSysHCom #-}
 
+
+----------------------------------------------------------------------------------------------------
+-- Overloaded application and forcing
 ----------------------------------------------------------------------------------------------------
 
 infixl 8 ∙
@@ -248,6 +263,7 @@ instance Apply (F Val) Val Val NCofArg DomArg where
   (∙) t u = case unF t of
     VLam t   -> t ∙ u
     VNe t is -> VNe (NApp t u) is
+    VTODO    -> VTODO
     _        -> impossible
   {-# inline (∙) #-}
 
@@ -293,6 +309,9 @@ infixl 8 ∙~
   VTODO    -> VTODO
   _        -> impossible
 
+
+----------------------------------------------------------------------------------------------------
+-- Evaluation
 ----------------------------------------------------------------------------------------------------
 
 localVar :: EnvArg => Ix -> Val
@@ -444,7 +463,7 @@ natElim p z s n = case unF n of
   VTODO           -> VTODO
   _               -> impossible
 
-natElimf  p z s n = frc  (natElim p z s n); {-# inline natElimf  #-}
+natElimf p z s n = frc (natElim p z s n); {-# inline natElimf #-}
 
 -- | Apply a path.
 papp :: NCofArg => DomArg => Val -> Val -> F Val -> F I -> Val
@@ -457,13 +476,11 @@ papp ~l ~r ~t i = case unF i of
     _           -> impossible
 {-# inline papp #-}
 
-pappf  ~t ~u0 ~u1 i = frc  (papp t u0 u1 i); {-# inline pappf  #-}
+pappf ~t ~u0 ~u1 i = frc (papp t u0 u1 i); {-# inline pappf #-}
 
-
---------------------------------------------------------------------------------
 
 -- assumption: r /= r'
-coed :: NCofArg => DomArg => F I -> F I -> F (BindI Val) -> F Val -> F Val
+coed :: F I -> F I -> F (BindI Val) -> F Val -> NCofArg => DomArg => F Val
 coed r r' topA t = case unF topA ^. body of
 
   VPi (rebind topA -> a) (rebind topA -> b) ->
@@ -538,7 +555,7 @@ com r r' ~a ~sys ~b
 --   VSuc n -> hcomNatdn r r'
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
-hcomdn :: NCofArg => DomArg => F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> F Val
+hcomdn :: F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> NCofArg => DomArg => F Val
 hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 
   VPi a b ->
@@ -653,6 +670,8 @@ evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)
 {-# inline evalf #-}
 
+
+----------------------------------------------------------------------------------------------------
 -- Forcing
 ----------------------------------------------------------------------------------------------------
 
@@ -794,7 +813,7 @@ instance Force a fa => Force (BindILazy a) (BindILazy fa) where
     seq ?sub $ seq ?cof $ F (BindILazy x fresh (unF (frcS a)))
   {-# inline frcS #-}
 
-
+----------------------------------------------------------------------------------------------------
 -- Pushing neutral substitutions
 ----------------------------------------------------------------------------------------------------
 
@@ -818,8 +837,9 @@ unSubNeS = \case
   NNatElim p z s n     -> NNatElim (sub p) (sub z) (sub s) (sub n)
 
 
+----------------------------------------------------------------------------------------------------
 -- Definitions
---------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 fun :: Val -> Val -> Val
 fun a b = VPi a $ NCl "_" $ CConst b

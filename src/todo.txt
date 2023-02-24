@@ -1,6 +1,6 @@
 
 - test stuff
-- Add Undefined value for placeholding
+- Coq-style function definitions
 
 - User interaction, copy from sett
 - add parametrized strict inductives (then perhaps remove Nat)

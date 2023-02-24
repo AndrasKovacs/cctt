@@ -2,6 +2,9 @@ module Common (
     module Common
   , module Data.Bits
   , module Lens.Micro.Platform
+  , oneShot
+  , inline
+  , noinline
   , coerce) where
 
 import GHC.Exts

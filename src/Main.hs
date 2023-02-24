@@ -36,19 +36,24 @@ p2 = justElab $ unlines [
 
 p3 = justElab $ unlines [
    ""
-  -- ,"test2 : U := (A : U) × A;"
-  -- ,"test3 : (x : (A : U) × A) → x.1 := λ x. x.2;"
-  -- ,"test4 : (A : U) × A → U := λ _. U;"
-  -- ,"test5 : (A : U)(B : A → U)(a : A)(b : B a) → (a : A) × B a := λ A B a b. (a, b);"
-  -- ,"test6 : (A : U)(B : A → U)(x : (a : A) × B a) → A := λ A B x. x.1;"
-  -- ,"test7 : (A : U)(B : A → U)(x : (a : A) × B a) → B x.1 := λ A B x. x.2;"
+  ,"test2 : U := (A : U) × A;"
+  ,"test3 : (x : (A : U) × A) → x.1 := λ x. x.2;"
+  ,"test4 : (A : U) × A → U := λ _. U;"
+  ,"test5 : (A : U)(B : A → U)(a : A)(b : B a) → (a : A) × B a := λ A B a b. (a, b);"
+  ,"test6 : (A : U)(B : A → U)(x : (a : A) × B a) → A := λ A B x. x.1;"
+  ,"test7 : (A : U)(B : A → U)(x : (a : A) × B a) → B x.1 := λ A B x. x.2;"
 
-  -- ,"refl : (A : U)(x : A) → x = x := λ A x _. x;"
-  ,"trans : (A : U)(x y z : A) → x = y → y = z → x = z := "
-  ,"  λ A x y z p q i. hcom 0 1 [i=0 _. x; i=1 j. q j] (p i);"
+  ,"refl : (A : U)(x : A) → x = x := λ A x _. x;"
+
+  ,"trans : (A : U)(x y z : A) → x = y → y = z → x = z"
+  ,"  := λ A x y z p q i. hcom 0 1 [i=0 _. x; i=1 j. q j] (p i);"
+
+  ,"sym : (A : U)(x y : A) → x = y → y = x "
+  ,"  := λ A x y p. λ i. hcom 0 1 [i=0 j. p j; i=1 _. x] x;"
+
+  ,"ap : (A B : U)(f : A → B)(x y : A) → x = y → f x = f y"
+  ,"   := λ A B f x y p i. f (p i);"
+
   ]
 
--- ("HCOMTOTAL",
---    "BindILazy {bindILazyName = \"_\", bindILazyBinds = 0, bindILazyBody = VNe (NLocalVar 1) []}"
---   ,"I1"
---   ,"VSub (VNe (NLocalVar 1) []) (0,1,[I1])")
+-- testEta (A : U) (a b : A) (p : Path A a b) : Path (Path A a b) p p = refl (Path A a b) (<i> p @ i)
