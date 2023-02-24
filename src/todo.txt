@@ -1,7 +1,10 @@
 
-- test stuff
 - Coq-style function definitions
+- test stuff (cubicaltt prelude, examples)
 
 - User interaction, copy from sett
 - add parametrized strict inductives (then perhaps remove Nat)
 - add weak HITs
+- file imports
+- glued eval for error printing
+- hole printing

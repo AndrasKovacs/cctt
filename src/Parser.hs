@@ -195,13 +195,28 @@ lam = do
   t <- lamlet
   pure $! foldr' (\(pos, x) t -> Pos (coerce pos) (Lam x t)) t bs
 
+-- | Desugar Coq-style definition args.
+desugarIdentArgs :: [([Name], Ty)] -> Maybe Ty -> Tm -> (Tm, Maybe Ty)
+desugarIdentArgs args mty rhs = (tm, ty) where
+
+  mkTy :: [([Name], Ty)] -> Ty -> Ty
+  mkTy args a = foldr' (\(xs, a) b -> foldr' (\x -> Pi x a) b xs) a args
+
+  mkTm :: [([Name], Ty)] -> Tm -> Tm
+  mkTm args t = foldr' (\(xs, _) t -> foldr' Lam t xs) t args
+
+  ty = fmap (mkTy args) mty
+  tm = mkTm args rhs
+
 pLet :: Parser Tm
 pLet = do
   keyword "let"
   x <- ident
+  args <- many piBinder
   ma <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
   symbol ":="
   t <- tm
+  (t, ma) <- pure $! desugarIdentArgs args ma t
   char ';'
   u <- lamlet
   pure $ Let x ma t u
@@ -219,9 +234,11 @@ tm = withPos do
 top :: Parser Top
 top = branch ((,) <$!> getSourcePos <*!> ident)
   (\(pos, x) -> do
+    args <- many piBinder
     ma <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
     symbol ":="
     t <- tm
+    (t, ma) <- pure $! desugarIdentArgs args ma t
     char ';'
     u <- top
     pure $ TDef (coerce pos) x ma t u)
