@@ -56,11 +56,12 @@ isKeyword x =
   || x == "Glue"
   || x == "glue"
   || x == "unglue"
+  || x == "com"
 
 ident :: Parser Name
 ident = try $ do
   o <- getOffset
-  x <- takeWhile1P Nothing isAlphaNum
+  x <- takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'')
   if isKeyword x
     then do {setOffset o; fail $ "unexpected keyword: " ++ x}
     else x <$ ws
@@ -139,13 +140,26 @@ app =
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
   <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
+  <|>  (keyword "com"     *> (Com <$!> int <*!> int <*!> bind <*!> proj <*!> sysHCom <*!> proj))
   <|>  (goApp =<< proj)
 
 eq :: Parser Tm
 eq = do
   t <- app
   branch (char '=')
-    (\_ -> Path t <$!> app)
+    (\_ -> do
+        branch (char '{')
+          (\_ -> branch (try (bind <* char '.'))
+            (\x -> do
+                a <- tm
+                char '}'
+                u <- app
+                pure (PathP x a t u))
+            (do a <- tm
+                char '}'
+                u <- app
+                pure (Path (Just a) t u)))
+          (Path Nothing t <$!> app))
     (pure t)
 
 sigma :: Parser Tm

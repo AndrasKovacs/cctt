@@ -31,10 +31,22 @@ conv t u = if Conversion.conv t u
   then pure ()
   else err $ CantConvert (quote t) (quote u)
 
+convExInf :: Elab (Val -> Val -> IO ())
+convExInf t u = if Conversion.conv t u
+  then pure ()
+  else err $ CantConvertExInf (quote t) (quote u)
+
 convCof :: Elab (F VCof -> F VCof -> IO ())
 convCof c c' = if Conversion.conv (unF c) (unF c')
   then pure ()
-  else err CantConvertCof
+  else err $! CantConvertCof (quote (unF c)) (quote (unF c'))
+
+convEndpoints :: Elab (Val -> Val -> IO ())
+convEndpoints t u = if Conversion.conv t u
+  then pure ()
+  else err $ CantConvertEndpoints (quote t) (quote u)
+
+--------------------------------------------------------------------------------
 
 eval :: NCofArg => DomArg => EnvArg => Tm -> Val
 eval t = let ?sub = idSub (dom ?cof) in Core.eval t
@@ -42,8 +54,8 @@ eval t = let ?sub = idSub (dom ?cof) in Core.eval t
 evalf :: NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = let ?sub = idSub (dom ?cof) in frc (Core.eval t)
 
-evalTopSub :: NCofArg => DomArg => EnvArg => Tm -> F I -> Val
-evalTopSub t i = let ?sub = idSub (dom ?cof) `ext` unF i in Core.eval t
+instantiate :: NCofArg => DomArg => EnvArg => Tm -> F I -> Val
+instantiate t i = let ?sub = idSub (dom ?cof) `ext` unF i in Core.eval t
 
 evalCof :: NCofArg => Cof -> F VCof
 evalCof cof = let ?sub = idSub (dom ?cof) in Core.evalCof cof
@@ -88,8 +100,9 @@ bind x a act =
 define :: Name -> VTy -> Val -> Elab a -> Elab a
 define x a ~v act =
   let ?env = EDef ?env v
+      ?dom = ?dom + 1
       ?tbl = M.insert x (Local ?dom a) ?tbl in
-  let _ = ?env; _ = ?tbl in
+  let _ = ?env; _ = ?tbl; _ = ?dom in
   act
 {-# inline define #-}
 
@@ -117,14 +130,16 @@ data Error
   = NameNotInScope Name
   | UnexpectedI
   | ExpectedI
-  | ExpectedPi
-  | ExpectedSg
-  | ExpectedGlueTy
+  | ExpectedPi Tm
+  | ExpectedSg Tm
+  | ExpectedGlueTy Tm
   | CantInferLam
   | CantInferPair
   | CantInferGlueTm
   | CantConvert Tm Tm
-  | CantConvertCof
+  | CantConvertCof Cof Cof
+  | CantConvertEndpoints Tm Tm
+  | CantConvertExInf Tm Tm
   | GlueTmSystemMismatch
   | TopShadowing
   deriving Show
@@ -164,16 +179,49 @@ displayErrInCxt file (ErrInCxt e) = withNames do
       lnum = show linum
       lpad = map (const ' ') lnum
       msg  = case e of
-        CantConvert t u ->
-          ("Cannot convert expected type\n\n" ++
+        CantConvertExInf t u ->
+           "Can't convert expected type\n\n" ++
            "  " ++ showTm u ++ "\n\n" ++
            "and inferred type\n\n" ++
-           "  " ++ showTm t)
+           "  " ++ showTm t
+        CantConvert t u ->
+           "Can't convert\n\n" ++
+           "  " ++ showTm u ++ "\n\n" ++
+           "and\n\n" ++
+           "  " ++ showTm t
+        CantConvertEndpoints t u ->
+           "Can't convert expected path endpoint\n\n" ++
+           "  " ++ showTm u ++ "\n\n" ++
+           "to\n\n" ++
+           "  " ++ showTm t
+        CantConvertCof c1 c2 ->
+           "Can't convert expected path endpoint\n\n" ++
+           "  " ++ showCof c1 ++ "\n\n" ++
+           "to\n\n" ++
+           "  " ++ showCof c2
         NameNotInScope x ->
            "Name not in scope: " ++ x
         TopShadowing ->
            "Duplicate top-level name"
-        e -> show e
+        UnexpectedI ->
+           "Unexpected interval expression"
+        ExpectedI ->
+           "Expected an interval expression"
+        ExpectedPi a ->
+           "Expected a function type, inferred" ++
+           "  " ++ showTm a
+        ExpectedSg a ->
+           "Expected a sigma type, inferred" ++
+           "  " ++ showTm a
+        ExpectedGlueTy a ->
+           "Expected a glue type, inferred" ++
+           "  " ++ showTm a
+        CantInferLam ->
+           "Can't infer type for lambda expression"
+        CantInferPair ->
+           "Can't infer type for pair expression"
+        CantInferGlueTm ->
+           "Can't infer type for glue expression"
 
   putStrLn (show path ++ ":" ++ lnum ++ ":" ++ show colnum)
   putStrLn (lpad ++ " |")
@@ -195,17 +243,19 @@ check t topA = case t of
   P.Pos pos t ->
     setPos pos $ check t topA
 
-  P.Let x Nothing t u -> do
-    Infer t a <- infer t
+  P.Let x ma t u -> do
+    (a, va, t) <- case ma of
+      Nothing -> do
+        Infer t va <- infer t
+        pure (quote va, va, t)
+      Just a -> do
+        a <- check a VU
+        let ~va = eval a
+        t <- check t va
+        pure (a, va, t)
     let ~vt = eval t
-    define x a vt $ check u topA
-
-  P.Let x (Just a) t u -> do
-    a <- check a VU
-    let va = eval a
-    t <- check t va
-    let ~vt = eval t
-    define x va vt $ check u topA
+    u <- define x va vt $ check u topA
+    pure $! Let x a t u
 
   t -> case (t, unF (frc topA)) of
 
@@ -214,8 +264,8 @@ check t topA = case t of
 
     (P.Lam x t, VPathP a l r) -> do
       t <- bindI x \r -> check t (icapp a (IVar r))
-      conv (evalTopSub t (F I0)) l
-      conv (evalTopSub t (F I1)) r
+      convEndpoints (instantiate t (F I0)) l
+      convEndpoints (instantiate t (F I1)) r
       pure $! PLam (quote l) (quote r) x t
 
     (P.Pair t u, VSg a b) -> do
@@ -230,7 +280,7 @@ check t topA = case t of
 
     (t, topA) -> do
       Infer t a <- infer t
-      conv a topA
+      convExInf a topA
       pure t
 
 infer :: Elab (P.Tm -> IO Infer)
@@ -247,24 +297,26 @@ infer = \case
 
   P.PathP x a t u -> do
     a <- bindI x \_ -> check a VU
-    t <- check t (evalTopSub a (F I0))
-    u <- check u (evalTopSub a (F I1))
+    t <- check t (instantiate a (F I0))
+    u <- check u (instantiate a (F I1))
     pure $! Infer (PathP x a t u) VU
 
   P.Pos pos t ->
     setPos pos $ infer t
 
-  P.Let x Nothing t u -> do
-    Infer t a <- infer t
+  P.Let x ma t u -> do
+    (a, va, t) <- case ma of
+      Nothing -> do
+        Infer t va <- infer t
+        pure (quote va, va, t)
+      Just a -> do
+        a <- check a VU
+        let ~va = eval a
+        t <- check t va
+        pure (a, va, t)
     let ~vt = eval t
-    define x a vt $ infer u
-
-  P.Let x (Just a) t u -> do
-    a <- check a VU
-    let va = eval a
-    t <- check t va
-    let ~vt = eval t
-    define x va vt $ infer u
+    Infer u b <- define x va vt $ infer u
+    pure $! Infer (Let x a t u) b
 
   P.Pi x a b -> do
     a <- check a VU
@@ -280,8 +332,8 @@ infer = \case
       VPathP a l r -> do
         u <- checkI u
         pure $! Infer (PApp (quote l) (quote r) t u) (a ∙ evalInf u)
-      _ ->
-        err ExpectedPi
+      a ->
+        err $! ExpectedPi (quote a)
 
   P.Lam{} ->
     err CantInferLam
@@ -298,28 +350,35 @@ infer = \case
     Infer t a <- infer t
     case unF (frc a) of
       VSg a b -> pure $ Infer (Proj1 t) a
-      _       -> err ExpectedSg
+      a       -> err $! ExpectedSg (quote a)
 
   P.Proj2 t -> do
     Infer t a <- infer t
     case unF (frc a) of
       VSg a b -> pure $! Infer (Proj2 t) (b ∙ proj1 (evalf t))
-      _       -> err ExpectedSg
+      a       -> err $! ExpectedSg (quote a)
 
   P.U ->
     pure $ Infer U VU
 
-  P.Path t u -> do
+  P.Path Nothing t u -> do
     Infer t a <- infer t
     u <- check u a
-    pure $ Infer (PathP "_" (Core.freshI \_ -> quote a) t u) VU
+    pure $! Infer (PathP "_" (Core.freshI \_ -> quote a) t u) VU
+
+  P.Path (Just a) t u -> do
+    a <- bindI "_" \_ -> check a VU
+    let va = instantiate a (F I0) -- instantiation doesn't matter
+    t <- check t va
+    u <- check u va
+    pure $! Infer (PathP "_" a t u) VU
 
   P.Coe r r' x a t -> do --
     r  <- checkI r
     r' <- checkI r'
     a  <- bindI x \_ -> check a VU
-    t  <- check t (evalTopSub a (evalI r))
-    pure $! Infer (Coe r r' x a t) (evalTopSub a (evalI r'))
+    t  <- check t (instantiate a (evalI r))
+    pure $! Infer (Coe r r' x a t) (instantiate a (evalI r'))
 
   P.HCom r r' Nothing sys t -> do
     r  <- checkI r
@@ -349,7 +408,7 @@ infer = \case
     Infer t a <- infer t
     case unF (frc a) of
       VGlueTy a sys _ -> pure $! Infer (Unglue t (quote sys)) a
-      _               -> err ExpectedGlueTy
+      a               -> err $! ExpectedGlueTy (quote a)
 
   P.Nat ->
     pure $! Infer Nat VU
@@ -369,6 +428,12 @@ infer = \case
     z <- check z (vp ∙ VZero)
     n <- check n VNat
     pure $! Infer (NatElim p s z n) (vp ∙~ eval n)
+
+  -- P.Com r r' i a sys base -> do
+  --   r  <- checkI r
+  --   r' <- checkI r'
+  --   a  <- bindI i \_ -> check a VU
+  --   _
 
 checkI :: Elab (P.Tm -> IO I)
 checkI = \case
@@ -421,7 +486,7 @@ elabSysHCom a r base = \case
 
     t <- bindVCof vcof do
       t <- bindI x \_ -> check t a
-      conv (evalTopSub t (frc r)) (eval base) -- check base boundary
+      conv (instantiate t (frc r)) (eval base) -- check base boundary
       pure t
 
     sys <- elabSysHCom a r base sys
@@ -501,6 +566,7 @@ inferTop :: ElabTop (P.Top -> IO Top)
 inferTop = \case
 
   P.TDef pos x ma t top -> setPos pos do
+
     noTopShadowing x
     (a, va, t) <- case ma of
       Nothing -> do
@@ -513,7 +579,7 @@ inferTop = \case
         pure (a, va, t)
 
     let ~vt = eval t
-    withNames $ debug ["TOPNF", x, showTm (quote vt)]
+    debug ["TOPNF", x, showTm (quote vt)]
     top <- defineTop x va vt $ inferTop top
     pure $! TDef x a t top
 

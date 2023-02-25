@@ -5,6 +5,7 @@ module Pretty (
   , type INames
   , showTm
   , showTop
+  , showCof
   , showTm0) where
 
 import Prelude hiding (pi)
@@ -19,7 +20,10 @@ import Interval
 
 --------------------------------------------------------------------------------
 
-newtype Txt = Txt {unTxt :: String -> String}
+newtype Txt = Txt (String -> String)
+
+runTxt :: Txt -> String
+runTxt (Txt f) = f ""
 
 instance Semigroup Txt where
   Txt x <> Txt y = Txt (x . y); {-# inline (<>) #-}
@@ -49,7 +53,7 @@ par p s | p < ?prec = char '(' <> s <> char ')'
 projp  s = par 6 s; {-# inline projp #-}
 appp   s = par 5 s; {-# inline appp #-}
 eqp    s = par 4 s; {-# inline eqp #-}
--- sigmap s = par 3 s; {-# inline sigmap #-}
+sigmap s = par 3 s; {-# inline sigmap #-}
 pip    s = par 2 s; {-# inline pip #-}
 letp   s = par 1 s; {-# inline letp #-}
 pairp  s = par 0 s; {-# inline pairp #-}
@@ -162,9 +166,9 @@ tm = \case
   App t u         -> appp (app t <> " " <> proj u)
   Lam x t         -> letp (fresh x \x -> "λ " <> x <> goLams t)
   Sg "_" a b      -> let pa = eq a in fresh "_" \_ ->
-                     pa <> " × " <> sigma b
+                     sigmap (pa <> " × " <> sigma b)
   Sg x a b        -> let pa = pair a in fresh x \x ->
-                     "(" <> x <> " : " <> pa <> ") × " <> sigma b
+                     sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
   Pair t u        -> pairp (let_ t <> ", " <> pair u)
   Proj1 t         -> projp (proj t <> ".1")
   Proj2 t         -> projp (proj t <> ".2")
@@ -173,7 +177,7 @@ tm = \case
   PathP x a t u   -> let pt = app t; pu = app u in freshI x \x ->
                      eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
   PApp _ _ t u    -> appp (app t <> " " <> int u)
-  PLam _ _ x t    -> freshI x \x -> "λ " <> x <> goLams t
+  PLam _ _ x t    -> letp (freshI x \x -> "λ " <> x <> goLams t)
   Coe r r' i a t  -> let pt = proj t in freshI i \i ->
                      appp ("coe " <> int r <> " " <> int r' <> " " <> i <> " " <> proj a <> " " <> pt)
   HCom r r' _ t u -> appp ("hcom " <> int r <> " " <> int r' <> " " <> sysH t <> " " <> proj u)
@@ -199,10 +203,13 @@ top = \case
      top u)
 
 showTop :: Top -> String
-showTop t = let ?top = mempty; ?lvl = 0 in unTxt (top t) ""
+showTop t = let ?top = mempty; ?lvl = 0 in runTxt (top t)
 
 showTm :: TopNames => Names => INames => Tm -> String
-showTm t = unTxt (pair t) ""
+showTm t = runTxt (pair t)
 
 showTm0 :: TopNames => Tm -> String
-showTm0 t = let ?names = []; ?inames = [] in unTxt (pair t) ""
+showTm0 t = let ?names = []; ?inames = [] in runTxt (pair t)
+
+showCof :: INames => Cof -> String
+showCof = runTxt . cof

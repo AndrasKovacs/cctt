@@ -6,5 +6,16 @@
 - add parametrized strict inductives (then perhaps remove Nat)
 - add weak HITs
 - file imports
-- glued eval for error printing
+- glued eval
+  - How: add glue values
+  - forcing does not remove glue
+  - all semantic functions preserve glue
+  - how to repr glued vals?
+    - we don't use spines
+    - Just another kind of neutral: Glue Ne ~Val
+
 - hole printing
+
+
+user interaction how:
+  - simple: file arg to exec, potentially additional args: top def nf printing, bench time printing

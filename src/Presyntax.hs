@@ -20,11 +20,12 @@ data Tm
   | Proj1 Tm
   | Proj2 Tm
   | U
-  | Path Tm Tm                        -- PathP _   x y
-  | PathP Name Ty Tm Tm               -- PathP i.A x y
+  | Path (Maybe Ty) Tm Tm             -- x ={A} y
+  | PathP Name Ty Tm Tm               -- x ={i.A} y
 
-  | Coe Tm Tm Name Ty Tm              -- coe r r' i.A t
+  | Coe Tm Tm Name Ty Tm              -- coe r r' i A t
   | HCom Tm Tm (Maybe Ty) SysHCom Tm  -- hcom r r' A [α x. t] u
+  | Com Tm Tm Name Ty SysHCom Tm      -- com r r' i A [α x. t] u
 
   | GlueTy Ty Sys                     -- Glue A [α. B]      (B : Σ X (X ≃ A))
   | GlueTm Tm Sys                     -- glue a [α. t]
