@@ -43,6 +43,9 @@ p3 = justElab $ unlines [
   ,"test6 : (A : U)(B : A → U)(x : (a : A) × B a) → A := λ A B x. x.1;"
   ,"test7 : (A : U)(B : A → U)(x : (a : A) × B a) → B x.1 := λ A B x. x.2;"
 
+  ,"comtest (A B : U)(p : A = B)(x : A) : hcom 0 1 [] (coe 0 1 (i.p i) x) = com 0 1 (i. p i) [] x"
+  ,"  := λ _. com 0 1 (i. p i) [] x;"
+
   ,"refl (A : U)(x : A) : x = x := λ _. x;"
 
   ,"trans (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z"
@@ -70,15 +73,12 @@ p3 = justElab $ unlines [
 
   ,"Sing (A : U) (a : A) : U := (x : A) × (a = x);"
 
-  ,"split (A : U)(a b : A)(p : a = b) : a = a := λ i. hcom 1 0 [i=0 _. a; i=1 j. p j] (p i);"
-
-  ,"connAndWeak (A : U)(a b : A)(p : a = b) : split A a b p ={l. a = p l} p"
-  ,"  := λ l k. hcom 1 l [k=0 _. a; k=1 x. p x] (p k);"
-
   ,"connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p"
-  ,"  := λ i j. hcom 0 1 [i=0 k. connAndWeak A a b p 0 k; i=1 k. connAndWeak A a b p j k;"
-  ,"                      j=0 k. connAndWeak A a b p 0 k; j=1 k. connAndWeak A a b p i k;"
-  ,"                      i=j k. connAndWeak A a b p i k] a;"
+  ,"  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1 x. p x] (p k);"
+  ,""
+  ,"     λ i j. hcom 0 1 [i=0 k. sq 0 k; i=1 k. sq j k;"
+  ,"                      j=0 k. sq 0 k; j=1 k. sq i k;"
+  ,"                      i=j k. sq i k] a;"
 
   ,"connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;"
 
@@ -89,28 +89,20 @@ p3 = justElab $ unlines [
   ,"  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl A a) (x, p) (contractSing A a x p) cr;"
 
   ,"J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p"
-  ,"  := coe 0 1 (i. C (hcom 0 1 [i=0 _. a; i=1 x. p x] a)"
-  ,"                   (λ j. hcom 0 j [i=0 _. a; i=1 x. p x] a)) d;"
+  ,"  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 x. p x] a;"
+  ,"     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;"
 
-  ,"test (A B : U)(p : A = B)(x : A) : hcom 0 1 [] (coe 0 1 (i.p i) x) = com 0 1 (i. p i) [] x"
-  ,"  := λ _. com 0 1 (i. p i) [] x;"
-
-  ,"JEq (A : U)(a : A)(C : (x : A) → a = x → U)(d : C a (λ _. a))"
+  ,"JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))"
   ,"  : J A a C d a (λ _. a) = d"
-  ,"  := λ k. com 0 1 (λ i. C ? ?)"
-  ,"                 [k=0 i. coe 0 i (λ i. C ? ?) d;"
-  ,"                  k=1 _. d] d;"
+  ,"  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;"
+  ,"     let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;"
+  ,"                                           k=1 _. a;"
+  ,"                                           i=0 _. a;"
+  ,"                                           i=1 _. a] a;"
+  ,""
+  ,"     λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))"
+  ,"                  [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;"
+  ,"                   k=1 _. d]"
+  ,"                  d;"
+
   ]
-
--- JEq (A : U) (a : A) (C : (x : A) -> Path A a x -> U) (d : C a (<_> a))
---    : Path (C a (<_> a)) (J A a C d a (<_> a)) d =
---    <k> com 0->1 (<i> C (cube @ i @ 1 @ k) (<j> cube @ i @ j @ k))
---        [(k=0) -> <i> coe 0->i (<i> C (sq @ i @ 1) (<j> sq @ i @ j)) d
---        ,(k=1) -> <_> d] d
-
---   where sq : Line (Line A) = <i j> hcom 0->j A [(i=0) -> <_> a,(i=1) -> <_> a] a
---         cube : Line (Line (Line A)) =
---           <i j k> hcom 0->j A [(k=0) -> sq @ i
---                               ,(k=1) -> <_> a
---                               ,(i=0) -> <_> a
---                               ,(i=1) -> <_> a] a

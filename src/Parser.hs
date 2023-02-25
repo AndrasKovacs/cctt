@@ -57,6 +57,7 @@ isKeyword x =
   || x == "glue"
   || x == "unglue"
   || x == "com"
+  || x == "I"
 
 ident :: Parser Name
 ident = try $ do
@@ -79,7 +80,8 @@ atom =
                <|> (Zero  <$  keyword "zero")
                <|> (I0    <$  keyword  "0"  )
                <|> (I1    <$  keyword  "1"  )
-               <|> (Ident <$!> ident         ))
+               <|> (I     <$  keyword  "I"  )
+               <|> (Ident <$!> ident        ))
 
 goProj :: Tm -> Parser Tm
 goProj t =

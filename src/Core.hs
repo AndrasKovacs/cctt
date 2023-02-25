@@ -362,7 +362,7 @@ capp (NCl _ t) ~u = case t of
   CIsEquiv6 b (frc -> f) g linv (frc -> rinv) ->
     let ~x  = u
         ~fx = f ∙ x in
-    VPathP (NICl "i" $ ICIsEquiv7 b (unF f) g linv x)
+    VPath (NICl "i" $ ICIsEquiv7 b (unF f) g linv x)
       (refl fx)
       (rinv ∙ fx)
 
@@ -395,13 +395,13 @@ capp (NCl _ t) ~u = case t of
   CCoeRinv0 a r r' -> VTODO
 
 
--- | Apply an ivar closure.
+-- | Apply a Path closure.
 icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
 icapp (NICl _ t) arg = case t of
   ICEval s env t ->
     let ?env = env; ?sub = ext s arg in eval t
 
-  ICCoePathP (frc -> r) (frc -> r') a lhs rhs p ->
+  ICCoePath (frc -> r) (frc -> r') a lhs rhs p ->
     let j = frc arg in
     com r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
              (vshcons (ceq j (F I0)) "i" (\i -> lhs ∘ unF i) $
@@ -409,13 +409,24 @@ icapp (NICl _ t) arg = case t of
               vshempty)
              (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j)
 
-  ICHComPathP (frc -> r) (frc -> r') a lhs rhs sys p ->
+  ICHComPath (frc -> r) (frc -> r') a lhs rhs sys p ->
     let farg = frc arg in
     hcom r r' (a ∘ unF farg)
       (vshcons (ceq farg (F I0)) "i" (\i -> frc lhs) $
        vshcons (ceq farg (F I1)) "i" (\i -> frc rhs) $
        mapVSysHCom (\_ t -> pappf lhs rhs (frc t) farg) (frc sys))
       (pappf lhs rhs (frc p) farg)
+
+  ICHComLine (frc -> r) (frc -> r') a sys base ->
+    let farg = frc arg in
+    hcom r r' (a ∘ unF farg)
+      (mapVSysHCom (\_ t -> lappf (frc t) farg) (frc sys))
+      (lappf (frc base) farg)
+
+  ICCoeLine (frc -> r) (frc -> r') a p ->
+    let j = frc arg in
+    coednf r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
+                (lappf (frc p) j)
 
   ICConst t -> t
 
@@ -435,6 +446,7 @@ icapp (NICl _ t) arg = case t of
         ~gfx = g ∙ fx  in
     path b (f ∙ papp x gfx (linv ∘ x) i) fx
 
+
 proj1 :: F Val -> Val
 proj1 t = case unF t of
   VPair t _ -> t
@@ -443,7 +455,7 @@ proj1 t = case unF t of
   _         -> impossible
 {-# inline proj1 #-}
 
-proj1f  t = frc  (proj1 t); {-# inline proj1f  #-}
+proj1f t = frc (proj1 t); {-# inline proj1f  #-}
 
 proj2 :: F Val -> Val
 proj2 t = case unF t of
@@ -473,11 +485,21 @@ papp ~l ~r ~t i = case unF i of
   IVar x -> case unF t of
     VPLam _ _ t -> t ∙ IVar x
     VNe t is    -> VNe (NPApp l r t (IVar x)) (IS.insert x is)
+    VTODO       -> VTODO
     _           -> impossible
 {-# inline papp #-}
 
 pappf ~t ~u0 ~u1 i = frc (papp t u0 u1 i); {-# inline pappf #-}
 
+lapp :: NCofArg => DomArg => F Val -> F I -> Val
+lapp t i = case unF t of
+  VLLam t  -> t ∙ unF i
+  VNe t is -> VNe (NLApp t (unF i)) is
+  VTODO    -> VTODO
+  _        -> impossible
+{-# inline lapp #-}
+
+lappf t i = frc (lapp t i); {-# inline lappf #-}
 
 -- assumption: r /= r'
 coed :: F I -> F I -> F (BindI Val) -> F Val -> NCofArg => DomArg => F Val
@@ -495,9 +517,15 @@ coed r r' topA t = case unF topA ^. body of
   VNat ->
     t
 
-  VPathP (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
-    F (VPLam (lhs ∙ unF r') (rhs ∙ unF r')
-             (NICl (a^.body.name) (ICCoePathP (unF r) (unF r') a lhs rhs (unF t))))
+  VPath (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
+    F $ VPLam (lhs ∙ unF r') (rhs ∙ unF r')
+      $ NICl (a^.body.name)
+      $ ICCoePath (unF r) (unF r') a lhs rhs (unF t)
+
+  VLine (rebind topA -> a) ->
+    F $ VLLam
+      $ NICl (a^.body.name)
+      $ ICCoeLine (unF r) (unF r') a (unF t)
 
   VU ->
     t
@@ -580,10 +608,10 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     0 -> base
     _ -> F VTODO -- hcomNatdn r r' (F nts) base
 
-  VPathP a lhs rhs ->
+  VPath a lhs rhs ->
     F $ VPLam lhs rhs
       $ NICl (a^.name)
-      $ ICHComPathP (unF r) (unF r') a lhs rhs nts (unF base)
+      $ ICHComPath (unF r) (unF r') a lhs rhs nts (unF base)
 
   a@(VNe n is') ->
     F $ VNe (NHCom (unF r) (unF r') a nts (unF base)) (is <> is')
@@ -593,6 +621,11 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 
   VGlueTy a sys is' ->
     F VTODO
+
+  VLine a ->
+    F $ VLLam
+      $ NICl (a^.name)
+      $ ICHComLine (unF r) (unF r') a nts (unF base)
 
   _ ->
     impossible
@@ -652,7 +685,7 @@ eval = \case
   Proj1 t          -> proj1 (evalf t)
   Proj2 t          -> proj2 (evalf t)
   U                -> VU
-  PathP x a t u    -> VPathP (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
+  Path x a t u     -> VPath (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
   PApp l r t i     -> papp (eval l) (eval r) (evalf t) (evalI i)
   PLam l r x t     -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
   Coe r r' x a t   -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
@@ -666,6 +699,9 @@ eval = \case
   NatElim p z s n  -> natElim (eval p) (eval z) (evalf s) (evalf n)
   TODO             -> VTODO
   Com r r' i a t b -> com (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom t) (evalf b)
+  Line x a         -> VLine (NICl x (ICEval ?sub ?env a))
+  LApp t i         -> lapp (evalf t) (evalI i)
+  LLam x t         -> VLLam (NICl x (ICEval ?sub ?env t))
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)
@@ -709,7 +745,7 @@ instance Force Val Val where
     VGlueTy a sys is  -> F (VGlueTy (sub a) (sub sys) (sub is))
     VPi a b           -> F (VPi (sub a) (sub b))
     VLam t            -> F (VLam (sub t))
-    VPathP a t u      -> F (VPathP (sub a) (sub t) (sub u))
+    VPath a t u       -> F (VPath (sub a) (sub t) (sub u))
     VPLam l r t       -> F (VPLam (sub l) (sub r) (sub t))
     VSg a b           -> F (VSg (sub a) (sub b))
     VPair t u         -> F (VPair (sub t) (sub u))
@@ -718,6 +754,8 @@ instance Force Val Val where
     VZero             -> F VZero
     VSuc t            -> F (VSuc (sub t))
     VTODO             -> F VTODO
+    VLine t           -> F (VLine (sub t))
+    VLLam t           -> F (VLLam (sub t))
 
 instance Force Ne Val where
   frc = \case
@@ -732,6 +770,7 @@ instance Force Ne Val where
     NUnglue t sys     -> ungluef t (frc sys)
     NGlue t sys       -> gluef t (frc sys)
     NNatElim p z s n  -> natElimf p z (frc s) (frc n)
+    NLApp t i         -> lappf (frc t) (frc i)
 
   frcS = \case
     t@NLocalVar{}     -> F (VNe t mempty)
@@ -745,6 +784,7 @@ instance Force Ne Val where
     NUnglue t sys     -> ungluef (sub t) (frcS sys)
     NGlue t sys       -> gluef (sub t) (frcS sys)
     NNatElim p z s n  -> natElimf (sub p) (sub z) (frcS s) (frcS n)
+    NLApp t i         -> lappf (frcS t) (frcS i)
 
 instance Force NeSys VSys where
   -- TODO: is it better to not do anything with system components in frc?
@@ -836,7 +876,7 @@ unSubNeS = \case
   NUnglue a sys        -> NUnglue (sub a) (sub sys)
   NGlue a sys          -> NGlue (sub a) (sub sys)
   NNatElim p z s n     -> NNatElim (sub p) (sub z) (sub s) (sub n)
-
+  NLApp t i            -> NLApp (sub t) (sub i)
 
 ----------------------------------------------------------------------------------------------------
 -- Definitions
@@ -847,7 +887,7 @@ fun a b = VPi a $ NCl "_" $ CConst b
 
 -- | (A : U) -> A -> A -> U
 path :: Val -> Val -> Val -> Val
-path a t u = VPathP (NICl "_" (ICConst a)) t u
+path a t u = VPath (NICl "_" (ICConst a)) t u
 
 -- | (x : A) -> PathP _ x x
 refl :: Val -> Val

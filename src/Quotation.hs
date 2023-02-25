@@ -28,6 +28,7 @@ instance Quote Ne Tm where
     NUnglue t sys     -> Unglue (quote t) (quote sys)
     NGlue t sys       -> Glue (quote t) (quote sys)
     NNatElim p z s n  -> NatElim (quote p) (quote z) (quote s) (quote n)
+    NLApp t i         -> LApp (quote t) (quote i)
 
 instance Quote Val Tm where
   quote t = case unF (frc t) of
@@ -36,7 +37,7 @@ instance Quote Val Tm where
     VGlueTy a sys _  -> GlueTy (quote a) (quote sys)
     VPi a b          -> Pi (b^.name) (quote a) (quote b)
     VLam t           -> Lam (t^.name) (quote t)
-    VPathP a lhs rhs -> PathP (a^.name) (quote a) (quote lhs) (quote rhs)
+    VPath a lhs rhs  -> Path (a^.name) (quote a) (quote lhs) (quote rhs)
     VPLam lhs rhs t  -> PLam (quote lhs) (quote rhs) (t^.name) (quote t)
     VSg a b          -> Sg (b^.name) (quote a) (quote b)
     VPair t u        -> Pair (quote t) (quote u)
@@ -45,6 +46,8 @@ instance Quote Val Tm where
     VZero            -> Zero
     VSuc t           -> Suc (quote t)
     VTODO            -> TODO
+    VLine t          -> Line (t^.name) (quote t)
+    VLLam t          -> LLam (t^.name) (quote t)
 
 instance Quote a b => Quote (BindCofLazy a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}

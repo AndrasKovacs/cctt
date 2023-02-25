@@ -24,7 +24,8 @@ import Pretty
 
 -- import Debug.Trace
 
---------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
 
 conv :: Elab (Val -> Val -> IO ())
 conv t u = if Conversion.conv t u
@@ -45,8 +46,6 @@ convEndpoints :: Elab (Val -> Val -> IO ())
 convEndpoints t u = if Conversion.conv t u
   then pure ()
   else err $ CantConvertEndpoints (quote t) (quote u)
-
---------------------------------------------------------------------------------
 
 eval :: NCofArg => DomArg => EnvArg => Tm -> Val
 eval t = let ?sub = idSub (dom ?cof) in Core.eval t
@@ -69,8 +68,10 @@ evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
 debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
 debug x = withNames (Common.debug x)
 
--- Context
---------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
+-- Elaboration context
+----------------------------------------------------------------------------------------------------
 
 data Entry
   = Top Lvl VTy ~Val      -- level, type, value
@@ -123,14 +124,16 @@ bindVCof cof act =
   in seq ?cof act
 {-# inline bindVCof #-}
 
+----------------------------------------------------------------------------------------------------
 -- Errors
---------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 data Error
   = NameNotInScope Name
   | UnexpectedI
+  | UnexpectedIType
   | ExpectedI
-  | ExpectedPi Tm
+  | ExpectedPiPathLine Tm
   | ExpectedSg Tm
   | ExpectedGlueTy Tm
   | CantInferLam
@@ -172,68 +175,72 @@ withNames act =
   act
 {-# inline withNames #-}
 
+showError :: TopNames => Names => INames => Error -> String
+showError = \case
+  CantConvertExInf t u ->
+    "Can't convert expected type\n\n" ++
+    "  " ++ pretty u ++ "\n\n" ++
+    "and inferred type\n\n" ++
+    "  " ++ pretty t
+  CantConvert t u ->
+    "Can't convert\n\n" ++
+    "  " ++ pretty u ++ "\n\n" ++
+    "and\n\n" ++
+    "  " ++ pretty t
+  CantConvertEndpoints t u ->
+    "Can't convert expected path endpoint\n\n" ++
+    "  " ++ pretty u ++ "\n\n" ++
+    "to\n\n" ++
+    "  " ++ pretty t
+  CantConvertCof c1 c2 ->
+    "Can't convert expected path endpoint\n\n" ++
+    "  " ++ pretty c1 ++ "\n\n" ++
+    "to\n\n" ++
+    "  " ++ pretty c2
+  NameNotInScope x ->
+    "Name not in scope: " ++ x
+  TopShadowing ->
+    "Duplicate top-level name"
+  UnexpectedI ->
+    "Unexpected interval expression"
+  ExpectedI ->
+    "Expected an interval expression"
+  ExpectedPiPathLine a ->
+    "Expected a function type, inferred" ++
+    "  " ++ pretty a
+  ExpectedSg a ->
+    "Expected a sigma type, inferred" ++
+    "  " ++ pretty a
+  ExpectedGlueTy a ->
+    "Expected a glue type, inferred" ++
+    "  " ++ pretty a
+  CantInferLam ->
+    "Can't infer type for lambda expression"
+  CantInferPair ->
+    "Can't infer type for pair expression"
+  CantInferGlueTm ->
+    "Can't infer type for glue expression"
+  GlueTmSystemMismatch sys ->
+    "Can't match glue system with expected Glue type system\n\n" ++
+    "  " ++ pretty sys
+  UnexpectedIType ->
+    "The type of intervals I can be only used in function domains"
+
 displayErrInCxt :: String -> ErrInCxt -> IO ()
 displayErrInCxt file (ErrInCxt e) = withNames do
 
   let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
       lnum = show linum
       lpad = map (const ' ') lnum
-      msg  = case e of
-        CantConvertExInf t u ->
-           "Can't convert expected type\n\n" ++
-           "  " ++ pretty u ++ "\n\n" ++
-           "and inferred type\n\n" ++
-           "  " ++ pretty t
-        CantConvert t u ->
-           "Can't convert\n\n" ++
-           "  " ++ pretty u ++ "\n\n" ++
-           "and\n\n" ++
-           "  " ++ pretty t
-        CantConvertEndpoints t u ->
-           "Can't convert expected path endpoint\n\n" ++
-           "  " ++ pretty u ++ "\n\n" ++
-           "to\n\n" ++
-           "  " ++ pretty t
-        CantConvertCof c1 c2 ->
-           "Can't convert expected path endpoint\n\n" ++
-           "  " ++ pretty c1 ++ "\n\n" ++
-           "to\n\n" ++
-           "  " ++ pretty c2
-        NameNotInScope x ->
-           "Name not in scope: " ++ x
-        TopShadowing ->
-           "Duplicate top-level name"
-        UnexpectedI ->
-           "Unexpected interval expression"
-        ExpectedI ->
-           "Expected an interval expression"
-        ExpectedPi a ->
-           "Expected a function type, inferred" ++
-           "  " ++ pretty a
-        ExpectedSg a ->
-           "Expected a sigma type, inferred" ++
-           "  " ++ pretty a
-        ExpectedGlueTy a ->
-           "Expected a glue type, inferred" ++
-           "  " ++ pretty a
-        CantInferLam ->
-           "Can't infer type for lambda expression"
-        CantInferPair ->
-           "Can't infer type for pair expression"
-        CantInferGlueTm ->
-           "Can't infer type for glue expression"
-        GlueTmSystemMismatch sys ->
-           "Can't match glue system with expected Glue type system\n\n" ++
-           "  " ++ pretty sys
 
   putStrLn (show path ++ ":" ++ lnum ++ ":" ++ show colnum)
   putStrLn (lpad ++ " |")
   putStrLn (lnum ++ " | " ++ (lines file !! (linum - 1)))
   putStrLn (lpad ++ " | " ++ replicate (colnum - 1) ' ' ++ "^")
-  putStrLn msg
+  putStrLn (showError e)
   putStrLn ""
 
---------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 setPos :: DontShow SourcePos -> (PosArg => a) -> a
 setPos pos act = let ?srcPos = coerce pos in act; {-# inline setPos #-}
@@ -265,11 +272,15 @@ check t topA = case t of
     (P.Lam x t, VPi a b) -> do
       Lam x <$!> bind x a (\v -> check t (capp b v))
 
-    (P.Lam x t, VPathP a l r) -> do
-      t <- bindI x \r -> check t (icapp a (IVar r))
+    (P.Lam x t, VPath a l r) -> do
+      t <- bindI x \r -> check t (a ∙ IVar r)
       convEndpoints (instantiate t (F I0)) l
       convEndpoints (instantiate t (F I1)) r
       pure $! PLam (quote l) (quote r) x t
+
+    (P.Lam x t, VLine a) -> do
+      t <- bindI x \r -> check t (a ∙ IVar r)
+      pure $ LLam x t
 
     (P.Pair t u, VSg a b) -> do
       t <- check t a
@@ -297,12 +308,13 @@ infer = \case
 
   P.I0 -> err UnexpectedI
   P.I1 -> err UnexpectedI
+  P.I  -> err UnexpectedIType
 
   P.PathP x a t u -> do
     a <- bindI x \_ -> check a VU
     t <- check t (instantiate a (F I0))
     u <- check u (instantiate a (F I1))
-    pure $! Infer (PathP x a t u) VU
+    pure $! Infer (Path x a t u) VU
 
   P.Pos pos t ->
     setPos pos $ infer t
@@ -321,6 +333,10 @@ infer = \case
     Infer u b <- define x va vt $ infer u
     pure $! Infer (Let x a t u) b
 
+  P.Pi x (P.unPos -> P.I) b -> do
+    b <- bindI x \_ -> check b VU
+    pure $ Infer (Line x b) VU
+
   P.Pi x a b -> do
     a <- check a VU
     b <- bind x (eval a) \_ -> check b VU
@@ -332,11 +348,14 @@ infer = \case
       VPi a b -> do
         u <- check u a
         pure $! Infer (App t u) (b ∙ eval u)
-      VPathP a l r -> do
+      VPath a l r -> do
         u <- checkI u
         pure $! Infer (PApp (quote l) (quote r) t u) (a ∙ evalInf u)
+      VLine a -> do
+        u <- checkI u
+        pure $! Infer (LApp t u) (a ∙ evalInf u)
       a ->
-        err $! ExpectedPi (quote a)
+        err $! ExpectedPiPathLine (quote a)
 
   P.Lam{} ->
     err CantInferLam
@@ -367,14 +386,14 @@ infer = \case
   P.Path Nothing t u -> do
     Infer t a <- infer t
     u <- check u a
-    pure $! Infer (PathP "_" (Core.freshI \_ -> quote a) t u) VU
+    pure $! Infer (Path "_" (Core.freshI \_ -> quote a) t u) VU
 
   P.Path (Just a) t u -> do
     a <- bindI "_" \_ -> check a VU
     let va = instantiate a (F I0) -- instantiation doesn't matter
     t <- check t va
     u <- check u va
-    pure $! Infer (PathP "_" a t u) VU
+    pure $! Infer (Path "_" a t u) VU
 
   P.Coe r r' x a t -> do --
     r  <- checkI r

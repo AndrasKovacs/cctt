@@ -101,11 +101,16 @@ doTm p t = let ?prec = p in tm t; {-# inline doTm #-}
 piBind :: Txt -> Txt -> Txt
 piBind n a = "(" <> n <> " : " <> a <> ")"; {-# inline piBind #-}
 
-goPis :: TopNames => Names => INames => Tm -> Txt
-goPis = \case
+lineBind :: Txt -> Txt
+lineBind n = "(" <> n <> " : I)"; {-# inline lineBind #-}
+
+goLinesPis :: TopNames => Names => INames => Tm -> Txt
+goLinesPis = \case
   Pi x a b | x /= "_" ->
     let pa = pair a in fresh x \x ->
-    piBind x pa <> goPis b
+    piBind x pa <> goLinesPis b
+  Line x b | x /= "_" ->
+    freshI x \x -> lineBind x <> goLinesPis b
   t ->
     " → " <> pi t
 
@@ -113,6 +118,7 @@ goLams :: TopNames => Names => INames => Tm -> Txt
 goLams = \case
   Lam x t      -> fresh  x \x -> " " <> x <> goLams t
   PLam _ _ x t -> freshI x \x -> " " <> x <> goLams t
+  LLam x t     -> freshI x \x -> " " <> x <> goLams t
   t            -> ". " <> let_ t
 
 int :: INames => I -> Txt
@@ -156,12 +162,19 @@ tm = \case
   LocalVar x       -> var ?names x
   Let x a t u      -> let pa = let_ a; pt = let_ t in fresh x \x ->
                       letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
+
   Pi "_" a b       -> let pa = sigma a in fresh "_" \_ ->
                       pip (pa <> " → " <> pi b)
   Pi n a b         -> let pa = pair a in fresh n \n ->
-                      pip (piBind n pa  <> goPis b)
+                      pip (piBind n pa  <> goLinesPis b)
   App t u          -> appp (app t <> " " <> proj u)
   Lam x t          -> letp (fresh x \x -> "λ " <> x <> goLams t)
+
+  Line "_" a       -> freshI "_" \_ -> pip ("I → " <> pi a)
+  Line x a         -> freshI x   \x -> pip (lineBind x <> goLinesPis a)
+  LApp t u         -> appp (app t <> " " <> int u)
+  LLam x t         -> letp (freshI x \x -> "λ " <> x <> goLams t)
+
   Sg "_" a b       -> let pa = eq a in fresh "_" \_ ->
                       sigmap (pa <> " × " <> sigma b)
   Sg x a b         -> let pa = pair a in fresh x \x ->
@@ -169,12 +182,15 @@ tm = \case
   Pair t u         -> pairp (let_ t <> ", " <> pair u)
   Proj1 t          -> projp (proj t <> ".1")
   Proj2 t          -> projp (proj t <> ".2")
+
   U                -> "U"
-  PathP "_" _ t u  -> eqp (app t <> " = " <> app u)
-  PathP x a t u    -> let pt = app t; pu = app u in freshI x \x ->
+
+  Path "_" _ t u   -> eqp (app t <> " = " <> app u)
+  Path x a t u     -> let pt = app t; pu = app u in freshI x \x ->
                       eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
   PApp _ _ t u     -> appp (app t <> " " <> int u)
   PLam _ _ x t     -> letp (freshI x \x -> "λ " <> x <> goLams t)
+
   Coe r r' i a t   -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
                       appp ("coe " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt)
   HCom r r' _ t u  -> appp ("hcom " <> int r <> " " <> int r' <> " " <> sysH t <> " " <> proj u)

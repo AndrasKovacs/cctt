@@ -28,9 +28,13 @@ data Tm
 
   | U
 
-  | PathP Name Ty Tm Tm    -- PathP i.A x y
+  | Path Name Ty Tm Tm    -- PathP i.A x y
   | PApp ~Tm ~Tm Tm I      -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
   | PLam ~Tm ~Tm Name Tm   -- endpoints, body
+
+  | Line Name Tm           -- (i : I) → A
+  | LApp Tm I
+  | LLam Name Tm
 
   | Coe I I Name Ty Tm      -- coe r r' i.A t
   | HCom I I Ty SysHCom Tm  -- hcom r r' i A [α → t] u
@@ -161,11 +165,14 @@ data Val
   -- canonicals
   | VPi VTy NamedClosure
   | VLam NamedClosure
-  | VPathP NamedIClosure Val Val
+  | VPath NamedIClosure Val Val
   | VPLam ~Val ~Val NamedIClosure  -- annotated with endpoints
   | VSg VTy NamedClosure
   | VPair Val Val
   | VU
+
+  | VLine NamedIClosure
+  | VLLam NamedIClosure
 
   | VNat
   | VZero
@@ -179,6 +186,7 @@ data Ne
   | NSub Ne Sub
   | NApp Ne Val
   | NPApp ~Val ~Val Ne I
+  | NLApp Ne I
   | NProj1 Ne
   | NProj2 Ne
   | NCoe I I (BindI Val) Val
@@ -228,7 +236,7 @@ data Closure
 --   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
 --   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
 --   × (coh    : (x^6 : A) →
---             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
+--             Path (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
 --                   (refl B (f x))
 --                   (rinv (f x)))
 
@@ -251,13 +259,15 @@ data Closure
 
   deriving Show
 
--- | Defunctionalized closures for IVar abstraction.
+-- | Defunctionalized closures for ivar abstraction
 data IClosure
   = ICEval Sub Env Tm
-  | ICCoePathP I I (BindI NamedIClosure) (BindI Val) (BindI Val) Val
-  | ICHComPathP I I NamedIClosure Val Val NeSysHCom Val
+  | ICCoePath I I (BindI NamedIClosure) (BindI Val) (BindI Val) Val
+  | ICHComPath I I NamedIClosure Val Val NeSysHCom Val
   | ICConst Val
   | ICIsEquiv7 Val Val Val Val Val
+  | ICHComLine I I NamedIClosure NeSysHCom Val
+  | ICCoeLine I I (BindI NamedIClosure) Val
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -370,14 +380,17 @@ instance SubAction IClosure where
       ICEval (sub s') (sub env) t
 
     -- recursive sub here as well!
-    ICCoePathP r r' a lh rh p ->
-      ICCoePathP (sub r) (sub r') (sub a) (sub lh) (sub rh) (sub p)
+    ICCoePath r r' a lh rh p ->
+      ICCoePath (sub r) (sub r') (sub a) (sub lh) (sub rh) (sub p)
 
-    ICHComPathP r r' a lhs rhs sys base ->
-      ICHComPathP (sub r) (sub r') (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
+    ICHComPath r r' a lhs rhs sys base ->
+      ICHComPath (sub r) (sub r') (sub a) (sub lhs) (sub rhs) (sub sys) (sub base)
 
     ICConst t               -> ICConst (sub t)
     ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
+    ICHComLine r r' a t b   -> ICHComLine (sub r) (sub r') (sub a) (sub t) (sub b)
+    ICCoeLine r r' a t      -> ICCoeLine (sub r) (sub r') (sub a) (sub t)
+
 
 --------------------------------------------------------------------------------
 

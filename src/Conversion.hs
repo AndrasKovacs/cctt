@@ -20,7 +20,7 @@ instance Conv Val where
     (VGlueTy a sys _, VGlueTy a' sys' _ ) -> conv a a' && conv sys sys'
     (VPi a b        , VPi a' b'         ) -> conv a a' && conv b b'
     (VLam t         , VLam t'           ) -> conv t t'
-    (VPathP a t u   , VPathP a' t' u'   ) -> conv a a' && conv t t' && conv u u'
+    (VPath a t u    , VPath a' t' u'    ) -> conv a a' && conv t t' && conv u u'
     (VPLam _ _ t    , VPLam _ _ t'      ) -> conv t t'
     (VSg a b        , VSg a' b'         ) -> conv a a' && conv b b'
     (VPair t u      , VPair t' u'       ) -> conv t t' && conv u u'
@@ -28,6 +28,8 @@ instance Conv Val where
     (VNat           , VNat              ) -> True
     (VZero          , VZero             ) -> True
     (VSuc n         , VSuc n'           ) -> conv n n'
+    (VLine a        , VLine a'          ) -> conv a a'
+    (VLLam t        , VLLam t'          ) -> conv t t'
 
     -- eta
     (VLam t         , F -> t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
@@ -36,6 +38,8 @@ instance Conv Val where
     (F -> t         , VPair t' u'       ) -> conv (proj1 t) t' && conv (proj2 t) u'
     (VPLam l r t    , F -> t'           ) -> freshI \(IVar -> i) -> conv (t ∙ i) (papp l r t' (F i))
     (F -> t         , VPLam l r t'      ) -> freshI \(IVar -> i) -> conv (papp l r t (F i)) (t' ∙ i)
+    (VLLam t        , F -> t'           ) -> freshI \(IVar -> i) -> conv (t ∙ i) (lapp t' (F i))
+    (F -> t         , VLLam t'          ) -> freshI \(IVar -> i) -> conv (lapp t (F i)) (t' ∙ i)
 
     (VSub{}         , _                 ) -> impossible
     (_              , VSub{}            ) -> impossible
@@ -49,6 +53,7 @@ instance Conv Ne where
     (NPApp p t u r , NPApp p' t' u' r' ) -> conv p p' && conv r r'
     (NProj1 n      , NProj1 n'         ) -> conv n n'
     (NProj2 n      , NProj2 n'         ) -> conv n n'
+    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv i i'
 
     (NCoe r1 r2 a t, NCoe r1' r2' a' t') ->
       conv r1 r1' && conv r2 r2' && conv a a' && conv t t'

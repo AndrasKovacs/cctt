@@ -9,6 +9,7 @@ type Ty = Tm
 data Tm
   = Ident Name
   | Pos (DontShow SourcePos) Tm
+  | I
   | I0
   | I1
   | Let Name (Maybe Ty) Tm Tm
@@ -51,3 +52,8 @@ data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
 
 data Top = TDef (DontShow SourcePos) Name (Maybe Ty) Tm Top | TEmpty
   deriving Show
+
+unPos :: Tm -> Tm
+unPos (Pos _ a) = a
+unPos a         = a
+{-# inline unPos #-}
