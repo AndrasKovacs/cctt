@@ -1,4 +1,8 @@
 
+- builtins: refl, _⁻¹, _◼_, ap, com
+
+- Line?
+
 - Coq-style function definitions
 - test stuff (cubicaltt prelude, examples)
 

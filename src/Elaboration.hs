@@ -462,19 +462,17 @@ checkCof = \case
   P.CTrue       -> pure CTrue
   P.CAnd eq cof -> CAnd <$!> checkCofEq eq <*!> checkCof cof
 
-------------------------------------------------------------
+-- Systems
+----------------------------------------------------------------------------------------------------
 
-goSysCompatHCom :: Elab (Tm -> SysHCom -> IO ())
-goSysCompatHCom t = \case
+sysHComCompat :: Elab (Tm -> SysHCom -> IO ())
+sysHComCompat t = \case
   SHEmpty              -> pure ()
   SHCons cof' x t' sys -> do
     case unF (evalCof cof') of
       VCFalse     -> pure ()
-      (F -> cof') -> bindVCof cof' $ bindI x \_ -> conv (eval t) (eval t')
-    goSysCompatHCom t sys
-
-sysCompatHCom :: Elab (F VCof -> Tm -> SysHCom -> IO ())
-sysCompatHCom cof t sys = bindVCof cof $ goSysCompatHCom t sys
+      (F -> cof') -> bindVCof cof' (bindI x \_ -> conv (eval t) (eval t'))
+    sysHComCompat t sys
 
 elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
 elabSysHCom a r base = \case
@@ -483,54 +481,43 @@ elabSysHCom a r base = \case
   P.SHCons cof x t sys -> do
     cof <- checkCof cof
     let vcof = evalCof cof
+    case unF vcof of
+      VCFalse -> do
+        elabSysHCom a r base sys
+      (F -> vcof) -> do
+        sys <- elabSysHCom a r base sys
+        bindVCof vcof do
+          t <- bindI x \_ -> check t a
+          conv (instantiate t (frc r)) (eval base) -- check compatibility with base
+          sysHComCompat t sys                      -- check compatibility with rest of system
+          pure $ SHCons cof x t sys
 
-    t <- bindVCof vcof do
-      t <- bindI x \_ -> check t a
-      conv (instantiate t (frc r)) (eval base) -- check base boundary
-      pure t
-
-    sys <- elabSysHCom a r base sys
-    sysCompatHCom vcof t sys -- check system compatibility
-    pure $ SHCons cof x t sys
-
-------------------------------------------------------------
-
-elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
-elabGlueTmSys base ts a equivs = case (ts, equivs) of
-  (P.SEmpty, NSEmpty) ->
-    pure SEmpty
-
-  (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> do
-    cof <- checkCof cof
-    let vcof = evalCof cof
-    convCof vcof (frc cof')
-
-    t <- bindVCof vcof do
-      let fequiv = frc equiv
-      t <- check t (proj1 fequiv)
-      conv (proj1f (proj2f fequiv) ∙ eval t) (eval base)
-      pure t
-
-    ts <- elabGlueTmSys base ts a equivs
-    sysCompat vcof t ts
-    pure $ SCons cof t ts
-
-  (_, _) ->
-    err GlueTmSystemMismatch
-
-------------------------------------------------------------
-
-goSysCompat :: Elab (Tm -> Sys -> IO ())
-goSysCompat t = \case
+sysCompat :: Elab (Tm -> Sys -> IO ())
+sysCompat t = \case
   SEmpty            -> pure ()
   SCons cof' t' sys -> do
     case unF (evalCof cof') of
       VCFalse     -> pure ()
       (F -> cof') -> bindVCof cof' $ conv (eval t) (eval t')
-    goSysCompat t sys
+    sysCompat t sys
 
-sysCompat :: Elab (F VCof -> Tm -> Sys -> IO ())
-sysCompat cof t sys = bindVCof cof $ goSysCompat t sys
+elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
+elabGlueTmSys base ts a equivs = case (ts, equivs) of
+  (P.SEmpty, NSEmpty) ->
+    pure SEmpty
+  (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> do
+    cof <- checkCof cof
+    let vcof = evalCof cof
+    convCof vcof (frc cof')
+    ts <- elabGlueTmSys base ts a equivs
+    bindVCof vcof do
+      let fequiv = frc equiv
+      t <- check t (proj1 fequiv)
+      conv (proj1f (proj2f fequiv) ∙ eval t) (eval base)
+      sysCompat t ts
+      pure $ SCons cof t ts
+  (_, _) ->
+    err GlueTmSystemMismatch
 
 elabGlueTySys :: Elab (VTy -> P.Sys -> IO Sys)
 elabGlueTySys a = \case
@@ -539,13 +526,17 @@ elabGlueTySys a = \case
   P.SCons cof t sys -> do
     cof <- checkCof cof
     let vcof = evalCof cof
-    t <- bindVCof vcof $ check t (equivInto a)
-    sys <- elabGlueTySys a sys
-    sysCompat vcof t sys
-    pure $ SCons cof t sys
+    case unF vcof of
+      VCFalse ->
+        elabGlueTySys a sys
+      (F -> vcof) -> do
+        sys <- elabGlueTySys a sys
+        bindVCof vcof do
+          t <- check t (equivInto a)
+          sysCompat t sys
+          pure $ SCons cof t sys
 
-
-------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 type ElabTop a = (?topLvl :: Lvl) => Elab a
 

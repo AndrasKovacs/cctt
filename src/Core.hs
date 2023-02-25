@@ -148,9 +148,9 @@ conjNeCof :: NCof -> NeCof -> NCof
 conjNeCof ncof necof = case necof of
   NCAnd c1 c2 -> ncof `conjNeCof` c1 `conjNeCof` c2
   NCEq i j    -> case (i, j) of
-    (IVar x, IVar y) -> let (!x, !i) = if x > y then (x, IVar y)
-                                                else (y, IVar x) in
-                        conjIVarI ncof x i
+    (IVar x, IVar y) -> let (!x', !i') = if x > y then (x, IVar y)
+                                                  else (y, IVar x) in
+                        conjIVarI ncof x' i'
     (IVar x, j     ) -> conjIVarI ncof x j
     (i     , IVar y) -> conjIVarI ncof y i
     _                -> impossible
