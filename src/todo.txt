@@ -1,15 +1,18 @@
 
-- builtins: refl, _⁻¹, _◼_, ap, com
+sugar:
+  - omit binders from coe, hcom, depPath when arg is path or line!
+  - distinguish the sugary versions already in presyntax
 
-- Line?
-- Switch megaparsec to strict bytestring input
+- add builtins with bidir checking: refl, _⁻¹, _◼_, ap, com, etc..
+
+- (Switch megaparsec to strict bytestring input)
 
 - test stuff (cubicaltt prelude, examples)
 
-- User interaction, copy from sett
 - add parametrized strict inductives (then perhaps remove Nat)
 - add weak HITs
 - file imports
+
 - glued eval
   - How: add glue values
   - forcing does not remove glue
@@ -19,7 +22,3 @@
     - Just another kind of neutral: Glue Ne ~Val
 
 - hole printing
-
-
-user interaction how:
-  - simple: file arg to exec, potentially additional args: top def nf printing, bench time printing

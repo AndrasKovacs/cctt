@@ -1,5 +1,6 @@
 module Common (
     module Common
+  , module Control.Monad
   , module Data.Bits
   , module Lens.Micro.Platform
   , oneShot
@@ -7,9 +8,11 @@ module Common (
   , noinline
   , coerce) where
 
-import GHC.Exts
-import Data.List
+import Control.Monad
 import Data.Bits
+import Data.List
+import Data.Time.Clock
+import GHC.Exts
 import Lens.Micro.Platform
 
 -- Debug printing, toggled by "debug" cabal flag
@@ -90,13 +93,6 @@ infixl 4 <*!>
   pure $! f a
 {-# inline (<*!>) #-}
 
-infixl 4 <$!>
-(<$!>) :: Monad m => (a -> b) -> m a -> m b
-(<$!>) f ma = do
-  a <- ma
-  pure $! f a
-{-# inline (<$!>) #-}
-
 -- De Bruijn indices and levels
 --------------------------------------------------------------------------------
 
@@ -122,3 +118,36 @@ newtype DontShow a = DontShow a
 
 instance Show (DontShow a) where
   showsPrec _ _ x = x
+
+-- Time measurement
+--------------------------------------------------------------------------------
+
+-- | Time an IO computation. Result is forced to whnf.
+timed :: IO a -> IO (a, NominalDiffTime)
+timed a = do
+  t1  <- getCurrentTime
+  res <- a
+  t2  <- getCurrentTime
+  let diff = diffUTCTime t2 t1
+  pure (res, diff)
+{-# inline timed #-}
+
+-- | Time a lazy pure value. Result is forced to whnf.
+timedPure :: a -> IO (a, NominalDiffTime)
+timedPure ~a = do
+  t1  <- getCurrentTime
+  let res = a
+  t2  <- getCurrentTime
+  let diff = diffUTCTime t2 t1
+  pure (res, diff)
+{-# noinline timedPure #-}
+
+-- | Time a lazy pure value. Result is forced to whnf.
+timedPure_ :: a -> IO NominalDiffTime
+timedPure_ ~a = do
+  t1  <- getCurrentTime
+  seq a $ do
+    t2  <- getCurrentTime
+    let diff = diffUTCTime t2 t1
+    pure diff
+{-# noinline timedPure_ #-}

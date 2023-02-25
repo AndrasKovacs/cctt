@@ -15,7 +15,7 @@ import Interval
 import Quotation
 import Substitution
 
-import qualified Common
+-- import qualified Common
 import qualified Conversion
 import qualified Core
 import qualified Presyntax as P
@@ -65,8 +65,8 @@ evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
 evalInf :: NCofArg => I -> I
 evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
 
-debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
-debug x = withNames (Common.debug x)
+-- debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
+-- debug x = withNames (Common.debug x)
 
 
 ----------------------------------------------------------------------------------------------------
@@ -568,7 +568,7 @@ elabGlueTySys a = \case
 
 ----------------------------------------------------------------------------------------------------
 
-type ElabTop a = (?topLvl :: Lvl) => Elab a
+type ElabTop a = (?topLvl :: Lvl) => (?printnf :: Maybe Name) => Elab a
 
 defineTop :: Name -> VTy -> Val -> ElabTop a -> ElabTop a
 defineTop x a ~v act =
@@ -600,21 +600,28 @@ inferTop = \case
         pure (a, va, t)
 
     let ~vt = eval t
-    debug ["TOPNF", x, pretty (quote vt)]
+
+    case ?printnf of
+      Just x' | x == x' -> withNames do
+        putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
+        putStrLn ""
+      _ -> pure ()
+
     top <- defineTop x va vt $ inferTop top
     pure $! TDef x a t top
 
   P.TEmpty ->
     pure TEmpty
 
-elabTop :: FilePath -> String -> P.Top -> IO Top
-elabTop path file top = do
-  let ?cof    = idSub 0
-      ?dom    = 0
-      ?env    = ENil
-      ?tbl    = mempty
-      ?srcPos = initialPos path
-      ?topLvl = 0
+elabTop :: Maybe Name -> FilePath -> String -> P.Top -> IO Top
+elabTop printnf path file top = do
+  let ?cof     = idSub 0
+      ?dom     = 0
+      ?env     = ENil
+      ?tbl     = mempty
+      ?srcPos  = initialPos path
+      ?topLvl  = 0
+      ?printnf = printnf
   catch (inferTop top) \(e :: ErrInCxt) -> do
     displayErrInCxt file e
     exitSuccess

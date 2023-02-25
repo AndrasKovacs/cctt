@@ -72,6 +72,11 @@ data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
 data Top = TDef Name Ty Tm Top | TEmpty
   deriving Show
 
+topLen :: Top -> Int
+topLen = go 0 where
+  go acc TEmpty           = acc
+  go acc (TDef _ _ _ top) = go (acc + 1) top
+
 -- Values
 --------------------------------------------------------------------------------
 

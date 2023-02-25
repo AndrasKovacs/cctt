@@ -60,7 +60,7 @@ isKeyword x =
   || x == "I"
 
 ident :: Parser Name
-ident = try $ do
+ident = try do
   o <- getOffset
   x <- takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'')
   if isKeyword x
@@ -68,7 +68,7 @@ ident = try $ do
     else x <$ ws
 
 keyword :: String -> Parser ()
-keyword kw = do
+keyword kw = try do
   C.string kw
   (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
 
