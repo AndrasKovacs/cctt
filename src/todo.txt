@@ -2,8 +2,8 @@
 - builtins: refl, _⁻¹, _◼_, ap, com
 
 - Line?
+- Switch megaparsec to strict bytestring input
 
-- Coq-style function definitions
 - test stuff (cubicaltt prelude, examples)
 
 - User interaction, copy from sett

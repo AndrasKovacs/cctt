@@ -641,30 +641,31 @@ ungluef t sys = frc (unglue t sys); {-# inline ungluef #-}
 
 eval :: SubArg => NCofArg => DomArg => EnvArg => Tm -> Val
 eval = \case
-  TopVar _ v      -> coerce v
-  LocalVar x      -> localVar x
-  Let x _ t u     -> define (eval t) (eval u)
-  Pi x a b        -> VPi (eval a) (NCl x (CEval ?sub ?env b))
-  App t u         -> evalf t ∙ eval u
-  Lam x t         -> VLam (NCl x (CEval ?sub ?env t))
-  Sg x a b        -> VSg (eval a) (NCl x (CEval ?sub ?env b))
-  Pair t u        -> VPair (eval t) (eval u)
-  Proj1 t         -> proj1 (evalf t)
-  Proj2 t         -> proj2 (evalf t)
-  U               -> VU
-  PathP x a t u   -> VPathP (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
-  PApp l r t i    -> papp (eval l) (eval r) (evalf t) (evalI i)
-  PLam l r x t    -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
-  Coe r r' x a t  -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
-  HCom r r' a t b -> hcom (evalI r) (evalI r') (evalf a) (evalSysHCom t) (evalf b)
-  GlueTy a sys    -> glueTy (eval a) (evalSys sys)
-  Glue t sys      -> glue (eval t) (evalSys sys)
-  Unglue t sys    -> unglue (eval t) (evalSys sys)
-  Nat             -> VNat
-  Zero            -> VZero
-  Suc t           -> VSuc (eval t)
-  NatElim p z s n -> natElim (eval p) (eval z) (evalf s) (evalf n)
-  TODO            -> VTODO
+  TopVar _ v       -> coerce v
+  LocalVar x       -> localVar x
+  Let x _ t u      -> define (eval t) (eval u)
+  Pi x a b         -> VPi (eval a) (NCl x (CEval ?sub ?env b))
+  App t u          -> evalf t ∙ eval u
+  Lam x t          -> VLam (NCl x (CEval ?sub ?env t))
+  Sg x a b         -> VSg (eval a) (NCl x (CEval ?sub ?env b))
+  Pair t u         -> VPair (eval t) (eval u)
+  Proj1 t          -> proj1 (evalf t)
+  Proj2 t          -> proj2 (evalf t)
+  U                -> VU
+  PathP x a t u    -> VPathP (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
+  PApp l r t i     -> papp (eval l) (eval r) (evalf t) (evalI i)
+  PLam l r x t     -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
+  Coe r r' x a t   -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
+  HCom r r' a t b  -> hcom (evalI r) (evalI r') (evalf a) (evalSysHCom t) (evalf b)
+  GlueTy a sys     -> glueTy (eval a) (evalSys sys)
+  Glue t sys       -> glue (eval t) (evalSys sys)
+  Unglue t sys     -> unglue (eval t) (evalSys sys)
+  Nat              -> VNat
+  Zero             -> VZero
+  Suc t            -> VSuc (eval t)
+  NatElim p z s n  -> natElim (eval p) (eval z) (evalf s) (evalf n)
+  TODO             -> VTODO
+  Com r r' i a t b -> com (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom t) (evalf b)
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)

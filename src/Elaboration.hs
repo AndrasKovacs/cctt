@@ -140,7 +140,7 @@ data Error
   | CantConvertCof Cof Cof
   | CantConvertEndpoints Tm Tm
   | CantConvertExInf Tm Tm
-  | GlueTmSystemMismatch
+  | GlueTmSystemMismatch Sys
   | TopShadowing
   deriving Show
 
@@ -181,24 +181,24 @@ displayErrInCxt file (ErrInCxt e) = withNames do
       msg  = case e of
         CantConvertExInf t u ->
            "Can't convert expected type\n\n" ++
-           "  " ++ showTm u ++ "\n\n" ++
+           "  " ++ pretty u ++ "\n\n" ++
            "and inferred type\n\n" ++
-           "  " ++ showTm t
+           "  " ++ pretty t
         CantConvert t u ->
            "Can't convert\n\n" ++
-           "  " ++ showTm u ++ "\n\n" ++
+           "  " ++ pretty u ++ "\n\n" ++
            "and\n\n" ++
-           "  " ++ showTm t
+           "  " ++ pretty t
         CantConvertEndpoints t u ->
            "Can't convert expected path endpoint\n\n" ++
-           "  " ++ showTm u ++ "\n\n" ++
+           "  " ++ pretty u ++ "\n\n" ++
            "to\n\n" ++
-           "  " ++ showTm t
+           "  " ++ pretty t
         CantConvertCof c1 c2 ->
            "Can't convert expected path endpoint\n\n" ++
-           "  " ++ showCof c1 ++ "\n\n" ++
+           "  " ++ pretty c1 ++ "\n\n" ++
            "to\n\n" ++
-           "  " ++ showCof c2
+           "  " ++ pretty c2
         NameNotInScope x ->
            "Name not in scope: " ++ x
         TopShadowing ->
@@ -209,19 +209,22 @@ displayErrInCxt file (ErrInCxt e) = withNames do
            "Expected an interval expression"
         ExpectedPi a ->
            "Expected a function type, inferred" ++
-           "  " ++ showTm a
+           "  " ++ pretty a
         ExpectedSg a ->
            "Expected a sigma type, inferred" ++
-           "  " ++ showTm a
+           "  " ++ pretty a
         ExpectedGlueTy a ->
            "Expected a glue type, inferred" ++
-           "  " ++ showTm a
+           "  " ++ pretty a
         CantInferLam ->
            "Can't infer type for lambda expression"
         CantInferPair ->
            "Can't infer type for pair expression"
         CantInferGlueTm ->
            "Can't infer type for glue expression"
+        GlueTmSystemMismatch sys ->
+           "Can't match glue system with expected Glue type system\n\n" ++
+           "  " ++ pretty sys
 
   putStrLn (show path ++ ":" ++ lnum ++ ":" ++ show colnum)
   putStrLn (lpad ++ " |")
@@ -429,11 +432,19 @@ infer = \case
     n <- check n VNat
     pure $! Infer (NatElim p s z n) (vp ∙~ eval n)
 
-  -- P.Com r r' i a sys base -> do
-  --   r  <- checkI r
-  --   r' <- checkI r'
-  --   a  <- bindI i \_ -> check a VU
-  --   _
+  P.Com r r' i a sys t -> do
+    r       <- checkI r
+    r'      <- checkI r'
+    (a, va) <- bindI i \_ -> do {a <- check a VU; pure (a, eval a)}
+    t       <- check t (instantiate a (evalI r))
+
+    -- NOTE: elabSysHCom happens to be correct for "com" as well. In the "hcom"
+    -- case, the "a" type gets implicitly weakened under both a cof and an ivar
+    -- binder when checking components. In the "com" case, "a" is already under
+    -- an ivar binder, so it's only weakened under the cof. The boundary checks
+    -- are exactly the same.
+    sys     <- elabSysHCom va r t sys
+    pure $! Infer (Com r r' i a sys t) (instantiate a (evalI r'))
 
 checkI :: Elab (P.Tm -> IO I)
 checkI = \case
@@ -487,7 +498,7 @@ elabSysHCom a r base = \case
       (F -> vcof) -> do
         sys <- elabSysHCom a r base sys
         bindVCof vcof do
-          t <- bindI x \_ -> check t a
+          t <- bindI x \_ -> check t a             -- "a" is weakened under vcof
           conv (instantiate t (frc r)) (eval base) -- check compatibility with base
           sysHComCompat t sys                      -- check compatibility with rest of system
           pure $ SHCons cof x t sys
@@ -516,8 +527,8 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
       conv (proj1f (proj2f fequiv) ∙ eval t) (eval base)
       sysCompat t ts
       pure $ SCons cof t ts
-  (_, _) ->
-    err GlueTmSystemMismatch
+  (ts, equivs) ->
+    err $! GlueTmSystemMismatch (quote equivs)
 
 elabGlueTySys :: Elab (VTy -> P.Sys -> IO Sys)
 elabGlueTySys a = \case
@@ -570,7 +581,7 @@ inferTop = \case
         pure (a, va, t)
 
     let ~vt = eval t
-    debug ["TOPNF", x, showTm (quote vt)]
+    debug ["TOPNF", x, pretty (quote vt)]
     top <- defineTop x va vt $ inferTop top
     pure $! TDef x a t top
 

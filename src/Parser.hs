@@ -131,16 +131,43 @@ sysHCom = char '[' *> goSysHCom <* char ']'
 goApp :: Tm -> Parser Tm
 goApp t = (goApp =<< (App t <$!> proj)) <|> pure t
 
+-- TODO: sugar for omitting binders, e.g. coe 0 1 p a --> coe 0 1 (i.p i) a
+--                                        hcom 0 1 [i=0 k. p k] b --> hcom 0 1 [i=0. p] b
+goCoe :: Parser Tm
+goCoe = do
+  r  <- int
+  r' <- int
+  char '('
+  x <- bind
+  char '.'
+  a <- tm
+  char ')'
+  t <- proj
+  pure $ Coe r r' x a t
+
+goCom :: Parser Tm
+goCom = do
+  r  <- int
+  r' <- int
+  char '('
+  x <- bind
+  char '.'
+  a <- tm
+  char ')'
+  sys <- sysHCom
+  t <- proj
+  pure $ Com r r' x a sys t
+
 app :: Parser Tm
 app =
        (keyword "suc"     *> (Suc <$!> proj))
   <|>  (keyword "NatElim" *> (NatElim <$!> proj <*!> proj <*!> proj <*!> proj))
-  <|>  (keyword "coe"     *> (Coe <$!> int <*!> int <*!> bind <*!> proj <*!> proj))
+  <|>  (keyword "coe"     *> goCoe)
   <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
   <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
-  <|>  (keyword "com"     *> (Com <$!> int <*!> int <*!> bind <*!> proj <*!> sysHCom <*!> proj))
+  <|>  (keyword "com"     *> goCom)
   <|>  (goApp =<< proj)
 
 eq :: Parser Tm

@@ -3,10 +3,7 @@ module Pretty (
     type TopNames
   , type Names
   , type INames
-  , showTm
-  , showTop
-  , showCof
-  , showTm0) where
+  , Pretty(..)) where
 
 import Prelude hiding (pi)
 import Data.String
@@ -155,42 +152,42 @@ sys s = "[" <> goSys s <> "]"
 
 tm :: TopNames => Names => INames => Prec => Tm -> Txt
 tm = \case
-  TopVar x _      -> str (?top M.! fromIntegral x)
-  LocalVar x      -> var ?names x
-  Let x a t u     -> let pa = let_ a; pt = let_ t in fresh x \x ->
-                     letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
-  Pi "_" a b      -> let pa = sigma a in fresh "_" \_ ->
-                     pip (pa <> " → " <> pi b)
-  Pi n a b        -> let pa = pair a in fresh n \n ->
-                     pip (piBind n pa  <> goPis b)
-  App t u         -> appp (app t <> " " <> proj u)
-  Lam x t         -> letp (fresh x \x -> "λ " <> x <> goLams t)
-  Sg "_" a b      -> let pa = eq a in fresh "_" \_ ->
-                     sigmap (pa <> " × " <> sigma b)
-  Sg x a b        -> let pa = pair a in fresh x \x ->
-                     sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
-  Pair t u        -> pairp (let_ t <> ", " <> pair u)
-  Proj1 t         -> projp (proj t <> ".1")
-  Proj2 t         -> projp (proj t <> ".2")
-  U               -> "U"
-  PathP "_" _ t u -> eqp (app t <> " = " <> app u)
-  PathP x a t u   -> let pt = app t; pu = app u in freshI x \x ->
-                     eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
-  PApp _ _ t u    -> appp (app t <> " " <> int u)
-  PLam _ _ x t    -> letp (freshI x \x -> "λ " <> x <> goLams t)
-  Coe r r' i a t  -> let pt = proj t in freshI i \i ->
-                     appp ("coe " <> int r <> " " <> int r' <> " " <> i <> " " <> proj a <> " " <> pt)
-  HCom r r' _ t u -> appp ("hcom " <> int r <> " " <> int r' <> " " <> sysH t <> " " <> proj u)
-  GlueTy a s      -> appp ("Glue " <> proj a <> " " <> sys s)
-  Unglue t _      -> appp ("unglue " <> proj t)
-  Glue a s        -> appp ("glue " <> proj a <> " " <> sys s)
-  Nat             -> "Nat"
-  Zero            -> "zero"
-  Suc t           -> appp ("suc " <> proj t)
-  NatElim p s z n -> appp ("NatElim " <> proj p <> " " <> proj s <> " " <> proj z <> " " <> proj n)
-  TODO            -> "TODO"
-
---------------------------------------------------------------------------------
+  TopVar x _       -> str (?top M.! fromIntegral x)
+  LocalVar x       -> var ?names x
+  Let x a t u      -> let pa = let_ a; pt = let_ t in fresh x \x ->
+                      letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
+  Pi "_" a b       -> let pa = sigma a in fresh "_" \_ ->
+                      pip (pa <> " → " <> pi b)
+  Pi n a b         -> let pa = pair a in fresh n \n ->
+                      pip (piBind n pa  <> goPis b)
+  App t u          -> appp (app t <> " " <> proj u)
+  Lam x t          -> letp (fresh x \x -> "λ " <> x <> goLams t)
+  Sg "_" a b       -> let pa = eq a in fresh "_" \_ ->
+                      sigmap (pa <> " × " <> sigma b)
+  Sg x a b         -> let pa = pair a in fresh x \x ->
+                      sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
+  Pair t u         -> pairp (let_ t <> ", " <> pair u)
+  Proj1 t          -> projp (proj t <> ".1")
+  Proj2 t          -> projp (proj t <> ".2")
+  U                -> "U"
+  PathP "_" _ t u  -> eqp (app t <> " = " <> app u)
+  PathP x a t u    -> let pt = app t; pu = app u in freshI x \x ->
+                      eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
+  PApp _ _ t u     -> appp (app t <> " " <> int u)
+  PLam _ _ x t     -> letp (freshI x \x -> "λ " <> x <> goLams t)
+  Coe r r' i a t   -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
+                      appp ("coe " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt)
+  HCom r r' _ t u  -> appp ("hcom " <> int r <> " " <> int r' <> " " <> sysH t <> " " <> proj u)
+  GlueTy a s       -> appp ("Glue " <> proj a <> " " <> sys s)
+  Unglue t _       -> appp ("unglue " <> proj t)
+  Glue a s         -> appp ("glue " <> proj a <> " " <> sys s)
+  Nat              -> "Nat"
+  Zero             -> "zero"
+  Suc t            -> appp ("suc " <> proj t)
+  NatElim p s z n  -> appp ("NatElim " <> proj p <> " " <> proj s <> " " <> proj z <> " " <> proj n)
+  TODO             -> "TODO"
+  Com r r' i a t u -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
+                      "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt <> " " <> pu)
 
 top :: TopNames => LvlArg => Top -> Txt
 top = \case
@@ -202,14 +199,24 @@ top = \case
          ?lvl = ?lvl + 1 in
      top u)
 
-showTop :: Top -> String
-showTop t = let ?top = mempty; ?lvl = 0 in runTxt (top t)
+----------------------------------------------------------------------------------------------------
 
-showTm :: TopNames => Names => INames => Tm -> String
-showTm t = runTxt (pair t)
+class Pretty c c0 a | a -> c c0 where
+  pretty  :: c => a -> String
+  pretty0 :: c0 => a -> String
 
-showTm0 :: TopNames => Tm -> String
-showTm0 t = let ?names = []; ?inames = [] in runTxt (pair t)
+instance Pretty () () Top where
+  pretty  t = let ?top = mempty; ?lvl = 0 in runTxt (top t)
+  pretty0 t = let ?top = mempty; ?lvl = 0 in runTxt (top t)
 
-showCof :: INames => Cof -> String
-showCof = runTxt . cof
+instance Pretty (TopNames, Names, INames) TopNames Tm where
+  pretty  t = runTxt (pair t)
+  pretty0 t = let ?names = []; ?inames = [] in runTxt (pair t)
+
+instance Pretty INames () Cof where
+  pretty  = runTxt . cof
+  pretty0 c = let ?inames = [] in runTxt (cof c)
+
+instance Pretty (TopNames, Names, INames) TopNames Sys where
+  pretty  s = runTxt (sys s)
+  pretty0 s = let ?names = []; ?inames = [] in runTxt (sys s)

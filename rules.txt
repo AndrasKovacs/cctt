@@ -54,13 +54,13 @@ Coercion
 Homogeneous composition
 
 
-    Γ ⊢ α cof  Γ ⊢ A : U   Γ, i, α ⊢ t : A    Γ ⊢ b : A    Γ, α ⊢ t r ≡ b
+    Γ ⊢ α cof  Γ ⊢ A : U   Γ, α, i ⊢ t : A    Γ ⊢ b : A    Γ, α ⊢ t r ≡ b
     ──────────────────────────────────────────────────────────────────────
          Γ ⊢ hcomⁱ r r' A [α ↦ t] b : A [r=r' ↦ b, α ↦ t r')
 
 Composition (derived)
 
-    Γ ⊢ α cof   Γ, i ⊢ A : U   Γ, i, α ⊢ t : A   Γ ⊢ b : A r   Γ, α ⊢ t r ≡ b
+    Γ ⊢ α cof   Γ, i ⊢ A : U   Γ, α, i ⊢ t : A   Γ ⊢ b : A r   Γ, α ⊢ t r ≡ b
     ────────────────────────────────────────────────────────────────────────
        Γ ⊢ comⁱ r r' A [α ↦ t] b : (A r') [r=r' ↦ b, α ↦ t r']
            comⁱ r r' A [α ↦ t] b :=

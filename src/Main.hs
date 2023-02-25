@@ -16,7 +16,7 @@ justElab :: String -> IO ()
 justElab str = do
   top <- parseString "(interactive)" str
   top <- elabTop "(interactive)" str top
-  putStrLn $ showTop top
+  putStrLn $ pretty top
 
 --------------------------------------------------------------------------------
 
@@ -62,11 +62,11 @@ p3 = justElab $ unlines [
   ,"funext (A : U)(B : A → U)(f g : (a : A) → B a)(p : (a : A) → f a = g a) : f = g"
   ,"  := λ i a. p a i;"
 
-  ,"coerce (A B : U) (p : A = B)(a : A) : B := coe 0 1 i (p i) a;"
+  ,"coerce (A B : U) (p : A = B)(a : A) : B := coe 0 1 (i. p i) a;"
 
-  ,"coerceinv (A B : U) (p : A = B)(b : B) : A := coe 1 0 i (p i) b;"
+  ,"coerceinv (A B : U) (p : A = B)(b : B) : A := coe 1 0 (i. p i) b;"
 
-  ,"subst (A : U)(P : A → U)(x y : A)(p : x = y)(px : P x) : P y := coe 0 1 i (P (p i)) px;"
+  ,"subst (A : U)(P : A → U)(x y : A)(p : x = y)(px : P x) : P y := coe 0 1 (i. P (p i)) px;"
 
   ,"Sing (A : U) (a : A) : U := (x : A) × (a = x);"
 
@@ -80,4 +80,37 @@ p3 = justElab $ unlines [
   ,"                      j=0 k. connAndWeak A a b p 0 k; j=1 k. connAndWeak A a b p i k;"
   ,"                      i=j k. connAndWeak A a b p i k] a;"
 
+  ,"connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;"
+
+  ,"contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={Sing A a} (b, p)"
+  ,"  := λ i. (p i, connAnd A a b p i);"
+
+  ,"Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a (refl A a))(x : A)(p : a = x) : C x p"
+  ,"  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl A a) (x, p) (contractSing A a x p) cr;"
+
+  ,"J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p"
+  ,"  := coe 0 1 (i. C (hcom 0 1 [i=0 _. a; i=1 x. p x] a)"
+  ,"                   (λ j. hcom 0 j [i=0 _. a; i=1 x. p x] a)) d;"
+
+  ,"test (A B : U)(p : A = B)(x : A) : hcom 0 1 [] (coe 0 1 (i.p i) x) = com 0 1 (i. p i) [] x"
+  ,"  := λ _. com 0 1 (i. p i) [] x;"
+
+  ,"JEq (A : U)(a : A)(C : (x : A) → a = x → U)(d : C a (λ _. a))"
+  ,"  : J A a C d a (λ _. a) = d"
+  ,"  := λ k. com 0 1 (λ i. C ? ?)"
+  ,"                 [k=0 i. coe 0 i (λ i. C ? ?) d;"
+  ,"                  k=1 _. d] d;"
   ]
+
+-- JEq (A : U) (a : A) (C : (x : A) -> Path A a x -> U) (d : C a (<_> a))
+--    : Path (C a (<_> a)) (J A a C d a (<_> a)) d =
+--    <k> com 0->1 (<i> C (cube @ i @ 1 @ k) (<j> cube @ i @ j @ k))
+--        [(k=0) -> <i> coe 0->i (<i> C (sq @ i @ 1) (<j> sq @ i @ j)) d
+--        ,(k=1) -> <_> d] d
+
+--   where sq : Line (Line A) = <i j> hcom 0->j A [(i=0) -> <_> a,(i=1) -> <_> a] a
+--         cube : Line (Line (Line A)) =
+--           <i j k> hcom 0->j A [(k=0) -> sq @ i
+--                               ,(k=1) -> <_> a
+--                               ,(i=0) -> <_> a
+--                               ,(i=1) -> <_> a] a
