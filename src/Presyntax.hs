@@ -21,8 +21,8 @@ data Tm
   | Proj1 Tm
   | Proj2 Tm
   | U
-  | Path (Maybe Ty) Tm Tm             -- x ={A} y
-  | DepPath Name Ty Tm Tm             -- x ={i.A} y
+  | Path Tm Tm                        -- x = y
+  | DepPath Name Ty Tm Tm             -- x ={i.A} y | x ={p} y
 
   | Coe Tm Tm BindMaybe Tm              -- coe r r' i A t
   | HCom Tm Tm (Maybe Ty) SysHCom Tm    -- hcom r r' A [α x. t] u

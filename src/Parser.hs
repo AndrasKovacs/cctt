@@ -116,9 +116,9 @@ goSys =
 
 sysBindMaybe :: Parser BindMaybe
 sysBindMaybe =
-  branch (try (bind <* char '.'))
-    (\x -> Bind x <$!> tm)
-    (DontBind <$!> tm)
+  branch bind
+    (\x -> Bind x <$!> (char '.' *> tm))
+    (DontBind <$!> (char '.' *> tm))
 
 goSysHCom' :: Parser SysHCom
 goSysHCom' =
@@ -143,31 +143,6 @@ bindMaybe :: Parser BindMaybe
 bindMaybe = branch (try (char '(' *> bind <* char '.'))
   (\x -> Bind x <$!> (tm <* char ')'))
   (DontBind <$!> proj)
-
--- goCoe :: Parser Tm
--- goCoe = do
---   r  <- int
---   r' <- int
---   char '('
---   x <- bind
---   char '.'
---   a <- tm
---   char ')'
---   t <- proj
---   pure $ Coe r r' (Bind x a) t
-
--- goCom :: Parser Tm
--- goCom = do
---   r  <- int
---   r' <- int
---   char '('
---   x <- bind
---   char '.'
---   a <- tm
---   char ')'
---   sys <- sysHCom
---   t <- proj
---   pure $ Com r r' (Bind x a) sys t
 
 goCoe :: Parser Tm
 goCoe = do
@@ -204,17 +179,14 @@ eq = do
   branch (char '=')
     (\_ -> do
         branch (char '{')
-          (\_ -> branch (try (bind <* char '.'))
-            (\x -> do
-                a <- tm
-                char '}'
-                u <- app
-                pure (DepPath x a t u))
-            (do a <- tm
-                char '}'
-                u <- app
-                pure (Path (Just a) t u)))
-          (Path Nothing t <$!> app))
+          (\_ -> do
+              x <- bind
+              char '.'
+              a <- tm
+              char '}'
+              u <- app
+              pure (DepPath x a t u))
+          (Path t <$!> app))
     (pure t)
 
 sigma :: Parser Tm

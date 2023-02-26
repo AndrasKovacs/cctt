@@ -26,7 +26,7 @@ helpMsg = unlines [
   ]
 
 elabFile :: FilePath -> IO ()
-elabFile path = mainWith (pure [path])
+elabFile path = mainWith (pure [path, "elab"])
 
 mainInteraction :: IO ()
 mainInteraction = mainWith getArgs

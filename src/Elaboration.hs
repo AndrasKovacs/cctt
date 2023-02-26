@@ -390,24 +390,10 @@ infer = \case
   P.U ->
     pure $ Infer U VU
 
-  P.Path Nothing t u -> do
+  P.Path t u -> do
     Infer t a <- infer t
     u <- check u a
     pure $! Infer (Path "_" (Core.freshI \_ -> quote a) t u) VU
-
-  P.Path (Just a) t u -> do
-    a <- bindI "_" \_ -> check a VU
-    let va = instantiate a (F I0) -- instantiation doesn't matter
-    t <- check t va
-    u <- check u va
-    pure $! Infer (Path "_" a t u) VU
-
-  -- P.Coe r r' (P.Bind x a) t -> do --
-  --   r  <- checkI r
-  --   r' <- checkI r'
-  --   a  <- bindI x \_ -> check a VU
-  --   t  <- check t (instantiate a (evalI r))
-  --   pure $! Infer (Coe r r' x a t) (instantiate a (evalI r'))
 
   P.Coe r r' a t -> do --
     r  <- checkI r

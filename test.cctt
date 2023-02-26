@@ -12,10 +12,10 @@ comtest (A B : U)(p : A = B)(x : A) : hcom 0 1 [] (coe 0 1 p x) = com 0 1 p [] x
 refl (A : U)(x : A) : x = x := λ _. x;
 
 trans (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
-  := λ i. hcom 0 1 [i=0 _. x; i=1 j. q j] (p i);
+  := λ i. hcom 0 1 [i=0 _. x; i=1. q] (p i);
 
 sym (A : U)(x y : A) (p : x = y) : y = x
-  := λ i. hcom 0 1 [i=0 j. p j; i=1 _. x] x;
+  := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
 ap (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y
    := λ i. f (p i);
@@ -37,22 +37,22 @@ subst (A : U)(P : A → U)(x y : A)(p : x = y)(px : P x) : P y := coe 0 1 (i. P 
 Sing (A : U) (a : A) : U := (x : A) × (a = x);
 
 connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
-  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1 x. p x] (p k);
+  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
 
-     λ i j. hcom 0 1 [i=0 k. sq 0 k; i=1 k. sq j k;
-                      j=0 k. sq 0 k; j=1 k. sq i k;
-                      i=j k. sq i k] a;
+     λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j;
+                      j=0. sq 0; j=1. sq i;
+                      i=j. sq i] a;
 
 connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
 
-contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={Sing A a} (b, p)
+contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
   := λ i. (p i, connAnd A a b p i);
 
 Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a (refl A a))(x : A)(p : a = x) : C x p
   := subst (Sing A a) (λ s. C s.1 s.2) (a, refl A a) (x, p) (contractSing A a x p) cr;
 
 J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
-  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 x. p x] a;
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
 JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))

@@ -5,7 +5,8 @@ import MainInteraction
 
 p1 = elabString $ unlines [
    ""
-  ,"coerce (p : I → U)(x : p 0) : p 1 := coe 0 1 p x;"
+  ,"trans (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z"
+  ,":= λ i. hcom 0 1 [i=0 _. x; i=1. q] (p i);"
   ]
 
 p2 = elabString $ unlines [
