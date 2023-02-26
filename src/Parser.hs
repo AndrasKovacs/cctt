@@ -180,12 +180,12 @@ eq = do
     (\_ -> do
         branch (char '{')
           (\_ -> do
-              x <- bind
-              char '.'
-              a <- tm
+              a <- branch (try (bind <* char '.'))
+                     (\x -> Bind x <$!> tm)
+                     (DontBind <$!> tm)
               char '}'
               u <- app
-              pure (DepPath x a t u))
+              pure $ DepPath a t u)
           (Path t <$!> app))
     (pure t)
 

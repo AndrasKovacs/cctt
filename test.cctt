@@ -6,6 +6,15 @@ test5 : (A : U)(B : A → U)(a : A)(b : B a) → (a : A) × B a := λ A B a b. (
 test6 : (A : U)(B : A → U)(x : (a : A) × B a) → A := λ A B x. x.1;
 test7 : (A : U)(B : A → U)(x : (a : A) × B a) → B x.1 := λ A B x. x.2;
 
+depPathtest (A : U)(B : A → U)(x y : A)(p : x = y)(bx : B x)(by : B y) : U
+  := bx ={i. B (p i)} by;
+
+depPathtest2 (A B : U)(p : A = B)(x : A)(y : B) : U
+  := x ={p} y;
+
+depLinetest (p : I → U)(x : p 0)(y : p 1) : U
+  := x ={p} y;
+
 comtest (A B : U)(p : A = B)(x : A) : hcom 0 1 [] (coe 0 1 p x) = com 0 1 p [] x
   := λ _. com 0 1 p [] x;
 

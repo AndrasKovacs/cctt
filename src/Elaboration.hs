@@ -317,10 +317,10 @@ infer = \case
   P.I1 -> err UnexpectedI
   P.I  -> err UnexpectedIType
 
-  P.DepPath x a t u -> do
-    a <- bindI x \_ -> check a VU
-    t <- check t (instantiate a (F I0))
-    u <- check u (instantiate a (F I1))
+  P.DepPath a t u -> do
+    (x, a, _, src, tgt) <- elabBindMaybe a (F I0) (F I1)
+    t <- check t src
+    u <- check u tgt
     pure $! Infer (Path x a t u) VU
 
   P.Pos pos t ->
