@@ -22,9 +22,6 @@ import qualified Presyntax as P
 
 import Pretty
 
--- import Debug.Trace
-
-
 ----------------------------------------------------------------------------------------------------
 
 conv :: Elab (Val -> Val -> IO ())
@@ -491,7 +488,7 @@ elabBindMaybe b r r' = case b of
             src = papp lhs rhs va r
             tgt = papp lhs rhs va r'
         bindI "i" \i -> do
-          a <- pure $ PApp (quote src) (quote tgt) (quote (unF va)) (IVar i)
+          a <- pure $ PApp (quote src) (quote tgt) (WkI a) (IVar i)
           pure ("i", a, eval a, src, tgt)
       VLine aty -> do
         isConstantU aty
@@ -499,7 +496,7 @@ elabBindMaybe b r r' = case b of
             src = lapp va r
             tgt = lapp va r'
         bindI "i" \i -> do
-          a <- pure $ LApp (quote (unF va)) (IVar i)
+          a <- pure $ LApp (WkI a) (IVar i)
           pure ("i", a, eval a, src, tgt)
       a -> do
         err $! ExpectedPathLine (quote a)
@@ -564,17 +561,6 @@ elabSysHCom a r base = \case
     case unF vcof of
       VCFalse -> do
         elabSysHCom a r base sys
-
-      -- (F -> vcof) -> do
-      --   (x, t) <- case t of P.Bind x t -> pure (x, t)
-      --   sys <- elabSysHCom a r base sys
-      --   bindVCof vcof do
-      --     t <- bindI x \_ -> check t a             -- "a" is weakened under vcof
-      --     conv (instantiate t (frc r)) (eval base) -- check compatibility with base
-      --     sysHComCompat t sys                      -- check compatibility with rest of system
-      --     pure $ SHCons cof x t sys
-
-
       (F -> vcof) -> do
         sys <- elabSysHCom a r base sys
         bindVCof vcof do
@@ -582,7 +568,7 @@ elabSysHCom a r base = \case
           -- overloaded binder notation
           (x, t) <- case t of
             P.Bind x t -> do
-              t <- bindI x \_ -> check t a         -- "a" is weakened under vcof
+              t <- bindI x \_ -> check t a -- "a" is weakened under vcof
               pure (x, t)
             P.DontBind t -> do
               Infer t tty <- infer t
@@ -590,12 +576,12 @@ elabSysHCom a r base = \case
                 VPath pty lhs rhs ->
                   bindI "i" \i -> do
                     conv (pty ∙ IVar i) a
-                    t <- pure $ PApp (quote lhs) (quote rhs) (quote (eval t)) (IVar i)
+                    t <- pure $ PApp (quote lhs) (quote rhs) (WkI t) (IVar i)
                     pure ("i", t)
                 VLine pty -> do
                   bindI "i" \i -> do
                     conv (pty ∙ IVar i) a
-                    t <- pure $ LApp (quote (eval t)) (IVar i)
+                    t <- pure $ LApp (WkI t) (IVar i)
                     pure ("i", t)
                 a -> do
                   err $! ExpectedPathLine (quote a)
@@ -603,8 +589,6 @@ elabSysHCom a r base = \case
           conv (instantiate t (frc r)) (eval base) -- check compatibility with base
           sysHComCompat t sys                      -- check compatibility with rest of system
           pure $ SHCons cof x t sys
-
-
 
 
 sysCompat :: Elab (Tm -> Sys -> IO ())

@@ -50,9 +50,11 @@ data Tm
   | Suc Tm
   | NatElim Tm Tm Tm Tm      -- (P : Nat -> U) -> P z -> ((n:_) -> P n -> P (suc n)) -> (n:_) -> P n
 
-  | TODO -- placeholder for TODO definitions
+  | TODO
 
   | Com I I Name Tm SysHCom Tm
+
+  | WkI Tm
   deriving Show
 
 -- | Atomic equation.

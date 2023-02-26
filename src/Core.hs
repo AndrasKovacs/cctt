@@ -50,6 +50,14 @@ assumeCof :: NeCof -> (NCofArg => a) -> (NCofArg => a)
 assumeCof cof act = let ?cof = conjNeCof ?cof cof in seq ?cof act
 {-# inline assumeCof #-}
 
+wkIS :: (SubArg => NCofArg => a) -> (SubArg => NCofArg => a)
+wkIS act =
+  let cod' = cod ?sub - 1 in
+  let ?sub = setCod cod' ?sub in
+  let ?cof = setCod cod' ?cof in
+  let _ = ?sub; _ = ?cof in
+  act
+{-# inline wkIS #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Creating semantic binders
@@ -734,6 +742,7 @@ eval = \case
   Line x a         -> VLine (NICl x (ICEval ?sub ?env a))
   LApp t i         -> lapp (evalf t) (evalI i)
   LLam x t         -> VLLam (NICl x (ICEval ?sub ?env t))
+  WkI t            -> wkIS (eval t)
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)

@@ -87,6 +87,10 @@ freshI x act = let x' = freshen ?inames x in
               act (str x')
 {-# inline freshI #-}
 
+wkI :: (INames => a) -> INames => a
+wkI act = let ?inames = tail ?inames in act
+{-# inline wkI #-}
+
 proj  x = doTm 6 x; {-# inline proj #-}
 app   x = doTm 5 x; {-# inline app #-}
 eq    x = doTm 4 x; {-# inline eq #-}
@@ -203,7 +207,9 @@ tm = \case
   NatElim p s z n  -> appp ("NatElim " <> proj p <> " " <> proj s <> " " <> proj z <> " " <> proj n)
   TODO             -> "TODO"
   Com r r' i a t u -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
-                      "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt <> " " <> pu)
+                      "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
+                             <> pt <> " " <> pu)
+  WkI t            -> wkI (tm t)
 
 top :: TopNames => LvlArg => Top -> Txt
 top = \case
