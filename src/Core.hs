@@ -109,6 +109,9 @@ ctrue, cfalse :: F VCof
 ctrue  = F VCTrue
 cfalse = F VCFalse
 
+varsOf :: F I -> IS.IVarSet
+varsOf i = matchIVar (unF i) IS.singleton mempty
+
 cand :: F VCof -> F VCof -> F VCof
 cand c1 ~c2 = case (unF c1, unF c2) of
   (VCFalse    , c2         ) -> cfalse
@@ -217,12 +220,28 @@ mapBindCof :: NCofArg => BindCof a -> (NCofArg => a -> a) -> BindCof a
 mapBindCof t f = bindCof (t^.binds) (f (t^.body))
 {-# inline mapBindCof #-}
 
+mapBindCofLazy :: NCofArg => BindCofLazy a -> (NCofArg => a -> F a) -> F (BindCofLazy a)
+mapBindCofLazy t f = bindCofLazy (t^.binds) (f (t^.body))
+{-# inline mapBindCofLazy #-}
+
+mapBindCofLazynf :: NCofArg => BindCofLazy a -> (NCofArg => a -> F a) -> BindCofLazy a
+mapBindCofLazynf t f = unF (mapBindCofLazy t f)
+{-# inline mapBindCofLazynf #-}
+
 mapBindILazy :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> F (BindILazy Val)
 mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ unF i)
 {-# inline mapBindILazy #-}
 
 mapBindILazynf :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> BindILazy Val
 mapBindILazynf t f = unF (mapBindILazy t f); {-# inline mapBindILazynf #-}
+
+mapNeSys :: NCofArg => (NCofArg => Val -> F Val) -> F NeSys -> F NeSys
+mapNeSys f sys = F (go (unF sys)) where
+  go :: NeSys -> NeSys
+  go = \case
+    NSEmpty      -> NSEmpty
+    NSCons t sys -> NSCons (mapBindCofLazynf t f) (go sys)
+{-# inline mapNeSys #-}
 
 mapNeSysHCom :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F NeSysHCom -> F NeSysHCom
 mapNeSysHCom f sys = F (go (unF sys)) where
@@ -617,7 +636,20 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     F $ VNe (NHCom (unF r) (unF r') a nts (unF base)) (is <> is')
 
   VU ->
-    F VTODO
+    let is' = is <> varsOf r <> varsOf r' in
+    F $ VGlueTy (unF base)
+                uf
+                is'
+
+-- hcomⁱ r r' U [α ↦ t] b = Glue [α ↦ (t r', (coeⁱ r' r (t i), _)), r=r' ↦ (b, idEqv)] b
+
+    -- hcom r r' (a ∘ unF farg)
+    --   (vshcons (ceq farg (F I0)) "i" (\i -> frc lhs) $
+    --    vshcons (ceq farg (F I1)) "i" (\i -> frc rhs) $
+    --    mapVSysHCom (\_ t -> pappf lhs rhs (frc t) farg) (frc sys))
+    --   (pappf lhs rhs (frc p) farg)
+
+
 
   VGlueTy a sys is' ->
     F VTODO

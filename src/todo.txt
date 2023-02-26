@@ -3,6 +3,8 @@ sugar:
   - omit binders from coe, hcom, depPath when arg is path or line!
   - distinguish the sugary versions already in presyntax
 
+overload map functions?
+
 - add builtins with bidir checking: refl, _⁻¹, _◼_, ap, com, etc..
 
 - (Switch megaparsec to strict bytestring input)

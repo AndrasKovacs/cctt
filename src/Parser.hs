@@ -114,14 +114,20 @@ goSys =
       (SCons <$!> (cof <* char '.') <*!> tm <*!> goSys')
   <|> pure SEmpty
 
+sysBindMaybe :: Parser BindMaybe
+sysBindMaybe =
+  branch (try (bind <* char '.'))
+    (\x -> Bind x <$!> tm)
+    (DontBind <$!> tm)
+
 goSysHCom' :: Parser SysHCom
 goSysHCom' =
-      (SHCons <$!> (char ';' *> cof) <*!> (bind <* char '.') <*!> tm <*!> goSysHCom')
+      (SHCons <$!> (char ';' *> cof) <*!> sysBindMaybe <*!> goSysHCom')
   <|> pure SHEmpty
 
 goSysHCom :: Parser SysHCom
 goSysHCom =
-      (SHCons <$!> cof <*!> (bind <* char '.') <*!> tm <*!> goSysHCom')
+      (SHCons <$!> cof <*!> sysBindMaybe <*!> goSysHCom')
   <|> pure SHEmpty
 
 sys :: Parser Sys
@@ -133,32 +139,52 @@ sysHCom = char '[' *> goSysHCom <* char ']'
 goApp :: Tm -> Parser Tm
 goApp t = (goApp =<< (App t <$!> proj)) <|> pure t
 
--- TODO: sugar for omitting binders, e.g. coe 0 1 p a --> coe 0 1 (i.p i) a
---                                        hcom 0 1 [i=0 k. p k] b --> hcom 0 1 [i=0. p] b
+bindMaybe :: Parser BindMaybe
+bindMaybe = branch (try (char '(' *> bind <* char '.'))
+  (\x -> Bind x <$!> (tm <* char ')'))
+  (DontBind <$!> proj)
+
+-- goCoe :: Parser Tm
+-- goCoe = do
+--   r  <- int
+--   r' <- int
+--   char '('
+--   x <- bind
+--   char '.'
+--   a <- tm
+--   char ')'
+--   t <- proj
+--   pure $ Coe r r' (Bind x a) t
+
+-- goCom :: Parser Tm
+-- goCom = do
+--   r  <- int
+--   r' <- int
+--   char '('
+--   x <- bind
+--   char '.'
+--   a <- tm
+--   char ')'
+--   sys <- sysHCom
+--   t <- proj
+--   pure $ Com r r' (Bind x a) sys t
+
 goCoe :: Parser Tm
 goCoe = do
   r  <- int
   r' <- int
-  char '('
-  x <- bind
-  char '.'
-  a <- tm
-  char ')'
-  t <- proj
-  pure $ Coe r r' x a t
+  a  <- bindMaybe
+  t  <- proj
+  pure $ Coe r r' a t
 
 goCom :: Parser Tm
 goCom = do
-  r  <- int
-  r' <- int
-  char '('
-  x <- bind
-  char '.'
-  a <- tm
-  char ')'
+  r   <- int
+  r'  <- int
+  a   <- bindMaybe
   sys <- sysHCom
-  t <- proj
-  pure $ Com r r' x a sys t
+  t   <- proj
+  pure $ Com r r' a sys t
 
 app :: Parser Tm
 app =
@@ -183,7 +209,7 @@ eq = do
                 a <- tm
                 char '}'
                 u <- app
-                pure (PathP x a t u))
+                pure (DepPath x a t u))
             (do a <- tm
                 char '}'
                 u <- app

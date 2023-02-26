@@ -68,7 +68,6 @@ evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
 -- debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
 -- debug x = withNames (Common.debug x)
 
-
 ----------------------------------------------------------------------------------------------------
 -- Elaboration context
 ----------------------------------------------------------------------------------------------------
@@ -136,6 +135,8 @@ data Error
   | ExpectedPiPathLine Tm
   | ExpectedSg Tm
   | ExpectedGlueTy Tm
+  | ExpectedPathLine Tm
+  | ExpectedPathULineU Tm
   | CantInferLam
   | CantInferPair
   | CantInferGlueTm
@@ -206,13 +207,19 @@ showError = \case
   ExpectedI ->
     "Expected an interval expression"
   ExpectedPiPathLine a ->
-    "Expected a function type, inferred" ++
+    "Expected a function type, inferred\n\n" ++
     "  " ++ pretty a
   ExpectedSg a ->
-    "Expected a sigma type, inferred" ++
+    "Expected a sigma type, inferred\n\n" ++
     "  " ++ pretty a
   ExpectedGlueTy a ->
-    "Expected a glue type, inferred" ++
+    "Expected a glue type, inferred\n\n" ++
+    "  " ++ pretty a
+  ExpectedPathLine a ->
+    "Expected a path type or a line type, inferred\n\n" ++
+    "  " ++ pretty a
+  ExpectedPathULineU a ->
+    "Expected a path type or a line type in U, inferred\n\n" ++
     "  " ++ pretty a
   CantInferLam ->
     "Can't infer type for lambda expression"
@@ -310,7 +317,7 @@ infer = \case
   P.I1 -> err UnexpectedI
   P.I  -> err UnexpectedIType
 
-  P.PathP x a t u -> do
+  P.DepPath x a t u -> do
     a <- bindI x \_ -> check a VU
     t <- check t (instantiate a (F I0))
     u <- check u (instantiate a (F I1))
@@ -395,12 +402,19 @@ infer = \case
     u <- check u va
     pure $! Infer (Path "_" a t u) VU
 
-  P.Coe r r' x a t -> do --
+  -- P.Coe r r' (P.Bind x a) t -> do --
+  --   r  <- checkI r
+  --   r' <- checkI r'
+  --   a  <- bindI x \_ -> check a VU
+  --   t  <- check t (instantiate a (evalI r))
+  --   pure $! Infer (Coe r r' x a t) (instantiate a (evalI r'))
+
+  P.Coe r r' a t -> do --
     r  <- checkI r
     r' <- checkI r'
-    a  <- bindI x \_ -> check a VU
-    t  <- check t (instantiate a (evalI r))
-    pure $! Infer (Coe r r' x a t) (instantiate a (evalI r'))
+    (x, a, va, src, tgt) <- elabBindMaybe a (evalI r) (evalI r')
+    t <- check t src
+    pure $! Infer (Coe r r' x a t) tgt
 
   P.HCom r r' Nothing sys t -> do
     r  <- checkI r
@@ -451,19 +465,64 @@ infer = \case
     n <- check n VNat
     pure $! Infer (NatElim p s z n) (vp ∙~ eval n)
 
-  P.Com r r' i a sys t -> do
-    r       <- checkI r
-    r'      <- checkI r'
-    (a, va) <- bindI i \_ -> do {a <- check a VU; pure (a, eval a)}
-    t       <- check t (instantiate a (evalI r))
+  -- P.Com r r' (P.Bind i a) sys t -> do
+  --   r       <- checkI r
+  --   r'      <- checkI r'
+  --   (a, va) <- bindI i \_ -> do {a <- check a VU; pure (a, eval a)}
+  --   t       <- check t (instantiate a (evalI r))
 
+  --   -- NOTE: elabSysHCom happens to be correct for "com" as well. In the "hcom"
+  --   -- case, the "a" type gets implicitly weakened under both a cof and an ivar
+  --   -- binder when checking components. In the "com" case, "a" is already under
+  --   -- an ivar binder, so it's only weakened under the cof. The boundary checks
+  --   -- are exactly the same.
+  --   sys     <- elabSysHCom va r t sys
+  --   pure $! Infer (Com r r' i a sys t) (instantiate a (evalI r'))
+
+  P.Com r r' a sys t -> do
+    r  <- checkI r
+    r' <- checkI r'
+    (i, a, va, src, tgt) <- elabBindMaybe a (evalI r) (evalI r')
+    t <- check t src
     -- NOTE: elabSysHCom happens to be correct for "com" as well. In the "hcom"
     -- case, the "a" type gets implicitly weakened under both a cof and an ivar
     -- binder when checking components. In the "com" case, "a" is already under
     -- an ivar binder, so it's only weakened under the cof. The boundary checks
     -- are exactly the same.
-    sys     <- elabSysHCom va r t sys
-    pure $! Infer (Com r r' i a sys t) (instantiate a (evalI r'))
+    sys <- elabSysHCom va r t sys
+    pure $! Infer (Com r r' i a sys t) tgt
+
+-- | Return binder name, type under binder, value of type under binder
+--   , source type val, target type val
+elabBindMaybe :: Elab (P.BindMaybe -> F I -> F I -> IO (Name, Tm, Val, Val, Val))
+elabBindMaybe b r r' = case b of
+  P.DontBind a -> do
+    Infer a aty <- infer a
+    case unF (frc aty) of
+      VPath aty lhs rhs -> do
+        isConstantU aty
+        let va  = evalf a
+            src = papp lhs rhs va r
+            tgt = papp lhs rhs va r'
+        bindI "i" \i -> do
+          a <- pure $ PApp (quote src) (quote tgt) (quote (unF va)) (IVar i)
+          pure ("i", a, eval a, src, tgt)
+      VLine aty -> do
+        isConstantU aty
+        let va  = evalf a
+            src = lapp va r
+            tgt = lapp va r'
+        bindI "i" \i -> do
+          a <- pure $ LApp (quote (unF va)) (IVar i)
+          pure ("i", a, eval a, src, tgt)
+      a -> do
+        err $! ExpectedPathLine (quote a)
+
+  P.Bind x a -> do
+    (a, va) <- bindI x \_ -> do {a <- check a VU; pure (a, eval a)}
+    let src = instantiate a r
+        tgt = instantiate a r'
+    pure (x, a, va, src, tgt)
 
 checkI :: Elab (P.Tm -> IO I)
 checkI = \case
@@ -481,6 +540,11 @@ checkI = \case
 
   t -> do
     err ExpectedI
+
+isConstantU :: Elab (NamedIClosure -> IO ())
+isConstantU t = bindI "i" \i -> case unF (t ∘ IVar i) of
+  VU -> pure ()
+  a  -> err $ ExpectedPathULineU (quote a)
 
 --------------------------------------------------------------------------------
 
@@ -508,19 +572,54 @@ elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
 elabSysHCom a r base = \case
   P.SHEmpty ->
     pure SHEmpty
-  P.SHCons cof x t sys -> do
+  P.SHCons cof t sys -> do
     cof <- checkCof cof
     let vcof = evalCof cof
     case unF vcof of
       VCFalse -> do
         elabSysHCom a r base sys
+
+      -- (F -> vcof) -> do
+      --   (x, t) <- case t of P.Bind x t -> pure (x, t)
+      --   sys <- elabSysHCom a r base sys
+      --   bindVCof vcof do
+      --     t <- bindI x \_ -> check t a             -- "a" is weakened under vcof
+      --     conv (instantiate t (frc r)) (eval base) -- check compatibility with base
+      --     sysHComCompat t sys                      -- check compatibility with rest of system
+      --     pure $ SHCons cof x t sys
+
+
       (F -> vcof) -> do
         sys <- elabSysHCom a r base sys
         bindVCof vcof do
-          t <- bindI x \_ -> check t a             -- "a" is weakened under vcof
+
+          -- overloaded binder notation
+          (x, t) <- case t of
+            P.Bind x t -> do
+              t <- bindI x \_ -> check t a         -- "a" is weakened under vcof
+              pure (x, t)
+            P.DontBind t -> do
+              Infer t tty <- infer t
+              case unF (frc tty) of
+                VPath pty lhs rhs ->
+                  bindI "i" \i -> do
+                    conv (pty ∙ IVar i) a
+                    t <- pure $ PApp (quote lhs) (quote rhs) (quote (eval t)) (IVar i)
+                    pure ("i", t)
+                VLine pty -> do
+                  bindI "i" \i -> do
+                    conv (pty ∙ IVar i) a
+                    t <- pure $ LApp (quote (eval t)) (IVar i)
+                    pure ("i", t)
+                a -> do
+                  err $! ExpectedPathLine (quote a)
+
           conv (instantiate t (frc r)) (eval base) -- check compatibility with base
           sysHComCompat t sys                      -- check compatibility with rest of system
           pure $ SHCons cof x t sys
+
+
+
 
 sysCompat :: Elab (Tm -> Sys -> IO ())
 sysCompat t = \case

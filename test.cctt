@@ -6,8 +6,8 @@ test5 : (A : U)(B : A → U)(a : A)(b : B a) → (a : A) × B a := λ A B a b. (
 test6 : (A : U)(B : A → U)(x : (a : A) × B a) → A := λ A B x. x.1;
 test7 : (A : U)(B : A → U)(x : (a : A) × B a) → B x.1 := λ A B x. x.2;
 
-comtest (A B : U)(p : A = B)(x : A) : hcom 0 1 [] (coe 0 1 (i.p i) x) = com 0 1 (i. p i) [] x
-  := λ _. com 0 1 (i. p i) [] x;
+comtest (A B : U)(p : A = B)(x : A) : hcom 0 1 [] (coe 0 1 p x) = com 0 1 p [] x
+  := λ _. com 0 1 p [] x;
 
 refl (A : U)(x : A) : x = x := λ _. x;
 
@@ -28,9 +28,9 @@ testEta (A : U) (x y : A)(p : x = y) : p = p := refl (x = y) (λ i. p i);
 funext (A : U)(B : A → U)(f g : (a : A) → B a)(p : (a : A) → f a = g a) : f = g
   := λ i a. p a i;
 
-coerce (A B : U) (p : A = B)(a : A) : B := coe 0 1 (i. p i) a;
+coerce (A B : U) (p : A = B)(a : A) : B := coe 0 1 p a;
 
-coerceinv (A B : U) (p : A = B)(b : B) : A := coe 1 0 (i. p i) b;
+coerceinv (A B : U) (p : A = B)(b : B) : A := coe 1 0 p b;
 
 subst (A : U)(P : A → U)(x y : A)(p : x = y)(px : P x) : P y := coe 0 1 (i. P (p i)) px;
 
