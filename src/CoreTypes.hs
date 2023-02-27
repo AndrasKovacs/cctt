@@ -54,7 +54,7 @@ data Tm
 
   | Com I I Name Tm SysHCom Tm
 
-  | WkI Tm
+  | WkI Name Tm
   deriving Show
 
 -- | Atomic equation.
@@ -212,7 +212,8 @@ vVar x = VNe (NLocalVar x) mempty
 newtype F a = F {unF :: a}
   deriving (SubAction, Show, Eq) via a
 
-type DomArg = (?dom :: Lvl)    -- fresh LocalVar
+type DomArg  = (?dom  :: Lvl)    -- fresh LocalVar
+type IDomArg = (?idom :: IVar)   -- fresh LocalVar
 
 --------------------------------------------------------------------------------
 

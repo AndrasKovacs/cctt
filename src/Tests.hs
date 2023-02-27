@@ -68,7 +68,7 @@ p3 = elabString $ unlines [
 
   ,"connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;"
 
-  ,"contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={Sing A a} (b, p)"
+  ,"contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)"
   ,"  := λ i. (p i, connAnd A a b p i);"
 
   ,"Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a (refl A a))(x : A)(p : a = x) : C x p"
@@ -92,27 +92,3 @@ p3 = elabString $ unlines [
   ,"                  d;"
 
   ]
-
--- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
--- (VNe (NLocalVar 1) []) (VNe (NLocalVar 0) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NCoe I0 I1 (BindI {bindIName = "j", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
--- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NLocalVar 3) [])) [0])) [0]
-
--- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
--- (VNe (NLocalVar 1) []) (VNe (NLocalVar 0) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NCoe I0 I1 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
--- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NLocalVar 3) [])) [0])) [0]
-
--- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
--- (VNe (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NCoe I0 I1 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
--- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NLocalVar 3) [])) [0])) [0]
-
--- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
--- (VNe (NLocalVar 1) []) (VNe (NLocalVar 0) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NCoe I0 I1 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
--- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
--- (NLocalVar 3) [])) [0])) [0]

@@ -743,7 +743,7 @@ eval = \case
   Line x a         -> VLine (NICl x (ICEval ?sub ?env a))
   LApp t i         -> lapp (evalf t) (evalI i)
   LLam x t         -> VLLam (NICl x (ICEval ?sub ?env t))
-  WkI t            -> wkIS (eval t)
+  WkI _ t          -> wkIS (eval t)
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)

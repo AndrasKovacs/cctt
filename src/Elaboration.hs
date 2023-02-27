@@ -5,9 +5,7 @@ module Elaboration (elabTop) where
 import Control.Exception
 import Text.Megaparsec (SourcePos(..), unPos, initialPos)
 import qualified Data.Map.Strict as M
-import qualified Data.IntMap.Strict as IM
 import System.Exit
-import Data.List
 
 import Common hiding (debug)
 import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalf)
@@ -63,8 +61,8 @@ evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
 evalInf :: NCofArg => I -> I
 evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
 
-debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
-debug x = withNames (Common.debug x)
+debug :: PrettyArgs [String] -> Elab (IO ())
+debug x = withPrettyArgs (Common.debug x)
 
 ----------------------------------------------------------------------------------------------------
 -- Elaboration context
@@ -114,22 +112,22 @@ bindI x act =
   act fresh
 {-# inline bindI #-}
 
--- | Insert an inver (an ivar which is not in the elab input).
-insertI :: Name -> Elab (IVar -> a) -> Elab a
-insertI x act =
-  let fresh = dom ?cof in
-  let ?cof  = setDom (fresh + 1) ?cof `ext` IVar fresh
-      ?tbl  = M.insert x (LocalInt fresh) ?tbl in
-  let _ = ?cof; _ = ?tbl in
-  act fresh
-{-# inline insertI #-}
-
 -- | Extend cxt with a cof (by conjunction)
 bindVCof :: F VCof -> Elab a -> Elab a
 bindVCof cof act =
   let ?cof = conjVCof ?cof cof
   in seq ?cof act
 {-# inline bindVCof #-}
+
+-- | Try to pick an informative fresh ivar name.
+pickIVarName :: Elab Name
+pickIVarName
+  | M.notMember "i" ?tbl = "i"
+  | M.notMember "j" ?tbl = "j"
+  | M.notMember "k" ?tbl = "k"
+  | M.notMember "l" ?tbl = "l"
+  | M.notMember "m" ?tbl = "m"
+  | True                 = "i"
 
 ----------------------------------------------------------------------------------------------------
 -- Errors
@@ -159,32 +157,32 @@ data Error
 instance Exception Error where
 
 data ErrInCxt where
-  ErrInCxt :: (TableArg, PosArg) => Error -> ErrInCxt
+  ErrInCxt :: (TableArg, PosArg, NCofArg, DomArg) => Error -> ErrInCxt
 
 instance Show ErrInCxt where
   show (ErrInCxt e) = show e
 
 instance Exception ErrInCxt
 
-err :: TableArg => PosArg => Error -> IO a
+err :: TableArg => PosArg => NCofArg => DomArg => Error -> IO a
 err e = throwIO $ ErrInCxt e
 
 -- | Convert the symbol table to a printing environment.
-withNames :: TableArg => (TopNames => Names => INames => a) -> a
-withNames act =
-  let go (!top, !ns, !ins) n = \case
-        Top x _ _  -> let x' :: Int = fromIntegral x in ((x',n):top, ns, ins)
-        Local x _  -> (top, (x,n):ns, ins)
-        LocalInt x -> (top, ns, (x,n):ins)
-      (top, ns, ins) = M.foldlWithKey' go ([], [], []) ?tbl in
-
-  let ?top    = IM.fromList top
-      ?names  = map snd $ sortBy (\(x, _) (y, _) -> compare y x) ns
-      ?inames = map snd $ sortBy (\(x, _) (y, _) -> compare y x) ins in
+withPrettyArgs :: TableArg => DomArg => NCofArg => PrettyArgs a -> a
+withPrettyArgs act =
+  let entryToNameKey = \case
+        Top x _ _  -> NKTop x
+        Local x _  -> NKLocal x
+        LocalInt x -> NKLocalI x in
+  let ?idom   = dom ?cof
+      ?names  = M.foldlWithKey'
+                  (\acc name e -> M.insert (entryToNameKey e) name acc)
+                  mempty ?tbl
+      ?shadow = mempty in
   act
-{-# inline withNames #-}
+{-# inline withPrettyArgs #-}
 
-showError :: TopNames => Names => INames => Error -> String
+showError :: PrettyArgs (Error -> String)
 showError = \case
   CantConvertExInf t u ->
     "Can't convert expected type\n\n" ++
@@ -242,7 +240,7 @@ showError = \case
     "The type of intervals I can be only used in function domains"
 
 displayErrInCxt :: String -> ErrInCxt -> IO ()
-displayErrInCxt file (ErrInCxt e) = withNames do
+displayErrInCxt file (ErrInCxt e) = withPrettyArgs do
 
   let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
       lnum = show linum
@@ -498,17 +496,19 @@ elabBindMaybe b r r' = case b of
         let va  = evalf a
             src = papp lhs rhs va r
             tgt = papp lhs rhs va r'
-        bindI "x" \i -> do
-          a <- pure $ PApp (quote lhs) (quote rhs) (WkI a) (IVar i)
-          pure ("x", a, eval a, src, tgt)
+        let iname = pickIVarName
+        bindI iname \i -> do
+          a <- pure $ PApp (quote lhs) (quote rhs) (WkI iname a) (IVar i)
+          pure (iname, a, eval a, src, tgt)
       VLine aty -> do
         isConstantU aty
         let va  = evalf a
             src = lapp va r
             tgt = lapp va r'
-        bindI "i" \i -> do
-          a <- pure $ LApp (WkI a) (IVar i)
-          pure ("i", a, eval a, src, tgt)
+        let iname = pickIVarName
+        bindI iname \i -> do
+          a <- pure $ LApp (WkI iname a) (IVar i)
+          pure (iname, a, eval a, src, tgt)
       a -> do
         err $! ExpectedPathLine (quote a)
 
@@ -584,16 +584,18 @@ elabSysHCom a r base = \case
             P.DontBind t -> do
               Infer t tty <- infer t
               case unF (frc tty) of
-                VPath pty lhs rhs ->
-                  bindI "i" \i -> do
+                VPath pty lhs rhs -> do
+                  let iname = pickIVarName
+                  bindI iname \i -> do
                     conv (pty ∙ IVar i) a
-                    t <- pure $ PApp (quote lhs) (quote rhs) (WkI t) (IVar i)
-                    pure ("i", t)
+                    t <- pure $ PApp (quote lhs) (quote rhs) (WkI iname t) (IVar i)
+                    pure (iname, t)
                 VLine pty -> do
-                  bindI "i" \i -> do
+                  let iname = pickIVarName
+                  bindI iname \i -> do
                     conv (pty ∙ IVar i) a
-                    t <- pure $ LApp (WkI t) (IVar i)
-                    pure ("i", t)
+                    t <- pure $ LApp (WkI iname t) (IVar i)
+                    pure (iname, t)
                 a -> do
                   err $! ExpectedPathLine (quote a)
 
@@ -682,7 +684,7 @@ inferTop = \case
     let ~vt = eval t
 
     case ?printnf of
-      Just x' | x == x' -> withNames do
+      Just x' | x == x' -> withPrettyArgs do
         putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
         putStrLn ""
       _ -> pure ()

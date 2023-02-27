@@ -11,6 +11,9 @@ reflLine (A : U) (a : A) : I → A := λ _. a;
 testEta (A : U) (a b : A) (p : a = b) : p = p
   := refl (a = b) (λ i. p i);
 
+testLineEta (A : U) (p : I → A) : p = (λ i. p i)
+  := refl (I → A) p;
+
 ap (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y
    := λ i. f (p i);
 

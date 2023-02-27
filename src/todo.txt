@@ -1,5 +1,5 @@
 
-refactor names
+refactor printed name handling
 
 ivar insertion? avoid symtable entry?
 
