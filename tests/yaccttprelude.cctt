@@ -1,0 +1,410 @@
+
+Square (A : U) (a0 a1 b0 b1 : A)
+               (u : a0 = a1) (v : b0 = b1)
+               (r0 : a0 = b0) (r1 : a1 = b1) : U
+ := r0 ={i. u i = v i} r1;
+
+Path (A : U)(x y : A) : U := x = y;
+PathP (A : I → U)(x : A 0)(y : A 1) : U := x ={i. A i} y;
+
+refl (A : U)(x : A) : x = x := λ _. x;
+
+reflLine (A : U) (a : A) : I → A := λ _. a;
+
+testPathEta (A : U) (a b : A) (p : a = b) : p = p
+  := refl (a = b) (λ i. p i);
+
+testLineEta (A : U) (p : I → A) : p = (λ i. p i)
+  := refl (I → A) p;
+
+ap (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y
+   := λ i. f (p i);
+
+funext (A : U)(B : A → U)(f g : (a : A) → B a)(p : (a : A) → f a = g a) : f = g
+  := λ i a. p a i;
+
+trans (A B : U) (p : A = B)(a : A) : B := coe 0 1 p a;
+
+transNeg (A B : U) (p : A = B)(b : B) : A := coe 1 0 p b;
+
+transLine (p : I → U) (a : p 0) : p 1 := coe 0 1 p a;
+
+transFill (A B : U)(p : A = B)(a : A) : a ={p} trans A B p a
+  := λ i. coe 0 i p a;
+
+transComp (A B : U) (p : A = B) (a : A) : a = transNeg A B p (trans A B p a)
+  := λ i. coe i 0 p (coe 0 i p a);
+
+transNegComp (A B : U) (p : A = B) (b : B) : coe 0 1 (i.p i) (coe 1 0 (i.p i) b) = b
+  := λ i. coe i 1 p (coe 1 i p b);
+
+substTrans (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
+  := trans (P a) (P b) (λ i. P (p i)) e;
+
+subst (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
+  := coe 0 1 (i. P (p i)) e;
+
+substRefl (A : U) (P : A → U) (a : A) (e : P a) : e = subst A P a a (λ _. a) e
+  := λ i. coe 0 i (_. P a) e;
+
+comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
+  := λ i. hcom 0 1 [i=0 _. x; i=1. q] (p i);
+
+sym (A : U)(x y : A) (p : x = y) : y = x
+  := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
+
+-- TODO: coherence for coeIsEquiv! "sym U A B P" below computes to some TODO-s.
+symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={sym U A B P} a
+  := λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
+                  [i=0. p; i=1 _. a] a;
+
+Sing (A : U) (a : A) : U := (x : A) × (a = x);
+
+connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
+     λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j; j=0. sq 0; j=1. sq i; i=j. sq i] a;
+
+connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
+
+connOr (A : U) (a b : A) (p : a = b) : p ={i. p i = b} (λ _. b)
+  := let connOrWeak (l k : I) : A := hcom 0 l [k=0. p; k=1 _. b] (p k);
+     λ i j. hcom 1 0 [ i=0. connOrWeak j ; i=1. connOrWeak 1
+                     ; j=0. connOrWeak i ; j=1. connOrWeak 1
+                     ; i=j. connOrWeak i ] b;
+
+contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
+  := λ i. (p i, connAnd A a b p i);
+
+Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a (refl A a))(x : A)(p : a = x) : C x p
+  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl A a) (x, p) (contractSing A a x p) cr;
+
+J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
+     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
+
+JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
+  : J A a C d a (λ _. a) = d
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
+     let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
+                                           k=1 _. a;
+                                           i=0 _. a;
+                                           i=1 _. a] a;
+
+     λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
+                  [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
+                   k=1 _. d]
+                  d;
+
+-- h-levels
+--------------------------------------------------------------------------------
+
+prop (A : U) : U := (a b : A) → a = b;
+set (A : U) : U := (a b : A) → prop (a = b);
+groupoid (A : U) : U := (a b : A) → set (a = b);
+twogroupoid (A : U) : U := (a b : A) → groupoid (a = b);
+
+-- the collection of all sets
+SET : U := (X:U) × set X;
+
+propSet (A : U) (h : prop A) : set A
+  := λ a b p q j i. hcom 0 1 [i=0. h a a;
+                              i=1. h a b;
+			      j=0. h a (p i);
+			      j=1. h a (q i)] a;
+
+setGroupoid (A : U) (h : set A) : groupoid A
+  := λ a b. propSet (a = b) (h a b);
+
+groupoidTwoGroupoid (A : U) (h : groupoid A) : twogroupoid A
+  := λ a b. setGroupoid (a = b) (h a b);
+
+propIsProp (A : U) : prop (prop A)
+  := λ f g i a b. propSet A f a b (f a b) (g a b) i;
+
+setIsProp (A : U) : prop (set A)
+  := λ f g i a b. propIsProp (a = b) (f a b) (g a b) i;
+
+PathS (A : U) (P : A → U)(a0 a1 : A)
+      (p : a0 = a1) (u0 : P a0) (u1 : P a1) : U
+  := u0 ={i. P (p i)} u1;
+
+lemProp (A : U) (h : A → prop A) : prop A
+  := λ a. h a a;
+
+-- Compare with: https://github.com/mortberg/cubicaltt/blob/master/examples/prelude.ctt#L205
+lemPropF (A : U) (P : A → U) (pP : (x : A) → prop (P x)) (a0 a1 : A)
+         (p : a0 = a1) (b0 : P a0) (b1 : P a1) :
+         b0 ={i. P (p i)} b1
+  := λ i. pP (p i) (coe 0 i (j. P (p j)) b0) (coe 1 i (j. P (p j)) b1) i;
+
+Sigma (A : U) (B : A → U) : U := (a : A) × B a;
+
+lemSig (A : U) (B : A → U) (pB : (a : A) → prop (B a))
+       (u v : Sigma A B) (p : u.1 = v.1) : u = v
+  := λ i. (p i, lemPropF A B pB u.1 v.1 p u.2 v.2 i);
+
+propSig (A : U) (B : A → U) (pA : prop A)
+        (pB : (x : A) → prop (B x)) (t u : Sigma A B) : t = u
+  := lemSig A B pB t u (pA t.1 u.1);
+
+propPi (A : U) (B : A → U) (h : (x : A) → prop (B x))
+       (f0 f1 : (x : A) → B x) : f0 = f1
+  := λ i x. h x (f0 x) (f1 x) i;
+
+-- Equivalent definition of isContr
+isInhProp (A : U) : U
+  := A × ((x y : A) → x = y);
+
+-- isContr RedPRL style
+isContr (A : U) : U
+  := (x : A) * ((y : A) → y = x);
+
+-- the other way
+isContr' (A : U) : U
+  := (x : A) * ((y : A) → x = y);
+
+isInhPropToIsContr (A : U) (h : isInhProp A) : isContr A
+  := (h.1, λ y. h.2 y h.1);
+
+isContrToIsInhProp (A : U) (h : isContr A) : isInhProp A
+  := (h.1, λ x y i. hcom 1 0 [i=0. h.2 x; i=1. h.2 y] h.1);
+
+fiber (A B : U) (f : A → B) (b : B) : U
+  := (a : A) * f a = b;
+
+isInhPropProp (A : U) (h : isInhProp A) : prop A
+  := h.2;
+
+isContrProp (A : U) (h : isContr A) : prop A
+  := λ a b i.hcom 1 0 [i=0. h.2 a; i=1. h.2 b] h.1;
+
+-- András: Anders' version for the following seemed to use the isContr the other
+-- way around. I repaired the "let"-s but skipped the final hcom.
+
+-- -- See below for a proof without connections
+-- propIsContrConn (A : U) (z0 z1 : isContr A) : z0 = z1
+--   := λ j.
+--      let a0 : A := z0.1;
+--      let p0 : (x : A) → x = a0 := z0.2;
+--      let a1 : A := z1.1;
+--      let p1 : (x : A) → x = a1 := z1.2;
+--      let lem1 (x : A) : p0 x ={i. p1 x i = a0} p0 a1 := λ i j. p0 (p1 x i) j;
+
+--      ( p0 a1 j
+--      , λ x i. hcom 0 1 [ i=0 k. p0 a1 j
+--                        ; i=1 k. connOr A a0 x (p0 x) j k
+--                        ; j=0 k. connAnd A a0 x (p0 x) i k
+--                        ; j=1 k. p1 x i ]
+--                        (lem1 x i j));
+
+propIsContr (A : U) : prop (isContr A)
+  := let rem (t : isContr A) : prop (isContr A)
+       := let T (x : A) : U := (y : A) → y = x;
+          let pA (x y : A) : x = y := λ i. hcom 1 0 [i=0 _. x; i=1. t.2 y] (t.2 x i);
+          let pB (x : A) : prop (T x) := propPi A (λ y. y = x) (λ y. propSet A pA y x);
+	  propSig A T pA pB;
+     lemProp (isContr A) rem;
+
+--------------------------------------------------------------------------------
+
+isEquiv (A B : U) (f : A → B) : U := (b : B) → isContr (fiber A B f b);
+
+equiv (A B : U) : U := (f : A → B) * isEquiv A B f;
+
+idfun (A : U) (a : A) : A := a;
+
+idEquiv (A : U) : equiv A A
+  := (idfun A,
+      λ a. ((a, λ _. a), λ f i. (  hcom 1 0 [i=0. f.2; i=1 _. a] a
+                                 , λ j. hcom 1 j [i=0. f.2; i=1 _. a] a)));
+
+isEquivInhProp (A B : U) (f : A → B) : U := (b : B) → isInhProp (fiber A B f b);
+
+equivInhProp (A B : U) : U := (f : A → B) * isEquivInhProp A B f;
+
+equivToEquivInhProp (A B : U) (f : equiv A B) : equivInhProp A B
+  := (f.1 , λ b. isContrToIsInhProp (fiber A B f.1 b) (f.2 b));
+
+equivInhPropToEquiv (A B : U) (f : equivInhProp A B) : equiv A B
+  :=  (f.1, λ b. isInhPropToIsContr (fiber A B f.1 b) (f.2 b));
+
+idEquivInhProp (A : U) : equivInhProp A A := equivToEquivInhProp A A (idEquiv A);
+
+-- András: TODO: handle printing and re-parsing of "_" ivars! We want to re-check
+-- that normal form.
+
+-- Anders: propIsEquiv without connections. normal form is big, but typechecks
+propIsEquiv (A B : U) (f : A → B) : prop (isEquiv A B f)
+  := λ u0 u1 i y. propIsContr (fiber A B f y) (u0 y) (u1 y) i;
+
+-- We should adapt this proof!
+connAndNoDiag (A : U) (a b : A) (p : a = b) : (λ _. a) ={i. a = p i} p
+  := λ i j. hcom 0 1 [i=0 k. hcom 1 0 [k=0 _. a; k=1. p] (p k)
+                     ;i=1 k. hcom 1 j [k=0 _. a; k=1. p] (p k)
+                     ;j=0 k. hcom 1 0 [k=0 _. a; k=1. p] (p k)
+                     ;j=1 k. hcom 1 i [k=0 _. a; k=1. p] (p k) ] a;
+
+propIsEquivDirect (A B : U) (f : A → B) : prop (isEquiv A B f)
+  := λ p q i y.
+    let p0 : A := (p y).1.1;
+    let p1 : f p0 = y := (p y).1.2;
+    let p2 : (w1 : fiber A B f y) → w1 = (p0, p1) := (p y).2;
+    let q0 : A := (q y).1.1;
+    let q1 : f q0 = y := (q y).1.2;
+    let q2 : (w1 : fiber A B f y) → w1 = (q0,q1) := (q y).2;
+    ( q2 (p0,p1) i
+    , λ w.
+        let sq : p2 w ={j. w = q2 (p0, p1) j} (q2 w)
+	    := λ i j. hcom 0 1
+                           [ i=0 k. connAndNoDiag (fiber A B f y) w (p0, p1) (p2 w) k j
+                           ; i=1 _. q2 w j
+                           ; j=0 _. w
+                           ; j=1 k. q2 (p2 w k) i ]
+                           (connAndNoDiag (fiber A B f y) w (q0, q1) (q2 w) i j);
+        sq i);
+
+-- -- propIsEquiv with connections
+-- propIsEquivConn (A B : U) (f : A → B) : prop (isEquiv A B f) :=
+--   λ u0 u1 i y. propIsContrConn (fiber A B f y) (u0 y) (u1 y) i;
+
+
+iso (A B : U) : U :=
+    (f  : A → B)
+  * (g  : B → A)
+  * ((b : B) → f (g b) = b)
+  * ((a : A) → g (f a) = a);
+
+
+-- -- TODO: error!
+-- lemIso (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
+
+--   let f  : A → B                 := i.1;
+--   let g  : B → A                 := i.2.1;
+--   let fg : (b : B) → f (g b) = b := i.2.2.1;
+--   let gf : (a : A) → g (f a) = a := i.2.2.2;
+--   let x0 : A                     := f0.1;
+--   let p0 : f x0 = b              := f0.2;
+--   let x1 : A                     := f1.1;
+--   let p1 : f x1 = b              := f1.2;
+
+--   let l0 : Path A x0 (g b) :=
+--         λ i. hcom 0 1 [i=0. gf x0; i=1 _. g b] (g (p0 i));
+--   let sq0 : PathP (λ i. Path A (g (p0 i)) (l0 i)) (gf x0) (λ _. g b) :=
+--         λ i j. hcom 0 j [i=0. gf x0; i=1 _. g b] (g (p0 i));
+
+--   let l1 : Path A x1 (g b) :=
+--         λ i. hcom 0 1 [i=0. gf x1; i=1 _. g b] (g (p1 i));
+--   let sq1 : PathP (λ i. Path A (g (p1 i)) (l1 i)) (gf x1) (λ _. g b) :=
+--         λ i j. hcom 0 j [i=0. gf x1; i=1 _. g b] (g (p1 i));
+
+--   let l2  : Path A x0 x1 := λ i. hcom 1 0 [i=0. l0; i=1. l1] (g b);
+--   let sq2 : PathP (λ i. Path A (l2 i) (g b)) l0 l1 :=
+--         λ i j. hcom 1 j [i=0. l0; i=1. l1] (g b);
+
+--   λ i. ( l2 i
+--         , λ j. hcom 0 1 [i=0. fg (p0 j)
+--                         ;i=1. fg (p1 j)
+--                         ;j=0. fg (f (l2 i))
+--                         ;j=1. fg b]
+--                         (f (hcom 1 0 [i=0. sq0 j
+--                                      ;i=1. sq1 j
+--                                      ;j=0. gf (l2 i)
+--                                      ;j=1 _. g b]
+--                                      (sq2 i j))));
+
+-- TODO: also error!
+-- Version of lemIso with heavy use of line types:
+lemIso (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
+
+  let f  : A → B                 := i.1;
+  let g  : B → A                 := i.2.1;
+  let fg : (b : B) → f (g b) = b := i.2.2.1;
+  let gf : (a : A) → g (f a) = a := i.2.2.2;
+  let x0 : A                     := f0.1;
+  let p0 : f x0 = b              := f0.2;
+  let x1 : A                     := f1.1;
+  let p1 : f x1 = b              := f1.2;
+
+  let sq0 (i j : I) : A := hcom 0 j [i=0. gf x0; i=1 _. g b] (g (p0 i));
+  let sq1 (i j : I) : A := hcom 0 j [i=0. gf x1; i=1 _. g b] (g (p1 i));
+
+  let sq2 (i j : I) : A := hcom 1 j [i=0 k. sq0 k 1
+                                    ;i=1 k. sq1 k 1] (g b);
+  λ i. ( sq2 i 0
+       , λ j. hcom 0 1 [i=0. fg (p0 j)
+                       ;i=1. fg (p1 j)
+                       ;j=0. fg (f (sq2 i 0))
+                       ;j=1. fg b]
+                       (f (hcom 1 0 [i=0. sq0 j
+                                    ;i=1. sq1 j
+                                    ;j=0. gf (sq2 i 0)
+                                    ;j=1 _. g b]
+                                    (sq2 i j))));
+
+-- isoToEquiv (A B : U) (i : iso A B) : equiv A B =
+--   (i.1,\(b : B) → ((i.2.1 b,i.2.2.1 b),\(fib : fiber A B i.1 b) →
+--   lemIso A B i b fib (i.2.1 b,i.2.2.1 b)))
+
+
+-- ---
+
+-- data N0 =
+
+-- efq (A : U) : N0 → A = split {}
+-- not (A : U) : U = A → N0
+
+-- data Unit = tt
+
+-- propUnit : prop Unit = split
+--  tt → split@((x:Unit) → Path Unit tt x) with
+--   tt → <i> tt
+
+-- setUnit : set Unit = propSet Unit propUnit
+
+-- data or (A B : U) = inl (a : A)
+--                   | inr (b : B)
+
+-- propOr (A B : U) (hA : prop A) (hB : prop B) (h : A → not B) : prop (or A B) = split
+--     inl a' → split@((b : or A B) → Path (or A B) (inl a') b) with
+--         inl b' → <i> inl (hA a' b' @ i)
+--         inr b' → efq (Path (or A B) (inl a') (inr b')) (h a' b')
+--     inr a' → split@((b : or A B) → Path (or A B) (inr a') b) with
+--         inl b' → efq (Path (or A B) (inr a') (inl b')) (h b' a')
+--         inr b' → <i> inr (hB a' b' @ i)
+
+-- stable (A:U) : U = not (not A) → A
+
+-- const (A : U) (f : A → A) : U = (x y : A) → Path A (f x) (f y)
+
+-- exConst (A : U) : U = (f:A → A) * const A f
+
+-- propN0 : prop N0 = \ (x y:N0) → efq (Path N0 x y) x
+
+-- propNot (A:U) : prop (not A) = \ (f g:not A) → <i>\(x:A) → (propN0 (f x) (g x))@i
+
+-- dNot (A:U) (a:A) : not (not A) = \ (h : not A) → h a
+
+-- dec (A : U) : U = or A (not A)
+
+-- propDec (A : U) (h : prop A) : prop (dec A) =
+--   propOr A (not A) h (propNot A) (\(x : A) (h : not A) → h x)
+
+-- decEqCong (A B : U) (f : A → B) (g : B → A) : dec A → dec B = split
+--   inl a → inl (f a)
+--   inr h → inr (\ (b:B) → h (g b))
+
+-- decStable (A:U) : dec A → stable A = split
+--  inl a → \ (h :not (not A)) → a
+--  inr b → \ (h :not (not A)) → efq A (h b)
+
+-- decConst (A : U) : dec A → exConst A = split
+--   inl a → (\ (x:A)  → a, \ (x y:A) → refl A a)
+--   inr h → (\ (x:A) → x, \ (x y:A) → efq (Path A x y) (h x))
+
+-- stableConst (A : U) (sA: stable A) : exConst A =
+--  (\ (x:A) → sA (dNot A x),\ (x y:A) → <i>sA (propNot (not A) (dNot A x) (dNot A y) @ i))
+
+-- discrete (A : U) : U = (a b : A) → dec (Path A a b)
+
+-- injective (A B : U) (f : A → B) : U =
+--   (a0 a1 : A) → Path B (f a0) (f a1) → Path A a0 a1

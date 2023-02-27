@@ -212,6 +212,9 @@ vVar x = VNe (NLocalVar x) mempty
 newtype F a = F {unF :: a}
   deriving (SubAction, Show, Eq) via a
 
+fi0 = F I0; {-# inline fi0 #-}
+fi1 = F I1; {-# inline fi1 #-}
+
 type DomArg  = (?dom  :: Lvl)    -- fresh LocalVar
 type IDomArg = (?idom :: IVar)   -- fresh LocalVar
 
@@ -234,7 +237,7 @@ data Closure
   | C'λ'a'i''a      -- λ a i. a
   | C'λ'a'i'j''a    -- λ a i j. a
 
-  | CCoeInv   (BindI Val) I I
+  | CCoeAlong (BindI Val) I I -- λ x. coe a r r' x
   | CCoeLinv0 (BindI Val) I I
   | CCoeRinv0 (BindI Val) I I
 
@@ -276,6 +279,9 @@ data IClosure
   | ICIsEquiv7 Val Val Val Val Val
   | ICHComLine I I NamedIClosure NeSysHCom Val
   | ICCoeLine I I (BindI NamedIClosure) Val
+
+  | ICCoeLinv1 (BindI Val) Val I I
+  | ICCoeRinv1 (BindI Val) Val I I
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -378,7 +384,7 @@ instance SubAction Closure where
     C'λ'a''a                  -> C'λ'a''a
     C'λ'a'i''a                -> C'λ'a'i''a
     C'λ'a'i'j''a              -> C'λ'a'i'j''a
-    CCoeInv a r r'            -> CCoeInv   (sub a) (sub r) (sub r')
+    CCoeAlong a r r'          -> CCoeAlong (sub a) (sub r) (sub r')
     CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
     CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
 
@@ -398,6 +404,8 @@ instance SubAction IClosure where
     ICIsEquiv7 b f g linv x -> ICIsEquiv7 (sub b) (sub f) (sub g) (sub linv) (sub x)
     ICHComLine r r' a t b   -> ICHComLine (sub r) (sub r') (sub a) (sub t) (sub b)
     ICCoeLine r r' a t      -> ICCoeLine (sub r) (sub r') (sub a) (sub t)
+    ICCoeLinv1 a x r r'     -> ICCoeLinv1 (sub a) (sub x) (sub r) (sub r')
+    ICCoeRinv1 a x r r'     -> ICCoeRinv1 (sub a) (sub x) (sub r) (sub r')
 
 
 --------------------------------------------------------------------------------

@@ -1,14 +1,12 @@
 
-refactor printed name handling
+- add explicit Path applications
+  Purpose: the normalization in PApp elaboration for the endpoints could
+  blow up. Explicit endpoints can be used to avoid that.
+- handle printing and re-parsing of "_"-bound vars! We should test
+  re-checking yaccttprelude definition nfs.
 
-ivar insertion? avoid symtable entry?
 
-
-sugar:
-  - omit binders from coe, hcom, depPath when arg is path or line!
-  - distinguish the sugary versions already in presyntax
-
-overload map functions?
+overload map functions in impl?
 
 - add builtins with bidir checking: refl, _⁻¹, _◼_, ap, com, etc..
 

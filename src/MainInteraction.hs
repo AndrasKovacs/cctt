@@ -25,8 +25,8 @@ helpMsg = unlines [
   ,"  elab          prints the elaboration output"
   ]
 
-elabFile :: FilePath -> IO ()
-elabFile path = mainWith (pure [path, "elab"])
+elabFile :: FilePath -> [String] -> IO ()
+elabFile path args = mainWith (pure $ path : args)
 
 mainInteraction :: IO ()
 mainInteraction = mainWith getArgs

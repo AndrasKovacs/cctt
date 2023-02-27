@@ -31,6 +31,11 @@ instance Conv Val where
     (VLine a        , VLine a'          ) -> conv a a'
     (VLLam t        , VLLam t'          ) -> conv t t'
 
+    -- This is useful for testing elaboration, where it's annoying to fail on
+    -- TODO. This is safe (doesn't affect type safety & termination), but of
+    -- course it can be unsound.
+    (VTODO          , VTODO             ) -> True
+
     -- eta
     (VLam t         , F -> t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
     (F -> t         , VLam t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)

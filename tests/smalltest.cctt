@@ -1,0 +1,20 @@
+
+symUtest (A B : U)(p : A = B) : B = A := λ i. hcom 0 1 [i=0. p; i=1 _. A] A;
+
+-- Glue A [
+
+--   i = 0.
+--       B
+--     , (λ x. coe 1 0 (j. p j) x)
+--     , (λ x. coe 0 1 (j. p j) x)
+--     , (λ x j. hcom 1 0 [j = 0 k. x; j = 1 k. coe k 1 (j1. p j1) (coe 1 k (j1. p j1) x)] x)
+--     , (λ x j. hcom 0 1 [j = 0 k. coe k 0 (j1. p j1) (coe 0 k (j1. p j1) x); j = 1 k. x] x)
+--     , TODO;
+
+--   i = 1.
+--       A
+--     , (λ x. coe 1 0 (_. A) x)
+--     , (λ x. coe 0 1 (_. A) x)
+--     , (λ x j. hcom 1 0 [j = 0 k. x; j = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x)
+--     , (λ x j. hcom 0 1 [j = 0 k. coe k 0 (_. A) (coe 0 k (_. A) x); j = 1 k. x] x)
+--     , TODO]
