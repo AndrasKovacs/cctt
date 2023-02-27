@@ -4,9 +4,11 @@ module Tests where
 import MainInteraction
 
 p1 = elabString $ unlines [
-   ""
-  ,"trans (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z"
-  ,":= λ i. hcom 0 1 [i=0 _. x; i=1. q] (p i);"
+  ""
+ -- ,"foo (A B : U)(p : A = B)(a : A) : coe 0 1 p a = coe 0 1 p a "
+ -- ,"  := λ _. coe 0 1 (j.p j) a;"
+  ,"transComp (A B : U) (p : A = B) (a : A) : a = coe 1 0 (j.p j) (coe 0 1 (j.p j) a)"
+  ,"  := λ i. coe i 0 p (coe 0 i p a);"
   ]
 
 p2 = elabString $ unlines [
@@ -90,3 +92,27 @@ p3 = elabString $ unlines [
   ,"                  d;"
 
   ]
+
+-- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
+-- (VNe (NLocalVar 1) []) (VNe (NLocalVar 0) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NCoe I0 I1 (BindI {bindIName = "j", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
+-- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NLocalVar 3) [])) [0])) [0]
+
+-- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
+-- (VNe (NLocalVar 1) []) (VNe (NLocalVar 0) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NCoe I0 I1 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
+-- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NLocalVar 3) [])) [0])) [0]
+
+-- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
+-- (VNe (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NCoe I0 I1 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
+-- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NLocalVar 3) [])) [0])) [0]
+
+-- VNe (NCoe I1 I0 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp
+-- (VNe (NLocalVar 1) []) (VNe (NLocalVar 0) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NCoe I0 I1 (BindI {bindIName = "i", bindIBinds = 0, bindIBody = VNe (NPApp (VNe
+-- (NLocalVar 0) []) (VNe (NLocalVar 1) []) (NLocalVar 2) (IVar 0)) [0]}) (VNe
+-- (NLocalVar 3) [])) [0])) [0]

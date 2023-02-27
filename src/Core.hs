@@ -644,10 +644,11 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     F $ VNe (NHCom (unF r) (unF r') a nts (unF base)) (is <> is')
 
   VU ->
-    let is' = is <> varsOf r <> varsOf r' in
-    F $ VGlueTy (unF base)
-                uf
-                is'
+    F VTODO
+    -- let is' = is <> varsOf r <> varsOf r' in
+    -- F $ VGlueTy (unF base)
+    --             uf
+    --             is'
 
 -- hcomⁱ r r' U [α ↦ t] b = Glue [α ↦ (t r', (coeⁱ r' r (t i), _)), r=r' ↦ (b, idEqv)] b
 

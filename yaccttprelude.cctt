@@ -17,20 +17,20 @@ ap (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y
 funext (A : U)(B : A → U)(f g : (a : A) → B a)(p : (a : A) → f a = g a) : f = g
   := λ i a. p a i;
 
-trans (A B : U) (p : A = B)(a : A) : B := coe 0 1 (i. p i) a;
+trans (A B : U) (p : A = B)(a : A) : B := coe 0 1 p a;
 
-transNeg (A B : U) (p : A = B)(b : B) : A := coe 1 0 (i. p i) b;
+transNeg (A B : U) (p : A = B)(b : B) : A := coe 1 0 p b;
 
-transLine (p : I → U) (a : p 0) : p 1 := coe 0 1 (i. p i) a;
+transLine (p : I → U) (a : p 0) : p 1 := coe 0 1 p a;
 
-transFill (A B : U)(p : A = B)(a : A) : a ={i.p i} trans A B p a
-  := λ i. coe 0 i (i.p i) a;
+transFill (A B : U)(p : A = B)(a : A) : a ={p} trans A B p a
+  := λ i. coe 0 i p a;
 
 transComp (A B : U) (p : A = B) (a : A) : a = transNeg A B p (trans A B p a)
-  := λ i. coe i 0 (i.p i) (coe 0 i (i.p i) a);
+  := λ i. coe i 0 p (coe 0 i p a);
 
 transNegComp (A B : U) (p : A = B) (b : B) : coe 0 1 (i.p i) (coe 1 0 (i.p i) b) = b
-  := λ i. coe i 1 (i.p i) (coe 1 i (i.p i) b);
+  := λ i. coe i 1 p (coe 1 i p b);
 
 substTrans (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
   := trans (P a) (P b) (λ i. P (p i)) e;
@@ -42,53 +42,47 @@ substRefl (A : U) (P : A → U) (a : A) (e : P a) : e = subst A P a a (λ _. a) 
   := λ i. coe 0 i (_. P a) e;
 
 comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
-  := λ i. hcom 0 1 [i=0 _. x; i=1 j. q j] (p i);
+  := λ i. hcom 0 1 [i=0 _. x; i=1. q] (p i);
 
 sym (A : U)(x y : A) (p : x = y) : y = x
-  := λ i. hcom 0 1 [i=0 j. p j; i=1 _. x] x;
+  := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
--- HCOM in the universe plz!
-symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={i.P i} b) : b ={i.sym U A B P i} a
-  := U;
+-- TODO: HCOM in the universe plz!
+-- symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={i.P i} b) : b ={i.sym U A B P i} a
+--   := U;
 
 -- symDep (A B : U) (P : Path U A B) (a : A) (b : B) (p : PathP P a b) :
 --   (PathP (sym U A B P) b a) =
 --   <i> com 0->1 (<j> hcom 0->j U [ (i=0) -> P, (i=1) -> <_> A ] A)
 --         [ (i=0) -> p , (i=1) -> <_> a ] a
 
+Sing (A : U) (a : A) : U := (x : A) × (a = x);
 
--- subst (A : U)(P : A → U)(x y : A)(p : x = y)(px : P x) : P y := coe 0 1 (i. P (p i)) px;
+connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
+     λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j; j=0. sq 0; j=1. sq i; i=j. sq i] a;
 
--- Sing (A : U) (a : A) : U := (x : A) × (a = x);
+connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
 
--- connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
---   := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1 x. p x] (p k);
+contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
+  := λ i. (p i, connAnd A a b p i);
 
---      λ i j. hcom 0 1 [i=0 k. sq 0 k; i=1 k. sq j k;
---                       j=0 k. sq 0 k; j=1 k. sq i k;
---                       i=j k. sq i k] a;
+Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a (refl A a))(x : A)(p : a = x) : C x p
+  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl A a) (x, p) (contractSing A a x p) cr;
 
--- connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
+J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
+     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
--- contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={Sing A a} (b, p)
---   := λ i. (p i, connAnd A a b p i);
+JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
+  : J A a C d a (λ _. a) = d
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
+     let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
+                                           k=1 _. a;
+                                           i=0 _. a;
+                                           i=1 _. a] a;
 
--- Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a (refl A a))(x : A)(p : a = x) : C x p
---   := subst (Sing A a) (λ s. C s.1 s.2) (a, refl A a) (x, p) (contractSing A a x p) cr;
-
--- J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
---   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 x. p x] a;
---      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
-
--- JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
---   : J A a C d a (λ _. a) = d
---   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
---      let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
---                                            k=1 _. a;
---                                            i=0 _. a;
---                                            i=1 _. a] a;
-
---      λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
---                   [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
---                    k=1 _. d]
---                   d;
+     λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
+                  [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
+                   k=1 _. d]
+                  d;

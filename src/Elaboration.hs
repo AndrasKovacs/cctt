@@ -1,3 +1,4 @@
+{-# options_ghc -Wno-unused-top-binds #-}
 
 module Elaboration (elabTop) where
 
@@ -15,7 +16,7 @@ import Interval
 import Quotation
 import Substitution
 
--- import qualified Common
+import qualified Common
 import qualified Conversion
 import qualified Core
 import qualified Presyntax as P
@@ -62,8 +63,8 @@ evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
 evalInf :: NCofArg => I -> I
 evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
 
--- debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
--- debug x = withNames (Common.debug x)
+debug :: (TopNames => Names => INames => [String]) -> Elab (IO ())
+debug x = withNames (Common.debug x)
 
 ----------------------------------------------------------------------------------------------------
 -- Elaboration context
@@ -112,6 +113,16 @@ bindI x act =
   let _ = ?cof; _ = ?tbl in
   act fresh
 {-# inline bindI #-}
+
+-- | Insert an inver (an ivar which is not in the elab input).
+insertI :: Name -> Elab (IVar -> a) -> Elab a
+insertI x act =
+  let fresh = dom ?cof in
+  let ?cof  = setDom (fresh + 1) ?cof `ext` IVar fresh
+      ?tbl  = M.insert x (LocalInt fresh) ?tbl in
+  let _ = ?cof; _ = ?tbl in
+  act fresh
+{-# inline insertI #-}
 
 -- | Extend cxt with a cof (by conjunction)
 bindVCof :: F VCof -> Elab a -> Elab a
@@ -188,7 +199,7 @@ showError = \case
   CantConvertEndpoints t u ->
     "Can't convert expected path endpoint\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
-    "to\n\n" ++
+    "to the inferred endpoint\n\n" ++
     "  " ++ pretty t
   CantConvertCof c1 c2 ->
     "Can't convert expected path endpoint\n\n" ++
@@ -277,7 +288,7 @@ check t topA = case t of
       Lam x <$!> bind x a (\v -> check t (capp b v))
 
     (P.Lam x t, VPath a l r) -> do
-      t <- bindI x \r -> check t (a ∙ IVar r)
+      t <- bindI x \i -> check t (a ∙ IVar i)
       convEndpoints (instantiate t (F I0)) l
       convEndpoints (instantiate t (F I1)) r
       pure $! PLam (quote l) (quote r) x t
@@ -487,9 +498,9 @@ elabBindMaybe b r r' = case b of
         let va  = evalf a
             src = papp lhs rhs va r
             tgt = papp lhs rhs va r'
-        bindI "i" \i -> do
-          a <- pure $ PApp (quote src) (quote tgt) (WkI a) (IVar i)
-          pure ("i", a, eval a, src, tgt)
+        bindI "x" \i -> do
+          a <- pure $ PApp (quote lhs) (quote rhs) (WkI a) (IVar i)
+          pure ("x", a, eval a, src, tgt)
       VLine aty -> do
         isConstantU aty
         let va  = evalf a

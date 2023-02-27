@@ -1,8 +1,8 @@
-overloaded ivar binders
-  - finish hcom binders
-  - add explicit ivar wk to tm, use it instead of normalization
-  - avoid Path annotation ambiguity by not having constant path annotation,
-    only dependent type annotation
+
+refactor names
+
+ivar insertion? avoid symtable entry?
+
 
 sugar:
   - omit binders from coe, hcom, depPath when arg is path or line!

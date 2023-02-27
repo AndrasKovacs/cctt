@@ -192,7 +192,7 @@ tm = \case
   Path "_" _ t u   -> eqp (app t <> " = " <> app u)
   Path x a t u     -> let pt = app t; pu = app u in freshI x \x ->
                       eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
-  PApp _ _ t u     -> appp (app t <> " " <> int u)
+  PApp l r t u     -> appp (app t <> " " <> app l <> " " <> app r <> " " <> int u)
   PLam _ _ x t     -> letp (freshI x \x -> "λ " <> x <> goLams t)
 
   Coe r r' i a t   -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
