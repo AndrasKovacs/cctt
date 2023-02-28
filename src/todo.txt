@@ -1,8 +1,11 @@
 
-- fix shadowed name printing and handling
-- fix "_" name printing
-- add debug pretty printing mode which is usable during evaluation
-  (prints vars as indices)
+Feature:
+- all Kan computation rules
+- strict inductives
+- HITs
+
+Convenience:
+
 - sugar for iterated projection:
   (print right-nested projection as number?
     x.1  ~ x.1
@@ -10,11 +13,17 @@
     x.3  ~ x.2.2.1
     x.4  ~ x.2.2.2.1
     but what about the rightmost field? Should we just use a dummy ending field?
-- improve system compat error messages
+
+- improve system compatibility error messages
+  - improve system error positions
+
+
+Performance:
+
+- optimize com the same way as with hcom'
+- unbox VSys types
+- coe Glue: unfold the hcom fiber
 - add explicit Path applications
   Purpose: the normalization in PApp elaboration for the endpoints could
   blow up. Explicit endpoints can be used to avoid that.
-
-OPT:
-- unbox VSys types
-- coe Glue: unfold the hcom fiber
+- switch to ByteString megaparsec input

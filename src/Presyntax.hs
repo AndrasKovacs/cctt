@@ -8,8 +8,11 @@ type Ty = Tm
 
 data Tm
   = Ident Name
+  | LocalLvl Lvl                  -- @n
+  | TopLvl Lvl                    -- @@n
   | Pos (DontShow SourcePos) Tm
   | I
+  | ILvl IVar
   | I0
   | I1
   | Let Name (Maybe Ty) Tm Tm

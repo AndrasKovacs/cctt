@@ -45,11 +45,15 @@ type Names    = (?names  :: M.Map NameKey Name)
 type Shadow   = (?shadow :: M.Map Name Int)
 
 showVar :: M.Map NameKey Name -> NameKey -> String
-showVar m k = case M.lookup k m of
-  Nothing -> case k of NKLocal x  -> show x
-                       NKTop x    -> "(TOP " ++ show x ++ ")"
-                       NKLocalI x -> show x
-  Just n  -> n
+showVar m k =
+  let gokey = case k of
+        NKLocal x  -> '@':show x
+        NKTop x    -> "@@"++show x
+        NKLocalI x -> "@"++show x
+  in case M.lookup k m of
+    Nothing      -> gokey
+    Just ('_':_) -> gokey
+    Just n       -> n
 
 type PrettyArgs a = Names => Shadow => DomArg => IDomArg => a
 
@@ -69,10 +73,11 @@ pairp  s = par 0 s; {-# inline pairp #-}
 --------------------------------------------------------------------------------
 
 freshen :: Name -> Int -> Name
-freshen x n = case n of 0 -> x; n -> x ++ show n
+freshen "_" n = "_"
+freshen x   n = case n of 0 -> x; n -> x ++ show n
 
 fresh :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
-fresh x act =
+fresh x act   =
   let fresh   = ?dom
       sh      = maybe 0 id (M.lookup x ?shadow)
       newname = freshen x sh in
@@ -202,7 +207,9 @@ tm = \case
   PLam _ _ x t     -> letp (freshI x \x -> "λ " <> x <> goLams t)
   Coe r r' i a t   -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
                       appp ("coe " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt)
-  HCom r r' _ t u  -> appp ("hcom " <> int r <> " " <> int r' <> " " <> sysH t <> " " <> proj u)
+  HCom r r' a t u  -> appp ("hcom " <> int r <> " " <> int r'
+                            -- <> " " <> proj a
+                            <> " " <> sysH t <> " " <> proj u)
   GlueTy a s       -> appp ("Glue " <> proj a <> " " <> sys s)
   Unglue t _       -> appp ("unglue " <> proj t)
   Glue a s         -> appp ("glue " <> proj a <> " " <> sys s)
@@ -229,7 +236,7 @@ top = \case
 class Pretty c c0 a | a -> c c0 where
   pretty    :: c => a -> String
   pretty0   :: c0 => a -> String
-  prettydbg :: a -> String
+  prettydbg :: a -> String -- ^ Print all vars as indices.
 
 instance Pretty () () Top where
   pretty  t   = let ?names = mempty; ?lvl = 0 in runTxt (top t)

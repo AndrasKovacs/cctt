@@ -29,6 +29,7 @@ withPos p = do
     t       -> pure $ Pos (coerce pos) t
 
 lexeme     = L.lexeme ws
+decimal    = lexeme (L.decimal :: Parser Lvl)
 symbol s   = lexeme (C.string s)
 char c     = lexeme (C.char c)
 parens p   = char '(' *> p <* char ')'
@@ -81,7 +82,9 @@ atom =
                <|> (I0    <$  keyword  "0"  )
                <|> (I1    <$  keyword  "1"  )
                <|> (I     <$  keyword  "I"  )
-               <|> (Ident <$!> ident        ))
+               <|> (TopLvl   <$!> (C.string "@@" *> decimal))
+               <|> (LocalLvl <$!> (C.char '@'    *> decimal))
+               <|> (Ident    <$!> ident))
 
 goProj :: Tm -> Parser Tm
 goProj t =
@@ -95,7 +98,9 @@ intLit :: Parser Tm
 intLit = (I0 <$ keyword "0") <|> (I1 <$ keyword "1")
 
 int :: Parser Tm
-int = intLit <|> (Ident <$!> ident)
+int = intLit
+  <|> (ILvl <$!> (C.char '@' *> (coerce decimal)))
+  <|> (Ident <$!> ident)
 
 cofEq :: Parser CofEq
 cofEq = CofEq <$!> int <*!> (char '=' *> int)

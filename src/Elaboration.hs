@@ -74,30 +74,37 @@ data Entry
   | LocalInt IVar
   deriving Show
 
-type Table = M.Map Name Entry
+data Box a = Box ~a deriving (Show)
 
-type TableArg = (?tbl    :: Table)
-type PosArg   = (?srcPos :: SourcePos)
+type Table      = M.Map Name Entry
+type TableArg   = (?tbl        :: Table)
+type PosArg     = (?srcPos     :: SourcePos)
+type TopDefs    = (?topDefs    :: [(Val, VTy)])
+type TopLvl     = (?topLvl     :: Lvl)
+type LocalTypes = (?localTypes :: [Box VTy])
 
-type Elab a = NCofArg => DomArg => EnvArg => TableArg => PosArg => a
+type Elab a = TopDefs => TopLvl => LocalTypes => NCofArg
+           => DomArg => EnvArg => TableArg => PosArg => a
 
 -- | Bind a fibrant variable.
 bind :: Name -> VTy -> Elab (Val -> a) -> Elab a
-bind x a act =
-  let v    = vVar ?dom in
-  let ?dom = ?dom + 1
-      ?env = EDef ?env v
-      ?tbl = M.insert x (Local ?dom a) ?tbl in
+bind x ~a act =
+  let v           = vVar ?dom in
+  let ?dom        = ?dom + 1
+      ?env        = EDef ?env v
+      ?tbl        = M.insert x (Local ?dom a) ?tbl
+      ?localTypes = Box a : ?localTypes in
   let _ = ?dom; _ = ?env; _ = ?tbl in
   act v
 {-# inline bind #-}
 
 -- | Define a fibrant variable.
 define :: Name -> VTy -> Val -> Elab a -> Elab a
-define x a ~v act =
-  let ?env = EDef ?env v
-      ?dom = ?dom + 1
-      ?tbl = M.insert x (Local ?dom a) ?tbl in
+define x ~a ~v act =
+  let ?env        = EDef ?env v
+      ?dom        = ?dom + 1
+      ?tbl        = M.insert x (Local ?dom a) ?tbl
+      ?localTypes = Box a : ?localTypes in
   let _ = ?env; _ = ?tbl; _ = ?dom in
   act
 {-# inline define #-}
@@ -135,6 +142,8 @@ pickIVarName
 
 data Error
   = NameNotInScope Name
+  | LocalLvlNotInScope
+  | TopLvlNotInScope
   | UnexpectedI
   | UnexpectedIType
   | ExpectedI
@@ -196,12 +205,6 @@ showError = \case
     "and\n\n" ++
     "  " ++ pretty t
 
-  -- CantConvert t u ->
-  --   "Can't convert\n\n" ++
-  --   "  " ++ show u ++ "\n\n" ++
-  --   "and\n\n" ++
-  --   "  " ++ show t
-
   CantConvertEndpoints t u ->
     "Can't convert expected path endpoint\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
@@ -216,6 +219,12 @@ showError = \case
 
   NameNotInScope x ->
     "Name not in scope: " ++ x
+
+  LocalLvlNotInScope ->
+    "Local De Bruijn level not in scope"
+
+  TopLvlNotInScope ->
+    "Top-level De Bruijn level not in scope"
 
   TopShadowing ->
     "Duplicate top-level name"
@@ -330,6 +339,7 @@ check t topA = case t of
 
     (t, topA) -> do
       Infer t a <- infer t
+      -- debug ["MALLAC", pretty t, pretty (quote a), pretty (quote topA)]
       convExInf a topA
       pure t
 
@@ -342,6 +352,18 @@ infer = \case
       Local l a  -> pure $! Infer (LocalVar (lvlToIx ?dom l)) a
       LocalInt l -> err UnexpectedI
 
+  P.LocalLvl x -> do
+    unless (0 <= x && x < ?dom) (err LocalLvlNotInScope)
+    let ix = lvlToIx ?dom x
+    let Box a = ?localTypes !! fromIntegral ix
+    pure $! Infer (LocalVar ix) a
+
+  P.TopLvl x -> do
+    unless (0 <= x && x < ?topLvl) (err TopLvlNotInScope)
+    let (a, v) = ?topDefs !! fromIntegral (lvlToIx ?topLvl x)
+    pure $! Infer (TopVar x (coerce v)) a
+
+  P.ILvl{} -> err UnexpectedI
   P.I0 -> err UnexpectedI
   P.I1 -> err UnexpectedI
   P.I  -> err UnexpectedIType
@@ -555,6 +577,14 @@ checkI = \case
       Just (LocalInt l) -> pure $ IVar l
       Just _            -> err ExpectedI
 
+  P.ILvl x -> do
+    unless (0 <= x && x < dom ?cof) (err LocalLvlNotInScope)
+    pure $ IVar x
+
+  P.LocalLvl (coerce -> x) -> do
+    unless (0 <= x && x < dom ?cof) (err LocalLvlNotInScope)
+    pure $ IVar x
+
   t -> do
     err ExpectedI
 
@@ -673,27 +703,26 @@ elabGlueTySys a = \case
 
 ----------------------------------------------------------------------------------------------------
 
-type ElabTop a = (?topLvl :: Lvl) => (?printnf :: Maybe Name) => Elab a
+type ElabTop a = (?printnf :: Maybe Name) => Elab a
 
 defineTop :: Name -> VTy -> Val -> ElabTop a -> ElabTop a
-defineTop x a ~v act =
-  let ?topLvl = ?topLvl + 1
-      ?tbl    = M.insert x (Top ?topLvl a v) ?tbl in
+defineTop x ~a ~v act =
+  let ?topLvl  = ?topLvl + 1
+      ?tbl     = M.insert x (Top ?topLvl a v) ?tbl
+      ?topDefs = (a, v) : ?topDefs in
   let _ = ?topLvl; _ = ?tbl in
   act
 {-# inline defineTop #-}
-
-noTopShadowing :: ElabTop (Name -> IO ())
-noTopShadowing x = case M.lookup x ?tbl of
-  Just{} -> err TopShadowing
-  _      -> pure ()
 
 inferTop :: ElabTop (P.Top -> IO Top)
 inferTop = \case
 
   P.TDef pos x ma t top -> setPos pos do
 
-    noTopShadowing x
+    case M.lookup x ?tbl of
+      Just{} -> err TopShadowing
+      _      -> pure ()
+
     (a, va, t) <- case ma of
       Nothing -> do
         Infer t va <- infer t
@@ -720,13 +749,15 @@ inferTop = \case
 
 elabTop :: Maybe Name -> FilePath -> String -> P.Top -> IO Top
 elabTop printnf path file top = do
-  let ?cof     = idSub 0
-      ?dom     = 0
-      ?env     = ENil
-      ?tbl     = mempty
-      ?srcPos  = initialPos path
-      ?topLvl  = 0
-      ?printnf = printnf
+  let ?cof        = idSub 0
+      ?dom        = 0
+      ?env        = ENil
+      ?tbl        = mempty
+      ?srcPos     = initialPos path
+      ?topLvl     = 0
+      ?printnf    = printnf
+      ?topDefs    = []
+      ?localTypes = []
   catch (inferTop top) \(e :: ErrInCxt) -> do
     displayErrInCxt file e
     exitSuccess

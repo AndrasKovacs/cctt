@@ -482,13 +482,20 @@ icapp (NICl _ t) arg = case t of
               vshempty)
              (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j)
 
+-- hcom r r' (lhs {i.A} rhs) [α j. t] base =
+--   (λ arg. hcom r r' (A arg) [arg=0 j. lhs, arg=1 j. rhs, α j. t j arg] (base arg))
+
   ICHComPath (frc -> r) (frc -> r') a lhs rhs sys p ->
     let farg = frc arg in
     hcom r r' (a ∘ unF farg)
       (vshcons (ceq farg fi0) "i" (\i -> frc lhs) $
        vshcons (ceq farg fi1) "i" (\i -> frc rhs) $
-       mapVSysHCom (\_ t -> pappf lhs rhs (frc t) farg) (frc sys))
+       mapVSysHCom (\_ t -> pappf lhs rhs (frc t) farg)
+                   (frc sys))
       (pappf lhs rhs (frc p) farg)
+
+      -- $ ICHComPath (unF r) (unF r') a lhs rhs nts (unF base)
+
 
   ICHComLine (frc -> r) (frc -> r') a sys base ->
     let farg = frc arg in
@@ -668,17 +675,6 @@ com r r' ~a ~sys ~b
   | VSHNe nsys is <- unF sys = comdnnf r r' a (F (nsys, is)) b
 {-# inline com #-}
 
--- projZero :: NCofArg => DomArg => F I -> F I -> F NeSysHCom -> F Val
--- projZero r r' sys = case unF sys of
-
--- projSuc :: NCofArg => DomArg => F I -> F I -> F NeSysHCom -> F Val -> F Val
--- projSuc = uf
-
--- -- | HCom Nat with off-diagonal I args ("d") and neutral system arg ("n").
--- hcomNatdn :: NCofArg => DomArg => F I -> F I -> F NeSysHCom -> F Val -> F Val
--- hcomNatdn r r' sys base = case unF base of
---   VZero  -> projZero r r' sys
---   VSuc n -> hcomNatdn r r'
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> NCofArg => DomArg => F Val
@@ -695,10 +691,11 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
         (proj1f base))
       (comdnnf r r'
         (bindIf "i" \i ->
-          hcomn r i
-            (frc a)
-            (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
-            (proj1f base))
+          b ∘
+            (hcomnnf r i
+              (frc a)
+              (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
+              (proj1f base)))
         (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
         (proj2f base))
 
@@ -760,6 +757,7 @@ hcomn r r' ~a ~sys ~b
   | True    = hcomdn r r' a sys b
 {-# inline hcomn #-}
 
+hcomnnf r r' ~a ~sys ~b = unF (hcomn r r' a sys b); {-# inline hcomnnf #-}
 hcomdnnf r r' a sys base = unF (hcomdn r r' a sys base); {-# inline hcomdnnf #-}
 hcomf r r' ~a ~t ~b = frc (hcom r r' a t b); {-# inline hcomf  #-}
 
