@@ -11,33 +11,14 @@
     x.3  ~ x.2.2.1
     x.4  ~ x.2.2.2.1
     but what about the rightmost field? Should we just use a dummy ending field?
-
 - improve system compat error messages
-
 - add explicit Path applications
   Purpose: the normalization in PApp elaboration for the endpoints could
   blow up. Explicit endpoints can be used to avoid that.
 
-
-
-overload map functions in impl?
-
-- add builtins with bidir checking: refl, _⁻¹, _◼_, ap, com, etc..
-
-- (Switch megaparsec to strict bytestring input)
-
-- test stuff (cubicaltt prelude, examples)
-
-- add parametrized strict inductives (then perhaps remove Nat)
-- add weak HITs
-- file imports
-
-- glued eval
-  - How: add glue values
-  - forcing does not remove glue
-  - all semantic functions preserve glue
-  - how to repr glued vals?
-    - we don't use spines
-    - Just another kind of neutral: Glue Ne ~Val
-
-- hole printing
+OPT:
+- hcom evaluation: fuse instantiation and evaluation:
+  - if some branch is true, eval the term under the instantiation
+    - downside: we have to duplicate some hcom code, or else store
+      more info in VSystem
+- coe Glue: look at the unfolded hcom fib defn

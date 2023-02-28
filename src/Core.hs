@@ -7,7 +7,7 @@ import Interval
 import Substitution
 import CoreTypes
 
-import Debug.Trace
+-- import Debug.Trace
 
 
 ----------------------------------------------------------------------------------------------------

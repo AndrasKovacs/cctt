@@ -1,4 +1,8 @@
 
+-- Adaptation of most of the yacctt prelude:
+--   https://github.com/mortberg/yacctt/blob/master/examples/prelude.ytt
+--------------------------------------------------------------------------------
+
 Square (A : U) (a0 a1 b0 b1 : A)
                (u : a0 = a1) (v : b0 = b1)
                (r0 : a0 = b0) (r1 : a1 = b1) : U
