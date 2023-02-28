@@ -189,53 +189,76 @@ showError = \case
     "  " ++ pretty u ++ "\n\n" ++
     "and inferred type\n\n" ++
     "  " ++ pretty t
+
   CantConvert t u ->
     "Can't convert\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
     "and\n\n" ++
     "  " ++ pretty t
+
+  -- CantConvert t u ->
+  --   "Can't convert\n\n" ++
+  --   "  " ++ show u ++ "\n\n" ++
+  --   "and\n\n" ++
+  --   "  " ++ show t
+
   CantConvertEndpoints t u ->
     "Can't convert expected path endpoint\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
     "to the inferred endpoint\n\n" ++
     "  " ++ pretty t
+
   CantConvertCof c1 c2 ->
     "Can't convert expected path endpoint\n\n" ++
     "  " ++ pretty c1 ++ "\n\n" ++
     "to\n\n" ++
     "  " ++ pretty c2
+
   NameNotInScope x ->
     "Name not in scope: " ++ x
+
   TopShadowing ->
     "Duplicate top-level name"
+
   UnexpectedI ->
     "Unexpected interval expression"
+
   ExpectedI ->
     "Expected an interval expression"
+
   ExpectedPiPathLine a ->
     "Expected a function type, inferred\n\n" ++
     "  " ++ pretty a
+
   ExpectedSg a ->
     "Expected a sigma type, inferred\n\n" ++
     "  " ++ pretty a
+
   ExpectedGlueTy a ->
     "Expected a glue type, inferred\n\n" ++
     "  " ++ pretty a
+
   ExpectedPathLine a ->
     "Expected a path type or a line type, inferred\n\n" ++
     "  " ++ pretty a
+
   ExpectedPathULineU a ->
     "Expected a path type or a line type in U, inferred\n\n" ++
     "  " ++ pretty a
+
   CantInferLam ->
     "Can't infer type for lambda expression"
+
   CantInferPair ->
     "Can't infer type for pair expression"
+
   CantInferGlueTm ->
     "Can't infer type for glue expression"
+
   GlueTmSystemMismatch sys ->
     "Can't match glue system with expected Glue type system\n\n" ++
     "  " ++ pretty sys
+
   UnexpectedIType ->
     "The type of intervals I can be only used in function domains"
 
@@ -576,7 +599,7 @@ elabSysHCom a r base = \case
         sys <- elabSysHCom a r base sys
         bindVCof vcof do
 
-          -- overloaded binder notation
+          -- desugar binders
           (x, t) <- case t of
             P.Bind x t -> do
               t <- bindI x \_ -> check t a -- "a" is weakened under vcof

@@ -209,9 +209,6 @@ vVar :: Lvl -> Val
 vVar x = VNe (NLocalVar x) mempty
 {-# inline vVar #-}
 
-newtype F a = F {unF :: a}
-  deriving (SubAction, Show, Eq) via a
-
 fi0 = F I0; {-# inline fi0 #-}
 fi1 = F I1; {-# inline fi1 #-}
 

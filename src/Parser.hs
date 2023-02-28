@@ -162,7 +162,7 @@ goCom = do
   pure $ Com r r' a sys t
 
 app :: Parser Tm
-app =
+app = withPos (
        (keyword "suc"     *> (Suc <$!> proj))
   <|>  (keyword "NatElim" *> (NatElim <$!> proj <*!> proj <*!> proj <*!> proj))
   <|>  (keyword "coe"     *> goCoe)
@@ -171,7 +171,7 @@ app =
   <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
   <|>  (keyword "com"     *> goCom)
-  <|>  (goApp =<< proj)
+  <|>  (goApp =<< proj))
 
 eq :: Parser Tm
 eq = do

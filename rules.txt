@@ -1,21 +1,8 @@
 
 TODO:
-  - eval computation
-  - conversion checking
-  - Bool, Nat for testing
-  - Inductives & HITs
-     - signatures & eliminators
-  - parser
-  - bidirectional elab
-
-  - extension types?
-  - partial path types (one or more endpoint unspecified)
-
-(TODO-ish:
-  - custom bidirectional rules
-  -
-  )
-
+- modernize notation everywhere
+- add newest coe Glue (old/notes), look at hcom fib unfolding optimization
+- write hcom Glue
 
 --------------------------------------------------------------------------------
 

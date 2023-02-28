@@ -121,6 +121,10 @@ mapCod f s = setCod (f (cod s)) s
 class SubAction a where
   sub :: SubArg => a -> a
 
+instance SubAction a => SubAction (F a) where
+  sub (F a) = F (sub a)
+  {-# inline sub #-}
+
 doSub :: SubAction a => Sub -> a -> a
 doSub s a = let ?sub = s in sub a
 {-# inline doSub #-}

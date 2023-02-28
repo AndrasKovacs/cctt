@@ -20,6 +20,11 @@ insert = coerce LS.insert
 
 insertI :: I -> IVarSet -> IVarSet
 insertI i is = matchIVar i (\x -> insert x is) is
+{-# inline insertI #-}
+
+insertFI :: F I -> IVarSet -> IVarSet
+insertFI i is = insertI (unF i) is
+{-# inline insertFI #-}
 
 delete :: IVar -> IVarSet -> IVarSet
 delete = coerce LS.delete

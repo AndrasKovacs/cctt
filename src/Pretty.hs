@@ -38,11 +38,18 @@ instance Show Txt where
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
 
-data NameKey = NKLocal Lvl | NKTop Lvl | NKLocalI IVar deriving (Eq, Ord, Show)
+data NameKey = NKLocal Lvl | NKTop Lvl | NKLocalI IVar deriving (Eq, Ord)
 
 type Prec     = (?prec   :: Int)
 type Names    = (?names  :: M.Map NameKey Name)
 type Shadow   = (?shadow :: M.Map Name Int)
+
+showVar :: M.Map NameKey Name -> NameKey -> String
+showVar m k = case M.lookup k m of
+  Nothing -> case k of NKLocal x  -> show x
+                       NKTop x    -> "(TOP " ++ show x ++ ")"
+                       NKLocalI x -> show x
+  Just n  -> n
 
 type PrettyArgs a = Names => Shadow => DomArg => IDomArg => a
 
@@ -133,7 +140,7 @@ int :: PrettyArgs (I -> Txt)
 int = \case
   I0     -> "0"
   I1     -> "1"
-  IVar x -> str (?names M.! NKLocalI x)
+  IVar x -> str (showVar ?names (NKLocalI x))
 
 cofEq :: PrettyArgs (CofEq -> Txt)
 cofEq (CofEq i j) = int i <> " = " <> int j
@@ -166,8 +173,8 @@ sys s = "[" <> goSys s <> "]"
 
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
-  TopVar x _       -> str (?names M.! NKTop x)
-  LocalVar x       -> str (?names M.! NKLocal (?dom - coerce x - 1))
+  TopVar x _       -> str (?names `showVar` NKTop x)
+  LocalVar x       -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
   Let x a t u      -> let pa = let_ a; pt = let_ t in fresh x \x ->
                       letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
   Pi "_" a b       -> let pa = sigma a in fresh "_" \_ ->
@@ -220,21 +227,26 @@ top = \case
 ----------------------------------------------------------------------------------------------------
 
 class Pretty c c0 a | a -> c c0 where
-  pretty  :: c => a -> String
-  pretty0 :: c0 => a -> String
+  pretty    :: c => a -> String
+  pretty0   :: c0 => a -> String
+  prettydbg :: a -> String
 
 instance Pretty () () Top where
-  pretty  t = let ?names = mempty; ?lvl = 0 in runTxt (top t)
-  pretty0 t = let ?names = mempty; ?lvl = 0 in runTxt (top t)
+  pretty  t   = let ?names = mempty; ?lvl = 0 in runTxt (top t)
+  pretty0 t   = let ?names = mempty; ?lvl = 0 in runTxt (top t)
+  prettydbg t = let ?names = mempty; ?lvl = 0 in runTxt (top t)
 
 instance Pretty (Names, DomArg, IDomArg) Names Tm where
-  pretty  t = let ?shadow = mempty in runTxt (pair t)
-  pretty0 t = let ?dom = 0; ?idom = 0; ?shadow = mempty in runTxt (pair t)
+  pretty    t = let ?shadow = mempty in runTxt (pair t)
+  pretty0   t = let ?dom = 0; ?idom = 0; ?shadow = mempty in runTxt (pair t)
+  prettydbg t = let ?dom = 0; ?idom = 0; ?shadow = mempty; ?names = mempty in runTxt (pair t)
 
 instance Pretty (Names, DomArg, IDomArg) Names Cof where
   pretty  t = let ?shadow = mempty in runTxt (cof t)
   pretty0 t = let ?dom = 0; ?idom = 0; ?shadow = mempty in runTxt (cof t)
+  prettydbg t = let ?dom = 0; ?idom = 0; ?shadow = mempty; ?names = mempty in runTxt (cof t)
 
 instance Pretty (Names, DomArg, IDomArg) Names Sys where
   pretty  t = let ?shadow = mempty in runTxt (sys t)
   pretty0 t = let ?dom = 0; ?idom = 0; ?shadow = mempty in runTxt (sys t)
+  prettydbg t = let ?dom = 0; ?idom = 0; ?shadow = mempty; ?names = mempty in runTxt (sys t)

@@ -7,7 +7,7 @@ import Interval
 import Substitution
 import CoreTypes
 
--- import Debug.Trace
+import Debug.Trace
 
 
 ----------------------------------------------------------------------------------------------------
@@ -116,9 +116,6 @@ bindILazySnf x act = unF (bindILazyS x act)
 ctrue, cfalse :: F VCof
 ctrue  = F VCTrue
 cfalse = F VCFalse
-
-varsOf :: F I -> IS.IVarSet
-varsOf i = matchIVar (unF i) IS.singleton mempty
 
 cand :: F VCof -> F VCof -> F VCof
 cand c1 ~c2 = case (unF c1, unF c2) of
@@ -685,12 +682,12 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
       $ ICHComPath (unF r) (unF r') a lhs rhs nts (unF base)
 
   a@(VNe n is') ->
-    F $ VNe (NHCom (unF r) (unF r') a nts (unF base)) (is <> is')
-
+    F $ VNe (NHCom (unF r) (unF r') a nts (unF base))
+            (IS.insertFI r $ IS.insertFI r' $ is <> is')
 
 -- hcom r r' U [α i. ↦ t] b = Glue [α ↦ (t r', (coeⁱ r' r (t i), coeIsEquiv)), r=r' ↦ (b, idEqv)] b
   VU -> let
-    is' = is <> varsOf r <> varsOf r'
+    is' = IS.insertI (unF r) $ IS.insertI (unF r') is
 
     mkSys :: NCofArg => F I -> F I -> NeSysHCom -> NeSys
     mkSys r r' sys = seq ?cof $ case sys of
@@ -722,7 +719,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 hcom :: NCofArg => DomArg => F I -> F I -> F Val -> F VSysHCom -> F Val -> Val
 hcom r r' ~a ~t ~b
   | r == r'                = unF b
-  | VSHTotal v    <- unF t = (v ∙ unF r')
+  | VSHTotal v    <- unF t = v ∙ unF r'
   | VSHNe nsys is <- unF t = hcomdnnf r r' a (F (nsys, is)) b
 {-# inline hcom #-}
 

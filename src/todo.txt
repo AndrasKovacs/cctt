@@ -1,9 +1,23 @@
 
+- fix yaccttprelude evaluation error
+- fix shadowed name printing and handling
+- fix "_" name printing
+- add debug pretty printing mode which is usable during evaluation
+  (prints vars as indices)
+- sugar for iterated projection:
+  (print right-nested projection as number?
+    x.1  ~ x.1
+    x.2  ~ x.2.1
+    x.3  ~ x.2.2.1
+    x.4  ~ x.2.2.2.1
+    but what about the rightmost field? Should we just use a dummy ending field?
+
+- improve system compat error messages
+
 - add explicit Path applications
   Purpose: the normalization in PApp elaboration for the endpoints could
   blow up. Explicit endpoints can be used to avoid that.
-- handle printing and re-parsing of "_"-bound vars! We should test
-  re-checking yaccttprelude definition nfs.
+
 
 
 overload map functions in impl?
