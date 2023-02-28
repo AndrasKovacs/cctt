@@ -224,6 +224,36 @@ evalSysHCom = \case
   SHEmpty            -> vshempty
   SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> evalf t) (evalSysHCom sys)
 
+----------------------------------------------------------------------------------------------------
+-- Alternative hcom semantics which shortcuts to term instantiation if the system is total.
+-- We make use of the knowledge that the system argument comes from a syntactic system.
+
+data VSysHCom' = VSHTotal'  Name Tm | VSHNe' NeSysHCom IS.IVarSet deriving Show
+
+vshempty' :: F VSysHCom'
+vshempty' = F $ VSHNe' NSHEmpty mempty
+
+vshconsS' :: SubArg => NCofArg => DomArg => EnvArg => F VCof -> Name -> Tm -> F VSysHCom' -> F VSysHCom'
+vshconsS' cof i t ~sys = case unF cof of
+  VCTrue      -> F (VSHTotal' i t)
+  VCFalse     -> sys
+  VCNe cof is -> case unF sys of
+    VSHTotal' x t  -> F (VSHTotal' x t)
+    VSHNe' sys is' -> F (VSHNe' (NSHCons (bindCof cof (bindILazySnf i \_ -> evalf t)) sys)
+                                (is <> is'))
+{-# inline vshconsS' #-}
+
+evalSysHCom' :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom'
+evalSysHCom' = \case
+  SHEmpty            -> vshempty'
+  SHCons cof x t sys -> vshconsS' (evalCof cof) x t (evalSysHCom' sys)
+
+hcom' :: SubArg => NCofArg => DomArg => EnvArg => F I -> F I -> F Val -> F VSysHCom' -> F Val -> Val
+hcom' r r' ~a ~t ~b
+  | r == r'                 = unF b
+  | VSHTotal' x t  <- unF t = let ?sub = ?sub `ext` unF r' in eval t
+  | VSHNe' nsys is <- unF t = hcomdnnf r r' a (F (nsys, is)) b
+{-# inline hcom' #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Mapping
@@ -774,7 +804,7 @@ eval = \case
   PApp l r t i     -> papp (eval l) (eval r) (evalf t) (evalI i)
   PLam l r x t     -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
   Coe r r' x a t   -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
-  HCom r r' a t b  -> hcom (evalI r) (evalI r') (evalf a) (evalSysHCom t) (evalf b)
+  HCom r r' a t b  -> hcom' (evalI r) (evalI r') (evalf a) (evalSysHCom' t) (evalf b)
   GlueTy a sys     -> glueTy (eval a) (evalSys sys)
   Glue t sys       -> glue (eval t) (evalSys sys)
   Unglue t sys     -> unglue (eval t) (evalSys sys)

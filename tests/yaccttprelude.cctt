@@ -278,8 +278,6 @@ iso (A B : U) : U :=
   * ((b : B) → f (g b) = b)
   * ((a : A) → g (f a) = a);
 
-
--- TODO: error!
 lemIso (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
 
   let f  : A → B                 := i.1;

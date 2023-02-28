@@ -1,5 +1,4 @@
 
-- fix yaccttprelude evaluation error
 - fix shadowed name printing and handling
 - fix "_" name printing
 - add debug pretty printing mode which is usable during evaluation
@@ -17,8 +16,5 @@
   blow up. Explicit endpoints can be used to avoid that.
 
 OPT:
-- hcom evaluation: fuse instantiation and evaluation:
-  - if some branch is true, eval the term under the instantiation
-    - downside: we have to duplicate some hcom code, or else store
-      more info in VSystem
-- coe Glue: look at the unfolded hcom fib defn
+- unbox VSys types
+- coe Glue: unfold the hcom fiber

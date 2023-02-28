@@ -45,8 +45,8 @@ mainWith getArgs = do
   putStrLn (path ++ " parsed in " ++ show tparse)
   (top, tcheck) <- timed (elabTop printnf path file top)
   putStrLn (path ++ " checked in " ++ show tcheck)
-  putStrLn ("loaded " ++ show (topLen top) ++ " definitions")
-  putStrLn ("total load time: " ++ show (tparse + tcheck))
+  putStrLn ("checked " ++ show (topLen top) ++ " definitions")
+  putStrLn ("total time: " ++ show (tparse + tcheck))
   when printelab do
     putStrLn ""
     putStrLn $ pretty top
