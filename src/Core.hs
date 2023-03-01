@@ -51,12 +51,7 @@ assumeCof cof act = let ?cof = conjNeCof ?cof cof in seq ?cof act
 {-# inline assumeCof #-}
 
 wkIS :: (SubArg => NCofArg => a) -> (SubArg => NCofArg => a)
-wkIS act =
-  let cod' = cod ?sub - 1 in
-  let ?sub = setCod cod' ?sub in
-  let ?cof = setCod cod' ?cof in
-  let _ = ?sub; _ = ?cof in
-  act
+wkIS act = let ?sub = setCod (cod ?sub - 1) ?sub in seq ?sub act
 {-# inline wkIS #-}
 
 ----------------------------------------------------------------------------------------------------
