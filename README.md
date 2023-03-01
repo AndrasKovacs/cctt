@@ -1,10 +1,15 @@
 
 ## cubeval
 
+Installation: install [Haskell stack](https://docs.haskellstack.org/en/stable/),
+then run `stack install` in the source directory.
+
+Usage and current features: see [tutorial.cctt](tutorial.cctt).
+
 A small implementation of a cartesian cubical type theory, designed from
-ground-up with performance in mind. WIP, doesn't work yet. The immediate project
-goal is to get the implementation in a testable state and then port over a bunch
-of existing cubical benchmarks.
+ground-up with performance in mind. WIP. The immediate project goal is to get
+the implementation in a testable state and then port over a bunch of existing
+cubical benchmarks.
 
 Existing code was written by me (András Kovács), but Anders Mörtberg and Evan
 Cavallo have provided significant design input and code review.
@@ -232,8 +237,8 @@ When we create a binder, the size of the current context is saved. This binder
 can be implicitly weakened to a larger context. We can instantiate a binder by applying a substitution
 which renames the abstracted variable to a fresh variable. This yields a nice higher-order
 interface to transparent binders where binder creation and binder application behave
-like meta-level functions. However, sometimes we want to use specialized code for efficiency. 
-For example, forcing a binder w.r.t. a cofibration can elide explicit substitution. 
+like meta-level functions. However, sometimes we want to use specialized code for efficiency.
+For example, forcing a binder w.r.t. a cofibration can elide explicit substitution.
 
 #### Defunctionalization
 
@@ -265,7 +270,7 @@ Defunctionalization is most convenient when we have few different kinds of
 closures, like in the vanilla NbE case, where there's just one kind of closure. If we
 have lots of different closures, there's a distance in the implementation code
 between the points where we create closures, and the place where we define the
-actual application logic for each closure (the "generic apply" function). 
+actual application logic for each closure (the "generic apply" function).
 
 Generally speaking, we have a choice about how pervasive defunctionalization is.
 All definitions which can be internalized in the theory can be defined as plain
@@ -275,12 +280,12 @@ and elaborated by the system itself. Cubical Agda uses some of this AFAIK. Howev
 internal definitions are less efficient than semantic definitions. The former are
 interpreted, the latter are natively compiled. There could be a framework where
 defunctionalization is done by metaprogramming, but that'd
-be a lot of work (if it's even feasible in Haskell). 
+be a lot of work (if it's even feasible in Haskell).
 
 Going further, there could be a logical framework that checks and efficiently compiles all cubical computation
-rules. Going even further, the entirety of elaboration could be written in a type-safe logical 
+rules. Going even further, the entirety of elaboration could be written in a type-safe logical
 framework. These sound nice but look pretty damn hard to implement. In this repo I stick
-to handcrafted defunctionalization and untyped (but, to some extent, *well-scoped*) semantics. 
+to handcrafted defunctionalization and untyped (but, to some extent, *well-scoped*) semantics.
 
 ### 3. Closed cubical evaluation
 

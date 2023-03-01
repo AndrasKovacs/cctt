@@ -1,0 +1,130 @@
+
+-- Comments are like in Haskell
+-- This tutorial is intended for people who are already familiar with cubical
+-- type theory.
+
+{-
+This is a multi-line comment.
+
+General usage: cctt <file> [nf <topdef>] [elab]
+
+Checks <file>. Options:
+  nf <topdef>   prints the normal form of top-level definition <topdef>
+  elab          prints the elaboration output
+-}
+
+--------------------------------------------------------------------------------
+
+-- A file consists of top-level definitions.
+-- Shadowing is not allowed on the top level.
+-- Definitions are terminated with ";". There's no indentation-sensitivity.
+
+foo1 : U := U;  -- U is the universe, with U : U
+
+-- Type annotations can be sometimes omitted. Inference is quite limited though.
+foo2 := U;
+
+-- Functions:
+id  : (A : U) → A → A := λ A x. x;
+id1 : (A : U) → A → A := λ A x. id A x;
+
+-- Arguments can be grouped:
+const : (A B : U) → A → B → A := λ A B x y. x;
+
+-- Arrows between function type binders can be ommitted:
+const2 : (A : U)(B : U) → A → B → A := λ A B x y. x;
+
+-- Coq-style definition parameters:
+const3 (A B : U)(x : A) (y : B) : A := x;
+
+-- Return type annotations are mandatory when using Coq-style parameters.
+-- This throws an error:
+-- const4 (A B : U)(x : A) (y : B) := x;
+
+-- Local let:
+foo : U :=
+   let A := U;
+   let f (x : A) : A := x;
+   let z := f;
+   U;
+
+-- We can use de Bruijn levels for local variables:
+dbLevel0 (A B C : U) : U := @0;  -- stands for A
+dbLevel1 (A B C : U) : U := @1;  -- stands for B
+
+-- We can also use de Bruijn levels for top-level definitions. This
+-- is generally only useful to ensure that cctt printing output is
+-- well-formed even if some names are locally shadowed.
+
+topLevel0 := @@0;  -- stands for foo1, the 0-th top definition.
+topLevel1 := @@1;  -- stands for foo2
+
+
+-- Line type
+--------------------------------------------------------------------------------
+
+-- A line type is a function type with I domain, written as
+-- (i : I) → A  or  (I → A)
+
+DepLine (A : I → U) : U := (i : I) → A i;
+Line (A : U) : U := DepLine (λ _. A);
+
+-- I is itself not a fibrant type and can only appear in function domains
+-- as a notation for line types.
+reflLine (A : U)(x : A) : Line A := λ _. x;
+
+-- We can also use I in Coq-style parameters. This gets us line types:
+reflLine' (A : U)(x : A)(_ : I) : A := x;
+
+
+-- Path type
+--------------------------------------------------------------------------------
+
+-- Notation:
+--   x = y        for non-dependent path with inferred type parameter
+--   x ={i.A} y   for  dependent path
+
+-- We can use "x ={_. A} y" for type-annotated non-dependent paths,
+-- when the types of sides can't be inferred.
+
+-- Abstraction and application for paths is written the same as for functions
+-- and lines.
+refl (A : U)(x : A) : x = x := λ _. x;
+
+-- coe/hcom follow ABCFHL: https://www.cs.cmu.edu/~cangiuli/papers/abcfhl.pdf
+
+-- simple coercion:
+coe01 (A B : U)(p : A = B)(x : A) : B := coe 0 1 (i. p i) x;
+
+-- The (i._) binder can be omitted. In this case, a path or a line in U is
+-- expected as argument. The path/line is desugared to the primitive binder.
+coe01' (A B : U)(p : A = B)(x : A) : B := coe 0 1 p x;
+
+
+-- hcom example:
+
+sym (A : U)(x y : A) (p : x = y) : y = x :=
+  λ i. hcom 0 1 [i=0 j. p j; i=1 _. x] x;
+
+-- The base type can be explicitly given. Otherwise it is inferred from
+-- the base argument:
+
+sym' (A : U)(x y : A) (p : x = y) : y = x
+  := λ i. hcom 0 1 A [i=0 j. p j; i=1 _. x] x;
+
+-- We have the I binder sugar in hcom too:
+sym'' (A : U)(x y : A) (p : x = y) : y = x
+  := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
+
+-- We can only write systems as arguments to hcom and Glue and glue.
+-- Cofibrations are comma-separated lists of atomic equations. The comma means
+-- conjunction.
+
+cofTest (A : U)(x : A)(i j : I) : A :=
+  hcom 0 1 [i=0,j=0 _. x; i=1,j=0 _. x] x;
+
+-- We don't yet support disjunctions in cofibrations.
+
+
+-- Definitional equality drops components with false cofibrations:
+cofEq (A : U)(x : A)(i : I) : A := hcom 0 1 [i=0,i=1 _. x] x;

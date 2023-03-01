@@ -259,7 +259,13 @@ pLet = do
   keyword "let"
   x <- ident
   args <- many piBinder
-  ma <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
+  ma <- case args of
+    [] -> optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
+    _  -> do o <- getOffset
+             char ':'
+             branch (char '=')
+               (\_ -> setOffset o >> fail "Expected a type annotation")
+               (Just <$!> tm)
   symbol ":="
   t <- tm
   (t, ma) <- pure $! desugarIdentArgs args ma t
@@ -281,7 +287,13 @@ top :: Parser Top
 top = branch ((,) <$!> getSourcePos <*!> ident)
   (\(pos, x) -> do
     args <- many piBinder
-    ma <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
+    ma <- case args of
+      [] -> optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
+      _  -> do o <- getOffset
+               char ':'
+               branch (char '=')
+                 (\_ -> setOffset o >> fail "Expected a type annotation")
+                 (Just <$!> tm)
     symbol ":="
     t <- tm
     (t, ma) <- pure $! desugarIdentArgs args ma t

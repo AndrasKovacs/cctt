@@ -1,10 +1,14 @@
 
+Fix:
+- Restructure cof evaluation, right now conjunction is not done properly
+
 Feature:
 - all Kan computation rules
 - strict inductives
 - HITs
 
 Convenience:
+- sugar for cof disjunction and ∀ in systems.
 
 - sugar for iterated projection:
   (print right-nested projection as number?

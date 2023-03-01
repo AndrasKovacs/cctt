@@ -1,6 +1,6 @@
 
 TODO:
-- modernize notation everywhere
+- harmonize notation with implementation everywhere
 - add newest coe Glue (old/notes), look at hcom fib unfolding optimization
 - write hcom Glue
 

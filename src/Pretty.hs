@@ -154,7 +154,7 @@ cof :: PrettyArgs (Cof -> Txt)
 cof = \case
   CTrue         -> "⊤"
   CAnd eq CTrue -> cofEq eq
-  CAnd eq c     -> cofEq eq <> " ∧ " <> cof c
+  CAnd eq c     -> cofEq eq <> " , " <> cof c
 
 goSysH :: PrettyArgs (SysHCom -> Txt)
 goSysH = \case

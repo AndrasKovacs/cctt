@@ -7,7 +7,7 @@ import Interval
 import Substitution
 import CoreTypes
 
--- import Debug.Trace
+import Debug.Trace
 
 
 ----------------------------------------------------------------------------------------------------
@@ -213,7 +213,7 @@ vshconsS :: SubArg => NCofArg => F VCof -> Name -> (SubArg => NCofArg => F I -> 
          -> F VSysHCom -> F VSysHCom
 vshconsS cof i v ~sys = case unF cof of
   VCTrue      -> F (VSHTotal (bindILazySnf i v))
-  VCFalse     -> sys
+  VCFalse     -> sys -- trace "FALSE" sys
   VCNe cof is -> case unF sys of
     VSHTotal v'   -> F (VSHTotal v')
     VSHNe sys is' -> F (VSHNe (NSHCons (bindCof cof (bindILazySnf i v)) sys) (is <> is'))
@@ -224,11 +224,13 @@ evalSysHCom = \case
   SHEmpty            -> vshempty
   SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> evalf t) (evalSysHCom sys)
 
-----------------------------------------------------------------------------------------------------
--- Alternative hcom semantics which shortcuts to term instantiation if the system is total.
--- We make use of the knowledge that the system argument comes from a syntactic system.
 
-data VSysHCom' = VSHTotal'  Name Tm | VSHNe' NeSysHCom IS.IVarSet deriving Show
+-- Alternative hcom and com semantics which shortcuts to term instantiation if
+-- the system is total. We make use of the knowledge that the system argument
+-- comes from the syntax.
+----------------------------------------------------------------------------------------------------
+
+data VSysHCom' = VSHTotal' Name Tm | VSHNe' NeSysHCom IS.IVarSet deriving Show
 
 vshempty' :: F VSysHCom'
 vshempty' = F $ VSHNe' NSHEmpty mempty
@@ -246,7 +248,9 @@ vshconsS' cof i t ~sys = case unF cof of
 evalSysHCom' :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom'
 evalSysHCom' = \case
   SHEmpty            -> vshempty'
-  SHCons cof x t sys -> vshconsS' (evalCof cof) x t (evalSysHCom' sys)
+  SHCons cof x t sys ->
+    -- traceShow ("COF", cof, evalCof cof) $
+    vshconsS' (evalCof cof) x t (evalSysHCom' sys)
 
 hcom' :: SubArg => NCofArg => DomArg => EnvArg => F I -> F I -> F Val -> F VSysHCom' -> F Val -> Val
 hcom' r r' ~a ~t ~b
