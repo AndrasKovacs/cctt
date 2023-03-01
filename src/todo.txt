@@ -1,6 +1,6 @@
 
-Fix:
-- Restructure cof evaluation, right now conjunction is not done properly
+Testing:
+  - hcom and coe comp rules
 
 Feature:
 - all Kan computation rules
@@ -24,6 +24,7 @@ Convenience:
 
 Performance:
 
+- bring back hcom' optimization
 - optimize com the same way as with hcom'
 - unbox VSys types
 - coe Glue: unfold the hcom fiber

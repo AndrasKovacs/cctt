@@ -50,8 +50,8 @@ Composition (derived)
     Γ ⊢ α cof   Γ, i ⊢ A : U   Γ, α, i ⊢ t : A   Γ ⊢ b : A r   Γ, α ⊢ t r ≡ b
     ────────────────────────────────────────────────────────────────────────
        Γ ⊢ comⁱ r r' A [α ↦ t] b : (A r') [r=r' ↦ b, α ↦ t r']
-           comⁱ r r' A [α ↦ t] b :=
-             hcomⁱ r r' (A r') [α ↦ coeʲ i r' (A j) t] (coeⁱ r r' A b)  -- fresh j
+           com r r' (i. A i) [α i. t] b :=
+             hcom r r' (A r') [α i. coe i r' (j. A j) t] (coe r r' (i. A i) b)
 
 
 -- filling
