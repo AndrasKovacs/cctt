@@ -97,10 +97,15 @@ data NeCof
   | NCAnd NeCof NeCof
   deriving Show
 
+data NeCof' = NeCof' {
+    neCof'Extended :: NCof
+  , neCof'Extra    :: NeCof}
+  deriving Show
+
 data VCof
   = VCTrue
   | VCFalse
-  | VCNe NeCof IS.IVarSet
+  | VCNe NeCof' IS.IVarSet
   deriving Show
 
 data Env
@@ -413,3 +418,4 @@ makeFields ''BindCof
 makeFields ''BindCofLazy
 makeFields ''NamedClosure
 makeFields ''NamedIClosure
+makeFields ''NeCof'

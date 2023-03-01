@@ -46,32 +46,31 @@ define :: Val -> (EnvArg => a) -> (EnvArg => a)
 define ~v act = let ?env = EDef ?env v in act
 {-# inline define #-}
 
-assumeCof :: NeCof -> (NCofArg => a) -> (NCofArg => a)
-assumeCof cof act = let ?cof = conjNeCof ?cof cof in seq ?cof act
-{-# inline assumeCof #-}
-
 wkIS :: (SubArg => NCofArg => a) -> (SubArg => NCofArg => a)
 wkIS act = let ?sub = setCod (cod ?sub - 1) ?sub in seq ?sub act
 {-# inline wkIS #-}
+
+assumeCof :: NeCof -> (NCofArg => a) -> (NCofArg => a)
+assumeCof cof act = let ?cof = conjNeCof ?cof cof in act
+{-# inline assumeCof #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Creating semantic binders
 ----------------------------------------------------------------------------------------------------
 
-
-bindCof :: NeCof -> (NCofArg => a) -> (NCofArg => BindCof a)
-bindCof cof act = assumeCof cof (BindCof cof act)
+bindCof :: NeCof' -> (NCofArg => a) -> (NCofArg => BindCof a)
+bindCof (NeCof' cof c) act = let ?cof = cof in BindCof c act
 {-# inline bindCof #-}
 
-bindCoff :: NeCof -> (NCofArg => F a) -> (NCofArg => F (BindCof a))
-bindCoff cof act = assumeCof cof (F (BindCof cof (unF act)))
+bindCoff :: NeCof' -> (NCofArg => F a) -> (NCofArg => F (BindCof a))
+bindCoff (NeCof' cof c) act = let ?cof = cof in F (BindCof c (unF act))
 {-# inline bindCoff #-}
 
-bindCofLazy :: NeCof -> (NCofArg => F a) -> (NCofArg => F (BindCofLazy a))
-bindCofLazy cof act = assumeCof cof (F (BindCofLazy cof (unF act)))
+bindCofLazy :: NeCof' -> (NCofArg => F a) -> (NCofArg => F (BindCofLazy a))
+bindCofLazy (NeCof' cof c) act = let ?cof = cof in F (BindCofLazy c (unF act))
 {-# inline bindCofLazy #-}
 
-bindCofLazynf :: NeCof -> (NCofArg => F a) -> (NCofArg => BindCofLazy a)
+bindCofLazynf :: NeCof' -> (NCofArg => F a) -> (NCofArg => BindCofLazy a)
 bindCofLazynf cof act = unF (bindCofLazy cof act)
 {-# inline bindCofLazynf #-}
 
@@ -112,37 +111,6 @@ ctrue, cfalse :: F VCof
 ctrue  = F VCTrue
 cfalse = F VCFalse
 
-cand :: F VCof -> F VCof -> F VCof
-cand c1 ~c2 = case (unF c1, unF c2) of
-  (VCFalse    , c2         ) -> cfalse
-  (_          , VCFalse    ) -> cfalse
-  (VCTrue     , c2         ) -> F c2
-  (c1         , VCTrue     ) -> F c1
-  (VCNe n1 is1, VCNe n2 is2) -> F (VCNe (NCAnd n1 n2) (is1 <> is2))
-{-# inline cand #-}
-
-ceq :: F I -> F I -> F VCof
-ceq c1 c2 = case (unF c1, unF c2) of
-  (i, j) | i == j -> ctrue
-  (i, j) -> matchIVar i
-    (\x -> matchIVar j
-      (\y -> F (VCNe (NCEq i j) (IS.singleton x <> IS.singleton y)))
-      (F (VCNe (NCEq i j) (IS.singleton x))))
-    (matchIVar j
-      (\y -> F (VCNe (NCEq i j) (IS.singleton y)))
-      cfalse)
-
-evalI :: SubArg => NCofArg => I -> F I
-evalI i = F (doSub ?cof (doSub ?sub i))
-
-evalCofEq :: SubArg => NCofArg => CofEq -> F VCof
-evalCofEq (CofEq i j) = ceq (evalI i) (evalI j)
-
-evalCof :: SubArg => NCofArg => Cof -> F VCof
-evalCof = \case
-  CTrue       -> ctrue
-  CAnd eq cof -> cand (evalCofEq eq) (evalCof cof)
-
 conjIVarI :: NCof -> IVar -> I -> NCof
 conjIVarI cof x i = mapSub id go cof where
   go _ j = matchIVar j (\y -> if x == y then i else j) j
@@ -158,32 +126,56 @@ conjNeCof ncof necof = case necof of
     (i     , IVar y) -> conjIVarI ncof y i
     (i     , j     ) -> error $ show (i, j)
 
-conjVCof :: NCof -> F VCof -> NCof
-conjVCof ncof cof = case unF cof of
-  VCFalse      -> impossible
-  VCTrue       -> ncof
-  VCNe necof _ -> conjNeCof ncof necof
-{-# inline conjVCof #-}
+vcne :: NCofArg => NeCof -> IS.IVarSet -> VCof
+vcne nc is = VCNe (NeCof' (conjNeCof ?cof nc) nc) is
+
+ceq :: NCofArg => F I -> F I -> F VCof
+ceq c1 c2 = case (unF c1, unF c2) of
+  (i, j) | i == j -> ctrue
+  (i, j) -> matchIVar i
+    (\x -> matchIVar j
+      (\y -> F (vcne (NCEq i j) (IS.singleton x <> IS.singleton y)))
+      (F (vcne (NCEq i j) (IS.singleton x))))
+    (matchIVar j
+      (\y -> F (vcne (NCEq i j) (IS.singleton y)))
+      cfalse)
+
+evalI :: SubArg => NCofArg => I -> F I
+evalI i = F (doSub ?cof (doSub ?sub i))
+
+evalCofEq :: SubArg => NCofArg => CofEq -> F VCof
+evalCofEq (CofEq i j) = ceq (evalI i) (evalI j)
+
+evalCof :: SubArg => NCofArg => Cof -> F VCof
+evalCof = \case
+  CTrue       -> ctrue
+  CAnd eq cof -> case unF (evalCofEq eq) of
+    VCTrue      -> evalCof cof
+    VCFalse     -> cfalse
+    VCNe c is -> let ?cof = c^.extended in case unF (evalCof cof) of
+      VCTrue      -> F $ VCNe c is
+      VCFalse     -> cfalse
+      VCNe c' is' -> F $ VCNe (NeCof' (c^.extended) (NCAnd (c^.extra) (c'^.extra)))
+                              (is <> is')
 
 vsempty :: F VSys
 vsempty = F (VSNe NSEmpty mempty)
-{-# inline vsempty #-}
 
 vscons :: NCofArg => F VCof -> (NCofArg => F Val) -> F VSys -> F VSys
 vscons cof v ~sys = case unF cof of
   VCTrue      -> F (VSTotal (unF v))
   VCFalse     -> sys
   VCNe cof is -> case unF sys of
-    VSTotal v'   -> F (VSTotal v')
-    VSNe sys is' -> F (VSNe (NSCons (bindCofLazynf cof v) sys) (is <> is'))
+    VSTotal v'   -> F $ VSTotal v'
+    VSNe sys is' -> F $ VSNe (NSCons (bindCofLazynf cof v) sys) (is <> is')
 {-# inline vscons #-}
 
 -- | Extend a *neutral* system with a *non-true* cof.
 nsconsNonTrue :: NCofArg => F VCof -> (NCofArg => F Val) -> F NeSys -> F NeSys
 nsconsNonTrue cof v ~sys = case unF cof of
-  VCTrue      -> impossible
-  VCFalse     -> sys
-  VCNe cof is -> F (NSCons (bindCofLazynf cof v) (unF sys))
+  VCTrue     -> impossible
+  VCFalse    -> sys
+  VCNe cof _ -> F $ NSCons (bindCofLazynf cof v) (unF sys)
 {-# inline nsconsNonTrue #-}
 
 evalSys :: SubArg => NCofArg => DomArg => EnvArg => Sys -> F VSys
@@ -197,21 +189,23 @@ vshempty = F (VSHNe NSHEmpty mempty)
 
 vshcons :: NCofArg => F VCof -> Name -> (NCofArg => F I -> F Val) -> F VSysHCom -> F VSysHCom
 vshcons cof i v ~sys = case unF cof of
-  VCTrue      -> F (VSHTotal (unF (bindILazy i v)))
+  VCTrue       -> F (VSHTotal (unF (bindILazy i v)))
   VCFalse     -> sys
   VCNe cof is -> case unF sys of
-    VSHTotal v'   -> F (VSHTotal v')
-    VSHNe sys is' -> F (VSHNe (NSHCons (bindCof cof (bindILazynf i v)) sys) (is <> is'))
+    VSHTotal v'   -> F $ VSHTotal v'
+    VSHNe sys is' -> F $ VSHNe (NSHCons (bindCof cof (bindILazynf i v)) sys)
+                               (is <> is')
 {-# inline vshcons #-}
 
 vshconsS :: SubArg => NCofArg => F VCof -> Name -> (SubArg => NCofArg => F I -> F Val)
          -> F VSysHCom -> F VSysHCom
 vshconsS cof i v ~sys = case unF cof of
-  VCTrue      -> F (VSHTotal (bindILazySnf i v))
-  VCFalse     -> sys -- trace "FALSE" sys
+  VCTrue      -> F (VSHTotal (unF (bindILazyS i v)))
+  VCFalse     -> sys
   VCNe cof is -> case unF sys of
-    VSHTotal v'   -> F (VSHTotal v')
-    VSHNe sys is' -> F (VSHNe (NSHCons (bindCof cof (bindILazySnf i v)) sys) (is <> is'))
+    VSHTotal v'   -> F $ VSHTotal v'
+    VSHNe sys is' -> F $ VSHNe (NSHCons (bindCof cof (bindILazySnf i v)) sys)
+                               (is <> is')
 {-# inline vshconsS #-}
 
 evalSysHCom :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom
@@ -225,45 +219,51 @@ evalSysHCom = \case
 -- comes from the syntax.
 ----------------------------------------------------------------------------------------------------
 
-data VSysHCom' = VSHTotal' Name Tm | VSHNe' NeSysHCom IS.IVarSet deriving Show
+-- data VSysHCom' = VSHTotal' Name Tm | VSHNe' NeSysHCom IS.IVarSet deriving Show
 
-vshempty' :: F VSysHCom'
-vshempty' = F $ VSHNe' NSHEmpty mempty
+-- vshempty' :: F VSysHCom'
+-- vshempty' = F $ VSHNe' NSHEmpty mempty
 
-vshconsS' :: SubArg => NCofArg => DomArg => EnvArg => F VCof -> Name -> Tm -> F VSysHCom' -> F VSysHCom'
-vshconsS' cof i t ~sys = case unF cof of
-  VCTrue      -> F (VSHTotal' i t)
-  VCFalse     -> sys
-  VCNe cof is -> case unF sys of
-    VSHTotal' x t  -> F (VSHTotal' x t)
-    VSHNe' sys is' -> F (VSHNe' (NSHCons (bindCof cof (bindILazySnf i \_ -> evalf t)) sys)
-                                (is <> is'))
-{-# inline vshconsS' #-}
+-- vshconsS' :: SubArg => NCofArg => DomArg => EnvArg => F VCof -> Name -> Tm -> F VSysHCom' -> F VSysHCom'
+-- vshconsS' cof i t ~sys = case unF cof of
+--   VCTrue      -> F (VSHTotal' i t)
+--   VCFalse     -> sys
+--   VCNe cof is -> case unF sys of
+--     VSHTotal' x t  -> F (VSHTotal' x t)
+--     VSHNe' sys is' -> F (VSHNe' (NSHCons (bindCof cof (bindILazySnf i \_ -> evalf t)) sys)
+--                                 (is <> is'))
+-- {-# inline vshconsS' #-}
 
-evalSysHCom' :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom'
-evalSysHCom' = \case
-  SHEmpty            -> vshempty'
-  SHCons cof x t sys ->
-    -- traceShow ("COF", cof, evalCof cof) $
-    vshconsS' (evalCof cof) x t (evalSysHCom' sys)
+-- evalSysHCom' :: SubArg => NCofArg => DomArg => EnvArg => SysHCom -> F VSysHCom'
+-- evalSysHCom' = \case
+--   SHEmpty            -> vshempty'
+--   SHCons cof x t sys ->
+--     -- traceShow ("COF", cof, evalCof cof) $
+--     vshconsS' (evalCof cof) x t (evalSysHCom' sys)
 
-hcom' :: SubArg => NCofArg => DomArg => EnvArg => F I -> F I -> F Val -> F VSysHCom' -> F Val -> Val
-hcom' r r' ~a ~t ~b
-  | r == r'                 = unF b
-  | VSHTotal' x t  <- unF t = let ?sub = ?sub `ext` unF r' in eval t
-  | VSHNe' nsys is <- unF t = hcomdnnf r r' a (F (nsys, is)) b
-{-# inline hcom' #-}
+-- hcom' :: SubArg => NCofArg => DomArg => EnvArg => F I -> F I -> F Val -> F VSysHCom' -> F Val -> Val
+-- hcom' r r' ~a ~t ~b
+--   | r == r'                 = unF b
+--   | VSHTotal' x t  <- unF t = let ?sub = ?sub `ext` unF r' in eval t
+--   | VSHNe' nsys is <- unF t = hcomdnnf r r' a (F (nsys, is)) b
+-- {-# inline hcom' #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Mapping
 ----------------------------------------------------------------------------------------------------
 
+unBindCof :: NCofArg => BindCof a -> NeCof'
+unBindCof t = NeCof' (conjNeCof ?cof (t^.binds)) (t^.binds)
+
+unBindCofLazy :: NCofArg => BindCofLazy a -> NeCof'
+unBindCofLazy t = NeCof' (conjNeCof ?cof (t^.binds)) (t^.binds)
+
 mapBindCof :: NCofArg => BindCof a -> (NCofArg => a -> a) -> BindCof a
-mapBindCof t f = bindCof (t^.binds) (f (t^.body))
+mapBindCof t f = bindCof (unBindCof t) (f (t^.body))
 {-# inline mapBindCof #-}
 
 mapBindCofLazy :: NCofArg => BindCofLazy a -> (NCofArg => a -> F a) -> F (BindCofLazy a)
-mapBindCofLazy t f = bindCofLazy (t^.binds) (f (t^.body))
+mapBindCofLazy t f = bindCofLazy (unBindCofLazy t) (f (t^.body))
 {-# inline mapBindCofLazy #-}
 
 mapBindCofLazynf :: NCofArg => BindCofLazy a -> (NCofArg => a -> F a) -> BindCofLazy a
@@ -719,7 +719,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     mkSys r r' sys = seq ?cof $ case sys of
       NSHEmpty -> NSEmpty
       NSHCons t sys ->
-        NSCons (bindCofLazynf (t^.binds) $
+        NSCons (bindCofLazynf (unBindCof t) $
                   F $ VPair (t^.body ∙ unF r')
                     $ theCoeEquiv (bindI (t^.body.name) \i -> t^.body ∙ unF i)
                                   (unF r') (unF r))
@@ -801,7 +801,7 @@ eval = \case
   PApp l r t i     -> papp (eval l) (eval r) (evalf t) (evalI i)
   PLam l r x t     -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
   Coe r r' x a t   -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
-  HCom r r' a t b  -> hcom' (evalI r) (evalI r') (evalf a) (evalSysHCom' t) (evalf b)
+  HCom r r' a t b  -> hcom (evalI r) (evalI r') (evalf a) (evalSysHCom t) (evalf b)
   GlueTy a sys     -> glueTy (eval a) (evalSys sys)
   Glue t sys       -> glue (eval t) (evalSys sys)
   Unglue t sys     -> unglue (eval t) (evalSys sys)
@@ -836,11 +836,25 @@ instance Force I I where
 instance Force NeCof VCof where
   frc = \case
     NCEq i j    -> ceq (frc i) (frc j)
-    NCAnd c1 c2 -> cand (frc c1) (frc c2)
+    NCAnd c1 c2 -> case unF (frc c1) of
+      VCTrue -> frc c2
+      VCFalse -> cfalse
+      VCNe cof is -> let ?cof = cof^.extended in case unF (frc c2) of
+        VCTrue        -> F $ VCNe cof is
+        VCFalse       -> cfalse
+        VCNe cof' is' -> F $ VCNe (NeCof' (cof'^.extended) (NCAnd (cof^.extra) (cof'^.extra)))
+                                  (is <> is')
 
   frcS = \case
     NCEq i j    -> ceq (frcS i) (frcS j)
-    NCAnd c1 c2 -> cand (frcS c1) (frcS c2)
+    NCAnd c1 c2 -> case unF (frcS c1) of
+      VCTrue -> frcS c2
+      VCFalse -> cfalse
+      VCNe cof is -> let ?cof = cof^.extended in case unF (frcS c2) of
+        VCTrue        -> F $ VCNe cof is
+        VCFalse       -> cfalse
+        VCNe cof' is' -> F $ VCNe (NeCof' (cof'^.extended) (NCAnd (cof^.extra) (cof'^.extra)))
+                                  (is <> is')
 
 instance Force Val Val where
   frc = \case

@@ -33,10 +33,10 @@ convExInf t u = if Conversion.conv t u
   then pure ()
   else err $ CantConvertExInf (quote t) (quote u)
 
-convCof :: Elab (F VCof -> F VCof -> IO ())
-convCof c c' = if Conversion.conv (unF c) (unF c')
+convNeCof :: Elab (NeCof -> NeCof -> IO ())
+convNeCof c c' = if Conversion.conv c c'
   then pure ()
-  else err $! CantConvertCof (quote (unF c)) (quote (unF c'))
+  else err $! CantConvertCof (quote c) (quote c')
 
 convEndpoints :: Elab (Val -> Val -> IO ())
 convEndpoints t u = if Conversion.conv t u
@@ -119,12 +119,8 @@ bindI x act =
   act fresh
 {-# inline bindI #-}
 
--- | Extend cxt with a cof (by conjunction)
-bindVCof :: F VCof -> Elab a -> Elab a
-bindVCof cof act =
-  let ?cof = conjVCof ?cof cof
-  in seq ?cof act
-{-# inline bindVCof #-}
+bindCof :: NeCof' -> Elab a -> Elab a
+bindCof (NeCof' cof c) act = let ?cof = cof in act; {-# inline bindCof #-}
 
 -- | Try to pick an informative fresh ivar name.
 pickIVarName :: Elab Name
@@ -161,6 +157,7 @@ data Error
   | CantConvertExInf Tm Tm
   | GlueTmSystemMismatch Sys
   | TopShadowing
+  | NonNeutralCofInSystem
   deriving Show
 
 instance Exception Error where
@@ -270,6 +267,9 @@ showError = \case
 
   UnexpectedIType ->
     "The type of intervals I can be only used in function domains"
+
+  NonNeutralCofInSystem ->
+    "Only neutral cofibrations are allowed in systems"
 
 displayErrInCxt :: String -> ErrInCxt -> IO ()
 displayErrInCxt file (ErrInCxt e) = withPrettyArgs do
@@ -612,7 +612,8 @@ sysHComCompat t = \case
   SHCons cof' x t' sys -> do
     case unF (evalCof cof') of
       VCFalse     -> pure ()
-      (F -> cof') -> bindVCof cof' (bindI x \_ -> conv (eval t) (eval t'))
+      VCTrue      -> bindI x \_ -> conv (eval t) (eval t')
+      VCNe cof' _ -> bindCof cof' (bindI x \_ -> conv (eval t) (eval t'))
     sysHComCompat t sys
 
 elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
@@ -621,13 +622,12 @@ elabSysHCom a r base = \case
     pure SHEmpty
   P.SHCons cof t sys -> do
     cof <- checkCof cof
-    let vcof = evalCof cof
-    case unF vcof of
-      VCFalse -> do
-        elabSysHCom a r base sys
-      (F -> vcof) -> do
+    case unF (evalCof cof) of
+      VCTrue  -> err NonNeutralCofInSystem
+      VCFalse -> err NonNeutralCofInSystem
+      VCNe ncof _ -> do
         sys <- elabSysHCom a r base sys
-        bindVCof vcof do
+        bindCof ncof do
 
           -- desugar binders
           (x, t) <- case t of
@@ -662,8 +662,9 @@ sysCompat t = \case
   SEmpty            -> pure ()
   SCons cof' t' sys -> do
     case unF (evalCof cof') of
+      VCTrue      -> conv (eval t) (eval t')
       VCFalse     -> pure ()
-      (F -> cof') -> bindVCof cof' $ conv (eval t) (eval t')
+      VCNe cof' _ -> bindCof cof' $ conv (eval t) (eval t')
     sysCompat t sys
 
 elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
@@ -672,15 +673,18 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
     pure SEmpty
   (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> do
     cof <- checkCof cof
-    let vcof = evalCof cof
-    convCof vcof (frc cof')
-    ts <- elabGlueTmSys base ts a equivs
-    bindVCof vcof do
-      let fequiv = frc equiv
-      t <- check t (proj1 fequiv)
-      conv (proj1f (proj2f fequiv) ∙ eval t) (eval base)
-      sysCompat t ts
-      pure $ SCons cof t ts
+    case unF (evalCof cof) of
+      VCTrue  -> err NonNeutralCofInSystem
+      VCFalse -> err NonNeutralCofInSystem
+      VCNe ncof _ -> do
+        convNeCof (ncof^.extra) cof'
+        ts <- elabGlueTmSys base ts a equivs
+        bindCof ncof do
+          let fequiv = frc equiv
+          t <- check t (proj1 fequiv)
+          conv (proj1f (proj2f fequiv) ∙ eval t) (eval base)
+          sysCompat t ts
+          pure $ SCons cof t ts
   (ts, equivs) ->
     err $! GlueTmSystemMismatch (quote equivs)
 
@@ -692,11 +696,11 @@ elabGlueTySys a = \case
     cof <- checkCof cof
     let vcof = evalCof cof
     case unF vcof of
-      VCFalse ->
-        elabGlueTySys a sys
-      (F -> vcof) -> do
+      VCTrue  -> err NonNeutralCofInSystem
+      VCFalse -> err NonNeutralCofInSystem
+      VCNe ncof _ -> do
         sys <- elabGlueTySys a sys
-        bindVCof vcof do
+        bindCof ncof do
           t <- check t (equivInto a)
           sysCompat t sys
           pure $ SCons cof t sys

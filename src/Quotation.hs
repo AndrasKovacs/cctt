@@ -55,6 +55,9 @@ instance Quote a b => Quote (BindCofLazy a) b where
 instance Quote a b => Quote (BindCof a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
 
+instance Quote NeCof' Cof where
+  quote (NeCof' _ c) = quote c
+
 instance Quote VCof Cof where
   quote = \case
     VCTrue   -> CTrue

@@ -124,3 +124,7 @@ instance Conv VCof where
     (VCNe c _ , VCNe c' _ ) -> conv c c'
     _                       -> False
   {-# inline conv #-}
+
+instance Conv NeCof' where
+  conv (NeCof' _ c) (NeCof' _ c') = conv c c'
+  {-# inline conv #-}

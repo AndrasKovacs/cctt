@@ -28,6 +28,10 @@ foo2 := U;
 id  : (A : U) → A → A := λ A x. x;
 id1 : (A : U) → A → A := λ A x. id A x;
 
+-- Every symbol has an ASCII synonym:
+id'  : (A : U) -> A -> A := \A x. x;
+id1' : (A : U) -> A -> A := \A x. id A x;
+
 -- Arguments can be grouped:
 const : (A B : U) → A → B → A := λ A B x y. x;
 
@@ -75,6 +79,17 @@ reflLine (A : U)(x : A) : Line A := λ _. x;
 
 -- We can also use I in Coq-style parameters. This gets us line types:
 reflLine' (A : U)(x : A)(_ : I) : A := x;
+
+-- Sigma
+--------------------------------------------------------------------------------
+
+-- Notation : (x : A) × B or (x : A) * B
+--   Also non-dependent product: A × B or A * B
+-- Pairing _,_ associates to the right
+-- Projections are .1 and .2
+-- Projections bind stronger than function application
+
+projEx (A : U)(f : A → A → A)(x : A × A × A) : A := f x.1 x.2.1;
 
 
 -- Path type
@@ -125,6 +140,26 @@ cofTest (A : U)(x : A)(i j : I) : A :=
 
 -- We don't yet support disjunctions in cofibrations.
 
+-- Users are not allowed to write true or false cofibrations in the source code,
+-- although of course they can arise during evaluation. This is purely to
+-- simplify elaboration.
 
--- Definitional equality drops components with false cofibrations:
-cofEq (A : U)(x : A)(i : I) : A := hcom 0 1 [i=0,i=1 _. x] x;
+-- Throws error:
+-- nonNeutralCof (A : U)(x : A)(i : I) : A := hcom 0 1 [i=0,i=1 _. x] x;
+
+
+-- Definitional equality drops system components with false cofibrations:
+cofEq : (A : U) (x : A)(i : I) →
+   (let help (A : U)(x : A)(i j : I) : A := hcom 0 1 [i=0,j=1 _. x] x;
+    help A x i i = hcom 0 1 [] x) :=
+ λ A x i _. hcom 0 1 [] x;
+
+-- But it does not sort components by cofibrations (possible future feature)
+
+-- noCofSort (A : U)(x : A)(i : I) :
+--   hcom 0 1 [i=0 _. x; i=1 _. x] x = hcom 0 1 [i=1 _. x; i=0 _. x] x :=
+--   λ _.   hcom 0 1 [i=1 _. x; i=0 _. x] x;
+
+
+-- Glue types
+--------------------------------------------------------------------------------

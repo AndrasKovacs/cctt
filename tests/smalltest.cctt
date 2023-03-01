@@ -1,10 +1,13 @@
 
--- Definitional equality drops components with false cofibrations:
-cofEq (A : U)(x : A)(i : I) : A := hcom 0 1 [i=0,i=1 _. x] x;
+comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
+  := λ i. hcom 0 1 [i=0 _. x; i=1. q] (p i);
 
--- fibtest (A B : U)(f : A → B)(b : B)(base base' : (a : A) × f a = b)
---         (p : base = base')(i : I) : (a : A) × f a = b
---   := hcom 0 1 [i=0. p] base;
+-- -- Definitional equality drops components with false cofibrations:
+-- cofEq (A : U)(x : A)(i : I) : A := hcom 0 1 [i=0,i=1 _. x] x;
+
+-- -- fibtest (A B : U)(f : A → B)(b : B)(base base' : (a : A) × f a = b)
+-- --         (p : base = base')(i : I) : (a : A) × f a = b
+-- --   := hcom 0 1 [i=0. p] base;
 
 
 --------------------------------------------------------------------------------
