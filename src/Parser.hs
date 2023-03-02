@@ -59,6 +59,8 @@ isKeyword x =
   || x == "unglue"
   || x == "com"
   || x == "I"
+  || x == "refl"
+  || x == "ap"
 
 ident :: Parser Name
 ident = try do
@@ -71,7 +73,7 @@ ident = try do
 keyword :: String -> Parser ()
 keyword kw = try do
   C.string kw
-  (takeWhile1P Nothing isAlphaNum *> empty) <|> ws
+  (takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'') *> empty) <|> ws
 
 atom :: Parser Tm
 atom =
@@ -82,14 +84,17 @@ atom =
                <|> (I0    <$  keyword  "0"  )
                <|> (I1    <$  keyword  "1"  )
                <|> (I     <$  keyword  "I"  )
+               <|> (Refl  <$  keyword "refl")
                <|> (TopLvl   <$!> (C.string "@@" *> decimal))
                <|> (LocalLvl <$!> (C.char '@'    *> decimal))
                <|> (Ident    <$!> ident))
 
 goProj :: Tm -> Parser Tm
 goProj t =
-      (p1 *> goProj (Proj1 t) <|> (p2 *> goProj (Proj2 t)))
-  <|> (pure t)
+       (p1 *> goProj (Proj1 t)
+   <|> (p2 *> goProj (Proj2 t)))
+   <|> (symbol "⁻¹" *> goProj (Sym t))
+   <|> (pure t)
 
 proj :: Parser Tm
 proj = goProj =<< atom
@@ -176,11 +181,15 @@ app = withPos (
   <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
   <|>  (keyword "com"     *> goCom)
+  <|>  (keyword "ap"      *> (Ap <$!> proj <*!> proj))
   <|>  (goApp =<< proj))
+
+trans :: Parser Tm
+trans = foldr1 Trans <$!> sepBy1 app (char '∙')
 
 eq :: Parser Tm
 eq = do
-  t <- app
+  t <- trans
   branch (char '=')
     (\_ -> do
         branch (char '{')
@@ -189,9 +198,9 @@ eq = do
                      (\x -> Bind x <$!> tm)
                      (DontBind <$!> tm)
               char '}'
-              u <- app
+              u <- trans
               pure $ DepPath a t u)
-          (Path t <$!> app))
+          (Path t <$!> trans))
     (pure t)
 
 sigma :: Parser Tm

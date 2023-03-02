@@ -556,6 +556,30 @@ icapp (NICl _ t) arg = case t of
        vshempty)
       x
 
+-- | sym (A : U)(x y : A) -> x = y : y = x
+--     := λ i*. hcom 0 1 [i=0 j. p j; i=1 j. x] x;
+  ICSym a x y p ->
+    let i = frc arg in
+    hcomd fi0 fi1 (frc a)
+          (vshcons (ceq i fi0) "j" (\j -> pappf x y (frc p) j) $
+           vshcons (ceq i fi1) "_" (\_ -> frc x) $
+           vshempty)
+          (frc x)
+
+-- | comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
+--    := λ i*. hcom 0 1 A [i=0 j. x; i=1 j. q j] (p i);
+  ICTrans a x y z p q ->
+    let i = frc arg in
+    hcomd fi0 fi1 (frc a)
+      (vshcons (ceq i fi0) "_" (\_ -> frc x) $
+       vshcons (ceq i fi1) "j" (\j -> pappf y z (frc q) j) $
+       vshempty)
+      (pappf x y (frc p) i)
+
+-- | ap (A B : U)(f : A -> B)(x y : A)(p : x = y) : f x = f y
+--     := λ i*. f (p i)
+  ICAp f x y p ->
+    let i = frc arg in frc f ∙ papp x y (frc p) i
 
 proj1 :: F Val -> Val
 proj1 t = case unF t of
@@ -762,6 +786,13 @@ hcomn r r' ~a ~sys ~b
   | True    = hcomdn r r' a sys b
 {-# inline hcomn #-}
 
+-- | Off-diagonal HCom.
+hcomd :: NCofArg => DomArg => F I -> F I -> F Val -> F VSysHCom -> F Val -> Val
+hcomd r r' ~a ~sys ~b
+  | VSHTotal v    <- unF sys = v ∙ unF r'
+  | VSHNe nsys is <- unF sys = hcomdnnf r r' a (F (nsys, is)) b
+{-# inline hcomd #-}
+
 hcomnnf r r' ~a ~sys ~b = unF (hcomn r r' a sys b); {-# inline hcomnnf #-}
 hcomdnnf r r' a sys base = unF (hcomdn r r' a sys base); {-# inline hcomdnnf #-}
 hcomf r r' ~a ~t ~b = frc (hcom r r' a t b); {-# inline hcomf  #-}
@@ -821,6 +852,13 @@ eval = \case
   LApp t i         -> lapp (evalf t) (evalI i)
   LLam x t         -> VLLam (NICl x (ICEval ?sub ?env t))
   WkI _ t          -> wkIS (eval t)
+
+  -- Builtins
+  Refl t            -> refl (eval t)
+  Sym a x y p       -> sym (eval a) (eval x) (eval y) (eval p)
+  Trans a x y z p q -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
+  Ap f x y p        -> ap_ (eval f) (eval x) (eval y) (eval p)
+
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = frc (eval t)
@@ -1024,7 +1062,23 @@ path a t u = VPath (NICl "_" (ICConst a)) t u
 
 -- | (x : A) -> PathP _ x x
 refl :: Val -> Val
-refl t = VPLam t t $ NICl "_" $ ICConst t
+refl ~t = VPLam t t $ NICl "_" $ ICConst t
+
+-- | sym (A : U)(x y : A) -> x = y : y = x
+--     := λ i. hcom 0 1 A [i=0. p; i=1 _. x] x;
+sym :: Val -> Val -> Val -> Val -> Val
+sym a ~x ~y p = VPLam x y $ NICl "i" (ICSym a x y p)
+
+-- | comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
+--    := λ i. hcom 0 1 A [i=0 j. x; i=1 j. q j] (p i);
+trans :: Val -> Val -> Val -> Val -> Val -> Val -> Val
+trans a ~x ~y ~z p q = VPLam x z $ NICl "i" $ ICTrans a x y z p q
+
+-- | ap (A B : U)(f : A -> B)(x y : A)(p : x = y) : f x = f y
+--     := λ i. f (p i)
+ap_ :: NCofArg => DomArg => Val -> Val -> Val -> Val -> Val
+ap_ f ~x ~y p = let ~ff = frc f in
+                VPLam (ff ∙ x) (ff ∙ y) $ NICl "i" $ ICAp (unF ff) x y p
 
 -- | (A : U)(B : U) -> (A -> B) -> U
 isEquiv :: Val -> Val -> Val -> Val

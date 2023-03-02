@@ -13,17 +13,17 @@ the (A : U) (x : A) : A := x;
 Path (A : U)(x y : A) : U := x = y;
 PathP (A : I → U)(x : A 0)(y : A 1) : U := x ={i. A i} y;
 
-refl (A : U)(x : A) : x = x := λ _. x;
+refl' (A : U)(x : A) : x = x := λ _. x;
 
 reflLine (A : U) (a : A) : I → A := λ _. a;
 
-testPathEta (A : U) (a b : A) (p : a = b) : p = p
-  := refl (a = b) (λ i. p i);
+testPathEta (A : U) (a b : A) (p : a = b) : p = (λ i. p i)
+  := refl;
 
 testLineEta (A : U) (p : I → A) : p = (λ i. p i)
-  := refl (I → A) p;
+  := refl;
 
-ap (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y
+ap' (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y
    := λ i. f (p i);
 
 funext (A : U)(B : A → U)(f g : (a : A) → B a)(p : (a : A) → f a = g a) : f = g
@@ -45,12 +45,12 @@ transNegComp (A B : U) (p : A = B) (b : B) : coe 0 1 p (coe 1 0 p b) = b
   := λ i. coe i 1 p (coe 1 i p b);
 
 substTrans (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
-  := trans (P a) (P b) (λ i. P (p i)) e;
+  := trans (P a) (P b) (ap P p) e;
 
 subst (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
-  := coe 0 1 (i. P (p i)) e;
+  := coe 0 1 (ap P p) e;
 
-substRefl (A : U) (P : A → U) (a : A) (e : P a) : e = subst A P a a (λ _. a) e
+substRefl (A : U) (P : A → U) (a : A) (e : P a) : e = subst A P a a refl e
   := λ i. coe 0 i (_. P a) e;
 
 comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
@@ -60,7 +60,7 @@ sym (A : U)(x y : A) (p : x = y) : y = x
   := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
 -- TODO: coherence for coeIsEquiv! "sym U A B P" below computes to some TODO-s.
-symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={sym U A B P} a
+symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a
   := λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
                   [i=0. p; i=1 _. a] a;
 
@@ -81,8 +81,8 @@ connOr (A : U) (a b : A) (p : a = b) : p ={i. p i = b} (λ _. b)
 contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
   := λ i. (p i, connAnd A a b p i);
 
-Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a (refl A a))(x : A)(p : a = x) : C x p
-  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl A a) (x, p) (contractSing A a x p) cr;
+Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a refl)(x : A)(p : a = x) : C x p
+  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl) (x, p) (contractSing A a x p) cr;
 
 J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
@@ -133,7 +133,7 @@ setIsProp (A : U) : prop (set A)
 
 PathS (A : U) (P : A → U)(a0 a1 : A)
       (p : a0 = a1) (u0 : P a0) (u1 : P a1) : U
-  := u0 ={i. P (p i)} u1;
+  := u0 ={ap P p} u1;
 
 lemProp (A : U) (h : A → prop A) : prop A
   := λ a. h a a;
@@ -141,8 +141,8 @@ lemProp (A : U) (h : A → prop A) : prop A
 -- Compare with: https://github.com/mortberg/cubicaltt/blob/master/examples/prelude.ctt#L205
 lemPropF (A : U) (P : A → U) (pP : (x : A) → prop (P x)) (a0 a1 : A)
          (p : a0 = a1) (b0 : P a0) (b1 : P a1) :
-         b0 ={i. P (p i)} b1
-  := λ i. pP (p i) (coe 0 i (j. P (p j)) b0) (coe 1 i (j. P (p j)) b1) i;
+         b0 ={ap P p} b1
+  := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
 
 Sigma (A : U) (B : A → U) : U := (a : A) × B a;
 
@@ -223,8 +223,8 @@ idfun (A : U) (a : A) : A := a;
 
 idEquiv (A : U) : equiv A A
   := (idfun A,
-      λ a. ((a, λ _. a), λ f i. (  hcom 1 0 [i=0. f.2; i=1 _. a] a
-                                 , λ j. hcom 1 j [i=0. f.2; i=1 _. a] a)));
+      λ a. ((a, refl), λ f i. (  hcom 1 0 [i=0. f.2; i=1 _. a] a
+                               , λ j. hcom 1 j [i=0. f.2; i=1 _. a] a)));
 
 isEquivInhProp (A B : U) (f : A → B) : U := (b : B) → isInhProp (fiber A B f b);
 
@@ -563,7 +563,7 @@ x. i.2.1 b] (i.2.1 (i.2.2.1 b k))] (i.2.1 b)))))));
 --  inr b → \ (h :not (not A)) → efq A (h b)
 
 -- decConst (A : U) : dec A → exConst A = split
---   inl a → (\ (x:A)  → a, \ (x y:A) → refl A a)
+--   inl a → (\ (x:A)  → a, \ (x y:A) → refl)
 --   inr h → (\ (x:A) → x, \ (x y:A) → efq (Path A x y) (h x))
 
 -- stableConst (A : U) (sA: stable A) : exConst A =

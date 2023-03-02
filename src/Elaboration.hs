@@ -28,6 +28,11 @@ conv t u = if Conversion.conv t u
   then pure ()
   else err $ CantConvert (quote t) (quote u)
 
+convICl :: Elab (NamedIClosure -> NamedIClosure -> IO ())
+convICl t u = if Conversion.conv t u
+  then pure ()
+  else err $ CantConvert (quote t) (quote u)
+
 convExInf :: Elab (Val -> Val -> IO ())
 convExInf t u = if Conversion.conv t u
   then pure ()
@@ -147,9 +152,12 @@ data Error
   | ExpectedSg Tm
   | ExpectedGlueTy Tm
   | ExpectedPathLine Tm
+  | ExpectedPath Tm
   | ExpectedPathULineU Tm
+  | ExpectedNonDepFun Tm
   | CantInferLam
   | CantInferPair
+  | CantInfer
   | CantInferGlueTm
   | CantConvert Tm Tm
   | CantConvertCof Cof Cof
@@ -196,6 +204,9 @@ showError = \case
     "and inferred type\n\n" ++
     "  " ++ pretty t
 
+  CantInfer ->
+    "Can't infer type for expression"
+
   CantConvert t u ->
     "Can't convert\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
@@ -232,8 +243,12 @@ showError = \case
   ExpectedI ->
     "Expected an interval expression"
 
+  ExpectedPath a ->
+    "Expected a path type, inferred\n\n" ++
+    "  " ++ pretty a
+
   ExpectedPiPathLine a ->
-    "Expected a function type, inferred\n\n" ++
+    "Expected a function, line or path type, inferred\n\n" ++
     "  " ++ pretty a
 
   ExpectedSg a ->
@@ -250,6 +265,10 @@ showError = \case
 
   ExpectedPathULineU a ->
     "Expected a path type or a line type in U, inferred\n\n" ++
+    "  " ++ pretty a
+
+  ExpectedNonDepFun a ->
+    "Expected a non-dependent function type, inferred\n\n" ++
     "  " ++ pretty a
 
   CantInferLam ->
@@ -323,6 +342,24 @@ check t topA = case t of
       convEndpoints (instantiate t (F I1)) r
       pure $! PLam (quote l) (quote r) x t
 
+    (P.Refl, VPath a l r) -> do
+      constantICl a
+      convEndpoints l r
+      pure $! Refl (quote l)
+
+    (P.Sym p, VPath a y x) -> do
+      constantICl a
+      p <- check p (VPath a x y)
+      pure $! Sym (quote a) (quote x) (quote y) p
+
+    (P.Trans p q, VPath a x z) -> do
+      Infer p axy <- infer p
+      (a', x', y) <- nonDepPath axy
+      convICl a' a
+      conv x' x
+      q <- check q (VPath a y z)
+      pure $! Trans (quote a) (quote x) (quote y) (quote z) p q
+
     (P.Lam x t, VLine a) -> do
       t <- bindI x \r -> check t (a ∙ IVar r)
       pure $ LLam x t
@@ -339,7 +376,6 @@ check t topA = case t of
 
     (t, topA) -> do
       Infer t a <- infer t
-      -- debug ["MALLAC", pretty t, pretty (quote a), pretty (quote topA)]
       convExInf a topA
       pure t
 
@@ -528,6 +564,52 @@ infer = \case
     -- are exactly the same.
     sys <- elabSysHCom va r t sys
     pure $! Infer (Com r r' i a sys t) tgt
+
+  P.Refl -> err CantInfer
+
+  P.Sym p -> do
+    Infer p axy <- infer p
+    (a, x, y)   <- nonDepPath axy
+    pure $! Infer (Sym (quote a) (quote x) (quote y) p) (VPath a y x)
+
+  P.Trans p q -> do
+    Infer p axy <- infer p
+    (a, x, y)   <- nonDepPath axy
+    Infer q ayz <- infer q
+    (a', y', z) <- nonDepPath ayz
+    convICl a' a
+    conv y' y
+    pure $! Infer (Trans (quote a) (quote x) (quote y) (quote z) p q) (VPath a x z)
+
+  P.Ap f p -> do
+    Infer f ab <- infer f
+    (a, b) <- nonDepFun ab
+    Infer p axy <- infer p
+    (a', x, y) <- nonDepPath axy
+    bindI "i" \(IVar -> i) -> conv (a' ∙ i) a
+    let vf = evalf f
+    pure $ Infer (Ap f (quote x) (quote y) p) (path (b ∙ x) (vf ∙ x) (vf ∙ y))
+
+
+-- | Ensure that an IClosure is constant.
+constantICl :: Elab (NamedIClosure -> IO ())
+constantICl a = bindI "i" \(IVar -> i) -> bindI "j" \(IVar -> j) -> conv (a ∙ i) (a ∙ j)
+
+-- | Ensure that a Closure is constant.
+constantCl :: Elab (VTy -> NamedClosure -> IO ())
+constantCl a cl = bind "x" a \x -> bind "y" a \y -> conv (cl ∙ x) (cl ∙ y)
+
+-- | Ensure that a type is a non-dependent function.
+nonDepFun :: Elab (Val -> IO (Val, NamedClosure))
+nonDepFun a = case unF (frc a) of
+  VPi a b -> constantCl a b >> pure (a, b)
+  a       -> err $! ExpectedNonDepFun (quote a)
+
+-- | Ensure that a type is a non-dependent path type.
+nonDepPath :: Elab (Val -> IO (NamedIClosure, Val, Val))
+nonDepPath a = case unF (frc a) of
+  VPath a x y -> constantICl a >> pure (a, x, y)
+  a           -> err $! ExpectedPath (quote a)
 
 -- | Return binder name, type under binder, value of type under binder
 --   , source type val, target type val
@@ -738,6 +820,8 @@ inferTop = \case
         pure (a, va, t)
 
     let ~vt = eval t
+
+    -- withPrettyArgs $ putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
 
     case ?printnf of
       Just x' | x == x' -> withPrettyArgs do

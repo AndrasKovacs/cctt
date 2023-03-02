@@ -8,6 +8,9 @@ Feature:
 - HITs
 
 Convenience:
+- sprinkle more source positions in the parser.
+- improve system compatibility error messages
+  - improve system error positions
 - sugar for cof disjunction and ∀ in systems.
 
 - sugar for iterated projection:
@@ -18,17 +21,9 @@ Convenience:
     x.4  ~ x.2.2.2.1
     but what about the rightmost field? Should we just use a dummy ending field?
 
-- improve system compatibility error messages
-  - improve system error positions
-
 
 Performance:
 
-- bring back hcom' optimization
-- optimize com the same way as with hcom'
 - unbox VSys types
 - coe Glue: unfold the hcom fiber
-- add explicit Path applications
-  Purpose: the normalization in PApp elaboration for the endpoints could
-  blow up. Explicit endpoints can be used to avoid that.
 - switch to ByteString megaparsec input

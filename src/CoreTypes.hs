@@ -55,7 +55,14 @@ data Tm
   | Com I I Name Tm SysHCom Tm
 
   | WkI Name Tm
+
+  -- builtins
+  | Refl ~Tm
+  | Sym ~Tm ~Tm ~Tm Tm
+  | Trans ~Tm ~Tm ~Tm ~Tm Tm Tm
+  | Ap Tm ~Tm ~Tm Tm
   deriving Show
+
 
 -- | Atomic equation.
 data CofEq = CofEq I I
@@ -284,6 +291,10 @@ data IClosure
 
   | ICCoeLinv1 (BindI Val) Val I I
   | ICCoeRinv1 (BindI Val) Val I I
+
+  | ICSym Val ~Val ~Val Val
+  | ICTrans Val ~Val ~Val ~Val Val Val
+  | ICAp Val ~Val ~Val Val
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -409,6 +420,9 @@ instance SubAction IClosure where
     ICCoeLinv1 a x r r'     -> ICCoeLinv1 (sub a) (sub x) (sub r) (sub r')
     ICCoeRinv1 a x r r'     -> ICCoeRinv1 (sub a) (sub x) (sub r) (sub r')
 
+    ICSym a x y p           -> ICSym (sub a) (sub x) (sub y) (sub p)
+    ICTrans a x y z p q     -> ICTrans (sub a) (sub x) (sub y) (sub z) (sub p) (sub q)
+    ICAp f x y p            -> ICAp (sub f) (sub x) (sub y) (sub p)
 
 --------------------------------------------------------------------------------
 

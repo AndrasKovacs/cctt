@@ -62,8 +62,9 @@ par p s | p < ?prec = char '(' <> s <> char ')'
         | True      = s
 {-# inline par #-}
 
-projp  s = par 6 s; {-# inline projp #-}
-appp   s = par 5 s; {-# inline appp #-}
+projp  s = par 7 s; {-# inline projp #-}
+appp   s = par 6 s; {-# inline appp #-}
+transp s = par 5 s; {-# inline transp #-}
 eqp    s = par 4 s; {-# inline eqp #-}
 sigmap s = par 3 s; {-# inline sigmap #-}
 pip    s = par 2 s; {-# inline pip #-}
@@ -107,8 +108,9 @@ wkI x act =
   act
 {-# inline wkI #-}
 
-proj  x = doTm 6 x; {-# inline proj #-}
-app   x = doTm 5 x; {-# inline app #-}
+proj  x = doTm 7 x; {-# inline proj #-}
+app   x = doTm 6 x; {-# inline app #-}
+trans x = doTm 5 x; {-# inline trans #-}
 eq    x = doTm 4 x; {-# inline eq #-}
 sigma x = doTm 3 x; {-# inline sigma #-}
 pi    x = doTm 2 x; {-# inline pi #-}
@@ -178,50 +180,55 @@ sys s = "[" <> goSys s <> "]"
 
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
-  TopVar x _       -> str (?names `showVar` NKTop x)
-  LocalVar x       -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
-  Let x a t u      -> let pa = let_ a; pt = let_ t in fresh x \x ->
-                      letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
-  Pi "_" a b       -> let pa = sigma a in fresh "_" \_ ->
-                      pip (pa <> " → " <> pi b)
-  Pi n a b         -> let pa = pair a in fresh n \n ->
-                      pip (piBind n pa  <> goLinesPis b)
-  App t u          -> appp (app t <> " " <> proj u)
-  Lam x t          -> letp (fresh x \x -> "λ " <> x <> goLams t)
-  Line "_" a       -> freshI "_" \_ -> pip ("I → " <> pi a)
-  Line x a         -> freshI x   \x -> pip (lineBind x <> goLinesPis a)
-  LApp t u         -> appp (app t <> " " <> int u)
-  LLam x t         -> letp (freshI x \x -> "λ " <> x <> goLams t)
-  Sg "_" a b       -> let pa = eq a in fresh "_" \_ ->
-                      sigmap (pa <> " × " <> sigma b)
-  Sg x a b         -> let pa = pair a in fresh x \x ->
-                      sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
-  Pair t u         -> pairp (let_ t <> ", " <> pair u)
-  Proj1 t          -> projp (proj t <> ".1")
-  Proj2 t          -> projp (proj t <> ".2")
-  U                -> "U"
-  Path "_" _ t u   -> eqp (app t <> " = " <> app u)
-  Path x a t u     -> let pt = app t; pu = app u in freshI x \x ->
-                      eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
-  PApp l r t u     -> appp (app t <> " " <> int u)
-  PLam _ _ x t     -> letp (freshI x \x -> "λ " <> x <> goLams t)
-  Coe r r' i a t   -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
-                      appp ("coe " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt)
-  HCom r r' a t u  -> appp ("hcom " <> int r <> " " <> int r'
-                            -- <> " " <> proj a
-                            <> " " <> sysH t <> " " <> proj u)
-  GlueTy a s       -> appp ("Glue " <> proj a <> " " <> sys s)
-  Unglue t _       -> appp ("unglue " <> proj t)
-  Glue a s         -> appp ("glue " <> proj a <> " " <> sys s)
-  Nat              -> "Nat"
-  Zero             -> "zero"
-  Suc t            -> appp ("suc " <> proj t)
-  NatElim p s z n  -> appp ("NatElim " <> proj p <> " " <> proj s <> " " <> proj z <> " " <> proj n)
-  TODO             -> "TODO"
-  Com r r' i a t u -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
-                      "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
-                             <> pt <> " " <> pu)
-  WkI x t          -> wkI x (tm t)
+  TopVar x _        -> str (?names `showVar` NKTop x)
+  LocalVar x        -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
+  Let x a t u       -> let pa = let_ a; pt = let_ t in fresh x \x ->
+                       letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
+  Pi "_" a b        -> let pa = sigma a in fresh "_" \_ ->
+                       pip (pa <> " → " <> pi b)
+  Pi n a b          -> let pa = pair a in fresh n \n ->
+                       pip (piBind n pa  <> goLinesPis b)
+  App t u           -> appp (app t <> " " <> proj u)
+  Lam x t           -> letp (fresh x \x -> "λ " <> x <> goLams t)
+  Line "_" a        -> freshI "_" \_ -> pip ("I → " <> pi a)
+  Line x a          -> freshI x   \x -> pip (lineBind x <> goLinesPis a)
+  LApp t u          -> appp (app t <> " " <> int u)
+  LLam x t          -> letp (freshI x \x -> "λ " <> x <> goLams t)
+  Sg "_" a b        -> let pa = eq a in fresh "_" \_ ->
+                       sigmap (pa <> " × " <> sigma b)
+  Sg x a b          -> let pa = pair a in fresh x \x ->
+                       sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
+  Pair t u          -> pairp (let_ t <> ", " <> pair u)
+  Proj1 t           -> projp (proj t <> ".1")
+  Proj2 t           -> projp (proj t <> ".2")
+  U                 -> "U"
+  Path "_" _ t u    -> eqp (trans t <> " = " <> trans u)
+  Path x a t u      -> let pt = trans t; pu = trans u in freshI x \x ->
+                       eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
+  PApp l r t u      -> appp (app t <> " " <> int u)
+  PLam _ _ x t      -> letp (freshI x \x -> "λ " <> x <> goLams t)
+  Coe r r' i a t    -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
+                       appp ("coe " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt)
+  HCom r r' a t u   -> appp ("hcom " <> int r <> " " <> int r'
+                             -- <> " " <> proj a
+                             <> " " <> sysH t <> " " <> proj u)
+  GlueTy a s        -> appp ("Glue " <> proj a <> " " <> sys s)
+  Unglue t _        -> appp ("unglue " <> proj t)
+  Glue a s          -> appp ("glue " <> proj a <> " " <> sys s)
+  Nat               -> "Nat"
+  Zero              -> "zero"
+  Suc t             -> appp ("suc " <> proj t)
+  NatElim p s z n   -> appp ("NatElim " <> proj p <> " " <> proj s <> " " <> proj z <> " " <> proj n)
+  TODO              -> "TODO"
+  Com r r' i a t u  -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
+                       "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
+                              <> pt <> " " <> pu)
+  WkI x t           -> wkI x (tm t)
+
+  Refl _            -> "refl"
+  Sym _ _ _ p       -> projp (proj p <> "⁻¹")
+  Trans _ _ _ _ p q -> transp (app p <> " ∙ " <> trans q)
+  Ap f _ _ p        -> appp ("ap " <> proj f <> " " <> proj p)
 
 top :: Names => LvlArg => Top -> Txt
 top = \case

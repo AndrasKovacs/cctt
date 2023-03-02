@@ -39,6 +39,11 @@ data Tm
   | Zero
   | Suc Tm
   | NatElim Tm Tm Tm Tm         -- (P : Nat -> U) -> P z -> ((n:_) -> P n -> P (suc n)) -> (n:_) -> P n
+
+  | Refl          -- checkable refl
+  | Sym Tm
+  | Trans Tm Tm
+  | Ap Tm Tm
   deriving Show
 
 data CofEq = CofEq Tm Tm
