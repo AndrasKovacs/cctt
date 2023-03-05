@@ -1,11 +1,14 @@
 
-myRefl (A : U) (a : A) : a = a := refl;
+test : U × U × U := U , U , U;
 
-sym (A : U) (x y : A)(p : x = y) : y = x := p ⁻¹;
 
-trans (A : U)(x y z : A)(p : x = y) (q : y = z) : x = z := p ∙ q;
+-- myRefl (A : U) (a : A) : a = a := refl;
 
-myAp (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y := ap f p;
+-- sym (A : U) (x y : A)(p : x = y) : y = x := p ⁻¹;
+
+-- trans (A : U)(x y z : A)(p : x = y) (q : y = z) : x = z := p ∙ q;
+
+-- myAp (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y := ap f p;
 
 -- badSym (A B : U)(P : A = B)(x : A)(y : B)(p : x ={P} y) : y ={P⁻¹} x := p⁻¹;
 

@@ -289,7 +289,7 @@ tm :: Parser Tm
 tm = withPos do
   t <- lamlet
   branch (char ',')
-    (\_ -> Pair t <$!> lamlet)
+    (\_ -> Pair t <$!> tm)
     (pure t)
 
 top :: Parser Top

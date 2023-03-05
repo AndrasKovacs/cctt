@@ -116,8 +116,29 @@ Glue
                   Γ ⊢ Glue [α ↦ eqv] B : U
                  Γ, α ⊢ Glue [α ↦ eqv] B ≡ A
 
+isEquiv : (A → B) → U
+isEquiv A B f :=
+    (g      : B → A)
+  × (linv   : (x : A) → Path A x (g (f x)))
+  × (rinv   : (x : B) → Path B (f (g x)) x)
+  × (coh    : (x : A) →
+            PathP i (Path B (f (linv x {x}{g (f x)} i)) (f x))
+                    (refl B (f x))
+                    (rinv (f x)))
 
-   Γ ⊢
+coeIsEquiv : (A : I → U) → (r r' : I) → isEquiv (coeⁱ r r' A : A r → A r')
+coeIsEquiv A r r' =
+  _⁻¹  := λ x. coe r' r A x
+  linv := λ x. λ j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+  rinv := λ x. λ j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x
+  coh  := TODO
+
+-- coh :
+
+--             PathP i (Path B (f (linv x {x}{g (f x)} i)) (f x))
+--                     (λ _. coe r r' A
+--                     (rinv (f x)))
+
 
 
 --------------------------------------------------------------------------------
