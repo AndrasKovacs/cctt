@@ -474,9 +474,8 @@ lemIsoWithLines (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 =
 
   let sq0 (i j : I) : A := hcom 0 j [i=0. gf x0; i=1 x. g b] (g (p0 i));
   let sq1 (i j : I) : A := hcom 0 j [i=0. gf x1; i=1 x. g b] (g (p1 i));
+  let sq2 (i j : I) : A := hcom 1 j [i=0 k. sq0 k 1;i=1 k. sq1 k 1] (g b);
 
-  let sq2 (i j : I) : A := hcom 1 j [i=0 k. sq0 k 1
-                                    ;i=1 k. sq1 k 1] (g b);
   λ i. ( sq2 i 0
        , λ j. hcom 0 1 [i=0. fg (p0 j)
                        ;i=1. fg (p1 j)

@@ -7,7 +7,7 @@ trans (A : U)(x y z : A)(p : x = y) (q : y = z) : x = z := p ∙ q;
 
 myAp (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y := ap f p;
 
-badSym (A B : U)(P : A = B)(x : A)(y : B)(p : x ={P} y) : y ={P⁻¹} x := p⁻¹;
+-- badSym (A B : U)(P : A = B)(x : A)(y : B)(p : x ={P} y) : y ={P⁻¹} x := p⁻¹;
 
 
 

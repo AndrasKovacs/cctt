@@ -104,7 +104,7 @@ projEx (A : U)(f : A → A → A)(x : A × A × A) : A := f x.1 x.2.1;
 
 -- Abstraction and application for paths is written the same as for functions
 -- and lines.
-refl (A : U)(x : A) : x = x := λ _. x;
+refl' (A : U)(x : A) : x = x := λ _. x;
 
 -- coe/hcom follow ABCFHL: https://www.cs.cmu.edu/~cangiuli/papers/abcfhl.pdf
 
@@ -156,10 +156,32 @@ cofEq : (A : U) (x : A)(i : I) →
 
 -- But it does not sort components by cofibrations (possible future feature)
 
--- noCofSort (A : U)(x : A)(i : I) :
+-- noCofSorting (A : U)(x : A)(i : I) :
 --   hcom 0 1 [i=0 _. x; i=1 _. x] x = hcom 0 1 [i=1 _. x; i=0 _. x] x :=
---   λ _.   hcom 0 1 [i=1 _. x; i=0 _. x] x;
+--     λ _.   hcom 0 1 [i=1 _. x; i=0 _. x] x;
 
+-- Builtins
+--------------------------------------------------------------------------------
+
+-- There are several built-in functions which take advantage of bidirectional
+-- elaboration to let us omit some parameters.
+
+-- Only the explicit arguments can be given for the following:
+--   refl : {A : U}{a : A} → a = a                             (checkable only)
+--   _⁻¹  : {A : U}{x y : A} → x = y → y = x                   (checkable and inferable)
+--  _∙_   : {A : U}{x y z : A} → x = y → y = z → x = z         (checkable and inferable)
+--  ap    : {A B : U}(f : A → B){x y : A} → x = y → f x = f y  (checkable and inferable)
+
+-- _⁻¹ has projection-like binding strength (binds stronger than function application)
+-- _∙_ binds stronger than _=_
+
+-- Examples:
+
+myRefl (A : U)(x : A) : x = x := refl;
+selfInv (A : U)(x y : A)(p : x = y) : x = x :=  p ∙ p⁻¹;
+invPrecedence (A : U)(x y : A)(p : y = x)(f : x = y → U) : U := f p⁻¹;
 
 -- Glue types
 --------------------------------------------------------------------------------
+
+-- TODO
