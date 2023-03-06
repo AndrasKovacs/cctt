@@ -71,7 +71,8 @@ isEquiv (coeⁱ r r' A : Ar → Ar')
   coh : ∀ a → PathPⁱ (f (linv a i) = f a)
                      (refl (f a)) (rinv (f a)))
 
-  coh = TODO
+  coh = TODO -- use transport to go from "hasCoh idIso" to "hasCoh (coeIso r r')"
+
 
 -- we get degenerate coe by coe isEquivId
 isEquiv (coeⁱ r r' A : Ar → Ar')
@@ -117,35 +118,34 @@ coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
      , r=r' ↦ (fr'.linv gr i, fr'.coh gr i)
      ] fib*
 
-  -- Evan: fully unfolding:
-  --   hcomⁱ fib = (hcomⁱ T, comⁱ PathA)
-                 = (hcomⁱ T, λj.comⁱ A [j=0↦_, j=1↦_])   (A doesn't depend on i)
-                 = (hcomⁱ T, λj.hcomⁱ A [j=0↦_, j=1↦_])
-
   Res = glue [αr' ↦ topt]
              (hcompⁱ 1 0 Ar' [αr' ↦ fr'topt≡ar' i, r=r' ↦ unglue gr] ar')
 
-   -- scratch
-   ------------------------------------------------------------
-      (fr'.linv (coeⁱ r r' T gr) 1, fr'.coh (coeⁱ r r' T gr) 1)
 
-      (fr'.linv gr 1  , fr'.coh gr 1)
-    = (fr'⁻¹ (fr' gr) , fr'.rinv ar')
+-- Unfolding hcom over fiber
+----------------------------------------------------------------------
 
-      fr'.linv gr  : gr = fr'⁻¹ (fr' gr)
-      fr'.coh gr i : fr' (fr'.linv gr i) = ar'
+hcom r r' ((x : A) * f x = y) [α i. t i] b =
+  ( hcom r r' A [α i. (t i).1] b.1
+  , λ j. hcom r r' B [j=0 i. f (hcom r i A [α k. (t k).1] b.1)
+                     ;j=1 i. y
+		     ;α i. (t i).2 j]
+		     (b.2 j))
 
-      fr'.coh gr :
-                PathPⁱ (fr' (fr'.linv gr i) = fr' gr)
-                       (refl (fr' gr)) (fr'.rinv (fr' gr)))
 
-                PathPⁱ (fr' (fr'.linv gr i) = ar')
-                       (refl ar') (fr'.rinv ar')))
+-- hcom for Glue
+--------------------------------------------------------------------------------
 
-      fr'.coh gr i :
-        (fr' (fr'.linv gr i) = ar')
-  ------------------------------------------------------------
+hcom r r' (Glue [α. (T, f)] A) [β i. t i] gr
 
+  goal : (Glue [α. (T, f)] A) [β ↦ t r']
+
+  gr        : Glue [α. (T, f)] A
+  unglue gr : A [ α ↦ f gr ]
+
+  :=
+  glue (hcom r r' A [β i. unglue (t i); α i. f (hcom r i T [β. t] gr)] (unglue gr))
+       [α. hcom r r' T [β. t] gr]
 
 
 -- With contr fibers

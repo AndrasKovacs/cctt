@@ -58,16 +58,10 @@ Composition (derived)
 --------------------------------------------------------------------------------
 
 Γ, i ⊢ coeFillⁱ r A t : A [i=r ↦ t, i=r' ↦ coeⁱ r r' A t ]
-       coeFillⁱ r A t := coeʲ r i (A j) t  -- fresh j
+       coeFillⁱ r A t := coe r i A t
 
-Γ, i ⊢ coeFill⁻¹ⁱ r' A t : A [i=r ↦ coeⁱ r' r A t, i=r' ↦ t]
-       coeFill⁻¹ⁱ r' A t := coeʲ r' i (A j) t -- fresh j
-
-Γ, i ⊢ hfillⁱ r A [α ↦ t] b : A[i=r ↦ b, i=r' ↦ hcomⁱ r r' A [α ↦ t] b]
-       hfillⁱ r A [α ↦ t] b := hcomʲ r i A [α ↦ t j] b
-
-Γ, i ⊢ hfill⁻¹ⁱ r' A [α ↦ t] b : A[i=r ↦ hcomⁱ r' r A [α ↦ t] b, i=r' ↦ b]
-       hfill⁻¹ⁱ r' A [α ↦ t] b := hcomʲ r' i A [α ↦ t j] b
+Γ, i ⊢ coeFill⁻¹ⁱ r A t : A [i=r ↦ coe r r' A t, i=r' ↦ t]
+       coeFill⁻¹ⁱ r A t := coe i r' A t
 
 
 -- Equivalences
