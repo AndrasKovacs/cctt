@@ -118,8 +118,8 @@ coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
      , r=r' ↦ (fr'.linv gr i, fr'.coh gr i)
      ] fib*
 
-  Res = glue [αr' ↦ topt]
-             (hcompⁱ 1 0 Ar' [αr' ↦ fr'topt≡ar' i, r=r' ↦ unglue gr] ar')
+  Res = glue (hcompⁱ 1 0 Ar' [αr' ↦ fr'topt≡ar' i, r=r' ↦ unglue gr] ar')
+             [αr' ↦ topt]
 
 
 -- Unfolding hcom over fiber

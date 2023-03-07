@@ -291,6 +291,15 @@ mapNeSys f sys = F (go (unF sys)) where
     NSCons t sys -> NSCons (mapBindCofLazynf t f) (go sys)
 {-# inline mapNeSys #-}
 
+mapNeSysnf :: NCofArg => (NCofArg => Val -> F Val) -> F NeSys -> NeSys
+mapNeSysnf f sys = unF (mapNeSys f sys); {-# inline mapNeSysnf #-}
+
+mapNeSys' :: NCofArg => (NCofArg => Val -> F Val)
+             -> F (NeSys, IS.IVarSet)
+             -> F (NeSys, IS.IVarSet)
+mapNeSys' f (F (!sys, !is)) = F ((,) $$! mapNeSysnf f (F sys) $$! is)
+{-# inline mapNeSys' #-}
+
 mapNeSysHCom :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F NeSysHCom -> F NeSysHCom
 mapNeSysHCom f sys = F (go (unF sys)) where
   go :: NeSysHCom -> NeSysHCom
@@ -305,7 +314,7 @@ mapNeSysHComnf f sys = unF (mapNeSysHCom f sys); {-# inline mapNeSysHComnf #-}
 mapNeSysHCom' :: NCofArg => (NCofArg => F I -> Val -> F Val)
               -> F (NeSysHCom, IS.IVarSet)
               -> F (NeSysHCom, IS.IVarSet)
-mapNeSysHCom' f (F (sys, is)) = F (mapNeSysHComnf f (F sys), is)
+mapNeSysHCom' f (F (!sys, !is)) = F ((,) $$! mapNeSysHComnf f (F sys) $$! is)
 {-# inline mapNeSysHCom' #-}
 
 mapVSysHCom :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F VSysHCom -> F VSysHCom
@@ -313,6 +322,48 @@ mapVSysHCom f sys = case unF sys of
   VSHTotal v   -> F (VSHTotal (mapBindILazynf v f))
   VSHNe sys is -> F (VSHNe (mapNeSysHComnf f (F sys)) is)
 {-# inline mapVSysHCom #-}
+
+mapNeSysToH :: NCofArg => (NCofArg => F I -> Val -> F Val) -> F NeSys -> F NeSysHCom
+mapNeSysToH f sys = case unF sys of
+  NSEmpty      -> F NSHEmpty
+  NSCons t sys -> F (NSHCons (bindCof (unBindCofLazy t) (bindILazynf "i" \i -> f i (t^.body)))
+                             (unF (mapNeSysToH f (F sys))))
+{-# inline mapNeSysToH #-}
+
+mapNeSysToH' :: NCofArg => (NCofArg => F I -> Val -> F Val)
+             -> F (NeSys, IS.IVarSet) -> F (NeSysHCom, IS.IVarSet)
+mapNeSysToH' f (F (!sys, !is)) = F ((,) $$! unF (mapNeSysToH f (F sys)) $$! is)
+{-# inline mapNeSysToH' #-}
+
+mapNeSysFromH :: NCofArg => (NCofArg => BindILazy Val -> F Val) -> F NeSysHCom -> F NeSys
+mapNeSysFromH f sys = case unF sys of
+  NSHEmpty      -> F NSEmpty
+  NSHCons t sys -> F (NSCons (bindCofLazynf (unBindCof t) (f (t^.body)))
+                             (unF (mapNeSysFromH f (F sys))))
+{-# inline mapNeSysFromH #-}
+
+
+-- System concatenation
+----------------------------------------------------------------------------------------------------
+
+catNeSysHCom' :: F (NeSysHCom, IS.IVarSet) -> F (NeSysHCom, IS.IVarSet) -> F (NeSysHCom, IS.IVarSet)
+catNeSysHCom' (F (!sys, !is)) (F (!sys', !is')) =
+  F $ ((,) $$! catNeSysHCom sys sys' $$! (is <> is'))
+{-# inline catNeSysHCom' #-}
+
+catNeSysHCom :: NeSysHCom -> NeSysHCom -> NeSysHCom
+catNeSysHCom sys sys' = case sys of
+  NSHEmpty      -> sys'
+  NSHCons t sys -> NSHCons t (catNeSysHCom sys sys')
+
+-- -- | Concatenate VSysHCom-s.
+-- catSysHCom :: F VSysHCom -> F VSysHCom -> F VSysHCom
+-- catSysHCom sys ~sys' = case unF sys of
+--   VSHTotal v   -> F (VSHTotal v)
+--   VSHNe sys is -> case unF sys' of
+--     VSHTotal v     -> F (VSHTotal v)
+--     VSHNe sys' is' -> F (VSHNe (catNeSysHCom sys sys') (is <> is'))
+-- {-# inline catSysHCom #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Overloaded application and forcing
@@ -741,27 +792,61 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     F $ VNe (NHCom (unF r) (unF r') a nts (unF base))
             (IS.insertFI r $ IS.insertFI r' $ is <> is')
 
--- hcom r r' U [α i. ↦ t] b = Glue [α ↦ (t r', (coeⁱ r' r (t i), coeIsEquiv)), r=r' ↦ (b, idEqv)] b
+  -- hcom r r' U [α i. ↦ t] b =
+  --   Glue [r=r' ↦ (b, idEqv), α ↦ (t r', (coeⁱ r' r (t i), coeIsEquiv))] b
   VU -> let
-    is' = IS.insertI (unF r) $ IS.insertI (unF r') is
-
-    mkSys :: NCofArg => F I -> F I -> NeSysHCom -> NeSys
-    mkSys r r' sys = seq ?cof $ case sys of
-      NSHEmpty -> NSEmpty
-      NSHCons t sys ->
-        NSCons (bindCofLazynf (unBindCof t) $
-                  F $ VPair (t^.body ∙ unF r')
-                    $ theCoeEquiv (bindI (t^.body.name) \i -> t^.body ∙ unF i)
-                                  (unF r') (unF r))
-               (mkSys r r' sys)
 
     -- NOTE the nsconsNonTrue; ceq r r' can be false or neutral
-    sys = nsconsNonTrue (ceq r r') (F (theIdEquiv (unF base))) (F (mkSys r r' nts))
-    in F $ VGlueTy (unF base) (unF sys) is'
+    sys = nsconsNonTrue (ceq r r') (F (theIdEquiv (unF base))) $
+          mapNeSysFromH
+            (\t -> F $ VPair (t ∙ unF r')
+                     $ theCoeEquiv (bindI (t^.name) \i -> t ∙ unF i)
+                                   (unF r') (unF r))
+            (F nts)
 
+    in F $ VGlueTy (unF base) (unF sys)
+                   (IS.insertI (unF r) $ IS.insertI (unF r') is)
 
-  VGlueTy a sys is' ->
-    F VTODO
+-- hcom for Glue
+--------------------------------------------------------------------------------
+
+  -- hcom r r' (Glue [α. (T, f)] A) [β i. t i] gr =
+  --   glue (hcom r r' A [β i. unglue (t i); α i. f (hcom r i T [β. t] gr)] (unglue gr))
+  --        [α. hcom r r' T [β i. t i] gr]
+
+  VGlueTy a alphasys alphais ->
+    let gr        = base
+        alphasys' = F (alphasys, alphais)
+        betasys   = nts
+        betais    = is
+        betasys'  = F (betasys, betais)
+
+        -- [α. hcom r r' T [β i. t i] gr]
+        fib = mapNeSys
+                (\t -> hcomdn r r' (proj1f (frc t)) betasys' gr)
+                (F alphasys)
+
+        -- hcom r r' A [  β i. unglue (t i)
+        --              ; α i. f (hcom r i T [β. t] gr)]
+        --             (unglue gr)
+        base =
+          hcomdn r r' (frc a)
+            (catNeSysHCom'
+               (mapNeSysHCom'
+                  (\_ t -> ungluenf t alphasys')
+                  betasys')
+               (mapNeSysToH'
+                  (\i (frc -> tf) ->
+                      let ty  = proj1f tf              -- T
+                          f   = proj1f (proj2f tf) in  -- f
+                      f ∘ hcomnnf r i ty betasys' gr
+                    )
+                  alphasys')
+              )
+            (ungluenf (unF gr) alphasys')
+
+    in F $ VNe (NGlue (unF base) (unF fib))
+               (IS.insertI (unF r) $ IS.insertI (unF r') (alphais <> betais))
 
   VLine a ->
     F $ VLLam
@@ -798,28 +883,33 @@ hcomdnnf r r' a sys base = unF (hcomdn r r' a sys base); {-# inline hcomdnnf #-}
 hcomf r r' ~a ~t ~b = frc (hcom r r' a t b); {-# inline hcomf  #-}
 
 glueTy :: NCofArg => DomArg => Val -> F VSys -> Val
-glueTy a sys = case unF sys of
+glueTy ~a sys = case unF sys of
   VSTotal b   -> proj1 (frc b)
   VSNe sys is -> VGlueTy a sys is
 {-# inline glueTy #-}
 
-glueTyf a sys = frc (glueTy a sys); {-# inline glueTyf #-}
+glueTyf ~a sys = frc (glueTy a sys); {-# inline glueTyf #-}
 
 glue :: Val -> F VSys -> Val
-glue t sys = case unF sys of
+glue ~t sys = case unF sys of
   VSTotal v   -> v
   VSNe sys is -> VNe (NGlue t sys) is
 {-# inline glue #-}
 
-gluef t sys = frc (glue t sys); {-# inline gluef #-}
+gluef ~t sys = frc (glue t sys); {-# inline gluef #-}
 
 unglue :: NCofArg => DomArg => Val -> F VSys -> Val
-unglue t sys = case unF sys of
+unglue ~t sys = case unF sys of
   VSTotal teqv -> proj1f (proj2f (frc teqv)) ∙ t
   VSNe sys is  -> VNe (NUnglue t sys) is
 {-# inline unglue #-}
 
-ungluef t sys = frc (unglue t sys); {-# inline ungluef #-}
+ungluen :: NCofArg => DomArg => Val -> F (NeSys, IS.IVarSet) -> Val
+ungluen ~t (F (!sys, !is)) = VNe (NUnglue t sys) is
+{-# inline ungluen #-}
+
+ungluef  ~t sys = frc (unglue t sys); {-# inline ungluef #-}
+ungluenf ~t sys = F (ungluen t sys); {-# inline ungluenf #-}
 
 eval :: SubArg => NCofArg => DomArg => EnvArg => Tm -> Val
 eval = \case

@@ -1,3 +1,6 @@
+Code:
+  - wrap (NeSys(HCom), IS.IVarSet) in some type
+
 
 Testing:
   - hcom and coe comp rules
