@@ -1,16 +1,26 @@
+
+QUESTION:
+  - Generic API for computing under a BindI, without renaming to fresh var!!!
+  - like projecting, applying, or matching on stuff
+  - "unsafe" mapping functions over binders: these don't rename the bound var, but we have
+    to ensure that the mapping function *only* depends on its input! If we refer to e.g.
+    values from external scope, that's unsound.
+
+
 Code:
   - wrap (NeSys(HCom), IS.IVarSet) in some type
 
-
 Testing:
-  - hcom and coe comp rules
+  - hcom glue
+  - coe glue
 
 Feature:
-- all Kan computation rules
-- strict inductives
-- HITs
+- 1. all Kan computation rules
+- 2. strict inductives
+- 3. HITs
 
 Convenience:
+- print elab cof environment on errors
 - sprinkle more source positions in the parser.
 - improve system compatibility error messages
   - improve system error positions

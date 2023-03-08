@@ -153,21 +153,25 @@ data NeSys
   | NSCons (BindCofLazy Val) NeSys
   deriving Show
 
+type NeSys' = (NeSys, IS.IVarSet)
+
 data NeSysHCom
   = NSHEmpty
   | NSHCons (BindCof (BindILazy Val)) NeSysHCom
   deriving Show
 
+type NeSysHCom' = (NeSysHCom, IS.IVarSet)
+
 -- TODO: unbox
 data VSys
   = VSTotal ~Val
-  | VSNe NeSys IS.IVarSet
+  | VSNe NeSys'
   deriving Show
 
 -- TODO: unbox
 data VSysHCom
   = VSHTotal (BindILazy Val)
-  | VSHNe NeSysHCom IS.IVarSet
+  | VSHNe NeSysHCom'
   deriving Show
 
 type VTy = Val
@@ -179,7 +183,7 @@ data Val
   -- also neutral, but they're handled separately, because we have to match on
   -- them in coe/hcom.
   | VNe Ne IS.IVarSet
-  | VGlueTy VTy NeSys IS.IVarSet
+  | VGlueTy VTy NeSys'
 
   -- canonicals
   | VPi VTy NamedClosure
