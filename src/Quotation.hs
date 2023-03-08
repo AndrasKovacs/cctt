@@ -34,7 +34,7 @@ instance Quote Val Tm where
   quote t = case unF (frc t) of
     VSub{}           -> impossible
     VNe n _          -> quote n
-    VGlueTy a sys _  -> GlueTy (quote a) (quote sys)
+    VGlueTy a sys    -> GlueTy (quote a) (quote (fst sys))
     VPi a b          -> Pi (b^.name) (quote a) (quote b)
     VLam t           -> Lam (t^.name) (quote t)
     VPath a lhs rhs  -> Path (a^.name) (quote a) (quote lhs) (quote rhs)

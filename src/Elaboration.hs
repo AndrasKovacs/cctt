@@ -369,9 +369,9 @@ check t topA = case t of
       u <- check u (b ∙ eval t)
       pure $! Pair t u
 
-    (P.GlueTm base ts, VGlueTy a equivs _) -> do
+    (P.GlueTm base ts, VGlueTy a equivs) -> do
       base <- check base a
-      ts   <- elabGlueTmSys base ts a equivs
+      ts   <- elabGlueTmSys base ts a (fst equivs)
       pure $ Glue base ts
 
     (t, topA) -> do
@@ -516,8 +516,8 @@ infer = \case
   P.Unglue t -> do
     Infer t a <- infer t
     case unF (frc a) of
-      VGlueTy a sys _ -> pure $! Infer (Unglue t (quote sys)) a
-      a               -> err $! ExpectedGlueTy (quote a)
+      VGlueTy a sys -> pure $! Infer (Unglue t (quote (fst sys))) a
+      a             -> err $! ExpectedGlueTy (quote a)
 
   P.Nat ->
     pure $! Infer Nat VU

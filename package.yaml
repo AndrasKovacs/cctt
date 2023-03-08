@@ -59,6 +59,7 @@ default-extensions:
   - LambdaCase
   - MagicHash
   - MultiParamTypeClasses
+  - OverloadedStrings
   - PackageImports
   - PatternSynonyms
   - PolyKinds
@@ -72,18 +73,29 @@ default-extensions:
   - TypeApplications
   - TypeFamilies
   - TypeFamilyDependencies
-  - OverloadedStrings
   - UndecidableInstances
   - UnicodeSyntax
   - ViewPatterns
 
 ghc-options:
+- -O
+- -fdicts-strict
+- -fmax-worker-args=15
+- -fspecialise-aggressively
+- -fexpose-all-unfoldings
+- -fplugin StrictImplParams
+- -fworker-wrapper-cbv
+- -rtsopts
+- -threaded
+- -with-rtsopts= "-A64M -N4"
 - -Wall
 - -Wno-name-shadowing
 - -Wno-missing-signatures
 - -Wno-unused-do-bind
 - -Wno-unused-matches
-- -fmax-worker-args=20
+- -Wno-missing-pattern-synonym-signatures
+- -fmax-relevant-binds=3
+- -fmax-valid-hole-fits=0
 
 dependencies:
 - base >= 4.7 && < 5
@@ -99,25 +111,6 @@ source-dirs: src
 executables:
   cctt:
     main: Main.hs
-    ghc-options:
-    - -O
-    - -fdicts-strict
-    - -fmax-worker-args=15
-    - -fspecialise-aggressively
-    - -fexpose-all-unfoldings
-    - -fplugin StrictImplParams
-    - -fworker-wrapper-cbv
-    - -rtsopts
-    - -threaded
-    - -with-rtsopts= "-A64M -N4"
-    - -Wall
-    - -Wno-name-shadowing
-    - -Wno-missing-signatures
-    - -Wno-unused-do-bind
-    - -Wno-unused-matches
-    - -Wno-missing-pattern-synonym-signatures
-    - -fmax-relevant-binds=3
-    - -fmax-valid-hole-fits=0
     when:
     - condition: false
       other-modules: Paths_cubeval

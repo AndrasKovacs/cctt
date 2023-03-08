@@ -548,6 +548,23 @@ capp (NCl _ t) ~u = case t of
   --   rinv := λ x^0. λ j^1. hcom r' r (A r') [j=0 k. coeⁱ k r' A (coeⁱ r' k A x); j=1 k. x] x
   --   coh  := TODO
 
+  -- isEquiv : (A B : U) → (A → B) → U
+  -- isEquiv A B f :=
+  --     (g    : B → A)
+  --   × (linv : (x : A) → Path A x (g (f x)))
+  --   × (rinv : (x : B) → Path B (f (g x)) x)
+  --   × (coh  : (x : A) →
+  --             PathP i (Path B (f (linv x i)) (f x))
+  --                     (refl B (f x))
+  --                     (rinv (f x)))
+
+  -- isEquivCoe : (A : I → U)(r r' : I) → isEquiv (λ x. coe r r' A x)
+  -- isEquivCoe A r r' =
+  --   g    := λ x. coe r' r A x
+  --   linv := λ x j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+  --   rinv := λ x j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x
+  --   coh  := TODO
+
   CCoeAlong (frc -> a) (frc -> r) (frc -> r') ->
     let ~x = u in coenf r r' a (frc x)
 
@@ -565,7 +582,7 @@ capp (NCl _ t) ~u = case t of
         ~rhs = unF x
     in VPLam lhs rhs $ NICl "j" $ ICCoeRinv1 (unF a) (unF x) (unF r) (unF r')
 
--- | Apply a Path closure.
+-- | Apply an ivar closure.
 icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
 icapp (NICl _ t) arg = case t of
   ICEval s env t ->
