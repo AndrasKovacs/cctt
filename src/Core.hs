@@ -163,7 +163,7 @@ vsempty = F (VSNe (NSEmpty, mempty))
 
 vscons :: NCofArg => F VCof -> (NCofArg => F Val) -> F VSys -> F VSys
 vscons cof v ~sys = case unF cof of
-  VCTrue      -> F (VSTotal (unF v))
+  VCTrue      -> F (VSTotal v)
   VCFalse     -> sys
   VCNe cof is -> case unF sys of
     VSTotal v'      -> F $ VSTotal v'
@@ -179,12 +179,11 @@ nsconsNonTrue cof v ~sys = case unF cof of
 {-# inline nsconsNonTrue #-}
 
 -- | Extend a *neutral* system with a *non-true* cof.
-nshconsNonTrue' :: NCofArg => F VCof -> (NCofArg => F I -> F Val) -> F NeSysHCom' -> F NeSysHCom'
-nshconsNonTrue' cof v ~sys = case unF cof of
-  _ -> uf
-  -- VCTrue     -> impossible
-  -- VCFalse    -> sys
-  -- VCNe cof _ -> uf -- F $ NSCons (bindCofLazynf cof v) (unF sys)
+nshconsNonTrue' :: NCofArg => F VCof -> Name -> (NCofArg => F I -> F Val) -> F NeSysHCom' -> F NeSysHCom'
+nshconsNonTrue' cof i v (F (sys, is)) = case unF cof of
+  VCTrue       -> impossible
+  VCFalse      -> F (sys, is)
+  VCNe cof is' -> F (NSHCons (bindCof cof (bindILazynf i v)) sys // (is <> is'))
 {-# inline nshconsNonTrue' #-}
 
 evalSys :: SubArg => NCofArg => DomArg => EnvArg => Sys -> F VSys
@@ -294,11 +293,28 @@ mapBindCofLazynf :: NCofArg => BindCofLazy a -> (NCofArg => a -> F a) -> BindCof
 mapBindCofLazynf t f = unF (mapBindCofLazy t f)
 {-# inline mapBindCofLazynf #-}
 
-mapBindILazy :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> F (BindILazy Val)
+mapBindILazy :: NCofArg => SubAction a => BindILazy a -> (NCofArg => F I -> a -> F a) -> F (BindILazy a)
 mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ unF i)
 {-# inline mapBindILazy #-}
 
-mapBindILazynf :: NCofArg => BindILazy Val -> (NCofArg => F I -> Val -> F Val) -> BindILazy Val
+-- | Map over a binder in a way which *doesn't* rename the bound variable to a
+--   fresh one.  In this case, the mapping function cannot refer to values in
+--   external scope, it can only depend on the value under the binder. This can
+--   be useful when we only do projections under a binder. The case switch in
+--   `coed` on the type argument is similar.
+unsafeMapBindI :: NCofArg => BindI a -> (NCofArg => a -> F a) -> F (BindI a)
+unsafeMapBindI (BindI x i a) f =
+  let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
+  seq ?cof (F (BindI x i (unF (f a))))
+{-# inline unsafeMapBindI #-}
+
+unsafeMapBindILazy :: NCofArg => BindILazy a -> (NCofArg => a -> F a) -> F (BindILazy a)
+unsafeMapBindILazy (BindILazy x i a) f =
+  let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
+  seq ?cof (F (BindILazy x i (unF (f a))))
+{-# inline unsafeMapBindILazy #-}
+
+mapBindILazynf :: NCofArg => SubAction a => BindILazy a -> (NCofArg => F I -> a -> F a) -> BindILazy a
 mapBindILazynf t f = unF (mapBindILazy t f); {-# inline mapBindILazynf #-}
 
 mapNeSys :: NCofArg => (NCofArg => Val -> F Val) -> F NeSys -> F NeSys
@@ -667,6 +683,10 @@ proj1 t = case unF t of
 
 proj1f t = frc (proj1 t); {-# inline proj1f  #-}
 
+proj1BindI :: NCofArg => DomArg => BindI Val -> F (BindI Val)
+proj1BindI t = unsafeMapBindI t (\t -> proj1f (frc t))
+{-# inline proj1BindI #-}
+
 proj2 :: F Val -> Val
 proj2 t = case unF t of
   VPair _ u -> u
@@ -758,7 +778,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   ar' : Ar'
   ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (T i) gr)] (unglue gr sysr)
 
-  under (α r'), mapping over the input system, producing eventually two output systems
+  under (α r'), mapping over [(α r'). (T r', f r')] system, producing two output systems
 
     Tr' = T r'
 
@@ -802,76 +822,88 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
   VGlueTy (rebind topA -> a) (rebind topA -> topSys, rebind topA -> is) -> let
 
-    i = a^.binds
-
-    gr = t
-
-    _Ar' = a ∘ unF r'
-
-    topSysr  = topSys ∘ unF r
-
-    topSysr' :: F VSys
-    topSysr' = topSys ∘ unF r'
+    gr       = t
+    ~_Ar'    = a ∘ unF r'
+    ~topSysr = topSys ∘ unF r
 
   -- ar' : Ar'
   -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
-    ar' = comdn r r' (frc a)
+    ~ar' = comdn r r' (frc a)
              (mapForallNeSys'
                 (\i tf -> let tfi = tf ∘ unF i; f = proj1f (proj2f tfi)
                           in f ∘ coenf r i (bindIf "i" \i -> proj1f (tf ∘ unF i)) gr)
                 topSys)
              (ungluef (unF gr) topSysr)
 
-    mkSys :: NeSys -> (NeSys, NeSysHCom)
-    mkSys = \case
-      NSEmpty ->
-        (NSEmpty // NSHEmpty)
-      NSCons tfr' sys -> let alphar' = tfr'^.binds in case mkSys sys of
-        (fibvals, fibpaths) -> assumeCof alphar' $ let
-          ~equiv1  = frc (tfr'^.body)
-          ~equiv2  = proj2f equiv1
-          ~equiv3  = proj2f equiv2
-          ~equiv4  = proj2f equiv3
-          ~equiv5  = proj2f equiv4
-          ~tr'     = proj1f equiv1
-          ~fr'     = proj1f equiv2
-          ~fr'inv  = proj1f equiv3
-          ~r'linv  = proj1f equiv4
-          ~r'rinv  = proj1f equiv5
-          ~r'coh   = proj2f equiv5
+    mkComponents :: NCofArg => Val -> (F Val, BindILazy Val)
+    mkComponents tfr' = seq ?cof $ let
+      ~equiv1  = frc tfr'
+      ~equiv2  = proj2f equiv1
+      ~equiv3  = proj2f equiv2
+      ~equiv4  = proj2f equiv3
+      ~equiv5  = proj2f equiv4
+      ~tr'     = proj1f equiv1
+      ~fr'     = proj1f equiv2
+      ~fr'inv  = proj1f equiv3
+      ~r'linv  = proj1f equiv4
+      ~r'rinv  = proj1f equiv5
+      ~r'coh   = proj2f equiv5
+      ~fibval  = fr'inv ∘ unF ar'
+      ~fibpath = r'rinv ∘ unF ar'
 
-          ~fibval  = fr'inv ∘ unF ar'
-          ~fibpath = r'rinv ∘ unF ar'
+      -- shorthands for path applications
+      app_r'linv ~x i = pappf x (fr'inv ∙ (fr' ∙ x)) (r'linv ∘ x) i
+      -- app_r'rinv ~x i = pappf (fr' ∙ (fr'inv ∙ x)) x (r'rinv ∘ x) i
+      app_r'coh  ~x i = pappf (refl (fr' ∙ x)) (r'rinv ∙ (fr' ∙ x)) (r'coh ∘ x) i
 
-          ~valSys = nshconsNonTrue' (ceq r r') (\i -> pappf uf uf (r'linv ∘ unF gr) i) $
-                   mapForallNeSys'
-                     (\i tf -> pappf uf uf (r'linv ∘ coenf r r' (bindIf "i" \i -> proj1f (tf ∘ unF i)) gr) i)
-                     topSys
+      -- valSys = [r=r'  i. fr'.linv gr i
+      --         ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
+      ~valSys = nshconsNonTrue' (ceq r r') "i" (\i -> app_r'linv (unF gr) i) $
+                mapForallNeSys' (\i tf -> app_r'linv (coenf r r' (proj1BindI tf) gr) i) topSys
 
-          ~fibval' = hcomdnnf fi1 fi0 tr' valSys fibval
+      -- fibval* : Tr'
+      -- fibval* = hcom 1 0 Tr' valSys fibval
+      ~fibval' = hcomdn fi1 fi0 tr' valSys fibval
 
-          fibpath' j =
-            hcomdf fi1 fi0 _Ar'
-              (vshcons (ceq j fi0) "i" (\i -> fr' ∘ hcomnnf fi1 i tr' valSys fibval) $
-               vshcons (ceq j fi1) "i" (\i -> ar') $
-               F $ VSHNe $ unF $
-               nshconsNonTrue' (ceq r r') (\i -> pappf uf uf (r'coh ∘ unF gr) i) $
-               mapForallNeSys'
-                 (\i tf -> pappf uf uf (r'coh ∘ coenf r r' (bindIf "i" \i -> proj1f (tf ∘ unF i)) gr) i)
-                 topSys
-              )
-              (pappf uf uf fibpath j)
+      -- fibpath* : fr' fibval = ar'
+      -- fibpath* = λ j.
+      --    hcom 1 0 (A r') [j=0    i. fr' (hcom 1 i valSys fibval)    -- no need to force valSys because
+      --                    ;j=1    i. ar'                             -- it's independent from j=0
+      --                    ;r=r'   i. fr'.coh gr i
+      --                    ;(∀i.α) i. fr'.coh (coeⁱ r r' (λ i. T i) gr) i]
+      --                    (fibpath {fr' fibval} {ar'} j)
+      fibpath' = bindILazynf "i" \j ->
+        hcomdf fi1 fi0 _Ar'
+          (vshcons (ceq j fi0) "i" (\i -> fr' ∘ hcomnnf fi1 i tr' valSys fibval) $
+           vshcons (ceq j fi1) "i" (\i -> ar') $
+           F $ VSHNe $ unF $
+           nshconsNonTrue' (ceq r r') "i" (\i -> app_r'coh (unF gr) i) $
+           mapForallNeSys' (\i tf -> app_r'coh (coenf r r' (proj1BindI tf) gr) i) topSys
+          )
+          (pappf (fr' ∙ unF fibval) (unF ar') fibpath j)
 
-          in   NSCons (BindCofLazy alphar' fibval') fibvals
-            // NSHCons (BindCof alphar' (bindILazynf "i" \i -> fibpath' i)) fibpaths
+      in (fibval', fibpath')
 
-    -- (!fibvals, !fibpaths) = mkSys (unF topSysr') -- VSys input...
+    mkNeSystems :: NeSys -> (NeSys, NeSysHCom)
+    mkNeSystems = \case
+      NSEmpty         -> NSEmpty // NSHEmpty
+      NSCons tfr' sys -> let
+        alphar' = tfr'^.binds
+        (fibval  , !fibpath)  = assumeCof alphar' $ mkComponents (tfr'^.body)
+        (!fibvals, !fibpaths) = mkNeSystems sys
+        in NSCons (BindCofLazy alphar' (unF fibval)) fibvals // NSHCons (BindCof alphar' fibpath) fibpaths
 
-  -- Result :=
-  --   glue (hcom 1 0 Ar' [r=r' i. unglue gr sysr; αr' i. fibpath* i] ar')
-  --        [αr'. fibval*]
+    (!fibvals, !fibpaths) = case unF (topSys ∘ unF r') of
+      VSTotal tfr'   -> let
+        (!fibval, !fibpath) = mkComponents (unF tfr')
+        in F (VSTotal fibval) // F (VSHTotal fibpath)
+      VSNe (sys, is) -> let
+        (!fibvals, !fibpaths) = mkNeSystems sys
+        in F (VSNe (fibvals, is)) // F (VSHNe (fibpaths, is))
 
-    in uf
+    in glue
+         (hcomd fi1 fi0 _Ar' (vshcons (ceq r r') "i" (\i -> ungluef (unF gr) topSysr) fibpaths) ar')
+         fibvals
 
   _ ->
     impossible
@@ -1033,7 +1065,7 @@ hcomdf r r' ~a ~sys ~b = frc (hcomd r r' a sys b); {-# inline hcomdf #-}
 
 glueTy :: NCofArg => DomArg => Val -> F VSys -> Val
 glueTy ~a sys = case unF sys of
-  VSTotal b -> proj1 (frc b)
+  VSTotal b -> proj1 b
   VSNe sys  -> VGlueTy a sys
 {-# inline glueTy #-}
 
@@ -1043,17 +1075,17 @@ gluen :: Val -> F NeSys' -> Val
 gluen ~t (F (!sys, !is)) = VNe (NGlue t sys) is
 {-# inline gluen #-}
 
-glue :: Val -> F VSys -> Val
+glue :: Val -> F VSys -> F Val
 glue ~t sys = case unF sys of
   VSTotal v      -> v
-  VSNe (sys, is) -> VNe (NGlue t sys) is
+  VSNe (sys, is) -> F (VNe (NGlue t sys) is)
 {-# inline glue #-}
 
-gluef ~t sys = frc (glue t sys); {-# inline gluef #-}
+gluenf ~t sys = unF (glue t sys); {-# inline gluenf #-}
 
 unglue :: NCofArg => DomArg => Val -> F VSys -> Val
 unglue ~t sys = case unF sys of
-  VSTotal teqv   -> proj1f (proj2f (frc teqv)) ∙ t
+  VSTotal teqv   -> proj1f (proj2f teqv) ∙ t
   VSNe (sys, is) -> VNe (NUnglue t sys) is
 {-# inline unglue #-}
 
@@ -1083,7 +1115,7 @@ eval = \case
   Coe r r' x a t   -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
   HCom r r' a t b  -> hcom' (evalI r) (evalI r') (evalf a) (evalSysHCom' t) (evalf b)
   GlueTy a sys     -> glueTy (eval a) (evalSys sys)
-  Glue t sys       -> glue (eval t) (evalSys sys)
+  Glue t sys       -> gluenf (eval t) (evalSys sys)
   Unglue t sys     -> unglue (eval t) (evalSys sys)
   Nat              -> VNat
   Zero             -> VZero
@@ -1182,7 +1214,7 @@ instance Force Ne Val where
     NCoe r r' a t     -> coe (frc r) (frc r') (frc a) (frc t)
     NHCom r r' a ts t -> hcomf (frc r) (frc r') (frc a) (frc ts) (frc t)
     NUnglue t sys     -> ungluef t (frc sys)
-    NGlue t sys       -> gluef t (frc sys)
+    NGlue t sys       -> glue t (frc sys)
     NNatElim p z s n  -> natElimf p z (frc s) (frc n)
     NLApp t i         -> lappf (frc t) (frc i)
 
@@ -1196,7 +1228,7 @@ instance Force Ne Val where
     NCoe r r' a t     -> coe (frcS r) (frcS r') (frcS a) (frcS t)
     NHCom r r' a ts t -> hcomf (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t)
     NUnglue t sys     -> ungluef (sub t) (frcS sys)
-    NGlue t sys       -> gluef (sub t) (frcS sys)
+    NGlue t sys       -> glue (sub t) (frcS sys)
     NNatElim p z s n  -> natElimf (sub p) (sub z) (frcS s) (frcS n)
     NLApp t i         -> lappf (frcS t) (frcS i)
 

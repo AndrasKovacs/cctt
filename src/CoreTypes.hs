@@ -164,7 +164,7 @@ type NeSysHCom' = (NeSysHCom, IS.IVarSet)
 
 -- TODO: unbox
 data VSys
-  = VSTotal ~Val
+  = VSTotal (F Val)
   | VSNe NeSys'
   deriving Show
 
