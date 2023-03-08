@@ -768,7 +768,7 @@ coed r r' topA t = case unF topA ^. body of
 
 {-
 - coe Glue with unfolded and optimized hcom over fibers
-- TODO: re-typecheck
+
 
 coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
@@ -812,36 +812,6 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
                     ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
                     (fibpath {fr' fibval} {ar'} j)
 
-  ------------------------------------------------------------
-  r=r',j=0 ⊢ fr' (hcom 1 i Tr' valSys fibval) = fr' (fr'.linv gr i)
-  r=r',j=0 ⊢ fr'.coh gr i 0 = fr' (fr'.linv gr i) OK
-  r=r',j=1 ⊢ fr'.coh gr i 1 = f gr
-             ar' = f gr OK
-  (∀i.α),j=0 ⊢ fr' (hcom 1 i Tr' valSys fibval) = fr' (fr'.linv (coe r r' T gr) i)
-               fr'.coh (coe r r' (i. T i) gr) i 0 = fr' (fr'.inv (coe...) i) OK
-  (∀i.α),j=1 ⊢ fr'.coh (coe r r' (i. T i) gr) i 1 = fr' (coe... gr)
-               ar' = fr' (coe... gr) OK
-  (∀i.α),r=r' ⊢ fr'.coh (coe r r' (i. T i) gr) i j = fr'.coh gr i j OK
-
-  j=0 OK
-  j=1 OK
-
-  αr' ⊢ fr' fibval* = fr' (hcom 1 0 Tr' valSys fibval)
-      ⊢ fibpath* 0 = fr' (hcom 1 0 Tr' valSys fibval) OK
-
-  r=r' ⊢ glue (hcom 1 0 Ar' [r=r' j. unglue gr sysr; αr' j. fibpath* j] ar')
-              [αr'. fibval*]
-       = glue (unglue gr sysr) [αr'. gr]
-       = gr OK
-
-  (∀i.α) ⊢ glue (hcom 1 0 Ar' [r=r' j. unglue gr sysr; αr' j. fibpath* j] ar')
-                [αr'. fibval*]
-        = fibval*
-        = fr'.linv (coe r r' (i. T i) gr) 0
-        = (coe r r' (i. T i) gr) OK
-
-  ------------------------------------------------------------
-
     -- one output system is a NeSys containing fibval*
     -- the other is NeSysHCom with fibpath* applied to the binder
 
@@ -849,7 +819,6 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     glue (hcom 1 0 Ar' [r=r' j. unglue gr sysr; αr' j. fibpath* j] ar')
          [αr'. fibval*]
 
-  TODO: FIX IMPLEMENTATION BELOW
 -}
 
   VGlueTy (rebind topA -> a) (rebind topA -> topSys, rebind topA -> is) -> let
@@ -883,9 +852,14 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       ~fibpath = r'rinv ∘ unF ar'
 
       -- shorthands for path applications
-      app_r'linv ~x i = pappf x (fr'inv ∙ (fr' ∙ x)) (r'linv ∘ x) i
-      -- app_r'rinv ~x i = pappf (fr' ∙ (fr'inv ∙ x)) x (r'rinv ∘ x) i
-      app_r'coh  ~x i = pappf (refl (fr' ∙ x)) (r'rinv ∙ (fr' ∙ x)) (r'coh ∘ x) i
+      app_r'linv ~x i =
+        pappf x (fr'inv ∙ (fr' ∙ x)) (r'linv ∘ x) i
+
+      app_r'coh ~x i j =
+        pappf (fr' ∙ unF (app_r'linv x i))
+              (fr' ∙ x)
+              (pappf (refl (fr' ∙ x)) (r'rinv ∙ (fr' ∙ x)) (r'coh ∘ x) i)
+              j
 
       -- valSys = [r=r'  i. fr'.linv gr i
       --         ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
@@ -908,8 +882,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
           (vshcons (ceq j fi0) "i" (\i -> fr' ∘ hcomnnf fi1 i tr' valSys fibval) $
            vshcons (ceq j fi1) "i" (\i -> ar') $
            F $ VSHNe $ unF $
-           nshconsNonTrue' (ceq r r') "i" (\i -> app_r'coh (unF gr) i) $
-           mapForallNeSys' (\i tf -> app_r'coh (coenf r r' (proj1BindI tf) gr) i) topSys
+           nshconsNonTrue' (ceq r r') "i" (\i -> app_r'coh (unF gr) i j) $
+           mapForallNeSys' (\i tf -> app_r'coh (coenf r r' (proj1BindI tf) gr) i j) topSys
           )
           (pappf (fr' ∙ unF fibval) (unF ar') fibpath j)
 
