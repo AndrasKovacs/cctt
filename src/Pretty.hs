@@ -215,10 +215,6 @@ tm = \case
   GlueTy a s        -> appp ("Glue " <> proj a <> " " <> sys s)
   Unglue t _        -> appp ("unglue " <> proj t)
   Glue a s          -> appp ("glue " <> proj a <> " " <> sys s)
-  Nat               -> "Nat"
-  Zero              -> "zero"
-  Suc t             -> appp ("suc " <> proj t)
-  NatElim p s z n   -> appp ("NatElim " <> proj p <> " " <> proj s <> " " <> proj z <> " " <> proj n)
   TODO              -> "TODO"
   Com r r' i a t u  -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
                        "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "

@@ -48,10 +48,6 @@ isKeyword x =
      x == "let"
   || x == "λ"
   || x == "U"
-  || x == "Nat"
-  || x == "zero"
-  || x == "suc"
-  || x == "NatElim"
   || x == "coe"
   || x == "hcom"
   || x == "Glue"
@@ -79,8 +75,6 @@ atom :: Parser Tm
 atom =
       parens tm
   <|> withPos (    (U     <$  keyword "U"   )
-               <|> (Nat   <$  keyword "Nat" )
-               <|> (Zero  <$  keyword "zero")
                <|> (I0    <$  keyword  "0"  )
                <|> (I1    <$  keyword  "1"  )
                <|> (I     <$  keyword  "I"  )
@@ -173,9 +167,7 @@ goCom = do
 
 app :: Parser Tm
 app = withPos (
-       (keyword "suc"     *> (Suc <$!> proj))
-  <|>  (keyword "NatElim" *> (NatElim <$!> proj <*!> proj <*!> proj <*!> proj))
-  <|>  (keyword "coe"     *> goCoe)
+       (keyword "coe"     *> goCoe)
   <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
   <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))

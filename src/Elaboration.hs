@@ -519,39 +519,6 @@ infer = \case
       VGlueTy a sys -> pure $! Infer (Unglue t (quote (fst sys))) a
       a             -> err $! ExpectedGlueTy (quote a)
 
-  P.Nat ->
-    pure $! Infer Nat VU
-
-  P.Zero ->
-    pure $! Infer Zero VNat
-
-  P.Suc t -> do
-    t <- check t VNat
-    pure $! Infer (Suc t) VNat
-
-  -- NatElim : (P : Nat -> U) -> P z -> ((n:_) -> P n -> P (suc n)) -> (n:_) -> P n
-  P.NatElim p s z n -> do
-    p <- check p (fun VNat VU)
-    let vp = evalf p
-    s <- check s (VPi VNat $ NCl "n" $ CNatElim (unF vp))
-    z <- check z (vp ∙ VZero)
-    n <- check n VNat
-    pure $! Infer (NatElim p s z n) (vp ∙~ eval n)
-
-  -- P.Com r r' (P.Bind i a) sys t -> do
-  --   r       <- checkI r
-  --   r'      <- checkI r'
-  --   (a, va) <- bindI i \_ -> do {a <- check a VU; pure (a, eval a)}
-  --   t       <- check t (instantiate a (evalI r))
-
-  --   -- NOTE: elabSysHCom happens to be correct for "com" as well. In the "hcom"
-  --   -- case, the "a" type gets implicitly weakened under both a cof and an ivar
-  --   -- binder when checking components. In the "com" case, "a" is already under
-  --   -- an ivar binder, so it's only weakened under the cof. The boundary checks
-  --   -- are exactly the same.
-  --   sys     <- elabSysHCom va r t sys
-  --   pure $! Infer (Com r r' i a sys t) (instantiate a (evalI r'))
-
   P.Com r r' a sys t -> do
     r  <- checkI r
     r' <- checkI r'

@@ -27,7 +27,6 @@ instance Quote Ne Tm where
     NHCom r r' a ts t -> HCom (quote r) (quote r') (quote a) (quote ts) (quote t)
     NUnglue t sys     -> Unglue (quote t) (quote sys)
     NGlue t sys       -> Glue (quote t) (quote sys)
-    NNatElim p z s n  -> NatElim (quote p) (quote z) (quote s) (quote n)
     NLApp t i         -> LApp (quote t) (quote i)
 
 instance Quote Val Tm where
@@ -42,9 +41,6 @@ instance Quote Val Tm where
     VSg a b          -> Sg (b^.name) (quote a) (quote b)
     VPair t u        -> Pair (quote t) (quote u)
     VU               -> U
-    VNat             -> Nat
-    VZero            -> Zero
-    VSuc t           -> Suc (quote t)
     VTODO            -> TODO
     VLine t          -> Line (t^.name) (quote t)
     VLLam t          -> LLam (t^.name) (quote t)

@@ -35,11 +35,6 @@ data Tm
   | GlueTm Tm Sys                     -- glue a [α. t]
   | Unglue Tm
 
-  | Nat
-  | Zero
-  | Suc Tm
-  | NatElim Tm Tm Tm Tm         -- (P : Nat -> U) -> P z -> ((n:_) -> P n -> P (suc n)) -> (n:_) -> P n
-
   | Refl          -- checkable refl
   | Sym Tm
   | Trans Tm Tm

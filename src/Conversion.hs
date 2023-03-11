@@ -25,9 +25,6 @@ instance Conv Val where
     (VSg a b        , VSg a' b'         ) -> conv a a' && conv b b'
     (VPair t u      , VPair t' u'       ) -> conv t t' && conv u u'
     (VU             , VU                ) -> True
-    (VNat           , VNat              ) -> True
-    (VZero          , VZero             ) -> True
-    (VSuc n         , VSuc n'           ) -> conv n n'
     (VLine a        , VLine a'          ) -> conv a a'
     (VLLam t        , VLLam t'          ) -> conv t t'
 
@@ -68,7 +65,6 @@ instance Conv Ne where
 
     (NUnglue a sys    , NUnglue a' sys'      ) -> conv a a' && conv sys sys'
     (NGlue a sys      , NGlue a' sys'        ) -> conv a a' && conv sys sys'
-    (NNatElim p z s n , NNatElim p' z' s' n' ) -> conv p p' && conv z z' && conv s s' && conv n n'
 
     (NSub{} , _      ) -> impossible
     (t      , NSub{} ) -> impossible

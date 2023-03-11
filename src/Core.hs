@@ -529,9 +529,6 @@ capp (NCl _ t) ~u = case t of
   -- equiv A B = (f* : A -> B) × isEquiv a b f
   CEquiv a b -> let ~f = u in isEquiv a b f
 
-  -- [P]  (n* : VNat) → P n → P (suc n)
-  CNatElim (frc -> p) -> let ~n = u in fun (p ∙ n) (p ∙ VSuc n)
-
   -- [A]  (B* : U) × equiv B A
   CEquivInto a -> let ~b = u in equiv a b
 
@@ -714,15 +711,6 @@ proj2 t = case unF t of
 
 proj2f t = frc (proj2 t); {-# inline proj2f #-}
 
-natElim :: NCofArg => DomArg => Val -> Val -> F Val -> F Val -> Val
-natElim p z s n = case unF n of
-  VZero           -> z
-  VSuc (frc -> n) -> s ∘ unF n ∙ natElim p z s n
-  VNe n is        -> VNe (NNatElim p z (unF s) n) is
-  VTODO           -> VTODO
-  _               -> impossible
-
-natElimf p z s n = frc (natElim p z s n); {-# inline natElimf #-}
 
 -- | Apply a path.
 papp :: NCofArg => DomArg => Val -> Val -> F Val -> F I -> Val
@@ -761,8 +749,6 @@ coed r r' topA t = case unF topA ^. body of
     in F (VPair (coednf r r' a t1)
                 (coednf r r' (bindIf "j" \j -> coe r j a t1) t2))
 
-  VNat ->
-    t
 
   VPath (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
     F $ VPLam (lhs ∙ unF r') (rhs ∙ unF r')
@@ -981,10 +967,6 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
         (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
         (proj2f base))
 
-  VNat -> case ?dom of
-    0 -> base
-    _ -> F VTODO -- hcomNatdn r r' (F nts) base
-
   VPath a lhs rhs ->
     F $ VPLam lhs rhs
       $ NICl (a^.name)
@@ -1139,10 +1121,6 @@ eval = \case
   GlueTy a sys     -> glueTy (eval a) (evalSys sys)
   Glue t sys       -> gluenf (eval t) (evalSys sys)
   Unglue t sys     -> unglue (eval t) (evalSys sys)
-  Nat              -> VNat
-  Zero             -> VZero
-  Suc t            -> VSuc (eval t)
-  NatElim p z s n  -> natElim (eval p) (eval z) (evalf s) (evalf n)
   TODO             -> VTODO
   Com r r' i a t b -> com' (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom' t) (evalf b)
   Line x a         -> VLine (NICl x (ICEval ?sub ?env a))
@@ -1218,9 +1196,6 @@ instance Force Val Val where
     VSg a b       -> F (VSg (sub a) (sub b))
     VPair t u     -> F (VPair (sub t) (sub u))
     VU            -> F VU
-    VNat          -> F VNat
-    VZero         -> F VZero
-    VSuc t        -> F (VSuc (sub t))
     VTODO         -> F VTODO
     VLine t       -> F (VLine (sub t))
     VLLam t       -> F (VLLam (sub t))
@@ -1237,7 +1212,6 @@ instance Force Ne Val where
     NHCom r r' a ts t -> hcomf (frc r) (frc r') (frc a) (frc ts) (frc t)
     NUnglue t sys     -> ungluef t (frc sys)
     NGlue t sys       -> glue t (frc sys)
-    NNatElim p z s n  -> natElimf p z (frc s) (frc n)
     NLApp t i         -> lappf (frc t) (frc i)
 
   frcS = \case
@@ -1251,7 +1225,6 @@ instance Force Ne Val where
     NHCom r r' a ts t -> hcomf (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t)
     NUnglue t sys     -> ungluef (sub t) (frcS sys)
     NGlue t sys       -> glue (sub t) (frcS sys)
-    NNatElim p z s n  -> natElimf (sub p) (sub z) (frcS s) (frcS n)
     NLApp t i         -> lappf (frcS t) (frcS i)
 
 instance Force NeSys VSys where
@@ -1343,7 +1316,6 @@ unSubNeS = \case
   NHCom r r' a sys t   -> NHCom (sub r) (sub r') (sub a) (sub sys) (sub t)
   NUnglue a sys        -> NUnglue (sub a) (sub sys)
   NGlue a sys          -> NGlue (sub a) (sub sys)
-  NNatElim p z s n     -> NNatElim (sub p) (sub z) (sub s) (sub n)
   NLApp t i            -> NLApp (sub t) (sub i)
 
 ----------------------------------------------------------------------------------------------------

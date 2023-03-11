@@ -45,11 +45,6 @@ data Tm
   | Glue   Tm ~Sys           -- glue a [α ↦ b]
   | Unglue Tm ~Sys           -- unglue g [α ↦ B]
 
-  | Nat
-  | Zero
-  | Suc Tm
-  | NatElim Tm Tm Tm Tm      -- (P : Nat -> U) -> P z -> ((n:_) -> P n -> P (suc n)) -> (n:_) -> P n
-
   | TODO
 
   | Com I I Name Tm SysHCom Tm
@@ -197,10 +192,6 @@ data Val
   | VLine NamedIClosure
   | VLLam NamedIClosure
 
-  | VNat
-  | VZero
-  | VSuc Val
-
   | VTODO -- placeholder
   deriving Show
 
@@ -216,7 +207,6 @@ data Ne
   | NHCom I I VTy NeSysHCom Val
   | NUnglue Val NeSys
   | NGlue Val NeSys
-  | NNatElim Val Val Val Ne
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -274,9 +264,6 @@ data Closure
 
   -- [A, B]  equiv A B = (f* : A -> B) × isEquiv A B f
   | CEquiv Val Val
-
-  -- [P]  (n* : VNat) → P n → P (suc n)
-  | CNatElim Val
 
   -- [A]  (B* : U) × equiv B A
   | CEquivInto Val
@@ -396,7 +383,6 @@ instance SubAction Closure where
     CIsEquiv5 b f g           -> CIsEquiv5 (sub b) (sub f) (sub g)
     CIsEquiv6 b f g linv rinv -> CIsEquiv6 (sub b) (sub f) (sub g) (sub linv) (sub rinv)
     CEquiv a b                -> CEquiv (sub a) (sub b)
-    CNatElim p                -> CNatElim (sub p)
     CEquivInto a              -> CEquivInto (sub a)
     C'λ'a''a                  -> C'λ'a''a
     C'λ'a'i''a                -> C'λ'a'i''a

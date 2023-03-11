@@ -1,14 +1,67 @@
 
-QUESTION:
-  - Generic API for computing under a BindI, without renaming to fresh var!!!
-  - like projecting, applying, or matching on stuff
-  - "unsafe" mapping functions over binders: these don't rename the bound var, but we have
-    to ensure that the mapping function *only* depends on its input! If we refer to e.g.
-    values from external scope, that's unsound.
+Strict inductives:
+
+syntax:
+
+--------------------------------------------------------------------------------
 
 
-Code:
-  - wrap (NeSys(HCom), IS.IVarSet) in some type
+
+data D (x1 : A1)(x2 : A2) ... (xn : An) :=
+    c1 (x1 : A1)(x2 : A2) ... (xn : An)
+   |c2 (x1 : A1)(x2 : A2) ... (xn : An)
+   |...
+   |cn (x1 : A1)(x2 : A2) ... (xn : An);
+
+
+elim x [c1 x y z. t1; c2 x y z. t2; ... ]                 -- x, y, z bind all induction hypotheses
+
+
+
+--------------------------------------------------------------------------------
+
+
+- params are not stored
+- constructors are checkable only and always saturated
+- no shadowing in constructors
+
+syntactic con signatures: right-nested telescope
+
+   ConSig = CSNil | CSInd Name ConSig | CSExt Name Ty Con | CSHInd Name Ty Con
+
+semantics
+- tycon is identified by level
+- datacon is identified by two levels: the type level and the level of the con inside the
+  type.
+
+   data Val
+     VITyCon Lvl [Val]
+     VIDCon Lvl Lvl IDSpine               -- IDCon could be packed to 1 word
+
+  data IDSpine = IDNil | IDInd Val IDSpine | IDHInd Val IDSpine | IDExt Val IDSpine
+
+  data Ne
+     NIElim Val [(Sub, Env, [Name], Tm)]      -- basically an evaluation closure for each method
+
+
+  -- eval an elim:
+  --   if scrutinee canonical, eval the branch
+  --   otherwise eval methods to list of closures
+    (this is the optimized version, for simplicity we could just create the closures first
+     and pass it the semantic elim next. Slightly less efficient but who cares)
+
+
+coe r r' (Ty P) (DCon args)
+  -- inductive arg: recursive coe
+  -- ext arg: coe over params (every external arg is a type family indexed by Par)                    List (A : U) := nil | cons (A * A * A) Rec
+
+
+-- Simple case: closed HITs
+-- coe does nothing
+-- hcom is formal
+
+
+--------------------------------------------------------------------------------
 
 Testing:
   - hcom glue
