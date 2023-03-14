@@ -24,15 +24,17 @@ data Tm
   | Proj1 Tm
   | Proj2 Tm
   | U
-  | Path Tm Tm                          -- x = y
-  | DepPath BindMaybe Tm Tm             -- x ={i.A} y | x ={p} y
+  | Path Tm Tm                                -- x = y
+  | DepPath BindMaybe Tm Tm                   -- x ={i.A} y | x ={p} y
 
-  | Coe Tm Tm BindMaybe Tm              -- coe r r' i A t
-  | HCom Tm Tm (Maybe Ty) SysHCom Tm    -- hcom r r' A [α x. t] u
-  | Com Tm Tm BindMaybe SysHCom Tm      -- com r r' i A [α x. t] u
+  | Elim (Maybe Tm) [([Name], Tm)] (Maybe Tm) -- elim {P} [con x y z. t] {x}
 
-  | GlueTy Ty Sys                     -- Glue A [α. B]      (B : Σ X (X ≃ A))
-  | GlueTm Tm Sys                     -- glue a [α. t]
+  | Coe Tm Tm BindMaybe Tm                    -- coe r r' i A t
+  | HCom Tm Tm (Maybe Ty) SysHCom Tm          -- hcom r r' {A} [α x. t] u
+  | Com Tm Tm BindMaybe SysHCom Tm            -- com r r' i A [α x. t] u
+
+  | GlueTy Ty Sys                             -- Glue A [α. B]
+  | GlueTm Tm Sys                             -- glue a [α. t]
   | Unglue Tm
 
   | Refl          -- checkable refl
@@ -56,7 +58,10 @@ data BindMaybe = Bind Name Tm | DontBind Tm
 data SysHCom = SHEmpty | SHCons Cof BindMaybe SysHCom
   deriving Show
 
-data Top = TDef (DontShow SourcePos) Name (Maybe Ty) Tm Top | TEmpty
+data Top
+  = TDef (DontShow SourcePos) Name (Maybe Ty) Tm Top
+  | TData (DontShow SourcePos) Name [(Name, Ty)] [(Name, [(Name, Ty)])] Top
+  | TEmpty
   deriving Show
 
 unPos :: Tm -> Tm

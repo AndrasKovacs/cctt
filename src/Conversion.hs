@@ -27,6 +27,8 @@ instance Conv Val where
     (VU             , VU                ) -> True
     (VLine a        , VLine a'          ) -> conv a a'
     (VLLam t        , VLLam t'          ) -> conv t t'
+    (VTyCon x ts    , VTyCon x' ts'     ) -> x == x' && conv ts ts'
+    (VDCon _ i sp   , VDCon _ i' sp'    ) -> i == i' && conv sp sp'
 
     -- This is useful for testing elaboration, where it's annoying to fail on
     -- TODO. This is safe (doesn't affect type safety & termination), but of
@@ -60,11 +62,13 @@ instance Conv Ne where
     (NCoe r1 r2 a t, NCoe r1' r2' a' t') ->
       conv r1 r1' && conv r2 r2' && conv a a' && conv t t'
 
-    (NHCom r1 r2 a sys t, NHCom r1' r2' a' sys' t') ->
-      conv r1 r1' && conv r2 r2' && conv a a' && conv sys sys' && conv t t'
+    (NHCom r1 r2 _ sys t, NHCom r1' r2' _ sys' t') ->
+      conv r1 r1' && conv r2 r2' && conv sys sys' && conv t t'
 
     (NUnglue a sys    , NUnglue a' sys'      ) -> conv a a' && conv sys sys'
     (NGlue a sys      , NGlue a' sys'        ) -> conv a a' && conv sys sys'
+
+    (NElim _   ms t   , NElim _ ms' t'       ) -> conv t t' && conv ms ms'
 
     (NSub{} , _      ) -> impossible
     (t      , NSub{} ) -> impossible
@@ -75,6 +79,32 @@ instance Conv NeCof where
     (NCEq i j   , NCEq i' j'   ) -> conv i i' && conv j j'
     (NCAnd c1 c2, NCAnd c1' c2') -> conv c1 c1' && conv c2 c2'
     _                            -> False
+
+instance Conv VDSpine where
+  conv sp sp' = case (sp, sp') of
+    (VDNil         , VDNil           ) -> True
+    (VDInd t sp    , VDInd t' sp'    ) -> conv t t' && conv sp sp'
+    (VDHInd t _ sp , VDHInd t' _ sp' ) -> conv t t' && conv sp sp'
+    (VDExt t _ sp  , VDExt t' _ sp'  ) -> conv t t' && conv sp sp'
+    _                                  -> impossible
+
+instance Conv VMethods where
+  conv ms ms' = case (ms, ms') of
+    (VMNil         , VMNil          ) -> True
+    (VMCons xs t ms, VMCons _ t' ms') -> convMethod xs t t' && conv ms ms'
+    _                                 -> impossible
+
+convMethod :: NCofArg => DomArg => [Name] -> EvalClosure -> EvalClosure -> Bool
+convMethod xs (EC s e t) (EC s' e' t') = case xs of
+  []   -> conv (let ?env = e; ?sub = s in eval t) (let ?env = e'; ?sub = s' in eval t')
+  _:xs -> fresh \x -> convMethod xs (EC s (EDef e x) t) (EC s' (EDef e x) t')
+
+instance Conv a => Conv [a] where
+  conv as as' = case (as, as') of
+    ([], [])       -> True
+    (a:as, a':as') -> conv a a' && conv as as'
+    _              -> False
+  {-# inline conv #-}
 
 instance Conv (BindI Val) where
   conv t t' = freshI \(IVar -> i) -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}

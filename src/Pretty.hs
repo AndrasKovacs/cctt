@@ -178,9 +178,31 @@ goSys = \case
 sys :: PrettyArgs (Sys -> Txt)
 sys s = "[" <> goSys s <> "]"
 
+topVar :: PrettyArgs (Lvl -> Txt)
+topVar x = str (?names `showVar` NKTop x)
+
+dSpine :: PrettyArgs (DSpine -> Txt)
+dSpine = \case
+  DNil         -> mempty
+  DInd t sp    -> " " <> proj t <> dSpine sp
+  DHInd t _ sp -> " " <> proj t <> dSpine sp
+  DExt t _ sp  -> " " <> proj t <> dSpine sp
+
+sepby :: (a -> Txt) -> [a] -> Txt -> Txt
+sepby f []  sep = mempty
+sepby f [a] sep = f a
+sepby f (a:as) sep = f a <> sep <> sepby f as sep
+{-# inline sepby #-}
+
+methods :: PrettyArgs (Methods -> Txt)
+methods = \case
+  MNil            -> mempty
+  MCons xs t MNil -> sepby str xs " " <> ". " <> proj t
+  MCons xs t ms   -> sepby str xs " " <> ". " <> proj t <> "; " <> methods ms
+
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
-  TopVar x _        -> str (?names `showVar` NKTop x)
+  TopVar x _        -> topVar x
   LocalVar x        -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
   Let x a t u       -> let pa = let_ a; pt = let_ t in fresh x \x ->
                        letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
@@ -220,11 +242,16 @@ tm = \case
                        "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
                               <> pt <> " " <> pu)
   WkI x t           -> wkI x (tm t)
-
   Refl _            -> "refl"
   Sym _ _ _ p       -> projp (proj p <> "⁻¹")
   Trans _ _ _ _ p q -> transp (app p <> " ∙ " <> trans q)
   Ap f _ _ p        -> appp ("ap " <> proj f <> " " <> proj p)
+  TyCon x []        -> topVar x
+  TyCon x ts        -> appp (topVar x <> sepby proj ts " ")
+  DCon x _ DNil     -> topVar x
+  DCon x _ sp       -> appp (topVar x <> dSpine sp)
+  Elim mot met t    -> appp ("elim " <> proj mot <> " [" <> methods met <> "] " <> proj t)
+
 
 top :: Names => LvlArg => Top -> Txt
 top = \case

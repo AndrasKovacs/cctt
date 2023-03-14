@@ -314,6 +314,9 @@ unsafeMapBindILazy (BindILazy x i a) f =
   seq ?cof (F (BindILazy x i (unF (f a))))
 {-# inline unsafeMapBindILazy #-}
 
+unsafeMapBindILazynf :: NCofArg => BindILazy a -> (NCofArg => a -> F a) -> BindILazy a
+unsafeMapBindILazynf t f = unF (unsafeMapBindILazy t f); {-# inline unsafeMapBindILazynf #-}
+
 mapBindILazynf :: NCofArg => SubAction a => BindILazy a -> (NCofArg => F I -> a -> F a) -> BindILazy a
 mapBindILazynf t f = unF (mapBindILazy t f); {-# inline mapBindILazynf #-}
 
@@ -481,7 +484,7 @@ localVar x = go ?env x where
 -- | Apply a closure. Note: *lazy* in argument.
 capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
-  CEval s env t -> let ?env = EDef env u; ?sub = s in eval t
+  CEval (EC s env t) -> let ?env = EDef env u; ?sub = s in eval t
 
   CCoePi (frc -> r) (frc -> r') (frc -> a) b (frc -> t) ->
     let x = frc u in
@@ -578,6 +581,10 @@ capp (NCl _ t) ~u = case t of
         ~lhs = coenf r r' a (coe r' r a x)
         ~rhs = unF x
     in VPLam lhs rhs $ NICl "j" $ ICCoeRinv1 (unF a) (unF x) (unF r) (unF r')
+
+  CHInd motive ms (frc -> t) ->
+    elim motive ms (t ∘ u)
+
 
 -- | Apply an ivar closure.
 icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
@@ -1037,8 +1044,19 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
       $ NICl (a^.name)
       $ ICHComLine (unF r) (unF r') a nts (unF base)
 
+  a@(VTyCon x ps) -> case unF base of
+    VDCon x i sp     -> case ?dom of
+                          0 -> hcomind0 r r' (F a) x i sp ts
+                          _ -> hcomind  r r' (F a) x i sp ts
+    base@(VNe n is') -> F $ VNe (NHCom (unF r) (unF r') a nts base)
+                                (IS.insertFI r $ IS.insertFI r' $ is <> is')
+    VTODO            -> F VTODO
+    _                -> impossible
+
   _ ->
     impossible
+
+----------------------------------------------------------------------------------------------------
 
 -- | HCom with nothing known about semantic arguments.
 hcom :: NCofArg => DomArg => F I -> F I -> F Val -> F VSysHCom -> F Val -> Val
@@ -1100,39 +1118,153 @@ ungluen ~t (F (!sys, !is)) = VNe (NUnglue t sys) is
 ungluef  ~t sys = frc (unglue t sys); {-# inline ungluef #-}
 ungluenf ~t sys = F (ungluen t sys); {-# inline ungluenf #-}
 
+
+-- Strict inductive types
+----------------------------------------------------------------------------------------------------
+
+tyParams :: SubArg => NCofArg => DomArg => EnvArg => [Tm] -> [Val]
+tyParams []     = []
+tyParams (t:ts) = (:) $$! eval t $$! tyParams ts
+
+dSpine :: SubArg => NCofArg => DomArg => EnvArg => DSpine -> VDSpine
+dSpine = \case
+  DNil         -> VDNil
+  DInd t sp    -> VDInd (eval t) (dSpine sp)
+  DHInd t a sp -> VDHInd (eval t) a (dSpine sp)
+  DExt t a sp  -> VDExt (eval t) a (dSpine sp)
+
+methods :: SubArg => EnvArg => Methods -> VMethods
+methods = \case
+  MNil          -> VMNil
+  MCons xs t ms -> VMCons xs (EC ?sub ?env t) (methods ms)
+
+evalMethod :: SubArg => NCofArg => DomArg => EnvArg => Val -> VMethods -> VDSpine -> Tm -> Val
+evalMethod ~motive ms sp body = case sp of
+  VDNil         -> eval body
+  VDInd t sp    -> let ~elimt = elim motive ms (frc t) in
+                   let ?env = ?env `EDef` t `EDef` elimt in
+                   evalMethod motive ms sp body
+  VDHInd t _ sp -> let elimt = VLam (NCl "x" (CHInd motive ms t)) in
+                   let ?env = ?env `EDef` t `EDef` elimt in
+                   evalMethod motive ms sp body
+  VDExt t _ sp  -> let ?env = ?env `EDef` t in evalMethod motive ms sp body
+
+lookupMethod :: NCofArg => DomArg => Lvl -> Val -> VMethods -> VDSpine -> Val
+lookupMethod i ~motive ms sp = case (i, ms) of
+  (0, VMCons xs (EC sub env t) _) -> let ?sub = sub; ?env = env in evalMethod motive ms sp t
+  (i, VMCons _ _ ms             ) -> lookupMethod (i - 1) motive ms sp
+  _                               -> impossible
+
+elim :: NCofArg => DomArg => Val -> VMethods -> F Val -> Val
+elim ~motive ms val = case unF val of
+  VDCon _ i sp -> lookupMethod i motive ms sp
+  VNe n is     -> VNe (NElim motive ms n) is
+  VTODO        -> VTODO
+  _            -> impossible
+{-# inline elim #-}
+
+elimf ~motive ms val = frc (elim motive ms val); {-# inline elimf #-}
+
+lazyprojsp :: NCofArg => DomArg => Lvl -> VDSpine -> F Val
+lazyprojsp ix sp = case (ix, sp) of
+  (0 , VDInd t _     ) -> frc t
+  (0 , VDHInd t _ _  ) -> frc t
+  (0 , VDExt t _ _   ) -> frc t
+  (ix, VDInd _ sp    ) -> lazyprojsp (ix - 1) sp
+  (ix, VDHInd _ _ sp ) -> lazyprojsp (ix - 1) sp
+  (ix, VDExt _ _ sp  ) -> lazyprojsp (ix - 1) sp
+  _                    -> impossible
+
+lazyprojfield :: NCofArg => DomArg => Lvl -> Lvl -> Val -> F Val
+lazyprojfield conix fieldix v = case unF (frc v) of
+  VDCon x i sp | i == conix -> lazyprojsp fieldix sp
+  _                         -> impossible
+{-# inline lazyprojfield #-}
+
+-- Project all fieldix fields of a constructor conix from a system
+lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
+lazyprojsys conix fieldix = \case
+  NSHEmpty      -> NSHEmpty
+  NSHCons t sys -> NSHCons (mapBindCof t \t -> unsafeMapBindILazynf t (lazyprojfield conix fieldix))
+                           (lazyprojsys conix fieldix sys)
+
+lazyprojsys' :: NCofArg => DomArg => Lvl -> Lvl -> F NeSysHCom' -> F NeSysHCom'
+lazyprojsys' conix fieldix (F (!sys, !is)) = F (lazyprojsys conix fieldix sys // is)
+{-# inline lazyprojsys' #-}
+
+hcomind0sp :: NCofArg => DomArg => F I -> F I -> F Val -> Lvl -> Lvl -> VDSpine -> F NeSysHCom' -> VDSpine
+hcomind0sp r r' a conix fieldix sp sys = case sp of
+  VDNil         -> VDNil
+  VDInd t sp    -> VDInd (hcomdnnf r r' a (lazyprojsys' conix fieldix sys) (frc t))
+                         (hcomind0sp r r' a conix (fieldix + 1) sp sys)
+  VDHInd t a sp -> uf
+  VDExt t a sp  -> uf
+
+hcomind0 :: NCofArg => DomArg => F I -> F I -> F Val -> Lvl -> Lvl -> VDSpine -> F NeSysHCom' -> F Val
+hcomind0 r r' a tyix conix sp sys = F $ VDCon tyix conix (hcomind0sp r r' a conix 0 sp sys)
+{-# inline hcomind0 #-}
+
+hcomind :: NCofArg => DomArg => F I -> F I -> F Val -> Lvl -> Lvl -> VDSpine -> F NeSysHCom' -> F Val
+hcomind = uf
+
+
+----------------------------------------------------------------------------------------------------
+
 eval :: SubArg => NCofArg => DomArg => EnvArg => Tm -> Val
 eval = \case
-  TopVar _ v       -> coerce v
-  LocalVar x       -> localVar x
-  Let x _ t u      -> define (eval t) (eval u)
-  Pi x a b         -> VPi (eval a) (NCl x (CEval ?sub ?env b))
-  App t u          -> evalf t ∙ eval u
-  Lam x t          -> VLam (NCl x (CEval ?sub ?env t))
-  Sg x a b         -> VSg (eval a) (NCl x (CEval ?sub ?env b))
-  Pair t u         -> VPair (eval t) (eval u)
-  Proj1 t          -> proj1 (evalf t)
-  Proj2 t          -> proj2 (evalf t)
-  U                -> VU
-  Path x a t u     -> VPath (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
-  PApp l r t i     -> papp (eval l) (eval r) (evalf t) (evalI i)
-  PLam l r x t     -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
-  Coe r r' x a t   -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
-  HCom r r' a t b  -> hcom' (evalI r) (evalI r') (evalf a) (evalSysHCom' t) (evalf b)
-  GlueTy a sys     -> glueTy (eval a) (evalSys sys)
-  Glue t sys       -> gluenf (eval t) (evalSys sys)
-  Unglue t sys     -> unglue (eval t) (evalSys sys)
-  TODO             -> VTODO
-  Com r r' i a t b -> com' (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom' t) (evalf b)
-  Line x a         -> VLine (NICl x (ICEval ?sub ?env a))
-  LApp t i         -> lapp (evalf t) (evalI i)
-  LLam x t         -> VLLam (NICl x (ICEval ?sub ?env t))
-  WkI _ t          -> wkIS (eval t)
+
+  TopVar _ v        -> coerce v
+  LocalVar x        -> localVar x
+  Let x _ t u       -> define (eval t) (eval u)
+
+  -- Pi
+  Pi x a b          -> VPi (eval a) (NCl x (CEval (EC ?sub ?env b)))
+  App t u           -> evalf t ∙ eval u
+  Lam x t           -> VLam (NCl x (CEval (EC ?sub ?env t)))
+
+  -- Sigma
+  Sg x a b          -> VSg (eval a) (NCl x (CEval (EC ?sub ?env b)))
+  Pair t u          -> VPair (eval t) (eval u)
+  Proj1 t           -> proj1 (evalf t)
+  Proj2 t           -> proj2 (evalf t)
+
+  -- U
+  U                 -> VU
+
+  -- Path
+  Path x a t u      -> VPath (NICl x (ICEval ?sub ?env a)) (eval t) (eval u)
+  PApp l r t i      -> papp (eval l) (eval r) (evalf t) (evalI i)
+  PLam l r x t      -> VPLam (eval l) (eval r) (NICl x (ICEval ?sub ?env t))
+
+  -- Kan
+  Coe r r' x a t    -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
+  HCom r r' a t b   -> hcom' (evalI r) (evalI r') (evalf a) (evalSysHCom' t) (evalf b)
+  Com r r' i a t b  -> com' (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom' t) (evalf b)
+
+  -- Glue
+  GlueTy a sys      -> glueTy (eval a) (evalSys sys)
+  Glue t sys        -> gluenf (eval t) (evalSys sys)
+  Unglue t sys      -> unglue (eval t) (evalSys sys)
+
+  -- Line
+  Line x a          -> VLine (NICl x (ICEval ?sub ?env a))
+  LApp t i          -> lapp (evalf t) (evalI i)
+  LLam x t          -> VLLam (NICl x (ICEval ?sub ?env t))
+
+  -- Misc
+  WkI _ t           -> wkIS (eval t)
+  TODO              -> VTODO
 
   -- Builtins
   Refl t            -> refl (eval t)
   Sym a x y p       -> sym (eval a) (eval x) (eval y) (eval p)
   Trans a x y z p q -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
   Ap f x y p        -> ap_ (eval f) (eval x) (eval y) (eval p)
+
+  -- Inductives
+  TyCon x ts        -> VTyCon x (tyParams ts)
+  DCon x i sp       -> VDCon x i (dSpine sp)
+  Elim mot met t    -> elim (eval mot) (methods met) (evalf t)
 
 
 evalf :: SubArg => NCofArg => DomArg => EnvArg => Tm -> F Val
@@ -1199,6 +1331,8 @@ instance Force Val Val where
     VTODO         -> F VTODO
     VLine t       -> F (VLine (sub t))
     VLLam t       -> F (VLLam (sub t))
+    VTyCon x ts   -> F (VTyCon x (sub ts))
+    VDCon x i sp  -> F (VDCon x i (sub sp))
 
 instance Force Ne Val where
   frc = \case
@@ -1213,6 +1347,7 @@ instance Force Ne Val where
     NUnglue t sys     -> ungluef t (frc sys)
     NGlue t sys       -> glue t (frc sys)
     NLApp t i         -> lappf (frc t) (frc i)
+    NElim mot ms t    -> elimf mot ms (frc t)
 
   frcS = \case
     t@NLocalVar{}     -> F (VNe t mempty)
@@ -1226,6 +1361,7 @@ instance Force Ne Val where
     NUnglue t sys     -> ungluef (sub t) (frcS sys)
     NGlue t sys       -> glue (sub t) (frcS sys)
     NLApp t i         -> lappf (frcS t) (frcS i)
+    NElim mot ms t    -> elimf (sub mot) (sub ms) (frcS t)
 
 instance Force NeSys VSys where
   -- TODO: is it better to not do anything with system components in frc?
@@ -1317,6 +1453,7 @@ unSubNeS = \case
   NUnglue a sys        -> NUnglue (sub a) (sub sys)
   NGlue a sys          -> NGlue (sub a) (sub sys)
   NLApp t i            -> NLApp (sub t) (sub i)
+  NElim mot ms t       -> NElim (sub mot) (sub ms) (sub t)
 
 ----------------------------------------------------------------------------------------------------
 -- Definitions

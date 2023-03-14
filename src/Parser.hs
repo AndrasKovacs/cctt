@@ -52,7 +52,9 @@ isKeyword x =
   || x == "hcom"
   || x == "Glue"
   || x == "glue"
+  || x == "data"
   || x == "unglue"
+  || x == "elim"
   || x == "com"
   || x == "I"
   || x == "refl"
@@ -165,10 +167,24 @@ goCom = do
   t   <- proj
   pure $ Com r r' a sys t
 
+methods :: Parser [([Name], Tm)]
+methods =
+  char '[' *>
+  sepBy ((,) <$!> ((:) <$!> ident <*!> many bind) <*!> (char '.' *> tm)) (char ';')
+  <* char ']'
+
+goElim :: Parser Tm
+goElim = do
+  motive  <- optional proj
+  methods <- methods
+  arg     <- optional proj
+  pure $ Elim motive methods arg
+
 app :: Parser Tm
 app = withPos (
        (keyword "coe"     *> goCoe)
   <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
+  <|>  (keyword "elim"    *> goElim)
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
   <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
@@ -284,24 +300,39 @@ tm = withPos do
     (\_ -> Pair t <$!> tm)
     (pure t)
 
+telescope :: Parser [(Name, Ty)]
+telescope = do
+  bs <- many piBinder
+  pure $! foldr' (\(xs, a) acc -> foldr' (\x acc -> (x, a):acc) acc xs) [] bs
+
 top :: Parser Top
-top = branch ((,) <$!> getSourcePos <*!> ident)
-  (\(pos, x) -> do
-    args <- many piBinder
-    ma <- case args of
-      [] -> optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
-      _  -> do o <- getOffset
-               char ':'
-               branch (char '=')
-                 (\_ -> setOffset o >> fail "Expected a type annotation")
-                 (Just <$!> tm)
-    symbol ":="
-    t <- tm
-    (t, ma) <- pure $! desugarIdentArgs args ma t
-    char ';'
-    u <- top
-    pure $ TDef (coerce pos) x ma t u)
-  (pure TEmpty)
+top =
+  branch ((,) <$!> getSourcePos <*> (keyword "data" *> ident))
+    (\(pos, x) -> do
+        params <- telescope
+        symbol ":="
+        constructors <- sepBy ((,) <$!> ident <*!> telescope) (char '|')
+        char ';'
+        u <- top
+        pure $! TData (coerce pos) x params constructors u
+    )
+    (branch ((,) <$!> getSourcePos <*!> ident)
+      (\(pos, x) -> do
+        args <- many piBinder
+        ma <- case args of
+          [] -> optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
+          _  -> do o <- getOffset
+                   char ':'
+                   branch (char '=')
+                     (\_ -> setOffset o >> fail "Expected a type annotation")
+                     (Just <$!> tm)
+        symbol ":="
+        t <- tm
+        (t, ma) <- pure $! desugarIdentArgs args ma t
+        char ';'
+        u <- top
+        pure $! TDef (coerce pos) x ma t u)
+      (pure TEmpty))
 
 src :: Parser Top
 src = ws *> top <* eof

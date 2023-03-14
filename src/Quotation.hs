@@ -28,6 +28,7 @@ instance Quote Ne Tm where
     NUnglue t sys     -> Unglue (quote t) (quote sys)
     NGlue t sys       -> Glue (quote t) (quote sys)
     NLApp t i         -> LApp (quote t) (quote i)
+    NElim mot ms t    -> Elim (quote mot) (quote ms) (quote t)
 
 instance Quote Val Tm where
   quote t = case unF (frc t) of
@@ -44,21 +45,38 @@ instance Quote Val Tm where
     VTODO            -> TODO
     VLine t          -> Line (t^.name) (quote t)
     VLLam t          -> LLam (t^.name) (quote t)
+    VTyCon x ts      -> TyCon x (quote ts)
+    VDCon x i sp     -> DCon x i (quote sp)
 
 instance Quote a b => Quote (BindCofLazy a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
+
+instance Quote a b => Quote [a] [b] where
+  quote = \case
+    []   -> []
+    a:as -> (:) $$! quote a $$! quote as
+  {-# inline quote #-}
+
+instance Quote VDSpine DSpine where
+  quote = \case
+    VDNil         -> DNil
+    VDInd t sp    -> DInd (quote t) (quote sp)
+    VDHInd t a sp -> DHInd (quote t) a (quote sp)
+    VDExt t a sp  -> DExt (quote t) a (quote sp)
 
 instance Quote a b => Quote (BindCof a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
 
 instance Quote NeCof' Cof where
   quote (NeCof' _ c) = quote c
+  {-# inline quote #-}
 
 instance Quote VCof Cof where
   quote = \case
     VCTrue   -> CTrue
     VCFalse  -> impossible
     VCNe c _ -> quote c
+  {-# inline quote #-}
 
 instance Quote NeCof Cof where
   quote c = go c CTrue where
@@ -87,3 +105,13 @@ instance Quote NamedClosure Tm where
 
 instance Quote NamedIClosure Tm where
   quote t = freshI \(IVar -> i) -> quote (t ∙ i); {-# inline quote #-}
+
+instance Quote VMethods Methods where
+  quote = \case
+    VMNil          -> MNil
+    VMCons xs t ms -> MCons xs (quoteMethod xs t) (quote ms)
+
+quoteMethod :: NCofArg => DomArg => [Name] -> EvalClosure -> Tm
+quoteMethod xs (EC s e t) = case xs of
+  []   -> let ?sub = s; ?env = e in quote (eval t)
+  _:xs -> fresh \x -> quoteMethod xs (EC s (EDef e x) t)

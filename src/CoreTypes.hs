@@ -1,4 +1,4 @@
-{-# options_ghc -funbox-strict-fields #-}
+{-# options_ghc -funbox-strict-fields -Wno-orphans #-}
 
 module CoreTypes where
 
@@ -16,6 +16,10 @@ data Tm
   = TopVar Lvl ~(DontShow Val)
   | LocalVar Ix
   | Let Name Tm Ty Tm
+
+  | TyCon Lvl [Tm]
+  | DCon Lvl Lvl DSpine         -- con lvl, con lvl relative to tycon (TODO: pack)
+  | Elim ~Tm Methods Tm         -- motive, methods, scrutinee
 
   | Pi Name Ty Ty
   | App Tm Tm
@@ -58,6 +62,18 @@ data Tm
   | Ap Tm ~Tm ~Tm Tm
   deriving Show
 
+data Methods
+  = MNil
+  | MCons [Name] Tm Methods
+  deriving Show
+
+data DSpine
+  = DNil
+  | DInd Tm DSpine       -- inductive argument
+  | DHInd Tm Ty DSpine   -- infinitary inductive argument, there's exactly one
+                         -- function param with in-signature type Ty.
+  | DExt Tm Ty DSpine    -- external param with signature type Ty.
+  deriving Show
 
 -- | Atomic equation.
 data CofEq = CofEq I I
@@ -188,9 +204,10 @@ data Val
   | VSg VTy NamedClosure
   | VPair Val Val
   | VU
-
   | VLine NamedIClosure
   | VLLam NamedIClosure
+  | VTyCon Lvl [Val]
+  | VDCon Lvl Lvl VDSpine
 
   | VTODO -- placeholder
   deriving Show
@@ -207,6 +224,20 @@ data Ne
   | NHCom I I VTy NeSysHCom Val
   | NUnglue Val NeSys
   | NGlue Val NeSys
+  | NElim ~Val VMethods Ne -- motive, methods, scrutinee
+  deriving Show
+
+data VMethods
+  = VMNil
+  | VMCons [Name] EvalClosure VMethods
+  deriving Show
+
+data VDSpine
+  = VDNil
+  | VDInd Val VDSpine       -- inductive argument
+  | VDHInd Val Ty VDSpine   -- infinitary inductive argument, there's exactly one
+                            -- function param with in-signature type Ty.
+  | VDExt Val Ty VDSpine    -- external param with signature type Ty.
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -223,10 +254,13 @@ type IDomArg = (?idom :: IVar)   -- fresh LocalVar
 
 --------------------------------------------------------------------------------
 
+data EvalClosure = EC Sub Env Tm
+  deriving Show
+
 -- | Defunctionalized closures.
 data Closure
   -- ^ Body of vanilla term evaluation.
-  = CEval Sub Env Tm
+  = CEval EvalClosure
 
   -- ^ Body of function coercions.
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
@@ -267,6 +301,9 @@ data Closure
 
   -- [A]  (B* : U) × equiv B A
   | CEquivInto Val
+
+  -- λ x. elim motive methods (val ∙ x)
+  | CHInd Val VMethods Val   -- motive, methods, val
 
   deriving Show
 
@@ -361,10 +398,13 @@ instance SubAction NamedIClosure where
   sub (NICl x cl) = NICl x (sub cl)
   {-# inline sub #-}
 
+instance SubAction EvalClosure where
+  sub (EC s' env t) = EC (sub s') (sub env) t
+  {-# inline sub #-}
+
 instance SubAction Closure where
   sub cl = case cl of
-    CEval s' env t ->
-      CEval (sub s') (sub env) t
+    CEval ecl -> CEval (sub ecl)
 
     -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.
@@ -390,6 +430,7 @@ instance SubAction Closure where
     CCoeAlong a r r'          -> CCoeAlong (sub a) (sub r) (sub r')
     CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
     CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
+    CHInd mot ms t            -> CHInd (sub mot) (sub ms) (sub t)
 
 instance SubAction IClosure where
   sub cl = case cl of
@@ -413,6 +454,24 @@ instance SubAction IClosure where
     ICSym a x y p           -> ICSym (sub a) (sub x) (sub y) (sub p)
     ICTrans a x y z p q     -> ICTrans (sub a) (sub x) (sub y) (sub z) (sub p) (sub q)
     ICAp f x y p            -> ICAp (sub f) (sub x) (sub y) (sub p)
+
+instance SubAction VMethods where
+  sub = \case
+    VMNil          -> VMNil
+    VMCons xs t ms -> VMCons xs (sub t) (sub ms)
+
+instance SubAction a => SubAction [a] where
+  sub = \case
+    []   -> []
+    a:as -> (:) $$! sub a $$! sub as
+  {-# inline sub #-}
+
+instance SubAction VDSpine where
+  sub = \case
+    VDNil         -> VDNil
+    VDInd t sp    -> VDInd (sub t) (sub sp)
+    VDHInd t a sp -> VDHInd (sub t) a (sub sp)
+    VDExt t a sp  -> VDExt (sub t) a (sub sp)
 
 --------------------------------------------------------------------------------
 
