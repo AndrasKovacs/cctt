@@ -275,7 +275,7 @@ isCoherentCoe :
     l=1,k=1 ⊢ rinvⁱ (fⁱ x) k = rinvⁱ (fⁱ x) 1 = fⁱ x
               fⁱ x = fⁱ x OK
 
-  Top boundary:
+  Top boundary: OK
 
 
 

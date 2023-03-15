@@ -291,6 +291,26 @@ data Closure
   | CCoeLinv0 (BindI Val) I I
   | CCoeRinv0 (BindI Val) I I
 
+{-
+    Coherence for coercion.
+
+    Metatheoretic shorthands:
+      fⁱ x      := coe r i A x
+      gⁱ x      := coe i r A x
+      linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+      rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+
+    coh := λ x^0 l^1 k^2. com r r' (i. A i)
+                         [k=0 i. fⁱ (linvⁱ x l)
+		        ; k=1 i. fⁱ x
+		        ; l=0 i. fⁱ x
+		        ; l=1 i. rinvⁱ (fⁱ x) k]
+		        x
+-}
+
+  | CCoeCoh0 (BindI Val) I I -- a r r'
+
+
 -- isEquiv : (A → B) → U
 -- isEquiv A B f :=
 --     (g^1    : B → A)
@@ -332,6 +352,25 @@ data IClosure
 
   | ICCoeLinv1 (BindI Val) Val I I
   | ICCoeRinv1 (BindI Val) Val I I
+
+{-
+    Coherence for coercion.
+
+    Metatheoretic shorthands:
+      fⁱ x      := coe r i A x
+      gⁱ x      := coe i r A x
+      linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+      rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+
+    coh := λ x^0 l^1 k^2. com r r' (i. A i)
+                         [k=0 i. fⁱ (linvⁱ x l)
+		        ; k=1 i. fⁱ x
+		        ; l=0 i. fⁱ x
+		        ; l=1 i. rinvⁱ (fⁱ x) k]
+		        x
+-}
+  | ICCoeCoh1 (BindI Val) I I Val    -- a r r' x
+  | ICCoeCoh2 (BindI Val) I I Val I  -- a r r' x l
 
   | ICSym Val ~Val ~Val Val
   | ICTrans Val ~Val ~Val ~Val Val Val
@@ -427,7 +466,6 @@ instance SubAction Closure where
     CHComPi r r' a b sys base ->
       CHComPi (sub r) (sub r') (sub a) (sub b) (sub sys) (sub base)
 
-
     CConst t                  -> CConst (sub t)
     CIsEquiv1 a b f           -> CIsEquiv1 (sub a) (sub b) (sub f)
     CIsEquiv2 a b f g         -> CIsEquiv2 (sub a) (sub b) (sub f) (sub g)
@@ -443,6 +481,7 @@ instance SubAction Closure where
     CCoeAlong a r r'          -> CCoeAlong (sub a) (sub r) (sub r')
     CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
     CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
+    CCoeCoh0 a r r'           -> CCoeCoh0 (sub a) (sub r) (sub r')
     CHInd mot ms t            -> CHInd (sub mot) (sub ms) (sub t)
 
 instance SubAction IClosure where
@@ -463,10 +502,11 @@ instance SubAction IClosure where
     ICCoeLine r r' a t      -> ICCoeLine (sub r) (sub r') (sub a) (sub t)
     ICCoeLinv1 a x r r'     -> ICCoeLinv1 (sub a) (sub x) (sub r) (sub r')
     ICCoeRinv1 a x r r'     -> ICCoeRinv1 (sub a) (sub x) (sub r) (sub r')
-
     ICSym a x y p           -> ICSym (sub a) (sub x) (sub y) (sub p)
     ICTrans a x y z p q     -> ICTrans (sub a) (sub x) (sub y) (sub z) (sub p) (sub q)
     ICAp f x y p            -> ICAp (sub f) (sub x) (sub y) (sub p)
+    ICCoeCoh1 a r r' x      -> ICCoeCoh1 (sub a) (sub r) (sub r') (sub x)
+    ICCoeCoh2 a r r' x l    -> ICCoeCoh2 (sub a) (sub r) (sub r') (sub x) (sub l)
 
 instance SubAction VMethods where
   sub = \case

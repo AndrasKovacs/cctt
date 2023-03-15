@@ -1,0 +1,26 @@
+
+-- coercion from 0 to 1 is an equivalence
+-- the same definition works for arbitrary r,r' instead of 0,1
+
+isEquiv (A B : U)(f : A → B) : U :=
+     (g    : B → A)
+   × (linv : (a : A) → a = g (f a))
+   × (rinv : (b : B) → f (g b) = b)
+   × ((a : A) → (λ _. f a) ={i. f (linv a i) = f a} rinv (f a));
+
+coe01isEquiv (A : I → U) : isEquiv (A 0) (A 1) (λ x. coe 0 1 A x) :=
+
+  let f' (i : I)(x : A 0)           : A i := coe 0 i A x;
+  let g' (i : I)(x : A i)           : A 0 := coe i 0 A x;
+  let linv' (i : I)(x : A 0)(j : I) : A 0 := hcom 0 i (A 0) [j=0 k. x; j=1 k. coe k 0 A (coe 0 k A x)] x;
+  let rinv' (i : I)(x : A i)(j : I) : A i := hcom i 0 (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
+
+  ( λ x. g' 1 x
+  , λ x j. linv' 1 x j
+  , λ x j. rinv' 1 x j
+  , λ x l k. com 0 1 A [k=0 i. f' i (linv' i x l)
+                       ;k=1 i. f' i x
+		       ;l=0 i. f' i x
+		       ;l=1 i. rinv' i (f' i x) k]
+		       x
+  );

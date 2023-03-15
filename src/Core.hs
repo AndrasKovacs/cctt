@@ -527,8 +527,6 @@ capp (NCl _ t) ~u = case t of
       (refl fx)
       (rinv ∙ fx)
 
-  ------------------------------------------------------------
-
   -- equiv A B = (f* : A -> B) × isEquiv a b f
   CEquiv a b -> let ~f = u in isEquiv a b f
 
@@ -546,24 +544,17 @@ capp (NCl _ t) ~u = case t of
   --   _⁻¹  := λ x^1. coeⁱ r' r A x
   --   linv := λ x^0. λ j^1. hcom r r' (A r)  [j=0 k. x; j=1 k. coeⁱ k r A (coeⁱ r k A x)] x
   --   rinv := λ x^0. λ j^1. hcom r' r (A r') [j=0 k. coeⁱ k r' A (coeⁱ r' k A x); j=1 k. x] x
-  --   coh  := TODO
-
-  -- isEquiv : (A B : U) → (A → B) → U
-  -- isEquiv A B f :=
-  --     (g    : B → A)
-  --   × (linv : (x : A) → Path A x (g (f x)))
-  --   × (rinv : (x : B) → Path B (f (g x)) x)
-  --   × (coh  : (x : A) →
-  --             PathP i (Path B (f (linv x i)) (f x))
-  --                     (refl B (f x))
-  --                     (rinv (f x)))
-
-  -- isEquivCoe : (A : I → U)(r r' : I) → isEquiv (λ x. coe r r' A x)
-  -- isEquivCoe A r r' =
-  --   g    := λ x. coe r' r A x
-  --   linv := λ x j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
-  --   rinv := λ x j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x
-  --   coh  := TODO
+  --   coh  := λ x^0 l^1 k^2.
+  --     fⁱ x      := coe r i A x
+  --     gⁱ x      := coe i r A x
+  --     linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+  --     rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+  --
+  --     com r r' (i. A i) [k=0 i. fⁱ (linvⁱ x l)
+  --     		  ; k=1 i. fⁱ x
+  --     		  ; l=0 i. fⁱ x
+  --     		  ; l=1 i. rinvⁱ (fⁱ x) k]
+  --     		    x
 
   CCoeAlong (frc -> a) (frc -> r) (frc -> r') ->
     let ~x = u in coenf r r' a (frc x)
@@ -582,6 +573,12 @@ capp (NCl _ t) ~u = case t of
         ~rhs = unF x
     in VPLam lhs rhs $ NICl "j" $ ICCoeRinv1 (unF a) (unF x) (unF r) (unF r')
 
+  CCoeCoh0 a r r' ->
+    uf
+    -- let ~x = u
+    -- in VPLam _ _ $ NICl "l" _
+
+
   CHInd motive ms (frc -> t) ->
     elim motive ms (t ∘ u)
 
@@ -593,15 +590,19 @@ icapp (NICl _ t) arg = case t of
     let ?env = env; ?sub = ext s arg in eval t
 
   ICCoePath (frc -> r) (frc -> r') a lhs rhs p ->
-    let j = frc arg in
-    com r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
-             (vshcons (ceq j fi0) "i" (\i -> lhs ∘ unF i) $
-              vshcons (ceq j fi1) "i" (\i -> rhs ∘ unF i) $
-              vshempty)
-             (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j)
+    let j     = frc arg
+        abind = bindIf "i" \i -> a ∙ unF i ∘ unF j in
+    hcom r r' (a ∙ unF r' ∘ unF j)
+      (vshcons (ceq j fi0) "i" (\i -> coe i r' abind (lhs ∘ unF i)) $
+       vshcons (ceq j fi1) "i" (\i -> coe i r' abind (rhs ∘ unF i)) $
+       vshempty)
+      (coe r r' abind (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j))
 
--- hcom r r' (lhs {i.A} rhs) [α j. t] base =
---   (λ arg. hcom r r' (A arg) [arg=0 j. lhs, arg=1 j. rhs, α j. t j arg] (base arg))
+    -- com r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
+    --          (vshcons (ceq j fi0) "i" (\i -> lhs ∘ unF i) $
+    --           vshcons (ceq j fi1) "i" (\i -> rhs ∘ unF i) $
+    --           vshempty)
+    --          (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j)
 
   ICHComPath (frc -> r) (frc -> r') a lhs rhs sys p ->
     let farg = frc arg in
@@ -612,9 +613,6 @@ icapp (NICl _ t) arg = case t of
                    (frc sys))
       (pappf lhs rhs (frc p) farg)
 
-      -- $ ICHComPath (unF r) (unF r') a lhs rhs nts (unF base)
-
-
   ICHComLine (frc -> r) (frc -> r') a sys base ->
     let farg = frc arg in
     hcom r r' (a ∘ unF farg)
@@ -623,8 +621,7 @@ icapp (NICl _ t) arg = case t of
 
   ICCoeLine (frc -> r) (frc -> r') a p ->
     let j = frc arg in
-    coednf r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
-                (lappf (frc p) j)
+    coenf r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j) (lappf (frc p) j)
 
   ICConst t -> t
 
@@ -841,14 +838,22 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     gr       = t
     ~_Ar'    = a ∘ unF r'
     ~topSysr = topSys ∘ unF r
+    ~frc_a   = frc a
 
   -- ar' : Ar'
   -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
-    ~ar' = comdn r r' (frc a)
+
+    ~ar' = hcomdn r r' _Ar'
              (mapForallNeSys'
-                (\i tf -> proj1f (proj2f (tf ∘ unF i)) ∘ coenf r i (proj1BindI tf) gr)
+                (\i tf -> coe i r' frc_a (proj1f (proj2f (tf ∘ unF i)) ∘ coenf r i (proj1BindI tf) gr))
                 topSys)
-             (ungluef (unF gr) topSysr)
+             (coed r r' frc_a (ungluef (unF gr) topSysr))
+
+    -- ~ar' = comdn r r' (frc a)
+    --          (mapForallNeSys'
+    --             (\i tf -> proj1f (proj2f (tf ∘ unF i)) ∘ coenf r i (proj1BindI tf) gr)
+    --             topSys)
+    --          (ungluef (unF gr) topSysr)
 
     mkComponents :: NCofArg => Val -> (F Val, BindILazy Val)
     mkComponents tfr' = seq ?cof $ let
@@ -965,19 +970,40 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     F $ VLam $ NCl (b^.name) $ CHComPi (unF r) (unF r') a b nts (unF base)
 
   VSg a b ->
+    let bbind =
+         bindIf "i" \i ->
+          b ∘ hcomnnf r i
+               (frc a)
+               (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
+               (proj1f base) in
     F $ VPair
       (hcomdnnf r r'
         (frc a)
         (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
         (proj1f base))
-      (comdnnf r r'
-        (bindIf "i" \i ->
-          b ∘ hcomnnf r i
-               (frc a)
-               (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
-               (proj1f base))
-        (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
-        (proj2f base))
+      (hcomdnnf r r'
+        (b ∘ hcomnnf r r'
+             (frc a)
+             (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
+             (proj1f base))
+        (mapNeSysHCom' (\i t -> coe i r' bbind (proj2f (frc t))) ts)
+        (coed r r' bbind (proj2f base)))
+
+  -- VSg a b ->
+  --   F $ VPair
+  --     (hcomdnnf r r'
+  --       (frc a)
+  --       (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
+  --       (proj1f base))
+  --     (comdnnf r r'
+  --       (bindIf "i" \i ->
+  --         b ∘ hcomnnf r i
+  --              (frc a)
+  --              (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
+  --              (proj1f base))
+  --       (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
+  --       (proj2f base))
+
 
   VPath a lhs rhs ->
     F $ VPLam lhs rhs
@@ -1338,7 +1364,6 @@ eval = \case
   -- Kan
   Coe r r' x a t    -> coenf (evalI r) (evalI r') (bindIS x \_ -> evalf a) (evalf t)
   HCom r r' a t b   -> hcom' (evalI r) (evalI r') (evalf a) (evalSysHCom' t) (evalf b)
-  Com r r' i a t b  -> com' (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom' t) (evalf b)
 
   -- Glue
   GlueTy a sys      -> glueTy (eval a) (evalSys sys)
@@ -1359,6 +1384,7 @@ eval = \case
   Sym a x y p       -> sym (eval a) (eval x) (eval y) (eval p)
   Trans a x y z p q -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
   Ap f x y p        -> ap_ (eval f) (eval x) (eval y) (eval p)
+  Com r r' i a t b  -> com' (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom' t) (evalf b)
 
   -- Inductives
   TyCon x ts        -> VTyCon x (tyParams ts)
@@ -1614,12 +1640,33 @@ theIdEquiv a =
   VPair (VLam $ NCl "x" C'λ'a''a)
         (idIsEquiv a)
 
+--------------------------------------------------------------------------------
+
+{-
+  coeIsEquiv : (A : I → U) (r r' : I) → isEquiv (λ x. coe r r' A x)
+  coeIsEquiv A r r' =
+
+    ffill i x      := coe r i A x
+    gfill i x      := coe i r A x
+    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+
+    g    := λ x^0. gfill r' x
+    linv := λ x^0 j^1. linvfill r' x j
+    rinv := λ x^0 j^1. rinvfill r' x j
+    coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
+      		                      ;k=1 i. ffill i x
+      		                      ;l=0 i. ffill i x
+      		                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      x
+-}
+
 coeIsEquiv :: BindI Val -> I -> I -> Val
 coeIsEquiv a r r' =
   VPair (VLam $ NCl "x" $ CCoeAlong a r' r) $
   VPair (VLam $ NCl "x" $ CCoeLinv0 a r r') $
   VPair (VLam $ NCl "x" $ CCoeRinv0 a r r') $
-        VTODO
+        (VLam $ NCl "x" $ CCoeCoh0  a r r')
 
 -- | Coercion function packed together with isEquiv.
 theCoeEquiv :: BindI Val -> I -> I -> Val
