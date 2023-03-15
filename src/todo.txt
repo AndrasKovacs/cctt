@@ -90,6 +90,7 @@ Convenience:
 
 Performance:
 
+- optimize closed inductive elim
 - unbox VSys types
 - coe Glue: unfold the hcom fiber
 - switch to ByteString megaparsec input

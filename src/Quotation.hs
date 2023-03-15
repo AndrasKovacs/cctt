@@ -111,6 +111,11 @@ instance Quote VMethods Methods where
     VMNil          -> MNil
     VMCons xs t ms -> MCons xs (quoteMethod xs t) (quote ms)
 
+instance Quote Env TyParams where
+  quote = \case
+    ENil       -> TPNil
+    EDef env t -> TPSnoc (quote env) (quote t)
+
 quoteMethod :: NCofArg => DomArg => [Name] -> EvalClosure -> Tm
 quoteMethod xs (EC s e t) = case xs of
   []   -> let ?sub = s; ?env = e in quote (eval t)

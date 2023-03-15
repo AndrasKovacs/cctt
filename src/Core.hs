@@ -281,19 +281,19 @@ unBindCof t = NeCof' (conjNeCof ?cof (t^.binds)) (t^.binds)
 unBindCofLazy :: NCofArg => BindCofLazy a -> NeCof'
 unBindCofLazy t = NeCof' (conjNeCof ?cof (t^.binds)) (t^.binds)
 
-mapBindCof :: NCofArg => BindCof a -> (NCofArg => a -> a) -> BindCof a
+mapBindCof :: NCofArg => BindCof a -> (NCofArg => a -> b) -> BindCof b
 mapBindCof t f = bindCof (unBindCof t) (f (t^.body))
 {-# inline mapBindCof #-}
 
-mapBindCofLazy :: NCofArg => BindCofLazy a -> (NCofArg => a -> F a) -> F (BindCofLazy a)
+mapBindCofLazy :: NCofArg => BindCofLazy a -> (NCofArg => a -> F b) -> F (BindCofLazy b)
 mapBindCofLazy t f = bindCofLazy (unBindCofLazy t) (f (t^.body))
 {-# inline mapBindCofLazy #-}
 
-mapBindCofLazynf :: NCofArg => BindCofLazy a -> (NCofArg => a -> F a) -> BindCofLazy a
+mapBindCofLazynf :: NCofArg => BindCofLazy a -> (NCofArg => a -> F b) -> BindCofLazy b
 mapBindCofLazynf t f = unF (mapBindCofLazy t f)
 {-# inline mapBindCofLazynf #-}
 
-mapBindILazy :: NCofArg => SubAction a => BindILazy a -> (NCofArg => F I -> a -> F a) -> F (BindILazy a)
+mapBindILazy :: NCofArg => SubAction a => BindILazy a -> (NCofArg => F I -> a -> F b) -> F (BindILazy b)
 mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ unF i)
 {-# inline mapBindILazy #-}
 
@@ -302,22 +302,22 @@ mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ unF i)
 --   external scope, it can only depend on the value under the binder. This can
 --   be useful when we only do projections under a binder. The case switch in
 --   `coed` on the type argument is similar.
-unsafeMapBindI :: NCofArg => BindI a -> (NCofArg => a -> F a) -> F (BindI a)
+unsafeMapBindI :: NCofArg => BindI a -> (NCofArg => a -> F b) -> F (BindI b)
 unsafeMapBindI (BindI x i a) f =
   let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
   seq ?cof (F (BindI x i (unF (f a))))
 {-# inline unsafeMapBindI #-}
 
-unsafeMapBindILazy :: NCofArg => BindILazy a -> (NCofArg => a -> F a) -> F (BindILazy a)
+unsafeMapBindILazy :: NCofArg => BindILazy a -> (NCofArg => a -> F b) -> F (BindILazy b)
 unsafeMapBindILazy (BindILazy x i a) f =
   let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
   seq ?cof (F (BindILazy x i (unF (f a))))
 {-# inline unsafeMapBindILazy #-}
 
-unsafeMapBindILazynf :: NCofArg => BindILazy a -> (NCofArg => a -> F a) -> BindILazy a
+unsafeMapBindILazynf :: NCofArg => BindILazy a -> (NCofArg => a -> F b) -> BindILazy b
 unsafeMapBindILazynf t f = unF (unsafeMapBindILazy t f); {-# inline unsafeMapBindILazynf #-}
 
-mapBindILazynf :: NCofArg => SubAction a => BindILazy a -> (NCofArg => F I -> a -> F a) -> BindILazy a
+mapBindILazynf :: NCofArg => SubAction a => BindILazy a -> (NCofArg => F I -> a -> F b) -> BindILazy b
 mapBindILazynf t f = unF (mapBindILazy t f); {-# inline mapBindILazynf #-}
 
 mapNeSys :: NCofArg => (NCofArg => Val -> F Val) -> F NeSys -> F NeSys
@@ -756,7 +756,6 @@ coed r r' topA t = case unF topA ^. body of
     in F (VPair (coednf r r' a t1)
                 (coednf r r' (bindIf "j" \j -> coe r j a t1) t2))
 
-
   VPath (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
     F $ VPLam (lhs ∙ unF r') (rhs ∙ unF r')
       $ NICl (a^.body.name)
@@ -769,6 +768,13 @@ coed r r' topA t = case unF topA ^. body of
 
   VU ->
     t
+
+  -- closed inductives
+  VTyCon x ENil ->
+    t
+
+  VTyCon x (rebind topA -> ps) ->
+    uf
 
   -- Note: I don't need to rebind the "is"! It can be immediately weakened
   -- to the outer context.
@@ -786,8 +792,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   sysr = [(α r). (T r, f r)]    -- instantiate system to r
 
   ar' : Ar'
-  ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (i.T i) gr)] (unglue gr sysr)
-
+  ar' := com r r' (i. A i) [(∀i.α) i. f i (coe r i (i.T i) gr)] (unglue gr sysr)
 
   working under (α r'), mapping over the [(α r'). (T r', f r')] system, producing two output systems:
 
@@ -1046,8 +1051,8 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 
   a@(VTyCon x ps) -> case unF base of
     VDCon x i sp     -> case ?dom of
-                          0 -> hcomind0 r r' (F a) x i sp ts
-                          _ -> hcomind  r r' (F a) x i sp ts
+                          0 -> hcomind0 r r' (F a) ts ps x i sp
+                          _ -> hcomind  r r' (F a) ts ps x i sp
     base@(VNe n is') -> F $ VNe (NHCom (unF r) (unF r') a nts base)
                                 (IS.insertFI r $ IS.insertFI r' $ is <> is')
     VTODO            -> F VTODO
@@ -1121,10 +1126,11 @@ ungluenf ~t sys = F (ungluen t sys); {-# inline ungluenf #-}
 
 -- Strict inductive types
 ----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
-tyParams :: SubArg => NCofArg => DomArg => EnvArg => [Tm] -> [Val]
-tyParams []     = []
-tyParams (t:ts) = (:) $$! eval t $$! tyParams ts
+tyParams :: SubArg => NCofArg => DomArg => EnvArg => TyParams -> Env
+tyParams TPNil         = ENil
+tyParams (TPSnoc as a) = EDef (tyParams as) (eval a)
 
 dSpine :: SubArg => NCofArg => DomArg => EnvArg => DSpine -> VDSpine
 dSpine = \case
@@ -1165,19 +1171,19 @@ elim ~motive ms val = case unF val of
 
 elimf ~motive ms val = frc (elim motive ms val); {-# inline elimf #-}
 
-lazyprojsp :: NCofArg => DomArg => Lvl -> VDSpine -> F Val
-lazyprojsp ix sp = case (ix, sp) of
+projsp :: NCofArg => DomArg => Lvl -> VDSpine -> F Val
+projsp ix sp = case (ix, sp) of
   (0 , VDInd t _     ) -> frc t
   (0 , VDHInd t _ _  ) -> frc t
   (0 , VDExt t _ _   ) -> frc t
-  (ix, VDInd _ sp    ) -> lazyprojsp (ix - 1) sp
-  (ix, VDHInd _ _ sp ) -> lazyprojsp (ix - 1) sp
-  (ix, VDExt _ _ sp  ) -> lazyprojsp (ix - 1) sp
+  (ix, VDInd _ sp    ) -> projsp (ix - 1) sp
+  (ix, VDHInd _ _ sp ) -> projsp (ix - 1) sp
+  (ix, VDExt _ _ sp  ) -> projsp (ix - 1) sp
   _                    -> impossible
 
 lazyprojfield :: NCofArg => DomArg => Lvl -> Lvl -> Val -> F Val
 lazyprojfield conix fieldix v = case unF (frc v) of
-  VDCon x i sp | i == conix -> lazyprojsp fieldix sp
+  VDCon x i sp | i == conix -> projsp fieldix sp
   _                         -> impossible
 {-# inline lazyprojfield #-}
 
@@ -1192,22 +1198,115 @@ lazyprojsys' :: NCofArg => DomArg => Lvl -> Lvl -> F NeSysHCom' -> F NeSysHCom'
 lazyprojsys' conix fieldix (F (!sys, !is)) = F (lazyprojsys conix fieldix sys // is)
 {-# inline lazyprojsys' #-}
 
-hcomind0sp :: NCofArg => DomArg => F I -> F I -> F Val -> Lvl -> Lvl -> VDSpine -> F NeSysHCom' -> VDSpine
-hcomind0sp r r' a conix fieldix sp sys = case sp of
-  VDNil         -> VDNil
-  VDInd t sp    -> VDInd (hcomdnnf r r' a (lazyprojsys' conix fieldix sys) (frc t))
-                         (hcomind0sp r r' a conix (fieldix + 1) sp sys)
-  VDHInd t a sp -> uf
-  VDExt t a sp  -> uf
+hcomind0sp :: NCofArg => DomArg =>
+              F I -> F I -> F Val -> F NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> VDSpine
+hcomind0sp r r' topa sys ext conix fieldix sp = case sp of
+  VDNil ->
+    VDNil
+  VDInd t sp ->
+    VDInd (hcomdnnf r r' topa (lazyprojsys' conix fieldix sys) (frc t))
+          (hcomind0sp r r' topa sys ext conix (fieldix + 1) sp)
+  VDHInd t a sp ->
+    let ft = frc t in
+    let va = (let ?env = ext; ?sub = idSub (dom ?cof) in eval a) in
+    VDHInd (hcomdnnf r r' (funf va (unF topa)) (lazyprojsys' conix fieldix sys) ft)
+           a
+           (hcomind0sp r r' topa sys (EDef ext (unF ft)) conix (fieldix + 1) sp)
+  VDExt t a sp  ->
+    let ft = frc t in
+    let ~va = (let ?env = ext; ?sub = idSub (dom ?cof) in evalf a) in
+    VDExt (hcomdnnf r r' va (lazyprojsys' conix fieldix sys) ft)
+          a
+          (hcomind0sp r r' topa sys (EDef ext (unF ft)) conix (fieldix + 1) sp)
 
-hcomind0 :: NCofArg => DomArg => F I -> F I -> F Val -> Lvl -> Lvl -> VDSpine -> F NeSysHCom' -> F Val
-hcomind0 r r' a tyix conix sp sys = F $ VDCon tyix conix (hcomind0sp r r' a conix 0 sp sys)
+hcomind0 :: NCofArg => DomArg =>
+            F I -> F I -> F Val -> F NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> F Val
+hcomind0 r r' a sys ext tyix conix sp =
+  F $ VDCon tyix conix (hcomind0sp r r' a sys ext conix 0 sp)
 {-# inline hcomind0 #-}
 
-hcomind :: NCofArg => DomArg => F I -> F I -> F Val -> Lvl -> Lvl -> VDSpine -> F NeSysHCom' -> F Val
-hcomind = uf
+
+-- System where all components are known to be the same constructor
+data Projected
+  = PNil
+  | PCons NeCof Name IVar VDSpine Projected
+
+type Projected' = (Projected, IS.IVarSet)
+
+-- TODO: unbox
+data TryToProject
+  = TTPProject Projected
+  | TTPNe {-# unpack #-} NeSysHCom'
+
+projsys :: NCofArg => DomArg => Lvl -> NeSysHCom' -> NeSysHCom -> TryToProject
+projsys conix topSys@(!_,!_) = \case
+  NSHEmpty      -> TTPProject PNil
+  NSHCons t sys ->
+    let ~prj = projsys conix topSys sys; {-# inline prj #-} in
+
+    assumeCof (t^.binds) $ case unF(frc (t^.body))^.body of
+      VDCon _ conix' sp | conix == conix' ->
+        case prj of
+          TTPProject prj ->
+            TTPProject (PCons (t^.binds) (t^.body.name) (t^.body.binds) sp prj)
+          prj@TTPNe{} ->
+            prj
+
+      VNe n is -> TTPNe (fst topSys // is <> snd topSys) -- extend blockers with is'
+      _        -> impossible
+
+projsys' :: NCofArg => DomArg => Lvl -> F NeSysHCom' -> TryToProject
+projsys' conix (F (!sys, !is)) = projsys conix (sys,is) sys
+{-# inline projsys' #-}
+
+projfields :: Projected -> Lvl -> NeSysHCom
+projfields prj fieldix = case prj of
+  PNil ->
+    NSHEmpty
+  PCons ncof x i sp prj ->
+    NSHCons (BindCof ncof (BindILazy x i uf)) (projfields prj fieldix)
+
+projfields' :: Projected' -> Lvl -> F NeSysHCom'
+projfields' (!prj,!is) fieldix = F (projfields prj fieldix // is)
+{-# inline projfields' #-}
+
+hcomindsp :: NCofArg => DomArg =>
+              F I -> F I -> F Val -> Projected' -> Env -> Lvl -> Lvl -> VDSpine -> VDSpine
+hcomindsp r r' topa prj@(!_,!_) ext conix fieldix sp = case sp of
+  VDNil ->
+    VDNil
+  VDInd t sp ->
+    VDInd (hcomdnnf r r' topa (projfields' prj fieldix) (frc t))
+          (hcomindsp r r' topa prj ext conix (fieldix + 1) sp)
+  VDHInd t a sp ->
+    let ft = frc t in
+    let va = (let ?env = ext; ?sub = idSub (dom ?cof) in eval a) in
+    VDHInd (hcomdnnf r r' (funf va (unF topa)) (projfields' prj fieldix) ft)
+           a
+           (hcomindsp r r' topa prj (EDef ext (unF ft)) conix (fieldix + 1) sp)
+
+  VDExt t a sp  ->
+    let ft = frc t in
+    let ~va = (let ?env = ext; ?sub = idSub (dom ?cof) in evalf a) in
+    VDExt (hcomdnnf r r' va (projfields' prj fieldix) ft)
+          a
+          (hcomindsp r r' topa prj (EDef ext (unF ft)) conix (fieldix + 1) sp)
+
+hcomind :: NCofArg => DomArg =>
+           F I -> F I -> F Val -> F NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> F Val
+hcomind r r' a sys ext tyix conix sp = case projsys' conix sys of
+  TTPProject prj ->
+    F $ VDCon tyix conix (hcomindsp r r' a (prj // snd (unF sys)) ext conix 0 sp)
+  TTPNe (sys,is) ->
+    F $ VNe (NHCom (unF r) (unF r') (unF a) sys (VDCon tyix conix sp))
+            (IS.insertI (unF r) $ IS.insertI (unF r') is)
+{-# inline hcomind #-}
+
+-- coeind :: NCofArg => DomArg => F I -> F I ->
 
 
+
+----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
 eval :: SubArg => NCofArg => DomArg => EnvArg => Tm -> Val
@@ -1461,6 +1560,9 @@ unSubNeS = \case
 
 fun :: Val -> Val -> Val
 fun a b = VPi a $ NCl "_" $ CConst b
+
+funf :: Val -> Val -> F Val
+funf a b = F $ VPi a $ NCl "_" $ CConst b
 
 -- | (A : U) -> A -> A -> U
 path :: Val -> Val -> Val -> Val

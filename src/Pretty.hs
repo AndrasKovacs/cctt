@@ -189,8 +189,8 @@ dSpine = \case
   DExt t _ sp  -> " " <> proj t <> dSpine sp
 
 sepby :: (a -> Txt) -> [a] -> Txt -> Txt
-sepby f []  sep = mempty
-sepby f [a] sep = f a
+sepby f []     sep = mempty
+sepby f [a]    sep = f a
 sepby f (a:as) sep = f a <> sep <> sepby f as sep
 {-# inline sepby #-}
 
@@ -199,6 +199,12 @@ methods = \case
   MNil            -> mempty
   MCons xs t MNil -> sepby str xs " " <> ". " <> proj t
   MCons xs t ms   -> sepby str xs " " <> ". " <> proj t <> "; " <> methods ms
+
+tyParams :: PrettyArgs (TyParams -> Txt)
+tyParams = \case
+  TPNil          -> mempty
+  TPSnoc TPNil t -> proj t
+  TPSnoc ts t    -> tyParams ts <> " " <> proj t
 
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
@@ -246,8 +252,8 @@ tm = \case
   Sym _ _ _ p       -> projp (proj p <> "⁻¹")
   Trans _ _ _ _ p q -> transp (app p <> " ∙ " <> trans q)
   Ap f _ _ p        -> appp ("ap " <> proj f <> " " <> proj p)
-  TyCon x []        -> topVar x
-  TyCon x ts        -> appp (topVar x <> sepby proj ts " ")
+  TyCon x TPNil     -> topVar x
+  TyCon x ts        -> appp (topVar x <> tyParams ts)
   DCon x _ DNil     -> topVar x
   DCon x _ sp       -> appp (topVar x <> dSpine sp)
   Elim mot met t    -> appp ("elim " <> proj mot <> " [" <> methods met <> "] " <> proj t)

@@ -129,8 +129,8 @@ hcom r r' ((x : A) * f x = y) [α i. t i] b =
   ( hcom r r' A [α i. (t i).1] b.1
   , λ j. hcom r r' B [j=0 i. f (hcom r i A [α k. (t k).1] b.1)
                      ;j=1 i. y
-		     ;α i. (t i).2 j]
-		     (b.2 j))
+                     ;α i. (t i).2 j]
+                     (b.2 j))
 
 
 -- hcom for Glue
@@ -168,4 +168,133 @@ coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
          (hcompⁱ 1 0 Ar'
             [ αr'  ↦ fr'topt≡ar' i
             , r=r' ↦ unglue gr] ar')
+
+
+-- isEquiv coe attempt
+--------------------------------------------------------------------------------
+
+isEquiv : (A B : U) → (A → B) → U
+isEquiv A B f :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x)
+  × (rinv : (x : B) → f (g x) = x
+  × (coh  : (x : A) → refl (f x) ={i. f (linv x i) = f x} rinv (f x)
+
+isEquivCoe : (A : I → U)(r r' : I) → isEquiv (λ x. coe r r' A x)
+isEquivCoe A r r' =
+  g    := λ x. coe r' r A x
+  linv := λ x j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+  rinv := λ x j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x
+  coh  := TODO
+
+One way is to coerce the identity equivalence:
+
+isEquivId : isEquiv A A (λ x. x) =
+  g    := λ x. x
+  linv := λ x j. x
+  rinv := λ x j. x
+  coh  := λ x j k. x
+
+isEquivCoe : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
+  coe r r' (i. isEquiv (A r) (A i) (λ x. coe r i A x)) (isEquivId (A r))
+
+isCoherent
+  (f    : A → B)
+  (g    : B → A)
+  (linv : (x : A) → x = g (f x))
+  (rinv : (x : B) → f (g x) = x)
+  := ((x : A) → refl (f x) ={l. f (linv x l) = f x} rinv (f x))
+
+
+
+isCoherentId : isCoherent (λ x. x) (λ x. x) (λ x j. x) (λ x j. x) := λ x j k. x
+
+reminder: coe Pi
+  coe r r' (i. (x : A i) → B i x) f
+    = λ x. coe r r' (i. B i (coe r' i A x)) (f (coe r' r A x))
+
+with constant domain:
+  coe r r' (i. (x : A) → B i x) f
+    = λ x. coe r r' (i. B i x) (f x)
+
+isCoherentCoe :
+  isCoherent (λ x. coe r r' A x)
+             (λ x. coe r' r A x)
+             (λ x j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x)
+             (λ x j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x)
+  :=
+  coe r r'
+    (i. isCoherent
+           f=    (λ x. coe r i A x)
+           g=    (λ x. coe i r A x)
+           linv= (λ x j. hcom r i (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x)
+           rinv= (λ x j. hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x))
+    (λ x j k. x)
+
+  coe r r'
+    (i. (x : A r) → refl (f x) ={l. f (linv x l) = f x} rinv (f x))
+    (λ x j k. x)
+
+  λ x. coe r r'
+    (i. refl (f x) ={l. f (linv x l) = f x} (rinv (f x)))
+    (λ j k. x)
+
+  λ x l. com r r'
+    (i. f (linv x l) ={_. A i} f x)
+    [l=0 i. refl (f x); l=1 i. rinv (f x)]
+    (λ k. x)
+
+  --------------------------------------------------------------------------------
+
+  metatheoretic shorthands:
+    fⁱ x      := coe r i A x
+    gⁱ x      := coe i r A x
+    linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+
+  coh := λ x l k. com r r' (i. A i)
+                       [k=0 i. fⁱ (linvⁱ x l)
+		      ; k=1 i. fⁱ x
+		      ; l=0 i. fⁱ x
+		      ; l=1 i. rinvⁱ (fⁱ x) k]
+		      x
+
+  Check:
+  Base compat:
+    fʳ (linvʳ x l) = x OK
+    fʳ x = x OK
+    fʳ x = x OK
+    rinvʳ (fʳ x) k = x OK
+
+  System compat:
+    l=0,k=0 ⊢ fⁱ (linvⁱ x l) = fⁱ x OK
+    l=0,k=1 ⊢ fⁱ x = fⁱ x OK
+    l=1,k=0 ⊢ rinvⁱ (fⁱ x) k = rinvⁱ (fⁱ x) 0 =  coe r i A (coe i r A (coe r i A x))
+              fⁱ (linvⁱ x l) = fⁱ (linvⁱ x 1) = fⁱ (coe i r A (coe r i A x))
+	        = coe r i A (coe i r A (coe r i A x) OK
+    l=1,k=1 ⊢ rinvⁱ (fⁱ x) k = rinvⁱ (fⁱ x) 1 = fⁱ x
+              fⁱ x = fⁱ x OK
+
+  Top boundary:
+
+
+
+  --------------------------------------------------------------------------------
+
+
+-- dependent path coe
+coe r r' (i. t i ={j. A i j} u i) p =
+  λ j. com r r' (i. A i j) [j=0 i. t i; j=1 i. u i] (p j)
+
+-- non-dependent path coe is the same...
+coe r r' (i. t i ={A i} u i} p =
+  λ j. com r r' A [j=0 i. t i; j=1 i. u i] (p j)
+
+-- dependent path com
+com r r' (i. left i ={j. A i j} right i) [α i. t i] p =
+  λ j. com r r' (i. A i j) [j=0 i. left i; j=1 i. right i; α i. t i j] (p j)
+
+
+
+
 --------------------------------------------------------------------------------

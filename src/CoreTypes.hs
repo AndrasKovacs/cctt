@@ -17,7 +17,7 @@ data Tm
   | LocalVar Ix
   | Let Name Tm Ty Tm
 
-  | TyCon Lvl [Tm]
+  | TyCon Lvl TyParams
   | DCon Lvl Lvl DSpine         -- con lvl, con lvl relative to tycon (TODO: pack)
   | Elim ~Tm Methods Tm         -- motive, methods, scrutinee
 
@@ -129,7 +129,11 @@ data VCof
 data Env
   = ENil
   | EDef Env ~Val
-  deriving Show
+
+instance Show Env where
+  show = show . go [] where
+    go acc ENil         = acc
+    go acc (EDef env v) = go (v:acc) env
 
 type EnvArg = (?env :: Env)
 
@@ -158,6 +162,15 @@ data BindCofLazy a = BindCofLazy {
   deriving Show
 
 --------------------------------------------------------------------------------
+
+data TyParams
+  = TPNil
+  | TPSnoc TyParams Tm
+
+instance Show TyParams where
+  show = show . go [] where
+    go acc TPNil         = acc
+    go acc (TPSnoc ts t) = go (t:acc) ts
 
 data NeSys
   = NSEmpty
@@ -206,7 +219,7 @@ data Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
-  | VTyCon Lvl [Val]
+  | VTyCon Lvl Env                 -- para
   | VDCon Lvl Lvl VDSpine
 
   | VTODO -- placeholder

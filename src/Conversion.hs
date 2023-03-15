@@ -154,3 +154,9 @@ instance Conv VCof where
 instance Conv NeCof' where
   conv (NeCof' _ c) (NeCof' _ c') = conv c c'
   {-# inline conv #-}
+
+instance Conv Env where
+  conv e e' = case (e, e') of
+    (ENil     , ENil       ) -> True
+    (EDef e t , EDef e' t' ) -> conv e e' && conv t t'
+    _                        -> False
