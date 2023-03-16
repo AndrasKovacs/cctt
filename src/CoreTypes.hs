@@ -287,29 +287,29 @@ data Closure
   | C'λ'a'i''a      -- λ a i. a
   | C'λ'a'i'j''a    -- λ a i j. a
 
-  | CCoeAlong (BindI Val) I I -- λ x. coe a r r' x
-  | CCoeLinv0 (BindI Val) I I
-  | CCoeRinv0 (BindI Val) I I
-
 {-
-    Coherence for coercion.
+  coeIsEquiv : (A : I → U) (r r' : I) → isEquiv (λ x. coe r r' A x)
+  coeIsEquiv A r r' =
 
-    Metatheoretic shorthands:
-      fⁱ x      := coe r i A x
-      gⁱ x      := coe i r A x
-      linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
-      rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+    ffill i x      := coe r i A x
+    gfill i x      := coe i r A x
+    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
-    coh := λ x^0 l^1 k^2. com r r' (i. A i)
-                         [k=0 i. fⁱ (linvⁱ x l)
-		        ; k=1 i. fⁱ x
-		        ; l=0 i. fⁱ x
-		        ; l=1 i. rinvⁱ (fⁱ x) k]
-		        x
+    g    := λ x^0. gfill r' x
+    linv := λ x^0 j^1. linvfill r' x j
+    rinv := λ x^0 j^1. rinvfill r' x j
+    coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
+                                      ;k=1 i. ffill i x
+                                      ;l=0 i. ffill i x
+                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      x
 -}
 
-  | CCoeCoh0 (BindI Val) I I -- a r r'
-
+  | CCoeAlong (BindI Val) I I -- λ x. coe a r r' x
+  | CCoeLinv0 (BindI Val) I I -- a r r'
+  | CCoeRinv0 (BindI Val) I I -- a r r'
+  | CCoeCoh0 (BindI Val)  I I -- a r r'
 
 -- isEquiv : (A → B) → U
 -- isEquiv A B f :=
@@ -350,27 +350,31 @@ data IClosure
   | ICHComLine I I NamedIClosure NeSysHCom Val
   | ICCoeLine I I (BindI NamedIClosure) Val
 
-  | ICCoeLinv1 (BindI Val) Val I I
-  | ICCoeRinv1 (BindI Val) Val I I
+  | ICCoeLinv1 (BindI Val) I I Val -- a r r' x
+  | ICCoeRinv1 (BindI Val) I I Val -- a r r' x
 
 {-
-    Coherence for coercion.
+  coeIsEquiv : (A : I → U) (r r' : I) → isEquiv (λ x. coe r r' A x)
+  coeIsEquiv A r r' =
 
-    Metatheoretic shorthands:
-      fⁱ x      := coe r i A x
-      gⁱ x      := coe i r A x
-      linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
-      rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+    ffill i x      := coe r i A x
+    gfill i x      := coe i r A x
+    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
-    coh := λ x^0 l^1 k^2. com r r' (i. A i)
-                         [k=0 i. fⁱ (linvⁱ x l)
-		        ; k=1 i. fⁱ x
-		        ; l=0 i. fⁱ x
-		        ; l=1 i. rinvⁱ (fⁱ x) k]
-		        x
+    g    := λ x^0. gfill r' x
+    linv := λ x^0 j^1. linvfill r' x j
+    rinv := λ x^0 j^1. rinvfill r' x j
+    coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
+                                      ;k=1 i. ffill i x
+                                      ;l=0 i. ffill i x
+                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      x
 -}
+
   | ICCoeCoh1 (BindI Val) I I Val    -- a r r' x
   | ICCoeCoh2 (BindI Val) I I Val I  -- a r r' x l
+  | ICCoeCoh0Rhs (BindI Val) I I Val -- a r r' x
 
   | ICSym Val ~Val ~Val Val
   | ICTrans Val ~Val ~Val ~Val Val Val

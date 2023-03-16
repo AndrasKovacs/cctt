@@ -1,4 +1,8 @@
 
+- test Glue, coeIsEquiv definitions
+  - check nfs
+  - check nfs with path app/lam endpoint printing!
+
 Strict inductives:
 
 syntax:

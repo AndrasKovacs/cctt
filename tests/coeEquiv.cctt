@@ -6,7 +6,7 @@ isEquiv (A B : U)(f : A → B) : U :=
      (g    : B → A)
    × (linv : (a : A) → a = g (f a))
    × (rinv : (b : B) → f (g b) = b)
-   × ((a : A) → (λ _. f a) ={i. f (linv a i) = f a} rinv (f a));
+   × ((a : A) → refl ={i. f (linv a i) = f a} (rinv (f a)));
 
 coe01isEquiv (A : I → U) : isEquiv (A 0) (A 1) (λ x. coe 0 1 A x) :=
 

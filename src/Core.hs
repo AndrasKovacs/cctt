@@ -539,22 +539,24 @@ capp (NCl _ t) ~u = case t of
   C'λ'a'i''a   -> refl u
   C'λ'a'i'j''a -> let ru = refl u in VPLam ru ru $ NICl "i" $ ICConst ru
 
-  -- coeIsEquiv : (Γ, i ⊢ A : U) (r r' : I) → Γ ⊢ isEquiv (coeⁱ r r' A : Ar → Ar')
-  -- coeIsEquiv A r r' =
-  --   _⁻¹  := λ x^1. coeⁱ r' r A x
-  --   linv := λ x^0. λ j^1. hcom r r' (A r)  [j=0 k. x; j=1 k. coeⁱ k r A (coeⁱ r k A x)] x
-  --   rinv := λ x^0. λ j^1. hcom r' r (A r') [j=0 k. coeⁱ k r' A (coeⁱ r' k A x); j=1 k. x] x
-  --   coh  := λ x^0 l^1 k^2.
-  --     fⁱ x      := coe r i A x
-  --     gⁱ x      := coe i r A x
-  --     linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
-  --     rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
-  --
-  --     com r r' (i. A i) [k=0 i. fⁱ (linvⁱ x l)
-  --     		  ; k=1 i. fⁱ x
-  --     		  ; l=0 i. fⁱ x
-  --     		  ; l=1 i. rinvⁱ (fⁱ x) k]
-  --     		    x
+{-
+  coeIsEquiv : (A : I → U) (r r' : I) → isEquiv (λ x. coe r r' A x)
+  coeIsEquiv A r r' =
+
+    ffill i x      := coe r i A x
+    gfill i x      := coe i r A x
+    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
+
+    g    := λ x^0. gfill r' x
+    linv := λ x^0 j^1. linvfill r' x j
+    rinv := λ x^0 j^1. rinvfill r' x j
+    coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
+                                      ;k=1 i. ffill i x
+                                      ;l=0 i. ffill i x
+                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      x
+-}
 
   CCoeAlong (frc -> a) (frc -> r) (frc -> r') ->
     let ~x = u in coenf r r' a (frc x)
@@ -564,20 +566,33 @@ capp (NCl _ t) ~u = case t of
         -- x = g (f x)
         ~lhs = unF x
         ~rhs = coenf r' r a (coe r r' a x)
-    in VPLam lhs rhs $ NICl "j" $ ICCoeLinv1 (unF a) (unF x) (unF r) (unF r')
+    in VPLam lhs rhs $ NICl "j" $ ICCoeLinv1 (unF a) (unF r) (unF r') (unF x)
 
-  CCoeRinv0 (frc -> a) (frc -> r) (frc -> r') ->
-    let ~x   = frc u
+  CCoeRinv0 a r r' ->
+    let ~x   = u
         -- f (g x) = x
-        ~lhs = coenf r r' a (coe r' r a x)
-        ~rhs = unF x
-    in VPLam lhs rhs $ NICl "j" $ ICCoeRinv1 (unF a) (unF x) (unF r) (unF r')
+        ~lhs = let fr = frc r; fr' = frc r'; fa = frc a
+               in coenf fr fr' fa (coe fr' fr fa (frc x))
+        ~rhs = x
+    in VPLam lhs rhs $ NICl "j" $ ICCoeRinv1 a r r' x
 
   CCoeCoh0 a r r' ->
-    uf
-    -- let ~x = u
-    -- in VPLam _ _ $ NICl "l" _
+    let ~x = u
 
+        -- (λ k. coe r r' a x)
+        ~lhs = refl (coenf (frc r) (frc r') (frc a) (frc x))
+
+        -- (λ k. rinvfill a r r' (ffill a r r' x) k)
+        ~rhs =
+           -- coe r r' a (coe r' r a (coe r r' a x))
+           let ~lhs' = let fr = frc r; fr' = frc r'; fa = frc a in
+                       coenf fr fr' fa (coe fr' fr fa (coe fr fr' fa (frc x)))
+
+               ~rhs' = x in
+
+           VPLam lhs' rhs' $ NICl "k" $ ICCoeCoh0Rhs a r r' x
+
+    in VPLam lhs rhs $ NICl "l" $ ICCoeCoh1 a r r' x
 
   CHInd motive ms (frc -> t) ->
     elim motive ms (t ∘ u)
@@ -641,30 +656,55 @@ icapp (NICl _ t) arg = case t of
         ~gfx = g ∙ fx  in
     path b (f ∙ papp x gfx (linv ∘ x) i) fx
 
-  -- coeIsEquiv : (Γ, i ⊢ A : U) (r r' : I) → Γ ⊢ isEquiv (coeⁱ r r' A : Ar → Ar')
-  -- coeIsEquiv A r r' =
-  --   _⁻¹  := λ x^1. coeⁱ r' r A x
-  --   linv := λ x^0. λ j^1. hcom r r' (A r)  [j=0 k. x; j=1 k. coeⁱ k r A (coeⁱ r k A x)] x
-  --   rinv := λ x^0. λ j^1. hcom r' r (A r') [j=0 k. coeⁱ k r' A (coeⁱ r' k A x); j=1 k. x] x
-  --   coh  := TODO
+{-
+  coeIsEquiv : (A : I → U) (r r' : I) → isEquiv (λ x. coe r r' A x)
+  coeIsEquiv A r r' =
 
-  ICCoeLinv1 (frc -> a) (frc -> x) (frc -> r) (frc -> r') ->
-    let j = frc arg in
-    hcom r r'
-      (unF a ∘ unF r)
-      (vshcons (ceq j fi0) "k" (\_ -> x) $
-       vshcons (ceq j fi1) "k" (\k -> coe k r a (coe r k a x)) $
-       vshempty)
-      x
+    ffill i x      := coe r i A x
+    gfill i x      := coe i r A x
+    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
-  ICCoeRinv1 (frc -> a) (frc -> x) (frc -> r) (frc -> r') ->
-    let j = frc arg in
-    hcom r' r
-      (unF a ∘ unF r')
-      (vshcons (ceq j fi0) "k" (\k -> coe k r' a (coe r' k a x)) $
-       vshcons (ceq j fi1) "k" (\_ -> x) $
-       vshempty)
-      x
+    g    := λ x^0. gfill r' x
+    linv := λ x^0 j^1. linvfill r' x j
+    rinv := λ x^0 j^1. rinvfill r' x j
+    coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
+                                      ;k=1 i. ffill i x
+                                      ;l=0 i. ffill i x
+                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      x
+-}
+
+  ICCoeLinv1 (frc -> a) (frc -> r) (frc -> r') (frc -> x) ->
+    let j = frc arg in linvfill a r r' x j
+
+  ICCoeRinv1 (frc -> a) (frc -> r) (frc -> r') (frc -> x) ->
+    let j = frc arg in rinvfill a r r' x j
+
+  ICCoeCoh1 a r r' x ->
+    let l    = arg
+        ~fa  = frc a
+        ~fr  = frc r
+        ~fr' = frc r'
+        ~fx  = frc x
+        ~fl  = frc l
+
+        -- ffill a r r' (linvfill a r r' x l)
+        ~lhs = ffillnf fa fr fr' (linvfillf fa fr fr' fx fl)
+
+        -- ffill a r r' x
+        ~rhs = ffillnf fa fr fr' fx
+
+    in VPLam lhs rhs $ NICl "k" $ ICCoeCoh2 a r r' x l
+
+  ICCoeCoh2 (frc -> a) (frc -> r) (frc -> r') (frc -> x) (frc -> l) ->
+    let k = frc arg in
+    coeCoherence a r r' x l k
+
+  -- (λ k. rinvfill a r r' (ffill a r r' x) k)
+  ICCoeCoh0Rhs (frc -> a) (frc -> r) (frc -> r') (frc -> x) ->
+    let k = frc arg in
+    rinvfill a r r' (ffill a r r' x) k
 
 -- | sym (A : U)(x y : A) -> x = y : y = x
 --     := λ i*. hcom 0 1 [i=0 j. p j; i=1 j. x] x;
@@ -1640,7 +1680,9 @@ theIdEquiv a =
   VPair (VLam $ NCl "x" C'λ'a''a)
         (idIsEquiv a)
 
---------------------------------------------------------------------------------
+
+-- Coercion is an equivalence
+----------------------------------------------------------------------------------------------------
 
 {-
   coeIsEquiv : (A : I → U) (r r' : I) → isEquiv (λ x. coe r r' A x)
@@ -1655,11 +1697,57 @@ theIdEquiv a =
     linv := λ x^0 j^1. linvfill r' x j
     rinv := λ x^0 j^1. rinvfill r' x j
     coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
-      		                      ;k=1 i. ffill i x
-      		                      ;l=0 i. ffill i x
-      		                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      ;k=1 i. ffill i x
+                                      ;l=0 i. ffill i x
+                                      ;l=1 i. rinvfill i (ffill i x) k]
                                       x
 -}
+
+ffill :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F Val
+ffill a r i x = coe r i a x; {-# inline ffill #-}
+
+ffillnf a r i x = unF (ffill a r i x); {-# inline ffillnf #-}
+
+gfill :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F Val
+gfill a r i x = coe i r a x; {-# inline gfill #-}
+
+linvfill :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F I -> Val
+linvfill a r i x j =
+  hcom r i (unF a ∘ unF r)
+    (vshcons (ceq j fi0) "k" (\_ -> x) $
+     vshcons (ceq j fi1) "k" (\k -> coe k r a (coe r k a x)) $
+     vshempty)
+    x
+
+linvfillf a r i x j = frc (linvfill a r i x j); {-# inline linvfillf #-}
+
+rinvfill :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F I -> Val
+rinvfill a r i x j =
+  hcom i r (unF a ∘ unF i)
+    (vshcons (ceq j fi0) "k" (\k -> coe k i a (coe i k a x)) $
+     vshcons (ceq j fi1) "k" (\k -> x) $
+     vshempty)
+    x
+
+rinvfillf a r i x j = frc (linvfill a r i x j); {-# inline rinvfillf #-}
+
+coeCoherence :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F I -> F I -> Val
+coeCoherence a r r' x l k =
+  hcom r r' (unF a ∘ unF r')
+    (vshcons (ceq k fi0) "i" (\i -> coe i r' a (ffill a r i (linvfillf a r i x l))) $
+     vshcons (ceq k fi1) "i" (\i -> coe i r' a (ffill a r i x)) $
+     vshcons (ceq l fi0) "i" (\i -> coe i r' a (ffill a r i x)) $
+     vshcons (ceq l fi1) "i" (\i -> coe i r' a (rinvfillf a r i (ffill a r i x) k)) $
+     vshempty)
+    (coe r r' a x)
+
+  -- com r r' a
+  --   (vshcons (ceq k fi0) "i" (\i -> ffill a r i (linvfillf a r i x l)) $
+  --    vshcons (ceq k fi1) "i" (\i -> ffill a r i x) $
+  --    vshcons (ceq l fi0) "i" (\i -> ffill a r i x) $
+  --    vshcons (ceq l fi1) "i" (\i -> rinvfillf a r i (ffill a r i x) k) $
+  --    vshempty)
+  --   x
 
 coeIsEquiv :: BindI Val -> I -> I -> Val
 coeIsEquiv a r r' =
