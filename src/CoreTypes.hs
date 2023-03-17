@@ -511,6 +511,7 @@ instance SubAction IClosure where
     ICAp f x y p            -> ICAp (sub f) (sub x) (sub y) (sub p)
     ICCoeCoh1 a r r' x      -> ICCoeCoh1 (sub a) (sub r) (sub r') (sub x)
     ICCoeCoh2 a r r' x l    -> ICCoeCoh2 (sub a) (sub r) (sub r') (sub x) (sub l)
+    ICCoeCoh0Rhs a r r' x   -> ICCoeCoh0Rhs (sub a) (sub r) (sub r') (sub x)
 
 instance SubAction VMethods where
   sub = \case

@@ -1,36 +1,4 @@
 
-fib (A B : U)(f : A → B)(b : B) : U := (a : A) × f a = b;
-
-comFib (A B : U)(f : A → B)(y : B)(base : fib A B f y) : fib A B f y :=
-  hcom 0 1 (fib A B f y) [] base;
-
-
--- λ A B f b base.
-  -- ( hcom 0 1 A [] base.1
-  -- , λ j. hcom 0 1 B [ j = 0 i. f (hcom 0 i [] base.1) ; j = 1 i. y] (base.2 j));
-
-
-λ A B f y base.
-  ( hcom 0 1 [] base.1
-  , λ _. hcom 0 1 [@0 = 0 i. f (hcom 0 1 [] base.1); @0 = 1 i. y]
-           (hcom 0 1 [@0 = 0 i. f (hcom 0 i [] base.1); @0 = 1 i. y]
-	     (base.2 @0)))
-
-
-
-{-
--- hcom over fib:
-
-hcom r r' ((x : A) * f x = y) [α i. t i] b =
-  ( hcom r r' A [α i. (t i).1] b.1
-  , λ j. hcom r r' B [j=0 i. f (hcom r i A [α k. (t k).1] b.1)
-                     ;j=1 i. y
-		     ;α i. (t i).2 j]
-		     (b.2 j))
-
--}
-
-
 
 --------------------------------------------------------------------------------
 

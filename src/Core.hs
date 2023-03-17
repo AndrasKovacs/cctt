@@ -1607,18 +1607,18 @@ unSubNe = \case
 
 unSubNeS :: SubArg => Ne -> Ne
 unSubNeS = \case
-  NSub n s             -> let ?sub = sub s in unSubNeS n
-  NLocalVar x          -> NLocalVar x
-  NApp t u             -> NApp (sub t) (sub u)
-  NPApp l r p i        -> NPApp (sub l) (sub r) (sub p) (sub i)
-  NProj1 t             -> NProj1 (sub t)
-  NProj2 t             -> NProj2 (sub t)
-  NCoe r r' a t        -> NCoe (sub r) (sub r') (sub a) (sub t)
-  NHCom r r' a sys t   -> NHCom (sub r) (sub r') (sub a) (sub sys) (sub t)
-  NUnglue a sys        -> NUnglue (sub a) (sub sys)
-  NGlue a sys          -> NGlue (sub a) (sub sys)
-  NLApp t i            -> NLApp (sub t) (sub i)
-  NElim mot ms t       -> NElim (sub mot) (sub ms) (sub t)
+  NSub n s           -> let ?sub = sub s in unSubNeS n
+  NLocalVar x        -> NLocalVar x
+  NApp t u           -> NApp (sub t) (sub u)
+  NPApp l r p i      -> NPApp (sub l) (sub r) (sub p) (sub i)
+  NProj1 t           -> NProj1 (sub t)
+  NProj2 t           -> NProj2 (sub t)
+  NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
+  NHCom r r' a sys t -> NHCom (sub r) (sub r') (sub a) (sub sys) (sub t)
+  NUnglue a sys      -> NUnglue (sub a) (sub sys)
+  NGlue a sys        -> NGlue (sub a) (sub sys)
+  NLApp t i          -> NLApp (sub t) (sub i)
+  NElim mot ms t     -> NElim (sub mot) (sub ms) (sub t)
 
 ----------------------------------------------------------------------------------------------------
 -- Definitions
@@ -1741,6 +1741,7 @@ coeCoherence a r r' x l k =
      vshempty)
     (coe r r' a x)
 
+  -- -- with com
   -- com r r' a
   --   (vshcons (ceq k fi0) "i" (\i -> ffill a r i (linvfillf a r i x l)) $
   --    vshcons (ceq k fi1) "i" (\i -> ffill a r i x) $

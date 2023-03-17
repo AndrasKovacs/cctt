@@ -4,17 +4,40 @@ module Pretty (
   , type Shadow
   , type PrettyArgs
   , type NameKey(..)
+  , setVerbosity
+  , getVerbosity
   , Pretty(..)) where
 
 import Prelude hiding (pi)
 import Data.String
 import qualified Data.Map.Strict as M
+import Data.IORef
 
 import Common
 import CoreTypes
 import Interval
 
 -- import Debug.Trace
+
+--------------------------------------------------------------------------------
+
+-- | When verbosity is true, we print all hcom base types and all path abstraction/application
+--   endpoints.
+verbosity :: IORef Bool
+verbosity = runIO $ newIORef False
+{-# noinline verbosity #-}
+
+getVerbosity :: IO Bool
+getVerbosity = readIORef verbosity
+
+setVerbosity :: Bool -> IO ()
+setVerbosity = writeIORef verbosity
+
+ifVerbose :: a -> a -> a
+ifVerbose t f = runIO $ getVerbosity >>= \case
+  True  -> pure t
+  False -> pure f
+{-# inline ifVerbose #-}
 
 --------------------------------------------------------------------------------
 
@@ -139,7 +162,10 @@ goLinesPis = \case
 goLams :: PrettyArgs (Tm -> Txt)
 goLams = \case
   Lam x t      -> fresh  x \x -> " " <> x <> goLams t
-  PLam _ _ x t -> freshI x \x -> " " <> x <> goLams t
+  PLam l r x t -> ifVerbose
+                    (let pl = pair l; pr = pair r in
+                     freshI x \x -> " {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t)
+                    (freshI x \x -> " " <> x <> goLams t)
   LLam x t     -> freshI x \x -> " " <> x <> goLams t
   t            -> ". " <> let_ t
 
@@ -206,6 +232,11 @@ tyParams = \case
   TPSnoc TPNil t -> proj t
   TPSnoc ts t    -> tyParams ts <> " " <> proj t
 
+coeTy :: PrettyArgs (Txt -> Tm -> Txt)
+coeTy i (PApp _ _ t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
+coeTy i (LApp t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
+coeTy i t = " (" <> i <> ". " <> pair t <> ") "
+
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
   TopVar x _        -> topVar x
@@ -233,12 +264,17 @@ tm = \case
   Path "_" _ t u    -> eqp (trans t <> " = " <> trans u)
   Path x a t u      -> let pt = trans t; pu = trans u in freshI x \x ->
                        eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
-  PApp l r t u      -> appp (app t <> " " <> int u)
-  PLam _ _ x t      -> letp (freshI x \x -> "λ " <> x <> goLams t)
+  PApp l r t u      -> ifVerbose
+                         (appp (app t <> " {" <> pair l <> "} {" <> pair r <> "} " <> int u))
+                         (appp (app t <> " " <> int u))
+  PLam l r x t      -> ifVerbose
+                         (let pl = pair l; pr = pair r in
+                          letp (freshI x \x -> "λ {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t))
+                         (letp (freshI x \x -> "λ " <> x <> goLams t))
   Coe r r' i a t    -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
-                       appp ("coe " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") " <> pt)
+                       appp ("coe " <> pr <> " " <> pr' <> coeTy i a <> pt)
   HCom r r' a t u   -> appp ("hcom " <> int r <> " " <> int r'
-                             -- <> " " <> proj a
+                             <> ifVerbose (" " <> proj a) ""
                              <> " " <> sysH t <> " " <> proj u)
   GlueTy a s        -> appp ("Glue " <> proj a <> " " <> sys s)
   Unglue t _        -> appp ("unglue " <> proj t)

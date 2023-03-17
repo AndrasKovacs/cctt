@@ -1,7 +1,7 @@
 
-- test Glue, coeIsEquiv definitions
-  - check nfs
-  - check nfs with path app/lam endpoint printing!
+- path app/lam endpoint printing/parsing/elaboration!
+  - use it for testing stuff!
+
 
 Strict inductives:
 

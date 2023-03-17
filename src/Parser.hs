@@ -143,7 +143,11 @@ sysHCom :: Parser SysHCom
 sysHCom = char '[' *> goSysHCom <* char ']'
 
 goApp :: Tm -> Parser Tm
-goApp t = (goApp =<< (App t <$!> proj)) <|> pure t
+goApp t =
+      do {l <- char '{' *> tm <* char '}'; r <- char '{' *> tm <* char '}'; u <- proj;
+          goApp (PApp l r t u)}
+  <|> do {u <- proj; goApp (App t u)}
+  <|> pure t
 
 bindMaybe :: Parser BindMaybe
 bindMaybe = branch (try (char '(' *> bind <* char '.'))
@@ -250,13 +254,26 @@ pi =
           (\_ -> Pi "_" t <$!> pi)
           (pure t))
 
+data LamBind = LBind Name | LPLam Tm Tm Name
+
+lamBind :: Parser LamBind
+lamBind =
+      do {l <- char '{' *> tm <* char '}'; r <- char '{' *> tm <* char '}';
+          x <- bind; pure $ LPLam l r x}
+  <|> (LBind <$!> bind)
+
 lam :: Parser Tm
 lam = do
   lambda
-  bs <- some ((,) <$!> getSourcePos <*!> bind)
+  bs <- some ((,) <$!> getSourcePos <*!> lamBind)
   char '.'
   t <- lamlet
-  pure $! foldr' (\(pos, x) t -> Pos (coerce pos) (Lam x t)) t bs
+  pure $! foldr'
+    (\(pos,b) t -> case b of
+        LBind x     -> Pos (coerce pos) (Lam x t)
+        LPLam l r x -> Pos (coerce pos) (PLam l r x t))
+    t bs
+  -- pure $! foldr' (\(pos, x) t -> Pos (coerce pos) (Lam x t)) t bs
 
 -- | Desugar Coq-style definition args.
 desugarIdentArgs :: [([Name], Ty)] -> Maybe Ty -> Tm -> (Tm, Maybe Ty)

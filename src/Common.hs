@@ -14,6 +14,7 @@ import Data.List
 import Data.Time.Clock
 import GHC.Exts
 import Lens.Micro.Platform
+import System.IO.Unsafe
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
@@ -53,6 +54,9 @@ debugging' act = act
 {-# inline debugging' #-}
 
 --------------------------------------------------------------------------------
+
+runIO :: IO a -> a
+runIO = unsafeDupablePerformIO; {-# inline runIO #-}
 
 type Name = String
 

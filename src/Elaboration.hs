@@ -338,9 +338,19 @@ check t topA = case t of
 
     (P.Lam x t, VPath a l r) -> do
       t <- bindI x \i -> check t (a ∙ IVar i)
-      convEndpoints (instantiate t (F I0)) l
-      convEndpoints (instantiate t (F I1)) r
+      convEndpoints (instantiate t fi0) l
+      convEndpoints (instantiate t fi1) r
       pure $! PLam (quote l) (quote r) x t
+
+    (P.PLam l r x t, VPath a l' r') -> do
+      t <- bindI x \i -> check t (a ∙ IVar i)
+      convEndpoints (instantiate t fi0) l'
+      convEndpoints (instantiate t fi1) r'
+      l <- check l (a ∙ I0)
+      r <- check r (a ∙ I1)
+      convEndpoints (eval l) l'
+      convEndpoints (eval r) r'
+      pure $! PLam l r x t
 
     (P.Refl, VPath a l r) -> do
       constantICl a
@@ -405,7 +415,7 @@ infer = \case
   P.I  -> err UnexpectedIType
 
   P.DepPath a t u -> do
-    (x, a, _, src, tgt) <- elabBindMaybe a (F I0) (F I1)
+    (x, a, _, src, tgt) <- elabBindMaybe a fi0 fi1
     t <- check t src
     u <- check u tgt
     pure $! Infer (Path x a t u) VU
@@ -451,7 +461,23 @@ infer = \case
       a ->
         err $! ExpectedPiPathLine (quote a)
 
+  P.PApp l r t u -> do
+    Infer t a <- infer t
+    case unF (frc a) of
+      VPath a l' r' -> do
+        u <- checkI u
+        l <- check l (a ∙ I0)
+        r <- check r (a ∙ I1)
+        convEndpoints (eval l) l'
+        convEndpoints (eval r) r'
+        pure $! Infer (PApp l r t u) (a ∙ evalInf u)
+      a ->
+        err $! ExpectedPath (quote a)
+
   P.Lam{} ->
+    err CantInferLam
+
+  P.PLam{} ->
     err CantInferLam
 
   P.Sg x a b -> do
