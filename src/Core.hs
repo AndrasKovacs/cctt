@@ -509,10 +509,10 @@ capp (NCl _ t) ~u = case t of
   --                   (rinv (f x)))
 
   CIsEquiv1 a b f -> let ~g = u in
-    VSg (VPi a $ NCl "a" $ CIsEquiv4 a f g) $ NCl "linv" $ CIsEquiv2 a b f g
+    VSg (VPi a $ NCl "x" $ CIsEquiv4 a f g) $ NCl "linv" $ CIsEquiv2 a b f g
 
   CIsEquiv2 a b f g -> let ~linv = u in
-    VSg (VPi a $ NCl "a" $ CIsEquiv5 b f g) $ NCl "rinv" $ CIsEquiv3 a b f g linv
+    VSg (VPi b $ NCl "x" $ CIsEquiv5 b f g) $ NCl "rinv" $ CIsEquiv3 a b f g linv
 
   CIsEquiv3 a b f g linv -> let ~rinv = u in
     VPi a $ NCl "a" $ CIsEquiv6 b f g linv rinv
@@ -531,7 +531,7 @@ capp (NCl _ t) ~u = case t of
   CEquiv a b -> let ~f = u in isEquiv a b f
 
   -- [A]  (B* : U) × equiv B A
-  CEquivInto a -> let ~b = u in equiv a b
+  CEquivInto a -> let ~b = u in equiv b a
 
   -- ------------------------------------------------------------
 

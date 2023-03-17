@@ -1,58 +1,33 @@
 
+-- isEquiv : (A : U)(B : U)(f : A → B) → U
+--   := λ A B f.
+--       (g : B → A)
+--     × (linv : (x : A) → x = g (f x))
+--     × (rinv : (x : B) → f (g x) = x)
+--     × ((x : A) → (λ {f x} {f x} _. f x) ={i. f (linv x {x} {g (f x)} i) = f x} rinv (f x));
 
---------------------------------------------------------------------------------
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × ((x : A) → (λ _. f x) ={i. f (linv x i) = f x} (rinv (f x)));
 
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
 
--- myRefl (A : U) (a : A) : a = a := refl;
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
 
--- sym (A : U) (x y : A)(p : x = y) : y = x := p ⁻¹;
+ua (A B : U)(f : equiv A B) : A = B :=
+  λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
 
--- trans (A : U)(x y z : A)(p : x = y) (q : y = z) : x = z := p ∙ q;
+uafwd (A B : U)(f : equiv A B)(x : A) : B := coe 0 1 (ua A B f) x;
 
--- myAp (A B : U)(f : A → B)(x y : A)(p : x = y) : f x = f y := ap f p;
+uabeta (A B : U)(f : equiv A B)(x : A) : coe 0 1 (ua A B f) x = f.1 x :=
+  λ i. hcom 1 i B [] (hcom i 1 B [] (coe i 1 (_. B) (f.1 x)));
 
--- badSym (A B : U)(P : A = B)(x : A)(y : B)(p : x ={P} y) : y ={P⁻¹} x := p⁻¹;
+uabetainv (A B : U)(f : equiv A B)(x : B) : coe 1 0 (ua A B f) x = f.2.1 x :=
+  λ i. hcom 1 i A [] (f.2.1 (hcom 1 i B [] (coe 1 i (_. B) x)));
 
-
-
--- testPathEta (A : U) (a b : A) (p : a = b) : p = (λ i. p i)
---   := refl;
-
--- comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
---   := λ i. hcom 0 1 [i=0 _. x; i=1. q] (p i);
-
--- -- Definitional equality drops components with false cofibrations:
--- cofEq (A : U)(x : A)(i : I) : A := hcom 0 1 [i=0,i=1 _. x] x;
-
--- -- fibtest (A B : U)(f : A → B)(b : B)(base base' : (a : A) × f a = b)
--- --         (p : base = base')(i : I) : (a : A) × f a = b
--- --   := hcom 0 1 [i=0. p] base;
-
-
---------------------------------------------------------------------------------
-
--- foo := U;
-
--- test (A : U)(A : U)(A : U) : U := @@0;
-
---------------------------------------------------------------------------------
-
--- symUtest (A B : U)(p : A = B) : B = A := λ i. hcom 0 1 [i=0. p; i=1 _. A] A;
-
--- Glue A [
-
---   i = 0.
---       B
---     , (λ x. coe 1 0 (j. p j) x)
---     , (λ x. coe 0 1 (j. p j) x)
---     , (λ x j. hcom 1 0 [j = 0 k. x; j = 1 k. coe k 1 (j1. p j1) (coe 1 k (j1. p j1) x)] x)
---     , (λ x j. hcom 0 1 [j = 0 k. coe k 0 (j1. p j1) (coe 0 k (j1. p j1) x); j = 1 k. x] x)
---     , TODO;
-
---   i = 1.
---       A
---     , (λ x. coe 1 0 (_. A) x)
---     , (λ x. coe 0 1 (_. A) x)
---     , (λ x j. hcom 1 0 [j = 0 k. x; j = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x)
---     , (λ x j. hcom 0 1 [j = 0 k. coe k 0 (_. A) (coe 0 k (_. A) x); j = 1 k. x] x)
---     , TODO]
+-- BUG: LOOPS!
+uasym (A B : U)(f : equiv A B) : B = A := (ua A B f)⁻¹;
