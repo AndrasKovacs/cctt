@@ -338,8 +338,8 @@ check t topA = case t of
 
     (P.Lam x t, VPath a l r) -> do
       t <- bindI x \i -> check t (a ∙ IVar i)
-      convEndpoints (instantiate t fi0) l
-      convEndpoints (instantiate t fi1) r
+      convEndpoints l (instantiate t fi0)
+      convEndpoints r (instantiate t fi1)
       pure $! PLam (quote l) (quote r) x t
 
     (P.PLam l r x t, VPath a l' r') -> do
@@ -468,8 +468,8 @@ infer = \case
         u <- checkI u
         l <- check l (a ∙ I0)
         r <- check r (a ∙ I1)
-        convEndpoints (eval l) l'
-        convEndpoints (eval r) r'
+        convEndpoints l' (eval l)
+        convEndpoints r' (eval r)
         pure $! Infer (PApp l r t u) (a ∙ evalInf u)
       a ->
         err $! ExpectedPath (quote a)

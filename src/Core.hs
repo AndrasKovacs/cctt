@@ -604,6 +604,9 @@ icapp (NICl _ t) arg = case t of
   ICEval s env t ->
     let ?env = env; ?sub = ext s arg in eval t
 
+  -- coe r r' (i. t i ={j. A i j} u i) p =
+  --   λ {t r'}{u r'} j. com r r' (i. A i j) [j=0 i. t i; j=1 i. u i] (p {t r} {u r}j)
+
   ICCoePath (frc -> r) (frc -> r') a lhs rhs p ->
     let j     = frc arg
         abind = bindIf "i" \i -> a ∙ unF i ∘ unF j in
@@ -611,13 +614,13 @@ icapp (NICl _ t) arg = case t of
       (vshcons (ceq j fi0) "i" (\i -> coe i r' abind (lhs ∘ unF i)) $
        vshcons (ceq j fi1) "i" (\i -> coe i r' abind (rhs ∘ unF i)) $
        vshempty)
-      (coe r r' abind (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j))
+      (coe r r' abind (pappf (lhs ∙ unF r) (rhs ∙ unF r) (frc p) j))
 
     -- com r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
     --          (vshcons (ceq j fi0) "i" (\i -> lhs ∘ unF i) $
     --           vshcons (ceq j fi1) "i" (\i -> rhs ∘ unF i) $
     --           vshempty)
-    --          (pappf (lhs ∙ unF r') (rhs ∙ unF r') (frc p) j)
+    --          (pappf (lhs ∙ unF r) (rhs ∙ unF r) (frc p) j)
 
   ICHComPath (frc -> r) (frc -> r') a lhs rhs sys p ->
     let farg = frc arg in
@@ -627,6 +630,10 @@ icapp (NICl _ t) arg = case t of
        mapVSysHCom (\_ t -> pappf lhs rhs (frc t) farg)
                    (frc sys))
       (pappf lhs rhs (frc p) farg)
+
+-- hcom r r' (lhs ={j.A j} rhs) [α i. t i] base =
+--   λ j. hcom r r' (A j) [j=0 i. lhs; j=1 i. rhs; α i. t i j] (base j)
+
 
   ICHComLine (frc -> r) (frc -> r') a sys base ->
     let farg = frc arg in
@@ -1043,6 +1050,10 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
   --              (proj1f base))
   --       (mapNeSysHCom' (\_ t -> proj2f (frc t)) ts)
   --       (proj2f base))
+
+  -- (  hcom r r' A [α i. (t i).1] b.1
+  --  , com r r' (i. B (hcom r i A [α j. (t j).1] b.1)) [α i. (t i).2] b.2)
+
 
 
   VPath a lhs rhs ->

@@ -151,6 +151,9 @@ coeⁱ r r' (Pathʲ A t u) p =
   (λ j. comⁱ r r' (A i j) [j=0 ↦ t i, j=1 ↦ u i] (p @ j))
   : Pathʲ (A[i↦r']) (t[i↦r']) (u[i↦r'])
 
+coe r r' (i. t i ={j. A i j} u i) p =
+  λ {t r'}{u r'} j. com r r' (i. A i j) [j=0 i. t i; j=1 i. u i] (p j)
+
 coeⁱ r r' ((j : I) → A j) p =
   (λ j. coeⁱ r r' (i. A i j) (p @ j))
 
@@ -158,15 +161,16 @@ coeⁱ r r' ℕ t = t
 coeⁱ r r' U t = t
 coeⁱ r r' (Glue [α ↦ (T, f)] A) gr = TODO
 
-hcomⁱ r r' ((a : A) × B a) [α ↦ t] b =
-  (  hcomⁱ r r' A [α ↦ (t i).1] b.1
-   , comⁱ r r' (B (hfillⁱ r r' A [α ↦ t.1] b.1)) [α ↦ (t i).2] b.2 )
+hcom r r' ((a : A) × B a) [α i. t i] b =
+  (  hcom r r' A [α i. (t i).1] b.1
+   , com r r' (i. B (hcom r i A [α j. (t j).1] b.1)) [α i. (t i).2] b.2)
 
 hcomⁱ r r' ((a : A) → B a) [α ↦ t] b =
   λ a. hcomⁱ r r' (B a) [α ↦ t i a] (b a)
 
-hcomⁱ r r' (Pathʲ A lhs rhs) [α ↦ t] base =
-  (λ arg. hcomⁱ r r' (A arg) [arg=0 ↦ lhs, arg=1 ↦ rhs, α ↦ t arg] (base arg))
+hcom r r' (lhs ={j.A j} rhs) [α i. t i] base =
+  λ j. hcom r r' (A j) [j=0 i. lhs i; j=1 i. rhs i; α i. t i j] (base j)
+
 
 hcom r r' ((i : I) → B i) [α j. t] b =
   (λ arg. hcom r r' (A arg) [α i. ↦ t arg] (base arg))
