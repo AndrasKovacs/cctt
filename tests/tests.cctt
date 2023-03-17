@@ -1,16 +1,9 @@
 
--- isEquiv : (A : U)(B : U)(f : A → B) → U
---   := λ A B f.
---       (g : B → A)
---     × (linv : (x : A) → x = g (f x))
---     × (rinv : (x : B) → f (g x) = x)
---     × ((x : A) → (λ {f x} {f x} _. f x) ={i. f (linv x {x} {g (f x)} i) = f x} rinv (f x));
-
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
   × (linv : (x : A) → x = g (f x))
   × (rinv : (x : B) → f (g x) = x)
-  × ((x : A) → (λ _. f x) ={i. f (linv x i) = f x} (rinv (f x)));
+  × ((x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
 
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
@@ -21,6 +14,9 @@ idEquiv (A : U) : equiv A A :=
 ua (A B : U)(f : equiv A B) : A = B :=
   λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
 
+sym (A : U)(x y : A)(p : x = y) : y = x :=
+  λ i. hcom 0 1 A [i = 0 j. p {x} {y} j; i = 1 _. x] x;
+
 uafwd (A B : U)(f : equiv A B)(x : A) : B := coe 0 1 (ua A B f) x;
 
 uabeta (A B : U)(f : equiv A B)(x : A) : coe 0 1 (ua A B f) x = f.1 x :=
@@ -30,4 +26,4 @@ uabetainv (A B : U)(f : equiv A B)(x : B) : coe 1 0 (ua A B f) x = f.2.1 x :=
   λ i. hcom 1 i A [] (f.2.1 (hcom 1 i B [] (coe 1 i (_. B) x)));
 
 -- BUG: LOOPS!
-uasym (A B : U)(f : equiv A B) : B = A := (ua A B f)⁻¹;
+uasym (A B : U)(f : equiv A B) : B = A := sym U A B (ua A B f);

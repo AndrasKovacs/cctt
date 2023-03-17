@@ -1065,8 +1065,9 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     F $ VNe (NHCom (unF r) (unF r') a nts (unF base))
             (IS.insertFI r $ IS.insertFI r' $ is <> is')
 
-  -- hcom r r' U [α i. ↦ t] b =
-  --   Glue [r=r' ↦ (b, idEqv), α ↦ (t r', (coeⁱ r' r (t i), coeIsEquiv))] b
+  -- hcom r r' U [α i. t i] b =
+  --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
+
   VU -> let
 
     -- NOTE the nsconsNonTrue; ceq r r' can be false or neutral
@@ -1077,8 +1078,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
                                    (unF r') (unF r))
             (F nts)
 
-    in F $ VGlueTy (unF base) (unF sys //
-                   (IS.insertI (unF r) $ IS.insertI (unF r') is))
+    in F $ VGlueTy (unF base) (unF sys // (IS.insertI (unF r) $ IS.insertI (unF r') is))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -1740,7 +1740,7 @@ rinvfill a r i x j =
      vshempty)
     x
 
-rinvfillf a r i x j = frc (linvfill a r i x j); {-# inline rinvfillf #-}
+rinvfillf a r i x j = frc (rinvfill a r i x j); {-# inline rinvfillf #-}
 
 coeCoherence :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F I -> F I -> Val
 coeCoherence a r r' x l k =
