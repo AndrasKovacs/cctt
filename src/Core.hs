@@ -7,6 +7,7 @@ import Interval
 import Substitution
 import CoreTypes
 
+-- import Pretty
 -- import Debug.Trace
 
 
@@ -585,10 +586,10 @@ capp (NCl _ t) ~u = case t of
         -- (λ k. rinvfill a r r' (ffill a r r' x) k)
         ~rhs =
            -- coe r r' a (coe r' r a (coe r r' a x))
-           let ~lhs' = let fr = frc r; fr' = frc r'; fa = frc a in
-                       coenf fr fr' fa (coe fr' fr fa (coe fr fr' fa (frc x)))
+           let ~fr = frc r; ~fr' = frc r'; ~fa = frc a in
 
-               ~rhs' = x in
+           let ~lhs' = coenf fr fr' fa (coe fr' fr fa (coe fr fr' fa (frc x)))
+               ~rhs' = coenf fr fr' fa (frc x) in
 
            VPLam lhs' rhs' $ NICl "k" $ ICCoeCoh0Rhs a r r' x
 
@@ -1135,8 +1136,9 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     VTODO            -> F VTODO
     _                -> impossible
 
-  _ ->
+  a ->
     impossible
+
 
 ----------------------------------------------------------------------------------------------------
 

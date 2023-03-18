@@ -9,7 +9,23 @@ isEquiv (A B : U)(f : A → B) : U :=
    × ((a : A) → refl ={i. f (linv a i) = f a} (rinv (f a)));
 
 coe01isEquiv (A : I → U) : isEquiv (A 0) (A 1) (λ x. coe 0 1 A x) :=
-   (λ x. coe 1 0 A x
+  let f' (i : I)(x : A 0)           : A i := coe 0 i A x;
+  let g' (i : I)(x : A i)           : A 0 := coe i 0 A x;
+  let linv' (i : I)(x : A 0)(j : I) : A 0 := hcom 0 i (A 0) [j=0 k. x; j=1 k. coe k 0 A (coe 0 k A x)] x;
+  let rinv' (i : I)(x : A i)(j : I) : A i := hcom i 0 (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
+
+  ( λ x. g' 1 x
+  , λ x j. linv' 1 x j
+  , λ x j. rinv' 1 x j
+  , λ x l k. com 0 1 A [k=0 i. f' i (linv' i x l)
+                       ;k=1 i. f' i x
+		       ;l=0 i. f' i x
+		       ;l=1 i. rinv' i (f' i x) k]
+		       x
+  );
+
+coe01isEquivnf (A : I → U) : isEquiv (A 0) (A 1) (λ x. coe 0 1 A x) :=
+    ( λ x. coe 1 0 A x
     , λ x j. hcom 0 1 [j = 0 k. x; j = 1 k. coe k 0 A (coe 0 k A x)] x
     , λ x j. hcom 1 0 [j = 0 k. coe k 1 A (coe 1 k A x); j = 1 k. x] x
     , λ x l k. hcom 0 1 [
@@ -20,31 +36,18 @@ coe01isEquiv (A : I → U) : isEquiv (A 0) (A 1) (λ x. coe 0 1 A x) :=
 	                              ; k = 1 k1. coe 0 i A x]
 				      (coe 0 i A x))] (coe 0 1 A x));
 
-  -- let f' (i : I)(x : A 0)           : A i := coe 0 i A x;
-  -- let g' (i : I)(x : A i)           : A 0 := coe i 0 A x;
-  -- let linv' (i : I)(x : A 0)(j : I) : A 0 := hcom 0 i (A 0) [j=0 k. x; j=1 k. coe k 0 A (coe 0 k A x)] x;
-  -- let rinv' (i : I)(x : A i)(j : I) : A i := hcom i 0 (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
+coe10isEquiv (A : I → U) : isEquiv (A 1) (A 0) (λ x. coe 1 0 A x) :=
+  let f' (i : I)(x : A 1)           : A i := coe 1 i A x;
+  let g' (i : I)(x : A i)           : A 1 := coe i 1 A x;
+  let linv' (i : I)(x : A 1)(j : I) : A 1 := hcom 1 i (A 1) [j=0 k. x; j=1 k. coe k 1 A (coe 1 k A x)] x;
+  let rinv' (i : I)(x : A i)(j : I) : A i := hcom i 1 (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
 
-  -- ( λ x. g' 1 x
-  -- , λ x j. linv' 1 x j
-  -- , λ x j. rinv' 1 x j
-  -- , λ x l k. com 0 1 A [k=0 i. f' i (linv' i x l)
-  --                      ;k=1 i. f' i x
-  -- 		       ;l=0 i. f' i x
-  -- 		       ;l=1 i. rinv' i (f' i x) k]
-  -- 		       x
-  -- );
-
-
-{-
-λ A. (λ x. coe 1 0 A x
-    , λ x j. hcom 0 1 [j = 0 k. x; j = 1 k. coe k 0 A (coe 0 k A x)] x
-    , λ x j. hcom 1 0 [j = 0 k. coe k 1 A (coe 1 k A x); j = 1 k. x] x
-    , λ x l k. hcom 0 1 [
-          k = 0 i. coe i 1 A (coe 0 i A (hcom 0 i [l = 0 k1. x; l = 1 k1. coe k1 0 A (coe 0 k1 A x)] x))
-        ; k = 1 i. coe i 1 A (coe 0 i A x)
-	; l = 0 i. coe i 1 A (coe 0 i A x)
-	; l = 1 i. coe i 1 A (hcom i 0 [k = 0 k1. coe k1 i A (coe i k1 A (coe 0 i A x))
-	                              ; k = 1 k1. coe 0 i A x]
-				      (coe 0 i A x))] (coe 0 1 A x))
--}
+  ( λ x. g' 0 x
+  , λ x j. linv' 0 x j
+  , λ x j. rinv' 0 x j
+  , λ x l k. com 1 0 A [k=0 i. f' i (linv' i x l)
+                       ;k=1 i. f' i x
+		       ;l=0 i. f' i x
+		       ;l=1 i. rinv' i (f' i x) k]
+		       x
+  );

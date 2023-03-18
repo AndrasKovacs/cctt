@@ -19,7 +19,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 type Parser = Parsec Void String
 
 ws :: Parser ()
-ws = L.space C.space1 (L.skipLineComment "--") (L.skipBlockComment "{-" "-}")
+ws = L.space C.space1 (L.skipLineComment "--") (L.skipBlockCommentNested "{-" "-}")
 
 withPos :: Parser Tm -> Parser Tm
 withPos p = do
