@@ -1105,7 +1105,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
         -- hcom r r' A [  β i. unglue (t i)
         --              ; α i. f (hcom r i T [β. t] gr)]
         --             (unglue gr)
-        base =
+        hcombase =
           hcomdn r r' (frc a)
             (catNeSysHCom'
                (mapNeSysHCom'
@@ -1121,7 +1121,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
               )
             (ungluenf (unF gr) alphasys')
 
-    in F $ VNe (NGlue (unF base) alphasys (unF fib))
+    in F $ VNe (NGlue (unF hcombase) alphasys (unF fib))
                (IS.insertI (unF r) $ IS.insertI (unF r') (alphais <> betais))
 
   VLine a ->
@@ -1179,6 +1179,7 @@ glueTy ~a sys = case unF sys of
 
 glueTyf ~a sys = frc (glueTy a sys); {-# inline glueTyf #-}
 
+-- TODO: eta-contract glue-unglue with empty system?
 glue :: Val -> F VSys -> F VSys -> F Val
 glue ~t eqs sys = case (unF eqs, unF sys) of
   (VSTotal{}    , VSTotal v)      -> v
@@ -1191,7 +1192,9 @@ gluenf ~t eqs sys = unF (glue t eqs sys); {-# inline gluenf #-}
 unglue :: NCofArg => DomArg => Val -> F VSys -> Val
 unglue ~t sys = case unF sys of
   VSTotal teqv   -> proj1f (proj2f teqv) ∙ t
-  VSNe (sys, is) -> VNe (NUnglue t sys) is
+  VSNe (sys, is) -> case unF (frc t) of
+    VNe (NGlue base _ fib) is' -> base
+    t                          -> VNe (NUnglue t sys) is
 {-# inline unglue #-}
 
 ungluen :: NCofArg => DomArg => Val -> F (NeSys, IS.IVarSet) -> Val

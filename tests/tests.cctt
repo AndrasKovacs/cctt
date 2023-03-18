@@ -2,6 +2,8 @@ isLogEq (A B : U)(f : A → B) : U := (B → A);
 
 isSection (A B : U)(f : A → B) : U := (g : B → A) × ((x : A) → x = g (f x));
 
+isRetraction (A B : U)(f : A → B) : U := (g : B → A) × ((x : B) → f (g x) = x);
+
 isIso (A B : U)(f : A → B) : U :=
     (g    : B → A)
   × (linv : (x : A) → x = g (f x))
@@ -35,49 +37,48 @@ coe01isEquiv (P : I → U) : isEquiv (P 0) (P 1) (λ x. coe 0 1 P x) :=
 		            (coe 0 1 P x)
   );
 
--- Bugged:
-foo (i j : I)(A : I → U)(f : (b : U) * equiv b (A j)) : U := Glue (A j) [j=0. f];
+-- try to print a bigger coe glue
+
+-- foo (i : I)(A : U)(x : Glue A [i=0. (A, idEquiv A)]) : Glue A [i=0. (A, idEquiv A)] :=
+--   glue (hcom 0 1 A [i = 0 i1. hcom 0 i1 A [] x] (unglue x)) [i = 0. A, λ x1. x1,
+--   λ x1. x1, λ x1 {x1} {x1} _. x1, λ x1 {x1} {x1} _. x1, λ x1 {λ {x1} {x1} _. x1}
+--   {λ {x1} {x1} _. x1} _ {x1} {x1} _. x1] [i = 0. hcom 0 1 A [] x];
+--   -- hcom 0 1 (Glue A [i=0. (A, idEquiv A)]) [] x;
+
+-- also a bigger hcom glue
+
+breh (A : U)(x : A) : Glue A [] := glue (hcom 1 0 A [] (hcom 0 1 A [] (coe 0 1 (i. A) x))) [];
 
 
--- coe i j (k. Glue (A k) [k=i. A i, idEquiv (A i)]) x;
--- :
+foo (A : U) : isRetraction A (Glue A []) (breh A) :=
 
--- breh (A : U)(x : A) : Glue A [] := glue (hcom 1 0 A [] (hcom 0 1 A [] (coe 0 1 (i. A) x))) [];
+  λ x. hcom 1 0 A [] (hcom 1 0 A [] (coe 1 0 (i. A) (unglue x)))
 
+, λ x {glue (hcom 1 0 A [] (hcom 0 1 A [] (coe 0 1 (i. A) (hcom 1 0 A [] (hcom 1 0 A [] (coe 1 0 (i. A) (unglue x))))))) [] []}
+      {x}
+      j.
 
--- foo (A : U) : isSection A (Glue A []) (breh A) :=
---   λ x. hcom 1 0 A [] (hcom 1 0 A [] (coe 1 0 (j. A) (unglue x)))
--- , λ x j. hcom 0 1 A [j = 0 k. x
---                    ; j = 1 k. hcom 1 0 A [k = 0 i. x]
--- 		                  (hcom k 0 A []
--- 				       (coe k 0 (l. A)
--- 				          (unglue
--- 					    (glue
--- 					      (hcom 1 0 A [0 = k i. x
--- 					                 ; k = 0 i. x]
--- 					         (hcom 0 k A []
--- 						   (coe 0 k (l. A) x)))
--- 					      [k = 0. x]))))]
--- 		   x;
+      glue (
+        hcom 1 0 A [j = 0 k.
 
-  -- let P (i : I)                     : U   := Glue A [i=0.(A,idEquiv A)];
-  -- let f' (i : I)(x : P 0)           : P i := coe 0 i P x;
-  -- let g' (i : I)(x : P i)           : P 0 := coe i 0 P x;
-  -- let linv' (i : I)(x : P 0)(j : I) : P 0 := hcom 0 i (P 0) [j=0 k. x; j=1 k. coe k 0 P (coe 0 k P x)] x;
-  -- let rinv' (i : I)(x : P i)(j : I) : P i := hcom i 0 (P i) [j=0 k. coe k i P (coe i k P x); j=1 k. x] x;
+unglue (glue (hcom 1 0 A [k = 1 i. unglue (glue (unglue x)
+[] [])] (hcom k 1 A [] (coe k 1 (i. A) (unglue (glue (hcom 1 0 A [1 = k
+i. unglue x ; k = 0 i. hcom 1 0 A [i = 0 i1. hcom 1 i1 A [] (hcom 1 0 A [] (coe
+1 0 (i2. A) (unglue x))); i = 1 i1. hcom 1 0 A [] (coe 1 0 (i2. A) (unglue x))]
+(hcom 1 0 A [] (coe 1 0 (i1. A) (unglue x)))] (hcom 1 k A [] (coe 1 k (i. A)
+(unglue x)))) [k = 0. A, λ x1. x1, λ x1. x1, λ x1 {x1} {x1} _. x1, λ x1 {x1}
+{x1} _. x1, λ x1 {λ {x1} {x1} _. x1} {λ {x1} {x1} _. x1} _ {x1} {x1} _. x1] [k =
+0. hcom 1 0 A [] (hcom 1 0 A [] (coe 1 0 (i. A) (unglue x)))]))))) [] [])
 
-  -- ( λ x. g' 1 x
-  -- , λ x j. linv' 1 x j
-  -- -- , λ x j. rinv' 1 x j
-  -- -- , λ x l k. hcom 0 1 (P 1) [k=0 i. coe i 1 P (f' i (linv' i x l))
-  -- --                           ;k=1 i. coe i 1 P (f' i x)
-  -- -- 		            ;l=0 i. coe i 1 P (f' i x)
-  -- -- 		            ;l=1 i. coe i 1 P (rinv' i (f' i x) k)]
-  -- -- 		            (coe 0 1 P x)
+                 ; j = 1 k. unglue x]
+                   (unglue x))
+        []
+	[];
+
+  -- let P (i : I) : U := Glue A [i=0.(A,idEquiv A)];
+  -- ( λ x. coe 1 0 P x
+  -- , λ x j. hcom 1 0 (P 1) [j=0 k. coe k 1 P (coe 1 k P x); j=1 k. x] x
   -- );
-
-  -- -- coe01isEquiv (λ i. Glue A [i=0. (A,idEquiv A)]);
-
 
 
 -- foo (A : U)(a : A) : A :=

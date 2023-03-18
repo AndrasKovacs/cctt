@@ -67,10 +67,21 @@ instance Conv Ne where
     (NHCom r1 r2 _ sys t, NHCom r1' r2' _ sys' t') ->
       conv r1 r1' && conv r2 r2' && conv sys sys' && conv t t'
 
-    (NUnglue a sys    , NUnglue a' sys'      ) -> conv a a' && conv sys sys'
-    (NGlue a _ sys    , NGlue a' _ sys'      ) -> conv a a' && conv sys sys'
+    -- the types of the "a"-s can be different Glue-s a priori, that's
+    -- why we first convert sys-es. Neutrals of different types can
+    -- be converted, and then the type equality is part of the output,
+    -- but the "a" here aren't neutrals!
+    (NUnglue a sys    , NUnglue a' sys'      ) -> conv sys sys' && conv a a'
+
 
     (NElim _   ms t   , NElim _ ms' t'       ) -> conv t t' && conv ms ms'
+    (NGlue b _ fib    , NGlue b' _ fib'      ) -> conv b b' && conv fib fib'
+
+    -- Glue eta
+    -- A bit ugly that we put "mempty"-s there, and potentially dodgy, but the only
+    -- way conversion checking can succeed here is when the VNe-s are immediately consumed.
+    (NGlue b sys fib  , t'                   ) -> conv b (VNe (NUnglue (VNe t' mempty) sys) mempty)
+    (t                , NGlue b' sys' fib'   ) -> conv (VNe (NUnglue (VNe t mempty) sys') mempty) b'
 
     (NSub{} , _      ) -> impossible
     (t      , NSub{} ) -> impossible
