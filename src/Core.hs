@@ -1072,7 +1072,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
   VU -> let
 
     -- NOTE the nsconsNonTrue; ceq r r' can be false or neutral
-    sys = nsconsNonTrue (ceq r r') (F (theIdEquiv (unF base))) $
+    sys = nsconsNonTrue (ceq r r') (F $ VPair (unF base) (theIdEquiv (unF base))) $
           mapNeSysFromH
             (\t -> F $ VPair (t ∙ unF r')
                      $ theCoeEquiv (bindI (t^.name) \i -> t ∙ unF i)
@@ -1137,7 +1137,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
     _                -> impossible
 
   a ->
-    impossible
+    error $ show a
 
 
 ----------------------------------------------------------------------------------------------------

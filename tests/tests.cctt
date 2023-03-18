@@ -132,10 +132,24 @@ i1 q x); l = 0 i1. coe i1 0 q (coe 1 i1 q x); l = 1 i1. coe i1 0 q (hcom i1 1 (q
 i1 q x] (coe 1 i1 q x))] (coe 1 0 q x)];
 
 
--- BUG: impossible in nf
-foo : isEquiv U U (λ x. coe 0 1 (_. U) x) := coe01isEquiv (λ _. U);
 
--- -- foo (A B : U)(f : equiv A B) : isEquiv (λ x. coe 0 1 (ua A B f) x) := coe01isEquiv (λ i. ua A B f i);
+-- BUG: impossible in nf
+foo : isEquiv U U (λ x. coe 0 1 (_. U) x) :=
+  λ x. x
+, λ x j.   hcom 0 1 U [j = 0 k. x; j = 1 k. x] x
+, λ x j.   hcom 1 0 U [j = 0 k. x; j = 1 k. x] x
+, λ x l k. hcom 0 1 U [k = 0 i. hcom 0 i U [l = 0 k1. x; l = 1 k1. x] x
+                     ; k = 1 i. x
+		     ; l = 0 i. x
+		     ; l = 1 i. hcom i 0 U [k = 0 k1. x; k = 1 k1. x] x]
+           x;
+
+-- Now it only loops...
+bar (x : U)(l : I) : U :=
+  hcom 0 1 U [l = 0 i. hcom 0 i U [] x] x;
+
+-- baz (x : U)(l k i : I) : U := hcom 0 i U [l = 0 k1. x; l = 1 k1. x] x;
+
 
 -- -- BUG: LOOPS!
 -- uasym (A B : U)(f : equiv A B) : B = A :=
