@@ -278,7 +278,9 @@ tm = \case
                              <> " " <> sysH t <> " " <> proj u)
   GlueTy a s        -> appp ("Glue " <> proj a <> " " <> sys s)
   Unglue t _        -> appp ("unglue " <> proj t)
-  Glue a s          -> appp ("glue " <> proj a <> " " <> sys s)
+  Glue a s1 s2      -> ifVerbose
+                         (appp ("glue " <> proj a <> " " <> sys s1 <> " " <> sys s2))
+                         (appp ("glue " <> proj a <> " " <> sys s2))
   TODO              -> "TODO"
   Com r r' i a t u  -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
                        "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "

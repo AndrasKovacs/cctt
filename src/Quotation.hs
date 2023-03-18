@@ -7,13 +7,15 @@ import Common
 import CoreTypes
 import Core
 
+-- NOTE: every quote method expects forced arguments, except Val which forces its argument.
+-- A sneaky complication is in NLApp where a forced NLApp t i does *not* imply that "i" is forced!
 ----------------------------------------------------------------------------------------------------
 
 class Quote a b | a -> b where
   quote :: NCofArg => DomArg => a -> b
 
 instance Quote I I where
-  quote = id; {-# inline quote #-}
+  quote i = i; {-# inline quote #-}
 
 instance Quote Ne Tm where
   quote n = case unSubNe n of
@@ -26,8 +28,8 @@ instance Quote Ne Tm where
     NCoe r r' a t     -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
     NHCom r r' a ts t -> HCom (quote r) (quote r') (quote a) (quote ts) (quote t)
     NUnglue t sys     -> Unglue (quote t) (quote sys)
-    NGlue t sys       -> Glue (quote t) (quote sys)
-    NLApp t i         -> LApp (quote t) (quote i)
+    NGlue t s1 s2     -> Glue (quote t) (quote s1) (quote s2)
+    NLApp t i         -> LApp (quote t) (quote (unF (frc i)))
     NElim mot ms t    -> Elim (quote mot) (quote ms) (quote t)
 
 instance Quote Val Tm where

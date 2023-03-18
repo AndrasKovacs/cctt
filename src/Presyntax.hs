@@ -36,7 +36,7 @@ data Tm
   | Com Tm Tm BindMaybe SysHCom Tm            -- com r r' i A [α x. t] u
 
   | GlueTy Ty Sys                             -- Glue A [α. B]
-  | GlueTm Tm Sys                             -- glue a [α. t]
+  | GlueTm Tm (Maybe Sys) Sys                 -- glue a {<equivsys>} <fibersys>
   | Unglue Tm
 
   | Refl          -- checkable refl

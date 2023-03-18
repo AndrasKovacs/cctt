@@ -883,10 +883,11 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
   VGlueTy (rebind topA -> a) (rebind topA -> topSys, rebind topA -> is) -> let
 
-    gr       = t
-    ~_Ar'    = a ∘ unF r'
-    ~topSysr = topSys ∘ unF r
-    ~frc_a   = frc a
+    gr        = t
+    ~_Ar'     = a ∘ unF r'
+    ~topSysr  = topSys ∘ unF r
+    ~topSysr' = topSys ∘ unF r'
+    ~frc_a    = frc a
 
   -- ar' : Ar'
   -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
@@ -976,6 +977,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
     in glue
          (hcomd fi1 fi0 _Ar' (vshcons (ceq r r') "i" (\i -> ungluef (unF gr) topSysr) fibpaths) ar')
+         topSysr'
          fibvals
 
   _ ->
@@ -1119,7 +1121,7 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
               )
             (ungluenf (unF gr) alphasys')
 
-    in F $ VNe (NGlue (unF base) (unF fib))
+    in F $ VNe (NGlue (unF base) alphasys (unF fib))
                (IS.insertI (unF r) $ IS.insertI (unF r') (alphais <> betais))
 
   VLine a ->
@@ -1177,17 +1179,14 @@ glueTy ~a sys = case unF sys of
 
 glueTyf ~a sys = frc (glueTy a sys); {-# inline glueTyf #-}
 
-gluen :: Val -> F NeSys' -> Val
-gluen ~t (F (!sys, !is)) = VNe (NGlue t sys) is
-{-# inline gluen #-}
-
-glue :: Val -> F VSys -> F Val
-glue ~t sys = case unF sys of
-  VSTotal v      -> v
-  VSNe (sys, is) -> F (VNe (NGlue t sys) is)
+glue :: Val -> F VSys -> F VSys -> F Val
+glue ~t eqs sys = case (unF eqs, unF sys) of
+  (VSTotal{}    , VSTotal v)      -> v
+  (VSNe (eqs, _), VSNe (sys, is)) -> F (VNe (NGlue t eqs sys) is)
+  _                               -> impossible
 {-# inline glue #-}
 
-gluenf ~t sys = unF (glue t sys); {-# inline gluenf #-}
+gluenf ~t eqs sys = unF (glue t eqs sys); {-# inline gluenf #-}
 
 unglue :: NCofArg => DomArg => Val -> F VSys -> Val
 unglue ~t sys = case unF sys of
@@ -1420,7 +1419,7 @@ eval = \case
 
   -- Glue
   GlueTy a sys      -> glueTy (eval a) (evalSys sys)
-  Glue t sys        -> gluenf (eval t) (evalSys sys)
+  Glue t eqs sys    -> gluenf (eval t) (evalSys eqs) (evalSys sys)
   Unglue t sys      -> unglue (eval t) (evalSys sys)
 
   -- Line
@@ -1523,7 +1522,7 @@ instance Force Ne Val where
     NCoe r r' a t     -> coe (frc r) (frc r') (frc a) (frc t)
     NHCom r r' a ts t -> hcomf (frc r) (frc r') (frc a) (frc ts) (frc t)
     NUnglue t sys     -> ungluef t (frc sys)
-    NGlue t sys       -> glue t (frc sys)
+    NGlue t eqs sys   -> glue t (frc eqs) (frc sys)
     NLApp t i         -> lappf (frc t) (frc i)
     NElim mot ms t    -> elimf mot ms (frc t)
 
@@ -1537,7 +1536,7 @@ instance Force Ne Val where
     NCoe r r' a t     -> coe (frcS r) (frcS r') (frcS a) (frcS t)
     NHCom r r' a ts t -> hcomf (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t)
     NUnglue t sys     -> ungluef (sub t) (frcS sys)
-    NGlue t sys       -> glue (sub t) (frcS sys)
+    NGlue t eqs sys   -> glue (sub t) (frcS eqs) (frcS sys)
     NLApp t i         -> lappf (frcS t) (frcS i)
     NElim mot ms t    -> elimf (sub mot) (sub ms) (frcS t)
 
@@ -1629,7 +1628,7 @@ unSubNeS = \case
   NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
   NHCom r r' a sys t -> NHCom (sub r) (sub r') (sub a) (sub sys) (sub t)
   NUnglue a sys      -> NUnglue (sub a) (sub sys)
-  NGlue a sys        -> NGlue (sub a) (sub sys)
+  NGlue a eqs sys    -> NGlue (sub a) (sub eqs) (sub sys)
   NLApp t i          -> NLApp (sub t) (sub i)
   NElim mot ms t     -> NElim (sub mot) (sub ms) (sub t)
 

@@ -46,7 +46,7 @@ data Tm
   -- we switch the field orders here compared to the papers, because
   -- this one is the sensible "dependency" order
   | GlueTy Ty Sys            -- Glue A [α ↦ B]      (B : Σ X (X ≃ A))
-  | Glue   Tm ~Sys           -- glue a [α ↦ b]
+  | Glue   Tm ~Sys ~Sys      -- glue a <equiv> <fib>
   | Unglue Tm ~Sys           -- unglue g [α ↦ B]
 
   | TODO
@@ -236,7 +236,7 @@ data Ne
   | NCoe I I (BindI Val) Val
   | NHCom I I VTy NeSysHCom Val
   | NUnglue Val NeSys
-  | NGlue Val NeSys
+  | NGlue Val ~NeSys NeSys
   | NElim ~Val VMethods Ne -- motive, methods, scrutinee
   deriving Show
 

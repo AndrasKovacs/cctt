@@ -8,7 +8,7 @@ import qualified Data.Map.Strict as M
 import System.Exit
 
 import Common hiding (debug)
-import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalf)
+import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalf, evalSys)
 import CoreTypes
 import Interval
 import Quotation
@@ -50,6 +50,9 @@ convEndpoints t u = if Conversion.conv t u
 
 eval :: NCofArg => DomArg => EnvArg => Tm -> Val
 eval t = let ?sub = idSub (dom ?cof) in Core.eval t
+
+evalSys :: NCofArg => DomArg => EnvArg => Sys -> F VSys
+evalSys sys = let ?sub = idSub (dom ?cof) in Core.evalSys sys
 
 evalf :: NCofArg => DomArg => EnvArg => Tm -> F Val
 evalf t = let ?sub = idSub (dom ?cof) in frc (Core.eval t)
@@ -379,10 +382,15 @@ check t topA = case t of
       u <- check u (b ∙ eval t)
       pure $! Pair t u
 
-    (P.GlueTm base ts, VGlueTy a equivs) -> do
+    (P.GlueTm base eqs ts, VGlueTy a equivs) -> do
+      ~eqs <- case eqs of
+        Nothing -> pure (quote (fst equivs))
+        Just eqs -> do
+          eqs <- elabGlueTySys a eqs
+          pure eqs
       base <- check base a
       ts   <- elabGlueTmSys base ts a (fst equivs)
-      pure $ Glue base ts
+      pure $ Glue base eqs ts
 
     (t, topA) -> do
       Infer t a <- infer t
@@ -536,7 +544,16 @@ infer = \case
     sys <- elabGlueTySys (eval a) sys
     pure $! Infer (GlueTy a sys) VU
 
-  P.GlueTm _ _ -> do
+  P.GlueTm base (Just eqs) sys -> do
+    Infer base a <- infer base
+    eqs <- elabGlueTySys a eqs
+    case unF (evalSys eqs) of
+      VSTotal _ -> impossible
+      VSNe veqs -> do
+        sys <- elabGlueTmSys base sys a (fst veqs)
+        pure $! Infer (Glue base eqs sys) (VGlueTy a veqs)
+
+  P.GlueTm _ Nothing _ -> do
     err CantInferGlueTm
 
   P.Unglue t -> do

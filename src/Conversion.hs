@@ -7,6 +7,8 @@ import Core
 import Interval
 import Substitution
 
+-- NOTE: every conv method expects forced arguments, except Val which forces its argument.
+-- A sneaky complication is in NLApp where a forced NLApp t i does *not* imply that "i" is forced!
 ----------------------------------------------------------------------------------------------------
 
 class Conv a where
@@ -57,7 +59,7 @@ instance Conv Ne where
     (NPApp p t u r , NPApp p' t' u' r' ) -> conv p p' && conv r r'
     (NProj1 n      , NProj1 n'         ) -> conv n n'
     (NProj2 n      , NProj2 n'         ) -> conv n n'
-    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv i i'
+    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv (unF (frc i)) (unF (frc i'))
 
     (NCoe r1 r2 a t, NCoe r1' r2' a' t') ->
       conv r1 r1' && conv r2 r2' && conv a a' && conv t t'
@@ -66,7 +68,7 @@ instance Conv Ne where
       conv r1 r1' && conv r2 r2' && conv sys sys' && conv t t'
 
     (NUnglue a sys    , NUnglue a' sys'      ) -> conv a a' && conv sys sys'
-    (NGlue a sys      , NGlue a' sys'        ) -> conv a a' && conv sys sys'
+    (NGlue a _ sys    , NGlue a' _ sys'      ) -> conv a a' && conv sys sys'
 
     (NElim _   ms t   , NElim _ ms' t'       ) -> conv t t' && conv ms ms'
 

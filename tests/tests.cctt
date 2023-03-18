@@ -1,3 +1,93 @@
+isLogEq (A B : U)(f : A → B) : U := (B → A);
+
+isSection (A B : U)(f : A → B) : U := (g : B → A) × ((x : A) → x = g (f x));
+
+isIso (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × ((x : B) → f (g x) = x);
+
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × ((x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+coe01isEquiv (P : I → U) : isEquiv (P 0) (P 1) (λ x. coe 0 1 P x) :=
+  let f' (i : I)(x : P 0)           : P i := coe 0 i P x;
+  let g' (i : I)(x : P i)           : P 0 := coe i 0 P x;
+  let linv' (i : I)(x : P 0)(j : I) : P 0 := hcom 0 i (P 0) [j=0 k. x; j=1 k. coe k 0 P (coe 0 k P x)] x;
+  let rinv' (i : I)(x : P i)(j : I) : P i := hcom i 0 (P i) [j=0 k. coe k i P (coe i k P x); j=1 k. x] x;
+
+  ( λ x. g' 1 x
+  , λ x j. linv' 1 x j
+  , λ x j. rinv' 1 x j
+  , λ x l k. hcom 0 1 (P 1) [k=0 i. coe i 1 P (f' i (linv' i x l))
+                            ;k=1 i. coe i 1 P (f' i x)
+		            ;l=0 i. coe i 1 P (f' i x)
+		            ;l=1 i. coe i 1 P (rinv' i (f' i x) k)]
+		            (coe 0 1 P x)
+  );
+
+-- Bugged:
+foo (i j : I)(A : I → U)(f : (b : U) * equiv b (A j)) : U := Glue (A j) [j=0. f];
+
+
+-- coe i j (k. Glue (A k) [k=i. A i, idEquiv (A i)]) x;
+-- :
+
+-- breh (A : U)(x : A) : Glue A [] := glue (hcom 1 0 A [] (hcom 0 1 A [] (coe 0 1 (i. A) x))) [];
+
+
+-- foo (A : U) : isSection A (Glue A []) (breh A) :=
+--   λ x. hcom 1 0 A [] (hcom 1 0 A [] (coe 1 0 (j. A) (unglue x)))
+-- , λ x j. hcom 0 1 A [j = 0 k. x
+--                    ; j = 1 k. hcom 1 0 A [k = 0 i. x]
+-- 		                  (hcom k 0 A []
+-- 				       (coe k 0 (l. A)
+-- 				          (unglue
+-- 					    (glue
+-- 					      (hcom 1 0 A [0 = k i. x
+-- 					                 ; k = 0 i. x]
+-- 					         (hcom 0 k A []
+-- 						   (coe 0 k (l. A) x)))
+-- 					      [k = 0. x]))))]
+-- 		   x;
+
+  -- let P (i : I)                     : U   := Glue A [i=0.(A,idEquiv A)];
+  -- let f' (i : I)(x : P 0)           : P i := coe 0 i P x;
+  -- let g' (i : I)(x : P i)           : P 0 := coe i 0 P x;
+  -- let linv' (i : I)(x : P 0)(j : I) : P 0 := hcom 0 i (P 0) [j=0 k. x; j=1 k. coe k 0 P (coe 0 k P x)] x;
+  -- let rinv' (i : I)(x : P i)(j : I) : P i := hcom i 0 (P i) [j=0 k. coe k i P (coe i k P x); j=1 k. x] x;
+
+  -- ( λ x. g' 1 x
+  -- , λ x j. linv' 1 x j
+  -- -- , λ x j. rinv' 1 x j
+  -- -- , λ x l k. hcom 0 1 (P 1) [k=0 i. coe i 1 P (f' i (linv' i x l))
+  -- --                           ;k=1 i. coe i 1 P (f' i x)
+  -- -- 		            ;l=0 i. coe i 1 P (f' i x)
+  -- -- 		            ;l=1 i. coe i 1 P (rinv' i (f' i x) k)]
+  -- -- 		            (coe 0 1 P x)
+  -- );
+
+  -- -- coe01isEquiv (λ i. Glue A [i=0. (A,idEquiv A)]);
+
+
+
+-- foo (A : U)(a : A) : A :=
+--   coe 1 0 (i. Glue A [0=i.(A, λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _.x)]) (glue a []);
+
+-- bar (x : U)(l : I) : U :=
+--   hcom 0 1 U [l = 0 i. Glue x [0=i. (x, λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _.x)]] x;
+
+
+{-
 
 isIso (A B : U)(f : A → B) : U :=
     (g    : B → A)
@@ -133,20 +223,9 @@ i1 q x] (coe 1 i1 q x))] (coe 1 0 q x)];
 
 
 
--- BUG: impossible in nf
-foo : isEquiv U U (λ x. coe 0 1 (_. U) x) :=
-  λ x. x
-, λ x j.   hcom 0 1 U [j = 0 k. x; j = 1 k. x] x
-, λ x j.   hcom 1 0 U [j = 0 k. x; j = 1 k. x] x
-, λ x l k. hcom 0 1 U [k = 0 i. hcom 0 i U [l = 0 k1. x; l = 1 k1. x] x
-                     ; k = 1 i. x
-		     ; l = 0 i. x
-		     ; l = 1 i. hcom i 0 U [k = 0 k1. x; k = 1 k1. x] x]
-           x;
-
--- Now it only loops...
+-- Bug: loops
 bar (x : U)(l : I) : U :=
-  hcom 0 1 U [l = 0 i. hcom 0 i U [] x] x;
+  hcom 0 1 U [l = 0 i. Glue x [0=i. (x, idEquiv x)]] x;
 
 -- baz (x : U)(l k i : I) : U := hcom 0 i U [l = 0 k1. x; l = 1 k1. x] x;
 
@@ -158,3 +237,4 @@ bar (x : U)(l : I) : U :=
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
+-}

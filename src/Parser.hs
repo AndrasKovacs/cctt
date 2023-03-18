@@ -184,13 +184,22 @@ goElim = do
   arg     <- optional proj
   pure $ Elim motive methods arg
 
+goGlue :: Parser Tm
+goGlue = do
+  base <- proj
+  sys1 <- sys
+  sys2 <- optional sys
+  case sys2 of
+    Nothing   -> pure $ GlueTm base Nothing sys1
+    Just sys2 -> pure $ GlueTm base (Just sys1) sys2
+
 app :: Parser Tm
 app = withPos (
        (keyword "coe"     *> goCoe)
   <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
   <|>  (keyword "elim"    *> goElim)
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
-  <|>  (keyword "glue"    *> (GlueTm <$!> proj <*!> sys))
+  <|>  (keyword "glue"    *> goGlue)
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
   <|>  (keyword "com"     *> goCom)
   <|>  (keyword "ap"      *> (Ap <$!> proj <*!> proj))
