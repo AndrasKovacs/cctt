@@ -235,7 +235,7 @@ data Ne
   | NProj2 Ne
   | NCoe I I (BindI Val) Val
   | NHCom I I VTy NeSysHCom Val
-  | NUnglue Val NeSys
+  | NUnglue Ne NeSys
   | NGlue Val ~NeSys NeSys
   | NElim ~Val VMethods Ne -- motive, methods, scrutinee
   deriving Show

@@ -80,8 +80,8 @@ instance Conv Ne where
     -- Glue eta
     -- A bit ugly that we put "mempty"-s there, and potentially dodgy, but the only
     -- way conversion checking can succeed here is when the VNe-s are immediately consumed.
-    (NGlue b sys fib  , t'                   ) -> conv b (VNe (NUnglue (VNe t' mempty) sys) mempty)
-    (t                , NGlue b' sys' fib'   ) -> conv (VNe (NUnglue (VNe t mempty) sys') mempty) b'
+    (NGlue b sys fib  , t'                   ) -> conv b (VNe (NUnglue t' sys) mempty)
+    (t                , NGlue b' sys' fib'   ) -> conv (VNe (NUnglue t sys') mempty) b'
 
     (NSub{} , _      ) -> impossible
     (t      , NSub{} ) -> impossible

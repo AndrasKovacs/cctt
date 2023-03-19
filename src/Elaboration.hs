@@ -836,6 +836,7 @@ inferTop = \case
     case ?printnf of
       Just x' | x == x' -> withPrettyArgs do
         putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
+        -- putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ show (quote vt)
         putStrLn ""
       _ -> pure ()
 

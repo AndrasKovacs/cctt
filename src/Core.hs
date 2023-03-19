@@ -7,10 +7,6 @@ import Interval
 import Substitution
 import CoreTypes
 
--- import Pretty
--- import Debug.Trace
-
-
 ----------------------------------------------------------------------------------------------------
 -- Context manipulation primitives
 ----------------------------------------------------------------------------------------------------
@@ -487,12 +483,12 @@ capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
   CEval (EC s env t) -> let ?env = EDef env u; ?sub = s in eval t
 
-  CCoePi (frc -> r) (frc -> r') (frc -> a) b (frc -> t) ->
+  CCoePi r@(frc -> rf) r'@(frc -> r'f) (frc -> a) b (frc -> t) ->
     let x = frc u in
-    coenf r r' (bindIf "j" \j -> b ∙ unF j ∘ coenf r' j a x) (t ∘ coenf r' r a x)
+    coenf rf r'f (bindIf "j" \j -> b ∙ unF j ∘ coenf r'f j a x) (t ∘ coenf r'f rf a x)
 
-  CHComPi (frc -> r) (frc -> r') a b sys base ->
-    hcom r r'
+  CHComPi r@(frc -> rf) r'@(frc -> r'f) a b sys base ->
+    hcom rf r'f
       (b ∘ u)
       (mapVSysHCom (\i t -> frc t ∘ u) (frc sys))
       (frc base ∘ u)
@@ -608,14 +604,15 @@ icapp (NICl _ t) arg = case t of
   -- coe r r' (i. t i ={j. A i j} u i) p =
   --   λ {t r'}{u r'} j. com r r' (i. A i j) [j=0 i. t i; j=1 i. u i] (p {t r} {u r}j)
 
-  ICCoePath (frc -> r) (frc -> r') a lhs rhs p ->
-    let j     = frc arg
-        abind = bindIf "i" \i -> a ∙ unF i ∘ unF j in
-    hcom r r' (a ∙ unF r' ∘ unF j)
-      (vshcons (ceq j fi0) "i" (\i -> coe i r' abind (lhs ∘ unF i)) $
-       vshcons (ceq j fi1) "i" (\i -> coe i r' abind (rhs ∘ unF i)) $
+  ICCoePath r@(frc -> rf) r'@(frc -> r'f) a lhs rhs p ->
+    let j     = arg
+        jf    = frc arg
+        abind = bindIf "i" \i -> a ∙ unF i ∘ j in
+    hcom rf r'f (a ∙ r' ∘ j)
+      (vshcons (ceq jf fi0) "i" (\i -> coe i (frc r') abind (lhs ∘ unF i)) $
+       vshcons (ceq jf fi1) "i" (\i -> coe i (frc r') abind (rhs ∘ unF i)) $
        vshempty)
-      (coe r r' abind (pappf (lhs ∙ unF r) (rhs ∙ unF r) (frc p) j))
+      (coe rf r'f abind (pappf (lhs ∙ r) (rhs ∙ r) (frc p) jf))
 
     -- com r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j)
     --          (vshcons (ceq j fi0) "i" (\i -> lhs ∘ unF i) $
@@ -623,12 +620,12 @@ icapp (NICl _ t) arg = case t of
     --           vshempty)
     --          (pappf (lhs ∙ unF r) (rhs ∙ unF r) (frc p) j)
 
-  ICHComPath (frc -> r) (frc -> r') a lhs rhs sys p ->
+  ICHComPath r@(frc -> rf) r'@(frc -> r'f) a lhs rhs sys p ->
     let farg = frc arg in
-    hcom r r' (a ∘ unF farg)
+    hcom rf r'f (a ∘ unF farg)
       (vshcons (ceq farg fi0) "i" (\i -> frc lhs) $
        vshcons (ceq farg fi1) "i" (\i -> frc rhs) $
-       mapVSysHCom (\_ t -> pappf lhs rhs (frc t) farg)
+       mapVSysHCom (\_ t -> pappf lhs rhs (frc t) (frc arg))
                    (frc sys))
       (pappf lhs rhs (frc p) farg)
 
@@ -636,15 +633,15 @@ icapp (NICl _ t) arg = case t of
 --   λ j. hcom r r' (A j) [j=0 i. lhs; j=1 i. rhs; α i. t i j] (base j)
 
 
-  ICHComLine (frc -> r) (frc -> r') a sys base ->
+  ICHComLine r@(frc -> rf) r'@(frc -> r'f) a sys base ->
     let farg = frc arg in
-    hcom r r' (a ∘ unF farg)
-      (mapVSysHCom (\_ t -> lappf (frc t) farg) (frc sys))
+    hcom rf r'f (a ∘ unF farg)
+      (mapVSysHCom (\_ t -> lappf (frc t) (frc arg)) (frc sys))
       (lappf (frc base) farg)
 
-  ICCoeLine (frc -> r) (frc -> r') a p ->
+  ICCoeLine r@(frc -> rf) r'@(frc -> r'f) a p ->
     let j = frc arg in
-    coenf r r' (bindIf "i" \i -> a ∙ unF i ∘ unF j) (lappf (frc p) j)
+    coenf rf r'f (bindIf "i" \i -> a ∙ unF i ∘ unF j) (lappf (frc p) j)
 
   ICConst t -> t
 
@@ -790,26 +787,26 @@ lappf t i = frc (lapp t i); {-# inline lappf #-}
 
 -- assumption: r /= r'
 coed :: F I -> F I -> F (BindI Val) -> F Val -> NCofArg => DomArg => F Val
-coed r r' topA t = case unF topA ^. body of
+coed rf r'f topA t = case unF topA ^. body of
 
   VPi (rebind topA -> a) (rebind topA -> b) ->
-    F (VLam (NCl (b^.body.name) (CCoePi (unF r) (unF r') a b (unF t))))
+    F (VLam (NCl (b^.body.name) (CCoePi (unF rf) (unF r'f) a b (unF t))))
 
   VSg (rebindf topA -> a) (rebindf topA -> b) ->
     let t1 = proj1f t
         t2 = proj2f t
-    in F (VPair (coednf r r' a t1)
-                (coednf r r' (bindIf "j" \j -> coe r j a t1) t2))
+    in F (VPair (coednf rf r'f a t1)
+                (coednf rf r'f (bindIf "j" \j -> coe rf j a t1) t2))
 
   VPath (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
-    F $ VPLam (lhs ∙ unF r') (rhs ∙ unF r')
+    F $ VPLam (lhs ∙ unF r'f) (rhs ∙ unF r'f)
       $ NICl (a^.body.name)
-      $ ICCoePath (unF r) (unF r') a lhs rhs (unF t)
+      $ ICCoePath (unF rf) (unF r'f) a lhs rhs (unF t)
 
   VLine (rebind topA -> a) ->
     F $ VLLam
       $ NICl (a^.body.name)
-      $ ICCoeLine (unF r) (unF r') a (unF t)
+      $ ICCoeLine (unF rf) (unF r'f) a (unF t)
 
   VU ->
     t
@@ -824,8 +821,8 @@ coed r r' topA t = case unF topA ^. body of
   -- Note: I don't need to rebind the "is"! It can be immediately weakened
   -- to the outer context.
   VNe (rebind topA -> n) is ->
-    F (VNe (NCoe (unF r) (unF r') (unF topA) (unF t))
-           (IS.insertI (unF r) $ IS.insertI (unF r') is))
+    F (VNe (NCoe (unF rf) (unF r'f) (unF topA) (unF t))
+           (IS.insertFI rf $ IS.insertFI r'f is))
 
 {-
 - coe Glue with unfolded and optimized hcom over fibers
@@ -883,26 +880,28 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
   VGlueTy (rebind topA -> a) (rebind topA -> topSys, rebind topA -> is) -> let
 
-    gr        = t
-    ~_Ar'     = a ∘ unF r'
-    ~topSysr  = topSys ∘ unF r
-    ~topSysr' = topSys ∘ unF r'
-    ~frc_a    = frc a
+    r          = unF rf
+    r'         = unF r'f
+    gr         = unF t
+    grf        = t
+    ~_Ar'      = a ∙ r' :: Val
+    ~_Ar'f     = frc _Ar'
+    ~topSysr   = topSys ∙ r :: NeSys
+    ~topSysrf  = frc topSysr
+    ~topSysr'  = topSys ∙ r' :: NeSys
+    ~topSysr'f = frc topSysr'
+    ~af        = frc a
 
   -- ar' : Ar'
   -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
 
-    ~ar' = hcomdn r r' _Ar'
+    ~ar' =
+           hcomdn rf r'f _Ar'f
              (mapForallNeSys'
-                (\i tf -> coe i r' frc_a (proj1f (proj2f (tf ∘ unF i)) ∘ coenf r i (proj1BindI tf) gr))
+                (\i tf -> coe i (frc r') (frc a) (proj1f (proj2f (tf ∘ unF i))
+                        ∘ coenf (frc r) i (proj1BindI tf) (frc gr)))
                 topSys)
-             (coed r r' frc_a (ungluef (unF gr) topSysr))
-
-    -- ~ar' = comdn r r' (frc a)
-    --          (mapForallNeSys'
-    --             (\i tf -> proj1f (proj2f (tf ∘ unF i)) ∘ coenf r i (proj1BindI tf) gr)
-    --             topSys)
-    --          (ungluef (unF gr) topSysr)
+             (coed rf r'f af (ungluef grf topSysrf))
 
     mkComponents :: NCofArg => Val -> (F Val, BindILazy Val)
     mkComponents tfr' = seq ?cof $ let
@@ -911,33 +910,43 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       ~equiv3  = proj2f equiv2
       ~equiv4  = proj2f equiv3
       ~equiv5  = proj2f equiv4
-      ~tr'     = proj1f equiv1
-      ~fr'     = proj1f equiv2
-      ~fr'inv  = proj1f equiv3
-      ~r'linv  = proj1f equiv4
-      ~r'rinv  = proj1f equiv5
-      ~r'coh   = proj2f equiv5
-      ~fibval  = fr'inv ∘ unF ar'
-      ~fibpath = r'rinv ∘ unF ar'
+      ~tr'     = proj1 equiv1
+      ~tr'f    = frc tr'
+      ~fr'     = proj1 equiv2
+      ~fr'f    = frc fr'
+      ~fr'inv  = proj1 equiv3
+      ~fr'invf = frc fr'inv
+      ~r'linv  = proj1 equiv4
+      ~r'rinv  = proj1 equiv5
+      ~r'rinvf = frc r'rinv
+      ~r'coh   = proj2 equiv5
+
+      ~fibval  = fr'invf ∘ unF ar'
+      ~fibpath = r'rinvf ∘ unF ar'
 
       -- shorthands for path applications
-      app_r'linv ~x i =
-        pappf x (fr'inv ∙ (fr' ∙ x)) (r'linv ∘ x) i
+      app_r'linv :: NCofArg => Val -> F I -> F Val
+      app_r'linv ~x i = seq ?cof $
+        pappf x (frc fr'inv ∙ (frc fr' ∙ x)) (frc r'linv ∘ x) i
 
-      app_r'coh ~x i j =
-        pappf (fr' ∙ unF (app_r'linv x i))
-              (fr' ∙ x)
-              (pappf (refl (fr' ∙ x)) (r'rinv ∙ (fr' ∙ x)) (r'coh ∘ x) i)
+      app_r'coh :: NCofArg => Val -> F I -> F I -> F Val
+      app_r'coh ~x i j = seq ?cof $
+        pappf (frc fr' ∙ unF (app_r'linv x i))
+              (frc fr' ∙ x)
+              (pappf (refl (frc fr' ∙ x)) (frc r'rinv ∙ (frc fr' ∙ x)) (frc r'coh ∘ x) i)
               j
+
+      -- valSys should be fine without NCof polymorphism, because
 
       -- valSys = [r=r'  i. fr'.linv gr i
       --         ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
-      ~valSys = nshconsNonTrue' (ceq r r') "i" (\i -> app_r'linv (unF gr) i) $
-                mapForallNeSys' (\i tf -> app_r'linv (coenf r r' (proj1BindI tf) gr) i) topSys
+      ~valSys =
+        nshconsNonTrue' (ceq rf r'f) "i" (\i -> app_r'linv gr i) $
+        mapForallNeSys' (\i tf -> app_r'linv (coenf (frc r) (frc r') (proj1BindI tf) (frc gr)) i) topSys
 
       -- fibval* : Tr'
       -- fibval* = hcom 1 0 Tr' valSys fibval
-      ~fibval' = hcomdn fi1 fi0 tr' valSys fibval
+      ~fibval' = hcomdn fi1 fi0 tr'f valSys fibval
 
       -- fibpath* : fr' fibval = ar'
       -- fibpath* = λ j.
@@ -947,14 +956,14 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       --                    ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i]
       --                    (fibpath {fr' fibval} {ar'} j)
       fibpath' = bindILazynf "i" \j ->
-        hcomdf fi1 fi0 _Ar'
-          (vshcons (ceq j fi0) "i" (\i -> fr' ∘ hcomnnf fi1 i tr' valSys fibval) $
+        hcomdf fi1 fi0 _Ar'f
+          (vshcons (ceq j fi0) "i" (\i -> fr'f ∘ hcomnnf fi1 i tr'f valSys fibval) $
            vshcons (ceq j fi1) "i" (\i -> ar') $
            F $ VSHNe $ unF $
-           nshconsNonTrue' (ceq r r') "i" (\i -> app_r'coh (unF gr) i j) $
-           mapForallNeSys' (\i tf -> app_r'coh (coenf r r' (proj1BindI tf) gr) i j) topSys
+           nshconsNonTrue' (ceq rf r'f) "i" (\i -> app_r'coh gr i j) $
+           mapForallNeSys' (\i tf -> app_r'coh (coenf (frc r) (frc r') (proj1BindI tf) (frc gr)) i j) topSys
           )
-          (pappf (fr' ∙ unF fibval) (unF ar') fibpath j)
+          (pappf (fr'f ∙ unF fibval) (unF ar') fibpath j)
 
       in (fibval', fibpath')
 
@@ -967,7 +976,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
         (!fibvals, !fibpaths) = mkNeSystems sys
         in NSCons (BindCofLazy alphar' (unF fibval)) fibvals // NSHCons (BindCof alphar' fibpath) fibpaths
 
-    (!fibvals, !fibpaths) = case unF (topSys ∘ unF r') of
+    (!fibvals, !fibpaths) = case unF (topSysr'f) of
       VSTotal tfr'   -> let
         (!fibval, !fibpath) = mkComponents (unF tfr')
         in F (VSTotal fibval) // F (VSHTotal fibpath)
@@ -976,8 +985,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
         in F (VSNe (fibvals, is)) // F (VSHNe (fibpaths, is))
 
     in glue
-         (hcomd fi1 fi0 _Ar' (vshcons (ceq r r') "i" (\i -> ungluef (unF gr) topSysr) fibpaths) ar')
-         topSysr'
+         (hcomd fi1 fi0 _Ar'f (vshcons (ceq rf r'f) "i" (\i -> ungluef (frc gr) (frc topSysr)) fibpaths) ar')
+         topSysr'f
          fibvals
 
   _ ->
@@ -1014,30 +1023,31 @@ com r r' ~a ~sys ~b
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> NCofArg => DomArg => F Val
-hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
+hcomdn rf@(unF -> r) r'f@(unF -> r') a ts@(F (!nts, !is)) base = case unF a of
 
   VPi a b ->
-    F $ VLam $ NCl (b^.name) $ CHComPi (unF r) (unF r') a b nts (unF base)
+    F $ VLam $ NCl (b^.name) $ CHComPi r r' a b nts (unF base)
 
   VSg a b ->
-    let bbind =
+    let bbind :: NCofArg => F (BindI Val)
+        bbind = seq ?cof $
          bindIf "i" \i ->
-          b ∘ hcomnnf r i
+          b ∘ hcomnnf rf i
                (frc a)
                (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
                (proj1f base) in
     F $ VPair
-      (hcomdnnf r r'
+      (hcomdnnf rf r'f
         (frc a)
         (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
         (proj1f base))
-      (hcomdnnf r r'
-        (b ∘ hcomnnf r r'
+      (hcomdnnf rf r'f
+        (b ∘ hcomnnf rf r'f
              (frc a)
              (mapNeSysHCom' (\_ t -> proj1f (frc t)) ts)
              (proj1f base))
-        (mapNeSysHCom' (\i t -> coe i r' bbind (proj2f (frc t))) ts)
-        (coed r r' bbind (proj2f base)))
+        (mapNeSysHCom' (\i t -> coe i (frc r') bbind (proj2f (frc t))) ts)
+        (coed rf r'f bbind (proj2f base)))
 
   -- VSg a b ->
   --   F $ VPair
@@ -1058,15 +1068,14 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
   --  , com r r' (i. B (hcom r i A [α j. (t j).1] b.1)) [α i. (t i).2] b.2)
 
 
-
   VPath a lhs rhs ->
     F $ VPLam lhs rhs
       $ NICl (a^.name)
-      $ ICHComPath (unF r) (unF r') a lhs rhs nts (unF base)
+      $ ICHComPath r r' a lhs rhs nts (unF base)
 
   a@(VNe n is') ->
-    F $ VNe (NHCom (unF r) (unF r') a nts (unF base))
-            (IS.insertFI r $ IS.insertFI r' $ is <> is')
+    F $ VNe (NHCom r r' a nts (unF base))
+            (IS.insertFI rf $ IS.insertFI r'f $ is <> is')
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1074,14 +1083,13 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
   VU -> let
 
     -- NOTE the nsconsNonTrue; ceq r r' can be false or neutral
-    sys = nsconsNonTrue (ceq r r') (F $ VPair (unF base) (theIdEquiv (unF base))) $
+    sys = nsconsNonTrue (ceq rf r'f) (F $ VPair (unF base) (theIdEquiv (unF base))) $
           mapNeSysFromH
-            (\t -> F $ VPair (t ∙ unF r')
-                     $ theCoeEquiv (bindI (t^.name) \i -> t ∙ unF i)
-                                   (unF r') (unF r))
+            (\t -> F $ VPair (t ∙ r')
+                     $ theCoeEquiv (bindI (t^.name) \i -> t ∙ unF i) r r')
             (F nts)
 
-    in F $ VGlueTy (unF base) (unF sys // (IS.insertI (unF r) $ IS.insertI (unF r') is))
+    in F $ VGlueTy (unF base) (unF sys // (IS.insertFI rf $ IS.insertFI r'f is))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -1091,50 +1099,52 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
   --        [α. hcom r r' T [β i. t i] gr]
 
   VGlueTy a (alphasys, alphais) ->
-    let gr        = base
-        alphasys' = F (alphasys, alphais)
-        betasys   = nts
-        betais    = is
-        betasys'  = F (betasys, betais)
+    let gr         = unF base
+        alphasys'  = (alphasys, alphais)
+        alphasys'f = F alphasys'
+        betasys    = nts
+        betais     = is
+        betasys'   = (betasys, betais)
+        betasys'f  = F betasys'
 
         -- [α. hcom r r' T [β i. t i] gr]
         fib = mapNeSys
-                (\t -> hcomdn r r' (proj1f (frc t)) betasys' gr)
+                (\t -> hcomdf (frc r) (frc r') (proj1f (frc t)) (frc betasys) (frc gr))
                 (F alphasys)
 
         -- hcom r r' A [  β i. unglue (t i)
         --              ; α i. f (hcom r i T [β. t] gr)]
         --             (unglue gr)
         hcombase =
-          hcomdn r r' (frc a)
+          hcomdn rf r'f (frc a)
             (catNeSysHCom'
                (mapNeSysHCom'
-                  (\_ t -> ungluenf t alphasys')
-                  betasys')
+                  (\_ t -> ungluef (frc t) (frc alphasys))
+                  betasys'f)
                (mapNeSysToH'
                   (\i (frc -> tf) ->
                       let ty  = proj1f tf              -- T
                           f   = proj1f (proj2f tf) in  -- f
-                      f ∘ hcomnnf r i ty betasys' gr
+                      f ∘ hcomd (frc r) i ty (frc betasys) (frc gr)
                     )
-                  alphasys')
+                  alphasys'f)
               )
-            (ungluenf (unF gr) alphasys')
+            (ungluenf (frc gr) alphasys'f)
 
     in F $ VNe (NGlue (unF hcombase) alphasys (unF fib))
-               (IS.insertI (unF r) $ IS.insertI (unF r') (alphais <> betais))
+               (IS.insertFI rf $ IS.insertFI r'f (alphais <> betais))
 
   VLine a ->
     F $ VLLam
       $ NICl (a^.name)
-      $ ICHComLine (unF r) (unF r') a nts (unF base)
+      $ ICHComLine r r' a nts (unF base)
 
   a@(VTyCon x ps) -> case unF base of
     VDCon x i sp     -> case ?dom of
-                          0 -> hcomind0 r r' (F a) ts ps x i sp
-                          _ -> hcomind  r r' (F a) ts ps x i sp
-    base@(VNe n is') -> F $ VNe (NHCom (unF r) (unF r') a nts base)
-                                (IS.insertFI r $ IS.insertFI r' $ is <> is')
+                          0 -> hcomind0 rf r'f (F a) ts ps x i sp
+                          _ -> hcomind  rf r'f (F a) ts ps x i sp
+    base@(VNe n is') -> F $ VNe (NHCom r r' a nts base)
+                                (IS.insertFI rf $ IS.insertFI r'f $ is <> is')
     VTODO            -> F VTODO
     _                -> impossible
 
@@ -1146,10 +1156,10 @@ hcomdn r r' a ts@(F (!nts, !is)) base = case unF a of
 
 -- | HCom with nothing known about semantic arguments.
 hcom :: NCofArg => DomArg => F I -> F I -> F Val -> F VSysHCom -> F Val -> Val
-hcom r r' ~a ~t ~b
-  | r == r'             = unF b
-  | VSHTotal v <- unF t = v ∙ unF r'
-  | VSHNe sys  <- unF t = hcomdnnf r r' a (F sys) b
+hcom rf@(unF -> r) r'f@(unF -> r') ~a ~t ~b
+  | rf == r'f           = unF b
+  | VSHTotal v <- unF t = v ∙ r'
+  | VSHNe sys  <- unF t = hcomdnnf rf r'f a (F sys) b
 {-# inline hcom #-}
 
 -- | HCom with neutral system input.
@@ -1189,16 +1199,21 @@ glue ~t eqs sys = case (unF eqs, unF sys) of
 
 gluenf ~t eqs sys = unF (glue t eqs sys); {-# inline gluenf #-}
 
-unglue :: NCofArg => DomArg => Val -> F VSys -> Val
+unglue :: NCofArg => DomArg => F Val -> F VSys -> Val
 unglue ~t sys = case unF sys of
-  VSTotal teqv   -> proj1f (proj2f teqv) ∙ t
-  VSNe (sys, is) -> case unF (frc t) of
-    VNe (NGlue base _ fib) is' -> base
-    t                          -> VNe (NUnglue t sys) is
+  VSTotal teqv   -> proj1f (proj2f teqv) ∙ unF t
+  VSNe (sys, is) -> case unF t of
+    VNe (NGlue base _ _) _ -> base
+    VNe n is'              -> VNe (NUnglue n sys) (is <> is')
+    t                      -> impossible
 {-# inline unglue #-}
 
-ungluen :: NCofArg => DomArg => Val -> F (NeSys, IS.IVarSet) -> Val
-ungluen ~t (F (!sys, !is)) = VNe (NUnglue t sys) is
+-- | Unglue with neutral system arg.
+ungluen :: NCofArg => DomArg => F Val -> F (NeSys, IS.IVarSet) -> Val
+ungluen t (F (!sys, !is)) = case unF t of
+  VNe (NGlue base _ _) _ -> base
+  VNe n is'              -> VNe (NUnglue n sys) (is <> is')
+  _                      -> impossible
 {-# inline ungluen #-}
 
 ungluef  ~t sys = frc (unglue t sys); {-# inline ungluef #-}
@@ -1380,7 +1395,7 @@ hcomind r r' a sys ext tyix conix sp = case projsys' conix sys of
     F $ VDCon tyix conix (hcomindsp r r' a (prj // snd (unF sys)) ext conix 0 sp)
   TTPNe (sys,is) ->
     F $ VNe (NHCom (unF r) (unF r') (unF a) sys (VDCon tyix conix sp))
-            (IS.insertI (unF r) $ IS.insertI (unF r') is)
+            (IS.insertFI r $ IS.insertFI r' is)
 {-# inline hcomind #-}
 
 -- coeind :: NCofArg => DomArg => F I -> F I ->
@@ -1423,7 +1438,7 @@ eval = \case
   -- Glue
   GlueTy a sys      -> glueTy (eval a) (evalSys sys)
   Glue t eqs sys    -> gluenf (eval t) (evalSys eqs) (evalSys sys)
-  Unglue t sys      -> unglue (eval t) (evalSys sys)
+  Unglue t sys      -> unglue (evalf t) (evalSys sys)
 
   -- Line
   Line x a          -> VLine (NICl x (ICEval ?sub ?env a))
@@ -1524,7 +1539,7 @@ instance Force Ne Val where
     NProj2 t          -> proj2f (frc t)
     NCoe r r' a t     -> coe (frc r) (frc r') (frc a) (frc t)
     NHCom r r' a ts t -> hcomf (frc r) (frc r') (frc a) (frc ts) (frc t)
-    NUnglue t sys     -> ungluef t (frc sys)
+    NUnglue t sys     -> ungluef (frc t) (frc sys)
     NGlue t eqs sys   -> glue t (frc eqs) (frc sys)
     NLApp t i         -> lappf (frc t) (frc i)
     NElim mot ms t    -> elimf mot ms (frc t)
@@ -1538,7 +1553,7 @@ instance Force Ne Val where
     NProj2 t          -> proj2f (frcS t)
     NCoe r r' a t     -> coe (frcS r) (frcS r') (frcS a) (frcS t)
     NHCom r r' a ts t -> hcomf (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t)
-    NUnglue t sys     -> ungluef (sub t) (frcS sys)
+    NUnglue t sys     -> ungluef (frcS t) (frcS sys)
     NGlue t eqs sys   -> glue (sub t) (frcS eqs) (frcS sys)
     NLApp t i         -> lappf (frcS t) (frcS i)
     NElim mot ms t    -> elimf (sub mot) (sub ms) (frcS t)
@@ -1727,34 +1742,38 @@ gfill :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F Val
 gfill a r i x = coe i r a x; {-# inline gfill #-}
 
 linvfill :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F I -> Val
-linvfill a r i x j =
-  hcom r i (unF a ∘ unF r)
-    (vshcons (ceq j fi0) "k" (\_ -> x) $
-     vshcons (ceq j fi1) "k" (\k -> coe k r a (coe r k a x)) $
+linvfill af@(unF -> a) rf@(unF -> r) i_f@(unF -> i) xf@(unF -> x) jf@(unF -> j) =
+  hcom rf i_f (a ∘ r)
+    (vshcons (ceq jf fi0) "k" (\_ -> frc x) $
+     vshcons (ceq jf fi1) "k" (\k -> coe k (frc r) (frc a) (coe (frc r) k (frc a) (frc x))) $
      vshempty)
-    x
+    xf
 
 linvfillf a r i x j = frc (linvfill a r i x j); {-# inline linvfillf #-}
 
 rinvfill :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F I -> Val
-rinvfill a r i x j =
-  hcom i r (unF a ∘ unF i)
-    (vshcons (ceq j fi0) "k" (\k -> coe k i a (coe i k a x)) $
-     vshcons (ceq j fi1) "k" (\k -> x) $
+rinvfill af@(unF -> a) rf@(unF -> r) i_f@(unF -> i) xf@(unF -> x) jf@(unF -> j) =
+  hcom i_f rf (a ∘ i)
+    (vshcons (ceq jf fi0) "k" (\k -> coe k (frc i) (frc a) (coe (frc i) k (frc a) (frc x))) $
+     vshcons (ceq jf fi1) "k" (\k -> frc x) $
      vshempty)
-    x
+    xf
 
 rinvfillf a r i x j = frc (rinvfill a r i x j); {-# inline rinvfillf #-}
 
 coeCoherence :: NCofArg => DomArg => F (BindI Val) -> F I -> F I -> F Val -> F I -> F I -> Val
-coeCoherence a r r' x l k =
-  hcom r r' (unF a ∘ unF r')
-    (vshcons (ceq k fi0) "i" (\i -> coe i r' a (ffill a r i (linvfillf a r i x l))) $
-     vshcons (ceq k fi1) "i" (\i -> coe i r' a (ffill a r i x)) $
-     vshcons (ceq l fi0) "i" (\i -> coe i r' a (ffill a r i x)) $
-     vshcons (ceq l fi1) "i" (\i -> coe i r' a (rinvfillf a r i (ffill a r i x) k)) $
+coeCoherence af@(unF -> a) rf@(unF -> r) r'f@(unF -> r') xf@(unF -> x) lf@(unF -> l) kf@(unF -> k) =
+  hcom rf r'f (a ∘ r')
+    (vshcons (ceq kf fi0) "i" (\i -> case (frc r', frc a, frc r, frc x, frc l) of
+                                 (r'f, af, rf, xf, lf) -> coe i r'f af (ffill af rf i (linvfillf af rf i xf lf))) $
+     vshcons (ceq kf fi1) "i" (\i -> case (frc r', frc a, frc r, frc x) of
+                                 (r'f, af, rf, xf) -> coe i r'f af (ffill af rf i xf)) $
+     vshcons (ceq lf fi0) "i" (\i -> case (frc r', frc a, frc r, frc x) of
+                                 (r'f, af, rf, xf) -> coe i r'f af (ffill af rf i xf)) $
+     vshcons (ceq lf fi1) "i" (\i -> case (frc r', frc a, frc r, frc x, frc k) of
+                                 (r'f, af, rf, xf, kf) -> coe i r'f af (rinvfillf af rf i (ffill af rf i xf) kf)) $
      vshempty)
-    (coe r r' a x)
+    (coe rf r'f af xf)
 
   -- -- with com
   -- com r r' a
