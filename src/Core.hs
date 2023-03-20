@@ -1092,7 +1092,7 @@ hcomdn rf@(unF -> r) r'f@(unF -> r') af@(unF -> a) ts@(F (!nts, !is)) basef@(unF
     sys = nsconsNonTrue (ceq rf r'f) (F $ VPair base (theIdEquiv base)) $
           mapNeSysFromH
             (\t -> F $ VPair (t ∙ r')
-                     $ theCoeEquiv (bindI (t^.name) \i -> t ∙ unF i) r r')
+                     $ theCoeEquiv (bindI (t^.name) \i -> t ∙ unF i) r' r)
             (F nts)
 
     in F $ VGlueTy base (unF sys // (IS.insertFI rf $ IS.insertFI r'f is))
