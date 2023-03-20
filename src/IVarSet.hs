@@ -14,6 +14,10 @@ singleton :: IVar -> IVarSet
 singleton = coerce LS.singleton
 {-# inline singleton #-}
 
+null :: IVarSet -> Bool
+null = coerce LS.null
+{-# inline null #-}
+
 insert :: IVar -> IVarSet -> IVarSet
 insert = coerce LS.insert
 {-# inline insert #-}

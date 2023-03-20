@@ -24,6 +24,11 @@ insert :: Lvl -> LvlSet -> LvlSet
 insert (Lvl x) (LvlSet s) = LvlSet (unsafeShiftL 1 (w2i x) .|. s)
 {-# inline insert #-}
 
+null :: LvlSet -> Bool
+null (LvlSet 0) = True
+null _          = False
+{-# inline null #-}
+
 delete :: Lvl -> LvlSet -> LvlSet
 delete (Lvl x) (LvlSet s) = LvlSet (complement (unsafeShiftL 1 (w2i x)) .&. s)
 {-# inline delete #-}

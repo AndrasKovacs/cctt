@@ -916,7 +916,6 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       ~equiv4  = proj2f equiv3
       ~equiv5  = proj2f equiv4
 
-      --
       ~tr'     = proj1 equiv1
       ~tr'f    = frc tr'
       ~fr'     = proj1 equiv2

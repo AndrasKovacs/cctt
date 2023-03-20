@@ -155,6 +155,7 @@ instance SubAction Sub where
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
 isUnblocked :: NCofArg => IS.IVarSet -> Bool
+isUnblocked is | IS.null is = False
 isUnblocked is = go is (mempty @IS.IVarSet) where
   go :: IS.IVarSet -> IS.IVarSet -> Bool
   go is varset = IS.popSmallest is
@@ -162,8 +163,10 @@ isUnblocked is = go is (mempty @IS.IVarSet) where
        (\x -> IS.member x varset || go is (IS.insert x varset))
        True)
     False
+{-# inline isUnblocked #-}
 
 isUnblockedS :: SubArg => NCofArg => IS.IVarSet -> Bool
+isUnblockedS is | IS.null is = False
 isUnblockedS is = go is (mempty @IS.IVarSet) where
   go :: IS.IVarSet -> IS.IVarSet -> Bool
   go is varset = IS.popSmallest is
@@ -173,6 +176,7 @@ isUnblockedS is = go is (mempty @IS.IVarSet) where
         True)
       True)
     False
+{-# inline isUnblockedS #-}
 
 instance SubAction IS.IVarSet where
   sub is = IS.foldl
