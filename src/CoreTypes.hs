@@ -259,8 +259,8 @@ vVar :: Lvl -> Val
 vVar x = VNe (NLocalVar x) mempty
 {-# inline vVar #-}
 
-fi0 = F I0; {-# inline fi0 #-}
-fi1 = F I1; {-# inline fi1 #-}
+i0f = F I0; {-# inline i0f #-}
+i1f = F I1; {-# inline i1f #-}
 
 type DomArg  = (?dom  :: Lvl)    -- fresh LocalVar
 type IDomArg = (?idom :: IVar)   -- fresh LocalVar

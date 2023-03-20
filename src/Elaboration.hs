@@ -341,14 +341,14 @@ check t topA = case t of
 
     (P.Lam x t, VPath a l r) -> do
       t <- bindI x \i -> check t (a ∙ IVar i)
-      convEndpoints l (instantiate t fi0)
-      convEndpoints r (instantiate t fi1)
+      convEndpoints l (instantiate t i0f)
+      convEndpoints r (instantiate t i1f)
       pure $! PLam (quote l) (quote r) x t
 
     (P.PLam l r x t, VPath a l' r') -> do
       t <- bindI x \i -> check t (a ∙ IVar i)
-      convEndpoints (instantiate t fi0) l'
-      convEndpoints (instantiate t fi1) r'
+      convEndpoints (instantiate t i0f) l'
+      convEndpoints (instantiate t i1f) r'
       l <- check l (a ∙ I0)
       r <- check r (a ∙ I1)
       convEndpoints (eval l) l'
@@ -423,7 +423,7 @@ infer = \case
   P.I  -> err UnexpectedIType
 
   P.DepPath a t u -> do
-    (x, a, _, src, tgt) <- elabBindMaybe a fi0 fi1
+    (x, a, _, src, tgt) <- elabBindMaybe a i0f i1f
     t <- check t src
     u <- check u tgt
     pure $! Infer (Path x a t u) VU
