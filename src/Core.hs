@@ -945,7 +945,7 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
     -- NOTE the nsconsNonTrue; ceq r r' can be false or neutral
     sys = nsconsNonTrue (ceq r r') (VPair base (theIdEquiv base)) $
           mapNeSysFromH
-            (\t -> VPair (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r r'))
+            (\t -> VPair (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
             nts
 
     in VGlueTy base (sys // (insertI r $ insertI r' is))
