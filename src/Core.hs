@@ -1009,7 +1009,7 @@ coe r r' ~a t
 coenf r r' a t = unF (coe r r' a t); {-# inline coenf #-}
 
 -- | Assumption: r /= r'
-comdn :: NCofArg => DomArg => F I -> F I -> F (BindI Val) -> F (NeSysHCom, IS.IVarSet) -> F Val -> F Val
+comdn :: NCofArg => DomArg => F I -> F I -> F (BindI Val) -> F NeSysHCom' -> F Val -> F Val
 comdn rf@(unF -> r) r'f@(unF -> r') ~af@(unF -> a) sys ~bf@(unF -> b) =
   hcomdn rf r'f
     (a ∘ r')
@@ -1026,9 +1026,8 @@ com r r' ~a ~sys ~b
   | VSHNe sys  <- unF sys = comdnnf r r' a (F sys) b
 {-# inline com #-}
 
-
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
-hcomdn :: F I -> F I -> F Val -> F (NeSysHCom, IS.IVarSet) -> F Val -> NCofArg => DomArg => F Val
+hcomdn :: F I -> F I -> F Val -> F NeSysHCom' -> F Val -> NCofArg => DomArg => F Val
 hcomdn rf@(unF -> r) r'f@(unF -> r') af@(unF -> a) ts@(F (!nts, !is)) basef@(unF -> base) = case a of
 
   VPi a b ->
@@ -1462,7 +1461,7 @@ eval = \case
   Sym a x y p       -> sym (eval a) (eval x) (eval y) (eval p)
   Trans a x y z p q -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
   Ap f x y p        -> ap_ (eval f) (eval x) (eval y) (eval p)
-  Com r r' i a t b  -> com' (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom' t) (evalf b)
+  Com r r' i a t b  -> com (evalI r) (evalI r') (bindIS i \_ -> evalf a) (evalSysHCom t) (evalf b)
 
   -- Inductives
   TyCon x ts        -> VTyCon x (tyParams ts)

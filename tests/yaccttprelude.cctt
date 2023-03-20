@@ -59,19 +59,10 @@ comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z :=
 sym (A : U)(x y : A) (p : x = y) : y = x :=
   λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
+-- com gets us buggy nf! hcom is fine
 symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
   λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
                 [i=0 j. p j; i=1 j. a] a;
-
-  -- λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
-  --              [i=0. p; i=1 _. a] a;
-
--- λ i. glue (hcom 0 1 [
---              i = 0 j. coe 0 j P (coe j 1 P (p j))]
--- 	    (hcom 1 0 [i = 0 i1. coe 0
--- 1 P (coe 0 1 P a); i = 1 i1. coe 0 1 (_. A) (coe 0 1 (j. A) a)] (hcom 0 1 [i = 0
--- j. coe j 1 (j1. A) (coe 0 j P (coe 0 j P a)); i = 1 j. coe j 1 (j1. A) (coe 0 j
--- (_. A) (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a)))) [i = 0. b; i = 1. a];
 
 Sing (A : U) (a : A) : U := (x : A) × (a = x);
 
