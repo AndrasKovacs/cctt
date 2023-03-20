@@ -5,7 +5,6 @@ import Common
 import CoreTypes
 import Core
 import Interval
-import Substitution
 
 -- NOTE: every conv method expects forced arguments, except Val which forces its argument.
 -- A sneaky complication is in NLApp where a forced NLApp t i does *not* imply that "i" is forced!
@@ -15,7 +14,7 @@ class Conv a where
   conv :: NCofArg => DomArg => a -> a -> Bool
 
 instance Conv Val where
-  conv t t' = case (,) $$! unF (frc t) $$! unF (frc t') of
+  conv t t' = case frc t // frc t' of
 
     -- rigid match
     (VNe n _        , VNe n' _          ) -> conv n n'
@@ -38,14 +37,14 @@ instance Conv Val where
     (VTODO          , VTODO             ) -> True
 
     -- eta
-    (VLam t         , F -> t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
-    (F -> t         , VLam t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
-    (VPair t u      , F -> t'           ) -> conv t (proj1 t') && conv u (proj2 t')
-    (F -> t         , VPair t' u'       ) -> conv (proj1 t) t' && conv (proj2 t) u'
-    (VPLam l r t    , F -> t'           ) -> freshI \(IVar -> i) -> conv (t ∙ i) (papp l r t' (F i))
-    (F -> t         , VPLam l r t'      ) -> freshI \(IVar -> i) -> conv (papp l r t (F i)) (t' ∙ i)
-    (VLLam t        , F -> t'           ) -> freshI \(IVar -> i) -> conv (t ∙ i) (lapp t' (F i))
-    (F -> t         , VLLam t'          ) -> freshI \(IVar -> i) -> conv (lapp t (F i)) (t' ∙ i)
+    (VLam t         , t'                ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
+    (t              , VLam t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
+    (VPair t u      , t'                ) -> conv t (proj1 t') && conv u (proj2 t')
+    (t              , VPair t' u'       ) -> conv (proj1 t) t' && conv (proj2 t) u'
+    (VPLam l r t    , t'                ) -> freshI \(IVar -> i) -> conv (t ∙ i) (papp l r t' i)
+    (t              , VPLam l r t'      ) -> freshI \(IVar -> i) -> conv (papp l r t i) (t' ∙ i)
+    (VLLam t        , t'                ) -> freshI \(IVar -> i) -> conv (t ∙ i) (lapp t' i)
+    (t              , VLLam t'          ) -> freshI \(IVar -> i) -> conv (lapp t i) (t' ∙ i)
 
     (VSub{}         , _                 ) -> impossible
     (_              , VSub{}            ) -> impossible
@@ -59,7 +58,7 @@ instance Conv Ne where
     (NPApp p t u r , NPApp p' t' u' r' ) -> conv p p' && conv r r'
     (NProj1 n      , NProj1 n'         ) -> conv n n'
     (NProj2 n      , NProj2 n'         ) -> conv n n'
-    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv (unF (frc i)) (unF (frc i'))
+    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv (frc i) (frc i')
 
     (NCoe r1 r2 a t, NCoe r1' r2' a' t') ->
       conv r1 r1' && conv r2 r2' && conv a a' && conv t t'
