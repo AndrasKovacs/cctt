@@ -83,7 +83,7 @@ ghc-options:
 - -fmax-worker-args=15
 - -fspecialise-aggressively
 - -fexpose-all-unfoldings
-# - -fplugin StrictImplParams
+- -fplugin StrictImplParams
 - -fworker-wrapper-cbv
 - -rtsopts
 - -threaded

@@ -34,18 +34,18 @@ coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
   );
 
 coeIsEquivnf (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
-(λ x. coe r' r A x, λ x {x} {coe r' r A (coe r r' A x)} j. hcom r r'
-(A r) [j = 0 k. x; j = 1 k. coe k r A (coe r k A x)] x, λ x {coe r r' A (coe r'
-r A x)} {x} j. hcom r' r (A r') [j = 0 k. coe k r' A (coe r' k A x); j = 1 k. x]
-x, λ x {λ {coe r r' A x} {coe r r' A x} _. coe r r' A x} {λ {coe r r' A (coe r'
-r A (coe r r' A x))} {coe r r' A x} j. hcom r' r (A r') [j = 0 k. coe k r' A
-(coe r' k A (coe r r' A x)); j = 1 k. coe r r' A x] (coe r r' A x)} l {coe r r'
-A (hcom r r' (A r) [l = 0 k. x; l = 1 k. coe k r A (coe r k A x)] x)} {coe r r'
-A x} k. hcom r r' (A r') [k = 0 i. coe i r' A (coe r i A (hcom r i (A r) [l = 0
-k1. x; l = 1 k1. coe k1 r A (coe r k1 A x)] x)); k = 1 i. coe i r' A (coe r i A
-x); l = 0 i. coe i r' A (coe r i A x); l = 1 i. coe i r' A (hcom i r (A i) [k =
-0 k1. coe k1 i A (coe i k1 A (coe r i A x)); k = 1 k1. coe r i A x] (coe r i A
-x))] (coe r r' A x));
+(λ x. coe r' r A x, λ x {x} {coe r' r A (coe r r' A x)} j. hcom r r' (A r) [j =
+0 k. x; j = 1 k. coe k r A (coe r k A x)] x, λ x {coe r r' A (coe r' r A x)} {x}
+j. hcom r' r (A r') [j = 0 k. coe k r' A (coe r' k A x); j = 1 k. x] x, λ x {λ
+{coe r r' A x} {coe r r' A x} _. coe r r' A x} {λ {coe r r' A (coe r' r A (coe r
+r' A x))} {coe r r' A x} j. hcom r' r (A r') [j = 0 k. coe k r' A (coe r' k A
+(coe r r' A x)); j = 1 k. coe r r' A x] (coe r r' A x)} l {coe r r' A (hcom r r'
+(A r) [l = 0 k. x; l = 1 k. coe k r A (coe r k A x)] x)} {coe r r' A x} k. hcom
+r r' (A r') [k = 0 i. coe i r' A (coe r i A (hcom r i (A r) [l = 0 k1. x; l = 1
+k1. coe k1 r A (coe r k1 A x)] x)); k = 1 i. coe i r' A (coe r i A x); l = 0
+i. coe i r' A (coe r i A x); l = 1 i. coe i r' A (hcom i r (A i) [k = 0 k1. coe
+k1 i A (coe i k1 A (coe r i A x)); k = 1 k1. coe r i A x] (coe r i A x))] (coe r
+r' A x));
 
 coe01isEquivnf (A : I → U) : isEquiv (A 0) (A 1)  (λ x. coe 0 1 A x) :=
 

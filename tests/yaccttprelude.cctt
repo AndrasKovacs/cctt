@@ -61,42 +61,9 @@ sym (A : U)(x y : A) (p : x = y) : y = x
 
 -- symu (A B : U)(p : A = B) : B = A := p⁻¹;
 
-symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
+-- symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
   -- := λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
   --                 [i=0. p; i=1 _. a] a;
-
-λ {b} {a} i. glue (hcom 0 1 A [i = 0 j. coe 0 j P (coe j 1 P (p {a}
-{b} j)); i = 1 _. coe 0 @1 (_. A) (coe @1 1 (j. A) a); i = 0 i1. coe 0 i1 P (coe
-i1 1 P (p {a} {b} i1)); i = 1 i1. coe 0 i1 (_. A) (coe i1 1 (j. A) a)] (hcom 1 0
-A [i = 0 i1. coe 0 1 P (coe 0 1 P a); i = 1 i1. coe 0 1 (_. A) (coe 0 1 (j. A)
-a)] (hcom 0 1 A [i = 0 j. coe j 1 (j1. A) (coe 0 j P (coe 0 j P a)); i = 1
-j. coe j 1 (j1. A) (coe 0 j (_. A) (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a))))
-[i = 0. P {A} {B} @1, λ x. coe 0 @1 P x, λ x. coe @1 0 P x, λ x {x} {coe @1 0 P
-(coe 0 @1 P x)} j. hcom 0 j A [j = 0 k. x; j = 1 k. coe k 0 P (coe 0 k P x)] x,
-λ x {coe 0 @1 P (coe @1 0 P x)} {x} j. hcom j 0 (P {A} {B} j) [j = 0 k. coe k j
-P (coe j k P x); j = 1 k. x] x, λ x {λ {coe 0 @1 P x} {coe 0 @1 P x} _. coe 0 @1
-P x} {λ {coe 0 @1 P (coe @1 0 P (coe 0 @1 P x))} {coe 0 @1 P x} k. hcom k 0 (P
-{A} {B} k) [k = 0 k1. coe k1 k P (coe k k1 P x); k = 1 k1. coe 0 1 P x] (coe 0 k
-P x)} l {coe 0 l P (hcom 0 l A [l = 0 k. x; l = 1 k. coe k 0 P (coe 0 k P x)]
-x)} {coe 0 l P x} k. hcom 0 l (P {A} {B} l) [k = 0 i1. coe i1 l P (coe 0 i1 P
-(hcom 0 i1 A [l = 0 k1. x; l = 1 k1. coe k1 0 P (coe 0 k1 P x)] x)); k = 1
-i1. coe i1 l P (coe 0 i1 P x); l = 0 i1. coe i1 l P (coe 0 i1 P x); l = 1
-i1. coe i1 l P (hcom i1 0 (P {A} {B} i1) [k = 0 k1. coe k1 i1 P (coe i1 k1 P
-(coe 0 i1 P x)); k = 1 k1. coe 0 i1 P x] (coe 0 i1 P x))] (coe 0 l P x); i =
-1. A, λ x. coe 0 @1 (_. A) x, λ x. coe @1 0 (_. A) x, λ x {x} {coe @1 0 (_. A)
-(coe 0 @1 (_. A) x)} j. hcom 0 j A [j = 0 k. x; j = 1 k. coe k 0 (_. A) (coe 0 k
-(_. A) x)] x, λ x {coe 0 @1 (_. A) (coe @1 0 (_. A) x)} {x} j. hcom j 0 A [j = 0
-k. coe k j (_. A) (coe j k (_. A) x); j = 1 k. x] x, λ x {λ {coe 0 @1 (_. A) x}
-{coe 0 @1 (_. A) x} _. coe 0 @1 (_. A) x} {λ {coe 0 @1 (_. A) (coe @1 0 (_. A)
-(coe 0 @1 (_. A) x))} {coe 0 @1 (_. A) x} k. hcom k 0 A [k = 0 k1. coe k1 k
-(_. A) (coe k k1 (_. A) x); k = 1 k1. coe 0 1 (_. A) x] (coe 0 k (_. A) x)} l
-{coe 0 l (_. A) (hcom 0 l A [l = 0 k. x; l = 1 k. coe k 0 (_. A) (coe 0 k (_. A)
-x)] x)} {coe 0 l (_. A) x} k. hcom 0 l A [k = 0 i1. coe i1 l (_. A) (coe 0 i1
-(_. A) (hcom 0 i1 A [l = 0 k1. x; l = 1 k1. coe k1 0 (_. A) (coe 0 k1 (_. A) x)]
-x)); k = 1 i1. coe i1 l (_. A) (coe 0 i1 (_. A) x); l = 0 i1. coe i1 l (_. A)
-(coe 0 i1 (_. A) x); l = 1 i1. coe i1 l (_. A) (hcom i1 0 A [k = 0 k1. coe k1 i1
-(_. A) (coe i1 k1 (_. A) (coe 0 i1 (_. A) x)); k = 1 k1. coe 0 i1 (_. A) x] (coe
-0 i1 (_. A) x))] (coe 0 l (_. A) x)] [i = 0. b; i = 1. a];
 
 -- Sing (A : U) (a : A) : U := (x : A) × (a = x);
 
@@ -135,7 +102,7 @@ x)); k = 1 i1. coe i1 l (_. A) (coe 0 i1 (_. A) x); l = 0 i1. coe i1 l (_. A)
 --                    k=1 _. d]
 --                   d;
 
-{-
+
 -- h-levels
 --------------------------------------------------------------------------------
 
@@ -995,4 +962,3 @@ k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2; k1 = 1 x. i.2.1 b] (i.2.1
 
 -- injective (A B : U) (f : A → B) : U =
 --   (a0 a1 : A) → Path B (f a0) (f a1) → Path A a0 a1
--}
