@@ -47,7 +47,7 @@ instance Conv Val where
     (t              , VLLam t'          ) -> freshI \(IVar -> i) -> conv (lapp t i) (t' ∙ i)
 
     (VSub{}         , _                 ) -> impossible
-    (_              , VSub{}            ) -> impossible
+    (ft             , VSub{}            ) -> impossible
     _                                     -> False
 
 instance Conv Ne where

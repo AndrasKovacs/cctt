@@ -59,48 +59,83 @@ comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
 sym (A : U)(x y : A) (p : x = y) : y = x
   := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
--- TODO: coherence for coeIsEquiv! "sym U A B P" below computes to some TODO-s.
-symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a
-  := λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
-                  [i=0. p; i=1 _. a] a;
+-- symu (A B : U)(p : A = B) : B = A := p⁻¹;
 
-Sing (A : U) (a : A) : U := (x : A) × (a = x);
+symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
+  -- := λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
+  --                 [i=0. p; i=1 _. a] a;
 
-connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
-  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
-     λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j; j=0. sq 0; j=1. sq i; i=j. sq i] a;
+λ {b} {a} i. glue (hcom 0 1 A [i = 0 j. coe 0 j P (coe j 1 P (p {a}
+{b} j)); i = 1 _. coe 0 @1 (_. A) (coe @1 1 (j. A) a); i = 0 i1. coe 0 i1 P (coe
+i1 1 P (p {a} {b} i1)); i = 1 i1. coe 0 i1 (_. A) (coe i1 1 (j. A) a)] (hcom 1 0
+A [i = 0 i1. coe 0 1 P (coe 0 1 P a); i = 1 i1. coe 0 1 (_. A) (coe 0 1 (j. A)
+a)] (hcom 0 1 A [i = 0 j. coe j 1 (j1. A) (coe 0 j P (coe 0 j P a)); i = 1
+j. coe j 1 (j1. A) (coe 0 j (_. A) (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a))))
+[i = 0. P {A} {B} @1, λ x. coe 0 @1 P x, λ x. coe @1 0 P x, λ x {x} {coe @1 0 P
+(coe 0 @1 P x)} j. hcom 0 j A [j = 0 k. x; j = 1 k. coe k 0 P (coe 0 k P x)] x,
+λ x {coe 0 @1 P (coe @1 0 P x)} {x} j. hcom j 0 (P {A} {B} j) [j = 0 k. coe k j
+P (coe j k P x); j = 1 k. x] x, λ x {λ {coe 0 @1 P x} {coe 0 @1 P x} _. coe 0 @1
+P x} {λ {coe 0 @1 P (coe @1 0 P (coe 0 @1 P x))} {coe 0 @1 P x} k. hcom k 0 (P
+{A} {B} k) [k = 0 k1. coe k1 k P (coe k k1 P x); k = 1 k1. coe 0 1 P x] (coe 0 k
+P x)} l {coe 0 l P (hcom 0 l A [l = 0 k. x; l = 1 k. coe k 0 P (coe 0 k P x)]
+x)} {coe 0 l P x} k. hcom 0 l (P {A} {B} l) [k = 0 i1. coe i1 l P (coe 0 i1 P
+(hcom 0 i1 A [l = 0 k1. x; l = 1 k1. coe k1 0 P (coe 0 k1 P x)] x)); k = 1
+i1. coe i1 l P (coe 0 i1 P x); l = 0 i1. coe i1 l P (coe 0 i1 P x); l = 1
+i1. coe i1 l P (hcom i1 0 (P {A} {B} i1) [k = 0 k1. coe k1 i1 P (coe i1 k1 P
+(coe 0 i1 P x)); k = 1 k1. coe 0 i1 P x] (coe 0 i1 P x))] (coe 0 l P x); i =
+1. A, λ x. coe 0 @1 (_. A) x, λ x. coe @1 0 (_. A) x, λ x {x} {coe @1 0 (_. A)
+(coe 0 @1 (_. A) x)} j. hcom 0 j A [j = 0 k. x; j = 1 k. coe k 0 (_. A) (coe 0 k
+(_. A) x)] x, λ x {coe 0 @1 (_. A) (coe @1 0 (_. A) x)} {x} j. hcom j 0 A [j = 0
+k. coe k j (_. A) (coe j k (_. A) x); j = 1 k. x] x, λ x {λ {coe 0 @1 (_. A) x}
+{coe 0 @1 (_. A) x} _. coe 0 @1 (_. A) x} {λ {coe 0 @1 (_. A) (coe @1 0 (_. A)
+(coe 0 @1 (_. A) x))} {coe 0 @1 (_. A) x} k. hcom k 0 A [k = 0 k1. coe k1 k
+(_. A) (coe k k1 (_. A) x); k = 1 k1. coe 0 1 (_. A) x] (coe 0 k (_. A) x)} l
+{coe 0 l (_. A) (hcom 0 l A [l = 0 k. x; l = 1 k. coe k 0 (_. A) (coe 0 k (_. A)
+x)] x)} {coe 0 l (_. A) x} k. hcom 0 l A [k = 0 i1. coe i1 l (_. A) (coe 0 i1
+(_. A) (hcom 0 i1 A [l = 0 k1. x; l = 1 k1. coe k1 0 (_. A) (coe 0 k1 (_. A) x)]
+x)); k = 1 i1. coe i1 l (_. A) (coe 0 i1 (_. A) x); l = 0 i1. coe i1 l (_. A)
+(coe 0 i1 (_. A) x); l = 1 i1. coe i1 l (_. A) (hcom i1 0 A [k = 0 k1. coe k1 i1
+(_. A) (coe i1 k1 (_. A) (coe 0 i1 (_. A) x)); k = 1 k1. coe 0 i1 (_. A) x] (coe
+0 i1 (_. A) x))] (coe 0 l (_. A) x)] [i = 0. b; i = 1. a];
 
-connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
+-- Sing (A : U) (a : A) : U := (x : A) × (a = x);
 
-connOr (A : U) (a b : A) (p : a = b) : p ={i. p i = b} (λ _. b)
-  := let connOrWeak (l k : I) : A := hcom 0 l [k=0. p; k=1 _. b] (p k);
-     λ i j. hcom 1 0 [ i=0. connOrWeak j ; i=1. connOrWeak 1
-                     ; j=0. connOrWeak i ; j=1. connOrWeak 1
-                     ; i=j. connOrWeak i ] b;
+-- connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+--   := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
+--      λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j; j=0. sq 0; j=1. sq i; i=j. sq i] a;
 
-contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
-  := λ i. (p i, connAnd A a b p i);
+-- connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
 
-Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a refl)(x : A)(p : a = x) : C x p
-  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl) (x, p) (contractSing A a x p) cr;
+-- connOr (A : U) (a b : A) (p : a = b) : p ={i. p i = b} (λ _. b)
+--   := let connOrWeak (l k : I) : A := hcom 0 l [k=0. p; k=1 _. b] (p k);
+--      λ i j. hcom 1 0 [ i=0. connOrWeak j ; i=1. connOrWeak 1
+--                      ; j=0. connOrWeak i ; j=1. connOrWeak 1
+--                      ; i=j. connOrWeak i ] b;
 
-J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
-  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
-     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
+-- contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
+--   := λ i. (p i, connAnd A a b p i);
 
-JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
-  : J A a C d a (λ _. a) = d
-  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
-     let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
-                                           k=1 _. a;
-                                           i=0 _. a;
-                                           i=1 _. a] a;
+-- Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a refl)(x : A)(p : a = x) : C x p
+--   := subst (Sing A a) (λ s. C s.1 s.2) (a, refl) (x, p) (contractSing A a x p) cr;
 
-     λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
-                  [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
-                   k=1 _. d]
-                  d;
+-- J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
+--   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
+--      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
+-- JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
+--   : J A a C d a (λ _. a) = d
+--   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
+--      let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
+--                                            k=1 _. a;
+--                                            i=0 _. a;
+--                                            i=1 _. a] a;
+
+--      λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
+--                   [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
+--                    k=1 _. d]
+--                   d;
+
+{-
 -- h-levels
 --------------------------------------------------------------------------------
 
@@ -960,3 +995,4 @@ k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2; k1 = 1 x. i.2.1 b] (i.2.1
 
 -- injective (A B : U) (f : A → B) : U =
 --   (a0 a1 : A) → Path B (f a0) (f a1) → Path A a0 a1
+-}

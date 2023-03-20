@@ -66,7 +66,7 @@ emptyIS = coerce LS.null
 
 -- | Insert a forced I.
 insertIF :: I -> IVarSet -> IVarSet
-insertIF i is = uf -- matchIVar i (\x -> LS.insert x is) is
+insertIF i is = matchIVarF i (\x -> coerce LS.insert x is) is
 {-# inline insertIF #-}
 
 -- | Insert a forced variable.

@@ -5,6 +5,8 @@ import Common
 import CoreTypes
 import Interval
 
+import Debug.Trace
+
 ----------------------------------------------------------------------------------------------------
 {-
 FORCING GUIDELINE
@@ -249,8 +251,8 @@ com' r r' ~a ~sys ~b
   | r == r'               = b
   | VSHTotal' x t  <- sys = let ?sub = ?sub `ext` r' in eval t
   | VSHNe' nsys is <- sys = hcomdn r r' (a ∙ r')
-                                   (mapNeSysHCom' (\i t -> coe i r' a t) (nsys,is))
-                                   (coed r r' a b)
+                              (mapNeSysHCom' (\i t -> coe i r' a t) (nsys,is))
+                              (coed r r' a b)
 {-# inline com' #-}
 
 ----------------------------------------------------------------------------------------------------
@@ -901,7 +903,7 @@ coe r r' ~a t
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
-hcomdn r r' a ts@(!nts, !is) base = case frc a of
+hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
   VPi a b ->
     VLam $ NCl (b^.name) $ CHComPi r r' a b nts base
 
@@ -946,7 +948,7 @@ hcomdn r r' a ts@(!nts, !is) base = case frc a of
             (\t -> VPair (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r r'))
             nts
 
-    in VGlueTy base (sys // (insertI r $ insertI r is))
+    in VGlueTy base (sys // (insertI r $ insertI r' is))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -980,7 +982,7 @@ hcomdn r r' a ts@(!nts, !is) base = case frc a of
                   alphasys'))
             (unglue gr (frc alphasys))
 
-    in VNe (NGlue hcombase alphasys fib) (insertI r $ insertI r (alphais <> betais))
+    in VNe (NGlue hcombase alphasys fib) (insertI r $ insertI r' (alphais <> betais))
 
   VLine a ->
         VLLam
@@ -1330,18 +1332,25 @@ instance Force NeCof VCof where
         VCNe cof' is' -> VCNe (NeCof' (cof'^.extended) (NCAnd (cof^.extra) (cof'^.extra)))
                               (is <> is')
 
+recFrc :: NCofArg => DomArg => Val -> Val
+recFrc = \case
+  VSub v s                             -> let ?sub = s in frcS v
+  VNe t is            | isUnblocked is -> frc t
+  VGlueTy a (sys, is) | isUnblocked is -> recFrc (glueTyNoinline a (frc sys))
+  v                                    -> v
+
 instance Force Val Val where
   frc = \case
     VSub v s                             -> let ?sub = s in frcS v
     VNe t is            | isUnblocked is -> frc t
-    VGlueTy a (sys, is) | isUnblocked is -> glueTyNoinline a (frc sys)
+    VGlueTy a (sys, is) | isUnblocked is -> recFrc (glueTyNoinline a (frc sys))
     v                                    -> v
   {-# inline frc #-}
 
   frcS = \case
-    VSub v s                              -> impossible
+    VSub v s                              -> let ?sub = sub s in frcS v
     VNe t is            | isUnblockedS is -> frcS t
-    VGlueTy a (sys, is) | isUnblockedS is -> glueTy (sub a) (frcS sys)
+    VGlueTy a (sys, is) | isUnblockedS is -> recFrc (glueTy (sub a) (frcS sys))
 
     VNe t is      -> VNe (sub t) (sub is)
     VGlueTy a sys -> VGlueTy (sub a) (sub sys)
@@ -1363,31 +1372,31 @@ instance Force Ne Val where
   frc = \case
     t@NLocalVar{}     -> VNe t mempty
     NSub n s          -> let ?sub = s in frcS n
-    NApp t u          -> frc t ∙ u
-    NPApp l r t i     -> papp l r (frc t) i
-    NProj1 t          -> proj1 (frc t)
-    NProj2 t          -> proj2 (frc t)
-    NCoe r r' a t     -> coe r r' (frc a) (frc t)
-    NHCom r r' a ts t -> hcom r r' (frc a) (frc ts) t
-    NUnglue t sys     -> unglue (frc t) (frc sys)
-    NGlue t eqs sys   -> glue t (frc eqs) (frc sys)
-    NLApp t i         -> lapp (frc t) i
-    NElim mot ms t    -> elim mot ms (frc t)
+    NApp t u          -> recFrc (frc t ∙ u)
+    NPApp l r t i     -> recFrc (papp l r (frc t) i)
+    NProj1 t          -> recFrc (proj1 (frc t))
+    NProj2 t          -> recFrc (proj2 (frc t))
+    NCoe r r' a t     -> recFrc (coe r r' (frc a) (frc t))
+    NHCom r r' a ts t -> recFrc (hcom r r' (frc a) (frc ts) t)
+    NUnglue t sys     -> recFrc (unglue (frc t) (frc sys))
+    NGlue t eqs sys   -> recFrc (glue t (frc eqs) (frc sys))
+    NLApp t i         -> recFrc (lapp (frc t) i)
+    NElim mot ms t    -> recFrc (elim mot ms (frc t))
   {-# noinline frc #-}
 
   frcS = \case
     t@NLocalVar{}     -> VNe t mempty
     NSub n s          -> let ?sub = sub s in frcS n
-    NApp t u          -> frcS t ∙ sub u
-    NPApp l r t i     -> papp (sub l) (sub r) (frcS t) (frcS i)
-    NProj1 t          -> proj1 (frcS t)
-    NProj2 t          -> proj2 (frcS t)
-    NCoe r r' a t     -> coe (frcS r) (frcS r') (frcS a) (frcS t)
-    NHCom r r' a ts t -> hcom (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t)
-    NUnglue t sys     -> unglue (frcS t) (frcS sys)
-    NGlue t eqs sys   -> glue (sub t) (frcS eqs) (frcS sys)
-    NLApp t i         -> lapp (frcS t) (frcS i)
-    NElim mot ms t    -> elim (sub mot) (sub ms) (frcS t)
+    NApp t u          -> recFrc (frcS t ∙ sub u)
+    NPApp l r t i     -> recFrc (papp (sub l) (sub r) (frcS t) (frcS i))
+    NProj1 t          -> recFrc (proj1 (frcS t))
+    NProj2 t          -> recFrc (proj2 (frcS t))
+    NCoe r r' a t     -> recFrc (coe (frcS r) (frcS r') (frcS a) (frcS t))
+    NHCom r r' a ts t -> recFrc (hcom (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t))
+    NUnglue t sys     -> recFrc (unglue (frcS t) (frcS sys))
+    NGlue t eqs sys   -> recFrc (glue (sub t) (frcS eqs) (frcS sys))
+    NLApp t i         -> recFrc (lapp (frcS t) (frcS i))
+    NElim mot ms t    -> recFrc (elim (sub mot) (sub ms) (frcS t))
 
 instance Force NeSys VSys where
   -- TODO: is it better to not do anything with system components in frc?
