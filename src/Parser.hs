@@ -112,7 +112,7 @@ cof = CAnd <$!> cofEq <*!> ((char ',' *> cof) <|> pure CTrue)
 
 goSys' :: Parser Sys
 goSys' =
-      (SCons <$!> (char ';' *> cof <* char '.') <*!> tm <*!> goSys)
+      (SCons <$!> (char ';' *> cof <* char '.') <*!> tm <*!> goSys')
   <|> pure SEmpty
 
 goSys :: Parser Sys
