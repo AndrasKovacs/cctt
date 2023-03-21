@@ -1,4 +1,9 @@
 
+
+-- TODO already possible: isoToEquiv
+
+
+
 -- Adaptation of most of the yacctt prelude:
 --   https://github.com/mortberg/yacctt/blob/master/examples/prelude.ytt
 --------------------------------------------------------------------------------
@@ -59,48 +64,46 @@ comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
 sym (A : U)(x y : A) (p : x = y) : y = x
   := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
--- symu (A B : U)(p : A = B) : B = A := p⁻¹;
+symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a
+  := λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
+                  [i=0. p; i=1 _. a] a;
 
--- symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
-  -- := λ i. com 0 1 (j. hcom 0 j U [i=0. P; i=1 _. A] A)
-  --                 [i=0. p; i=1 _. a] a;
+Sing (A : U) (a : A) : U := (x : A) × (a = x);
 
--- Sing (A : U) (a : A) : U := (x : A) × (a = x);
+connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
+     λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j; j=0. sq 0; j=1. sq i; i=j. sq i] a;
 
--- connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
---   := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
---      λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j; j=0. sq 0; j=1. sq i; i=j. sq i] a;
+connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
 
--- connAndDiag (A : U)(a b : A)(p : a = b) : p = (λ i. connAnd A a b p i i) := λ _. p;
+connOr (A : U) (a b : A) (p : a = b) : p ={i. p i = b} (λ _. b)
+  := let connOrWeak (l k : I) : A := hcom 0 l [k=0. p; k=1 _. b] (p k);
+     λ i j. hcom 1 0 [ i=0. connOrWeak j ; i=1. connOrWeak 1
+                     ; j=0. connOrWeak i ; j=1. connOrWeak 1
+                     ; i=j. connOrWeak i ] b;
 
--- connOr (A : U) (a b : A) (p : a = b) : p ={i. p i = b} (λ _. b)
---   := let connOrWeak (l k : I) : A := hcom 0 l [k=0. p; k=1 _. b] (p k);
---      λ i j. hcom 1 0 [ i=0. connOrWeak j ; i=1. connOrWeak 1
---                      ; j=0. connOrWeak i ; j=1. connOrWeak 1
---                      ; i=j. connOrWeak i ] b;
+contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
+  := λ i. (p i, connAnd A a b p i);
 
--- contractSing (A : U)(a b : A)(p : a = b) : (a, λ _. a) ={_. Sing A a} (b, p)
---   := λ i. (p i, connAnd A a b p i);
+Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a refl)(x : A)(p : a = x) : C x p
+  := subst (Sing A a) (λ s. C s.1 s.2) (a, refl) (x, p) (contractSing A a x p) cr;
 
--- Jbig (A : U)(a : A)(C : (x : A) → a = x → U)(cr : C a refl)(x : A)(p : a = x) : C x p
---   := subst (Sing A a) (λ s. C s.1 s.2) (a, refl) (x, p) (contractSing A a x p) cr;
+J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
+     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
--- J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
---   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
---      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
+JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
+  : J A a C d a (λ _. a) = d
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
+     let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
+                                           k=1 _. a;
+                                           i=0 _. a;
+                                           i=1 _. a] a;
 
--- JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
---   : J A a C d a (λ _. a) = d
---   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
---      let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
---                                            k=1 _. a;
---                                            i=0 _. a;
---                                            i=1 _. a] a;
-
---      λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
---                   [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
---                    k=1 _. d]
---                   d;
+     λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
+                  [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
+                   k=1 _. d]
+                  d;
 
 
 -- h-levels

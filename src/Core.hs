@@ -15,6 +15,11 @@ FORCING GUIDELINE
 
   - if a function name ends on "F", it has forcing preconditions
   - Semantic Cof/I functions return forced results.
+
+  - moving under cofibrations:
+    - WE LOSE OFF-DIAGONALS
+    - WE LOSE SYSTEM FORCING
+
 -}
 
 ----------------------------------------------------------------------------------------------------
@@ -339,20 +344,35 @@ mapNeSysFromH f sys = case sys of
   NSHCons t sys -> NSCons (bindCofLazy (unBindCof t) (f (t^.body))) (mapNeSysFromH f sys)
 {-# inline mapNeSysFromH #-}
 
--- | Map over the (∀i.α) of a system under a binder, returning a NeSysHCom'.
---   The BindI in the function arguments refers to the original component value.
-mapForallNeSys' :: NCofArg => (NCofArg => I -> BindI Val -> Val) -> BindI NeSys -> NeSysHCom'
-mapForallNeSys' f bind@(BindI x i sys) = case sys of
+-- | Filter out the components of system which depend on a binder, and at the same time
+--   push the binder inside so that we get a NeSysHCom'.
+forallNeSys :: BindI NeSys -> NeSysHCom'
+forallNeSys (BindI x i sys) = case sys of
   NSEmpty -> NSHEmpty // mempty
   NSCons t sys ->
     if occursInNeCof (t^.binds) i
-      then mapForallNeSys' f (BindI x i sys)
-      else case mapForallNeSys' f (BindI x i sys) of
-        (!sys,!is) -> NSHCons (bindCof (unBindCofLazy t)
-                                 (bindILazy x \j -> f j (rebind bind (t^.body))))
-                              sys
-                      // is <> neCofVars (t^.binds)
-{-# inline mapForallNeSys' #-}
+      then forallNeSys (BindI x i sys)
+      else case forallNeSys (BindI x i sys) of
+        (!sys, !is) ->
+          NSHCons
+            (BindCof (t^.binds) (BindILazy x i (t^.body)))
+            sys
+         // is <> neCofVars (t^.binds)
+
+-- -- | Map over the (∀i.α) of a system under a binder, returning a NeSysHCom'.
+-- --   The BindI in the function arguments refers to the original component value.
+-- mapForallNeSys' :: NCofArg => (NCofArg => I -> BindI Val -> Val) -> BindI NeSys -> NeSysHCom'
+-- mapForallNeSys' f bind@(BindI x i sys) = case sys of
+--   NSEmpty -> NSHEmpty // mempty
+--   NSCons t sys ->
+--     if occursInNeCof (t^.binds) i
+--       then mapForallNeSys' f (BindI x i sys)
+--       else case mapForallNeSys' f (BindI x i sys) of
+--         (!sys,!is) -> NSHCons (bindCof (unBindCofLazy t)
+--                                  (bindILazy x \j -> f j (rebind bind (t^.body))))
+--                               sys
+--                       // is <> neCofVars (t^.binds)
+-- {-# inline mapForallNeSys' #-}
 
 -- System concatenation
 ----------------------------------------------------------------------------------------------------
@@ -424,7 +444,7 @@ capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
   CEval (EC s env t) -> let ?env = EDef env u; ?sub = s in eval t
 
-  CCoePi r@(frc -> rf) r'@(frc -> r'f) (frc -> a) b (frc -> t) ->
+  CCoePi r r' a b t ->
     let ~x = u in
     coe r r' (bindI "j" \j -> b ∙ j ∙ coe r' j a x) (t ∙ coe r' r a x)
 
@@ -520,7 +540,6 @@ capp (NCl _ t) ~u = case t of
         -- (λ k. rinvfill a r r' (ffill a r r' x) k)
         ~rhs =
            -- coe r r' a (coe r' r a (coe r r' a x))
-
            let ~lhs' = coe r r' a (coe r' r a (coe r r' a x))
                ~rhs' = coe r r' a x in
 
@@ -540,8 +559,7 @@ icapp (NICl _ t) arg = case t of
     let ?env = env; ?sub = ext s arg in eval t
 
   -- coe r r' (i. t i ={j. A i j} u i) p =
-  --   λ {t r'}{u r'} j. com r r' (i. A i j) [j=0 i. t i; j=1 i. u i] (p {t r} {u r}j)
-
+  --   λ {t r'}{u r'} j*. com r r' (i. A i j) [j=0 i. t i; j=1 i. u i] (p {t r} {u r}j)
   ICCoePath r r' a lhs rhs p ->
     let j = arg in
     hcom r r' (a ∙ r' ∙ j)
@@ -550,17 +568,18 @@ icapp (NICl _ t) arg = case t of
        vshempty)
       (coe r r' (bindI "i" \i -> a ∙ i ∙ j) (papp (lhs ∙ r) (rhs ∙ r) p j))
 
--- hcom r r' (lhs ={j.A j} rhs) [α i. t i] base =
---   λ j. hcom r r' (A j) [j=0 i. lhs; j=1 i. rhs; α i. t i j] (base j)
-
+  -- hcom r r' (lhs ={j.A j} rhs) [α i. t i] base =
+  --   λ j*. hcom r r' (A j) [j=0 i. lhs; j=1 i. rhs; α i. t i j] (base j)
   ICHComPath r r' a lhs rhs sys p ->
     let j = arg in
     hcom r r' (a ∙ j)
-      (vshcons (ceq j I0) "i" (\i -> lhs) $
-       vshcons (ceq j I1) "i" (\i -> rhs) $
+      (vshcons (ceq j I0) "i" (\_ -> lhs) $
+       vshcons (ceq j I1) "i" (\_ -> rhs) $
        mapVSysHCom (\_ t -> papp lhs rhs t j) (frc sys))
       (papp lhs rhs p j)
 
+  -- hcom r r' ((j : A) → B j) [α i. t i] base =
+  --   λ j*. hcom
   ICHComLine r r' a sys base ->
     let j = arg in
     hcom r r' (a ∙ j) (mapVSysHCom (\_ t -> lapp t j) (frc sys)) (lapp base j)
@@ -665,6 +684,7 @@ proj1 t = case frc t of
   _         -> impossible
 {-# inline proj1 #-}
 
+-- | Project under a binder.
 proj1BindI :: NCofArg => DomArg => BindI Val -> BindI Val
 proj1BindI t = unsafeMapBindI t (\t -> proj1 t)
 {-# inline proj1BindI #-}
@@ -791,24 +811,26 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
   VGlueTy (rebind topA -> a) (rebind topA -> topSys, rebind topA -> is) -> let
 
-    gr         = t
-    ~_Ar'      = a ∙ r'
-    ~topSysr   = topSys ∙ r :: NeSys
-    ~topSysrf  = frc topSysr
-    ~topSysr'  = topSys ∙ r' :: NeSys
-    topSysr'f  = frc topSysr'
+    gr           = t
+    ~_Ar'        = a ∙ r'
+    ~topSysr     = topSys ∙ r :: NeSys
+    ~topSysrf    = frc topSysr
+    ~topSysr'    = topSys ∙ r' :: NeSys
+    topSysr'f    = frc topSysr'
+    forallTopSys = forallNeSys topSys
 
   -- ar' : Ar'
   -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
 
-    ~ar' = hcomdn r r' _Ar'
-             (mapForallNeSys'
+    ~ar' =
+          hcomdn r r' _Ar'
+             (mapNeSysHCom'
                 (\i tf -> coe i r' a (proj1 (proj2 (tf ∙ i)) ∙ coe r i (proj1BindI tf) gr))
-                topSys)
+                forallTopSys)
              (coed r r' a (unglue gr topSysrf))
 
-    mkComponents :: NCofArg => Val -> (Val, BindILazy Val)
-    mkComponents tfr' = seq ?cof $ let
+    mkComponent :: NCofArg => Val -> (Val, BindILazy Val)
+    mkComponent tfr' = let
 
       ~equiv1  = tfr'
       ~equiv2  = proj2 equiv1
@@ -828,11 +850,11 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
       -- shorthands for path applications
       app_r'linv :: NCofArg => Val -> I -> Val
-      app_r'linv ~x i = seq ?cof $
+      app_r'linv ~x i =
         papp x (fr'inv ∙ fr' ∙ x) (r'linv ∙ x) i
 
       app_r'coh :: NCofArg => Val -> I -> I -> Val
-      app_r'coh ~x i j = seq ?cof $
+      app_r'coh ~x i j =
         papp (fr' ∙ app_r'linv x i)
              (fr' ∙ x)
              (papp (refl (fr' ∙ x)) (r'rinv ∙ (fr' ∙ x)) (r'coh ∙ x) i)
@@ -842,9 +864,9 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
       -- valSys = [r=r'  i. fr'.linv gr i
       --         ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
-      ~valSys =
-        nshconsNonTrue' (ceq r r') "i" (\i -> app_r'linv gr i) $
-        mapForallNeSys' (\i tf -> app_r'linv (coe r r' (proj1BindI tf) gr) i) topSys
+      ~valSys = uf
+        -- nshconsNonTrue' (ceq r r') "i" (\i -> app_r'linv gr i) $
+        -- mapForallNeSys' (\i tf -> app_r'linv (coe r r' (proj1BindI tf) gr) i) topSys
 
       -- fibval* : Tr'
       -- fibval* = hcom 1 0 Tr' valSys fibval
@@ -857,15 +879,17 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       --                    ;r=r'   i. fr'.coh gr i
       --                    ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i]
       --                    (fibpath {fr' fibval} {ar'} j)
-      fibpath' = bindILazy "i" \j ->
-        hcomd I1 I0 _Ar'
-          (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcomn I1 i tr' valSys fibval) $
-           vshcons (ceq j I1) "i" (\i -> ar') $
-           VSHNe $
-           nshconsNonTrue' (ceq r r') "i" (\i -> app_r'coh gr i j) $
-           mapForallNeSys' (\i tf -> app_r'coh (coe r r' (proj1BindI tf) gr) i j) topSys
-          )
-          (papp (fr' ∙ fibval) ar' fibpath j)
+
+      fibpath' = uf
+        -- bindILazy "i" \j ->
+        -- hcomd I1 I0 _Ar'
+        --   (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcomn I1 i tr' valSys fibval) $
+        --    vshcons (ceq j I1) "i" (\i -> ar') $
+        --    VSHNe $
+        --    nshconsNonTrue' (ceq r r') "i" (\i -> app_r'coh gr i j) $
+        --    mapForallNeSys' (\i tf -> app_r'coh (coe r r' (proj1BindI tf) gr) i j) topSys
+        --   )
+        --   (papp (fr' ∙ fibval) ar' fibpath j)
 
       in (fibval', fibpath')
 
@@ -874,13 +898,13 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       NSEmpty         -> NSEmpty // NSHEmpty
       NSCons tfr' sys -> let
         alphar' = tfr'^.binds
-        (fibval  , !fibpath)  = assumeCof alphar' $ mkComponents (tfr'^.body)
+        (fibval  , !fibpath)  = assumeCof alphar' $ mkComponent (tfr'^.body)
         (!fibvals, !fibpaths) = mkNeSystems sys
         in NSCons (BindCofLazy alphar' fibval) fibvals // NSHCons (BindCof alphar' fibpath) fibpaths
 
     (!fibvals, !fibpaths) = case topSysr'f of
       VSTotal tfr'   -> let
-        (!fibval, !fibpath) = mkComponents tfr'
+        (!fibval, !fibpath) = mkComponent tfr'
         in VSTotal fibval // VSHTotal fibpath
       VSNe (sys, is) -> let
         (!fibvals, !fibpaths) = mkNeSystems sys
@@ -1012,6 +1036,17 @@ hcom r r' ~a ~t ~b
       VSHTotal v -> v ∙ r'
       VSHNe sys  -> hcomdn r r' a sys b
 {-# inline hcom #-}
+
+-- hcom
+-- hcomf
+-- hcomd
+-- hcomdf
+-- hcomdnf
+
+-- coe
+-- coed
+-- coenf
+-- coednf
 
 -- | HCom with neutral system input.
 hcomn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val

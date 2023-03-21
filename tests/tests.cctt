@@ -1,4 +1,20 @@
 
+{-
+Tracking efficienry-related info
+  - forcing
+     - values
+     - systems
+     - cofs
+     - I
+  - off-diagonal
+
+
+-}
+
+
+--------------------------------------------------------------------------------
+
+
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
   × (linv : (x : A) → x = g (f x))
