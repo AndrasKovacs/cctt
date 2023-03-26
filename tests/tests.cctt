@@ -5,6 +5,7 @@ isEquiv (A B : U)(f : A → B) : U :=
   × (rinv : (x : B) → f (g x) = x)
   × ((x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
 
+
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
 
