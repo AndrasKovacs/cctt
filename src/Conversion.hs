@@ -52,7 +52,7 @@ instance Conv Val where
 
 instance Conv Ne where
 
-  conv t t' = case (,) $$! unSubNe t $$! unSubNe t' of
+  conv t t' = case unSubNe t // unSubNe t' of
     (NLocalVar x   , NLocalVar x'      ) -> x == x'
     (NApp t u      , NApp t' u'        ) -> conv t t' && conv u u'
     (NPApp p t u r , NPApp p' t' u' r' ) -> conv p p' && conv r r'

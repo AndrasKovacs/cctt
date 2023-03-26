@@ -87,6 +87,7 @@ type LocalTypes = (?localTypes :: [Box VTy])
 type Elab a = TopDefs => TopLvl => LocalTypes => NCofArg
            => DomArg => EnvArg => TableArg => PosArg => a
 
+
 -- | Bind a fibrant variable.
 bind :: Name -> VTy -> Elab (Val -> a) -> Elab a
 bind x ~a act =
@@ -330,7 +331,7 @@ check t topA = case t of
   t -> case (t, frc topA) of
 
     (P.Lam x t, VPi a b) -> do
-      Lam x <$!> bind x a (\v -> check t (capp b v))
+      Lam x <$!> bind x a (\v -> check t (b ∙ v))
 
     (P.Lam x t, VPath a l r) -> do
       t <- bindI x \i -> check t (a ∙ IVar i)
@@ -593,6 +594,8 @@ infer = \case
     let vf = eval f
     pure $ Infer (Ap f (quote x) (quote y) p) (path (b ∙ x) (vf ∙ x) (vf ∙ y))
 
+  P.Elim{} -> uf
+
 
 -- | Ensure that an IClosure is constant.
 constantICl :: Elab (NamedIClosure -> IO ())
@@ -835,6 +838,8 @@ inferTop = \case
 
     top <- defineTop x va vt $ inferTop top
     pure $! TDef x a t top
+
+  P.TData{} -> uf
 
   P.TEmpty ->
     pure TEmpty

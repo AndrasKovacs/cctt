@@ -5,20 +5,16 @@ import Common
 import CoreTypes
 import Interval
 
-import Debug.Trace
+-- import Debug.Trace
 
 ----------------------------------------------------------------------------------------------------
 {-
-FORCING GUIDELINE
-  - Always forced:
-    - VSys, NeSys', NeSysHCom', NeCof, IVar
-
-  - if a function name ends on "F", it has forcing preconditions
-  - Semantic Cof/I functions return forced results.
-
+FORCING
   - moving under cofibrations:
-    - WE LOSE OFF-DIAGONALS
-    - WE LOSE SYSTEM FORCING
+    - We lose off-diagonals
+    - We lose system forcing
+
+  - semantic system cons-es always take forced cofibrations
 
 -}
 
@@ -161,20 +157,12 @@ vscons cof v ~sys = case cof of
 {-# inline vscons #-}
 
 -- | Extend a *neutral* system with a *non-true* cof.
-nsconsNonTrue :: NCofArg => VCof -> (NCofArg => Val) -> NeSys -> NeSys
-nsconsNonTrue cof v ~sys = case cof of
+nscons :: NCofArg => VCof -> (NCofArg => Val) -> NeSys -> NeSys
+nscons cof v ~sys = case cof of
   VCTrue     -> impossible
   VCFalse    -> sys
   VCNe cof _ -> NSCons (bindCofLazy cof v) sys
-{-# inline nsconsNonTrue #-}
-
--- | Extend a *neutral* system with a *non-true* cof.
-nshconsNonTrue' :: NCofArg => VCof -> Name -> (NCofArg => I -> Val) -> NeSysHCom' -> NeSysHCom'
-nshconsNonTrue' cof i v (!sys, !is) = case cof of
-  VCTrue       -> impossible
-  VCFalse      -> (sys, is)
-  VCNe cof is' -> NSHCons (bindCof cof (bindILazy i v)) sys // (is <> is')
-{-# inline nshconsNonTrue' #-}
+{-# inline nscons #-}
 
 evalSys :: SubArg => NCofArg => DomArg => EnvArg => Sys -> VSys
 evalSys = \case
@@ -256,7 +244,7 @@ com' r r' ~a ~sys ~b
   | r == r'               = b
   | VSHTotal' x t  <- sys = let ?sub = ?sub `ext` r' in eval t
   | VSHNe' nsys is <- sys = hcomdn r r' (a ∙ r')
-                              (mapNeSysHCom' (\i t -> coe i r' a t) (nsys,is))
+                              (mapNeSysHCom' (\i t -> coe i r' a (t ∙ i)) (nsys,is))
                               (coed r r' a b)
 {-# inline com' #-}
 
@@ -278,26 +266,32 @@ mapBindCofLazy :: NCofArg => BindCofLazy a -> (NCofArg => a -> b) -> BindCofLazy
 mapBindCofLazy t f = bindCofLazy (unBindCofLazy t) (f (t^.body))
 {-# inline mapBindCofLazy #-}
 
-mapBindILazy :: NCofArg => SubAction a => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
-mapBindILazy t f = bindILazy (t^.name) \i -> f i (t ∙ i)
-{-# inline mapBindILazy #-}
+bindIFromLazy :: BindILazy a -> BindI a
+bindIFromLazy (BindILazy x i a) = BindI x i a; {-# inline bindIFromLazy #-}
+
+bindIToLazy :: BindILazy a -> BindI a
+bindIToLazy (BindILazy x i z) = BindI x i z; {-# inline bindIToLazy #-}
 
 -- | Map over a binder in a way which *doesn't* rename the bound variable to a
 --   fresh one.  In this case, the mapping function cannot refer to values in
 --   external scope, it can only depend on the value under the binder. This can
 --   be useful when we only do projections under a binder. The case switch in
 --   `coed` on the type argument is similar.
-unsafeMapBindI :: NCofArg => BindI a -> (NCofArg => a -> b) -> BindI b
-unsafeMapBindI (BindI x i a) f =
-  let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
-  seq ?cof (BindI x i (f a))
-{-# inline unsafeMapBindI #-}
-
-unsafeMapBindILazy :: NCofArg => BindILazy a -> (NCofArg => a -> b) -> BindILazy b
-unsafeMapBindILazy (BindILazy x i a) f =
+umapBindILazy :: NCofArg => BindILazy a -> (NCofArg => a -> b) -> BindILazy b
+umapBindILazy (BindILazy x i a) f =
   let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
   seq ?cof (BindILazy x i (f a))
-{-# inline unsafeMapBindILazy #-}
+{-# inline umapBindILazy #-}
+
+umapBindI :: NCofArg => BindI a -> (NCofArg => a -> b) -> BindI b
+umapBindI (BindI x i a) f =
+  let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
+  seq ?cof (BindI x i (f a))
+{-# inline umapBindI #-}
+
+proj1BindIFromLazy :: NCofArg => DomArg => BindILazy Val -> BindI Val
+proj1BindIFromLazy t = umapBindI (bindIToLazy t) proj1
+{-# inline proj1BindIFromLazy #-}
 
 mapNeSys :: NCofArg => (NCofArg => Val -> Val) -> NeSys -> NeSys
 mapNeSys f sys = go sys where
@@ -310,20 +304,20 @@ mapNeSys' :: NCofArg => (NCofArg => Val -> Val) -> NeSys' -> NeSys'
 mapNeSys' f (!sys, !is) = (mapNeSys f sys // is)
 {-# inline mapNeSys' #-}
 
-mapNeSysHCom :: NCofArg => (NCofArg => I -> Val -> Val) -> NeSysHCom -> NeSysHCom
+mapNeSysHCom :: NCofArg => (NCofArg => I -> BindILazy Val -> Val) -> NeSysHCom -> NeSysHCom
 mapNeSysHCom f sys = go sys where
   go = \case
     NSHEmpty      -> NSHEmpty
-    NSHCons t sys -> NSHCons (mapBindCof t \t -> mapBindILazy t f) (go sys)
+    NSHCons t sys -> NSHCons (mapBindCof t \t -> bindILazy (t^.name) (\i -> f i t)) (go sys)
 {-# inline mapNeSysHCom #-}
 
-mapNeSysHCom' :: NCofArg => (NCofArg => I -> Val -> Val) -> NeSysHCom' -> NeSysHCom'
+mapNeSysHCom' :: NCofArg => (NCofArg => I -> BindILazy Val -> Val) -> NeSysHCom' -> NeSysHCom'
 mapNeSysHCom' f (!sys, !is) = (mapNeSysHCom f sys // is)
 {-# inline mapNeSysHCom' #-}
 
-mapVSysHCom :: NCofArg => (NCofArg => I -> Val -> Val) -> VSysHCom -> VSysHCom
+mapVSysHCom :: NCofArg => (NCofArg => I -> BindILazy Val -> Val) -> VSysHCom -> VSysHCom
 mapVSysHCom f sys = case sys of
-  VSHTotal v      -> VSHTotal (mapBindILazy v f)
+  VSHTotal v      -> VSHTotal (bindILazy (v^.name) \i -> f i v)
   VSHNe (sys, is) -> VSHNe (mapNeSysHCom f sys // is)
 {-# inline mapVSysHCom #-}
 
@@ -358,21 +352,6 @@ forallNeSys (BindI x i sys) = case sys of
             (BindCof (t^.binds) (BindILazy x i (t^.body)))
             sys
          // is <> neCofVars (t^.binds)
-
--- -- | Map over the (∀i.α) of a system under a binder, returning a NeSysHCom'.
--- --   The BindI in the function arguments refers to the original component value.
--- mapForallNeSys' :: NCofArg => (NCofArg => I -> BindI Val -> Val) -> BindI NeSys -> NeSysHCom'
--- mapForallNeSys' f bind@(BindI x i sys) = case sys of
---   NSEmpty -> NSHEmpty // mempty
---   NSCons t sys ->
---     if occursInNeCof (t^.binds) i
---       then mapForallNeSys' f (BindI x i sys)
---       else case mapForallNeSys' f (BindI x i sys) of
---         (!sys,!is) -> NSHCons (bindCof (unBindCofLazy t)
---                                  (bindILazy x \j -> f j (rebind bind (t^.body))))
---                               sys
---                       // is <> neCofVars (t^.binds)
--- {-# inline mapForallNeSys' #-}
 
 -- System concatenation
 ----------------------------------------------------------------------------------------------------
@@ -451,7 +430,7 @@ capp (NCl _ t) ~u = case t of
   CHComPi r r' a b sys base ->
     hcom r r'
       (b ∙ u)
-      (mapVSysHCom (\i t -> t ∙ u) (frc sys))
+      (mapVSysHCom (\i t -> t ∙ i ∙ u) (frc sys))
       (base ∙ u)
 
   CConst v -> v
@@ -575,14 +554,14 @@ icapp (NICl _ t) arg = case t of
     hcom r r' (a ∙ j)
       (vshcons (ceq j I0) "i" (\_ -> lhs) $
        vshcons (ceq j I1) "i" (\_ -> rhs) $
-       mapVSysHCom (\_ t -> papp lhs rhs t j) (frc sys))
+       mapVSysHCom (\i t -> papp lhs rhs (t ∙ i) j) (frc sys))
       (papp lhs rhs p j)
 
   -- hcom r r' ((j : A) → B j) [α i. t i] base =
   --   λ j*. hcom
   ICHComLine r r' a sys base ->
     let j = arg in
-    hcom r r' (a ∙ j) (mapVSysHCom (\_ t -> lapp t j) (frc sys)) (lapp base j)
+    hcom r r' (a ∙ j) (mapVSysHCom (\i t -> lapp (t ∙ i) j) (frc sys)) (lapp base j)
 
   ICCoeLine r r' a p ->
     let j = arg in
@@ -684,10 +663,10 @@ proj1 t = case frc t of
   _         -> impossible
 {-# inline proj1 #-}
 
--- | Project under a binder.
-proj1BindI :: NCofArg => DomArg => BindI Val -> BindI Val
-proj1BindI t = unsafeMapBindI t (\t -> proj1 t)
-{-# inline proj1BindI #-}
+-- -- | Project under a binder.
+-- proj1BindILazy :: NCofArg => DomArg => BindILazy Val -> BindILazy Val
+-- proj1BindILazy t = umapBindILazy t proj1
+-- {-# inline proj1BindILazy #-}
 
 proj2 :: NCofArg => DomArg => Val -> Val
 proj2 t = case frc t of
@@ -814,20 +793,17 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     gr           = t
     ~_Ar'        = a ∙ r'
     ~topSysr     = topSys ∙ r :: NeSys
-    ~topSysrf    = frc topSysr
     ~topSysr'    = topSys ∙ r' :: NeSys
-    topSysr'f    = frc topSysr'
     forallTopSys = forallNeSys topSys
+    topSysr'f    = frc topSysr'
 
   -- ar' : Ar'
   -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
-
-    ~ar' =
-          hcomdn r r' _Ar'
+    ~ar' = hcomdn r r' _Ar'
              (mapNeSysHCom'
-                (\i tf -> coe i r' a (proj1 (proj2 (tf ∙ i)) ∙ coe r i (proj1BindI tf) gr))
+                (\i tf -> coe i r' a (proj1 (proj2 (tf ∙ i)) ∙ coe r i (proj1BindIFromLazy tf) gr))
                 forallTopSys)
-             (coed r r' a (unglue gr topSysrf))
+             (coed r r' a (unglue gr (frc topSysr)))
 
     mkComponent :: NCofArg => Val -> (Val, BindILazy Val)
     mkComponent tfr' = let
@@ -848,6 +824,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       ~fibval  = fr'inv ∙ ar'
       ~fibpath = r'rinv ∙ ar'
 
+      ~forallTopSysf = frc forallTopSys
+
       -- shorthands for path applications
       app_r'linv :: NCofArg => Val -> I -> Val
       app_r'linv ~x i =
@@ -864,32 +842,34 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
       -- valSys = [r=r'  i. fr'.linv gr i
       --         ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
-      ~valSys = uf
-        -- nshconsNonTrue' (ceq r r') "i" (\i -> app_r'linv gr i) $
-        -- mapForallNeSys' (\i tf -> app_r'linv (coe r r' (proj1BindI tf) gr) i) topSys
+      ~valSys =
+          vshcons (ceq r r') "i" (\i -> app_r'linv gr i) $
+          mapVSysHCom (\i tf -> app_r'linv (coe r r' (proj1BindIFromLazy tf) gr) i) $
+          forallTopSysf
+
 
       -- fibval* : Tr'
       -- fibval* = hcom 1 0 Tr' valSys fibval
-      ~fibval' = hcomdn I1 I0 tr' valSys fibval
+      ~fibval' = hcomd I1 I0 tr' valSys fibval
 
       -- fibpath* : fr' fibval = ar'
       -- fibpath* = λ j.
-      --    hcom 1 0 (A r') [j=0    i. fr' (hcom 1 i Tr' valSys fibval)    -- no need to force valSys because
-      --                    ;j=1    i. ar'                                 -- it's independent from j=0
-      --                    ;r=r'   i. fr'.coh gr i
-      --                    ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i]
-      --                    (fibpath {fr' fibval} {ar'} j)
+      --    hcom 1 0 Ar' [j=0    i. fr' (hcom 1 i Tr' valSys fibval)    -- no need to force valSys because
+      --                 ;j=1    i. ar'                                 -- it's independent from j=0
+      --                 ;r=r'   i. fr'.coh gr i j
+      --                 ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
+      --                 (fibpath {fr' fibval} {ar'} j)
 
-      fibpath' = uf
-        -- bindILazy "i" \j ->
-        -- hcomd I1 I0 _Ar'
-        --   (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcomn I1 i tr' valSys fibval) $
-        --    vshcons (ceq j I1) "i" (\i -> ar') $
-        --    VSHNe $
-        --    nshconsNonTrue' (ceq r r') "i" (\i -> app_r'coh gr i j) $
-        --    mapForallNeSys' (\i tf -> app_r'coh (coe r r' (proj1BindI tf) gr) i j) topSys
-        --   )
-        --   (papp (fr' ∙ fibval) ar' fibpath j)
+      fibpath' =
+        bindILazy "j" \j ->
+        hcomd I1 I0 _Ar'
+          (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcom I1 i tr' valSys fibval) $
+           vshcons (ceq j I1) "i" (\i -> ar') $
+           vshcons (ceq r r') "i" (\i -> app_r'coh gr i j) $
+           mapVSysHCom (\i tf -> app_r'coh (coe r r' (proj1BindIFromLazy tf) gr) i j) $
+           forallTopSysf
+          )
+          (papp (fr' ∙ fibval) ar' fibpath j)
 
       in (fibval', fibpath')
 
@@ -910,13 +890,15 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
         (!fibvals, !fibpaths) = mkNeSystems sys
         in VSNe (fibvals, is) // VSHNe (fibpaths, is)
 
+    -- glue (hcom 1 0 Ar' [r=r' j. unglue gr sysr; αr' j. fibpath* j] ar')
+    --      [αr'. fibval*]
     in glue
          (hcomd I1 I0 _Ar' (vshcons (ceq r r') "i" (\i -> unglue gr (frc topSysr)) fibpaths) ar')
          topSysr'f
          fibvals
 
-  _ ->
-    impossible
+  a ->
+    error $ show (?cof, a)
 
 
 coe :: NCofArg => DomArg => I -> I -> BindI Val -> Val -> Val
@@ -932,22 +914,32 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
     VLam $ NCl (b^.name) $ CHComPi r r' a b nts base
 
   VSg a b ->
-    let bbind :: NCofArg => BindI Val
-        bbind = seq ?cof $
-         bindI "i" \i ->
-          b ∙ hcomn r i a
-               (mapNeSysHCom' (\_ t -> proj1 t) ts)
-               (proj1 base) in
     VPair
       (hcomdn r r' a
-        (mapNeSysHCom' (\_ t -> proj1 t) ts)
+        (mapNeSysHCom' (\i t -> proj1 (t ∙ i)) ts)
         (proj1 base))
+
       (hcomdn r r'
         (b ∙ hcomn r r' a
-             (mapNeSysHCom' (\_ t -> proj1 t) ts)
+             (mapNeSysHCom' (\i t -> proj1 (t ∙ i)) ts)
              (proj1 base))
-        (mapNeSysHCom' (\i t -> coe i r' bbind (proj2 t)) ts)
-        (coed r r' bbind (proj2 base)))
+
+        (mapNeSysHCom'
+          (\i t ->
+           coe i r'
+             (bindI "i" \i ->
+                b ∙ hcom r i a
+                     (mapVSysHCom (\i t -> proj1 (t ∙ i)) (frc ts))
+                     (proj1 base))
+             (proj2 (t ∙ i)))
+          ts)
+
+        (coed r r'
+           (bindI "i" \i ->
+              b ∙ hcomn r i a
+                   (mapNeSysHCom' (\i t -> proj1 (t ∙ i)) ts)
+                   (proj1 base))
+           (proj2 base)))
 
   -- (  hcom r r' A [α i. (t i).1] b.1
   --  , com r r' (i. B (hcom r i A [α j. (t j).1] b.1)) [α i. (t i).2] b.2)
@@ -966,30 +958,27 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
 
   VU -> let
 
-    -- NOTE the nsconsNonTrue; ceq r r' can be false or neutral
-    sys = nsconsNonTrue (ceq r r') (VPair base (theIdEquiv base)) $
+    -- NOTE: r = r' can be false or neutral
+    sys = nscons (ceq r r') (VPair base (theIdEquiv base)) $
           mapNeSysFromH
             (\t -> VPair (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
             nts
 
-    in VGlueTy base (sys // (insertI r $ insertI r' is))
+    in VGlueTy base (sys // insertI r (insertI r' is))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
 
   -- hcom r r' (Glue [α. (T, f)] A) [β i. t i] gr =
-  --   glue (hcom r r' A [β i. unglue (t i); α i. f (hcom r i T [β. t] gr)] (unglue gr))
+  --   glue (hcom r r' A [β i. unglue (t i); α i. f (hcom r i T [β j. t j] gr)] (unglue gr))
   --        [α. hcom r r' T [β i. t i] gr]
 
-  VGlueTy a (alphasys, alphais) ->
-    let gr         = base
-        alphasys'  = (alphasys, alphais)
-        betasys    = nts
-        betais     = is
-        betasys'   = (betasys, betais)
+  VGlueTy a alphasys ->
+    let gr      = base
+        betasys = ts
 
             -- [α. hcom r r' T [β i. t i] gr]
-        fib = mapNeSys (\t -> hcomd r r' (proj1 t) (frc betasys) gr) alphasys
+        fib = mapNeSys' (\t -> hcom r r' (proj1 t) (frc betasys) gr) alphasys
 
         -- hcom r r' A [  β i. unglue (t i)
         --              ; α i. f (hcom r i T [β. t] gr)]
@@ -997,16 +986,12 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
         hcombase =
           hcomdn r r' a
             (catNeSysHCom'
-               (mapNeSysHCom' (\_ t -> unglue t (frc alphasys)) betasys')
-               (mapNeSysToH'
-                  (\i tf ->
-                      let ty  = proj1 tf             -- T
-                          f   = proj1 (proj2 tf) in  -- f
-                      f ∙ hcomd r i ty (frc betasys) gr)
-                  alphasys'))
-            (unglue gr (frc alphasys))
+               (mapNeSysHCom' (\i t -> unglue (t ∙ i) (frc alphasys))                            betasys)
+               (mapNeSysToH'  (\i tf -> proj1 (proj2 tf) ∙ hcom r i (proj1 tf) (frc betasys) gr) alphasys))
+            (ungluen gr alphasys)
 
-    in VNe (NGlue hcombase alphasys fib) (insertI r $ insertI r' (alphais <> betais))
+    in VNe (NGlue hcombase (fst alphasys) (fst fib))
+           (insertI r $ insertI r' (snd alphasys <> snd betasys))
 
   VLine a ->
         VLLam
@@ -1036,17 +1021,6 @@ hcom r r' ~a ~t ~b
       VSHTotal v -> v ∙ r'
       VSHNe sys  -> hcomdn r r' a sys b
 {-# inline hcom #-}
-
--- hcom
--- hcomf
--- hcomd
--- hcomdf
--- hcomdnf
-
--- coe
--- coed
--- coenf
--- coednf
 
 -- | HCom with neutral system input.
 hcomn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val
@@ -1166,7 +1140,7 @@ lazyprojfield conix fieldix v = case frc v of
 lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
 lazyprojsys conix fieldix = \case
   NSHEmpty      -> NSHEmpty
-  NSHCons t sys -> NSHCons (mapBindCof t \t -> unsafeMapBindILazy t (lazyprojfield conix fieldix))
+  NSHCons t sys -> NSHCons (mapBindCof t \t -> umapBindILazy t (lazyprojfield conix fieldix))
                            (lazyprojsys conix fieldix sys)
 
 lazyprojsys' :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom' -> NeSysHCom'
@@ -1268,9 +1242,6 @@ hcomind r r' a sys ext tyix conix sp = case projsys' conix sys of
     VNe (NHCom r r' a sys (VDCon tyix conix sp)) (insertI r $ insertI r' is)
 {-# inline hcomind #-}
 
--- coeind :: NCofArg => DomArg => F I -> F I ->
-
-
 ----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
@@ -1336,9 +1307,11 @@ eval = \case
 ----------------------------------------------------------------------------------------------------
 
 class Force a b | a -> b where
-  frc  :: NCofArg => DomArg => a -> b           -- force a value wrt current cof. Idempotent.
-  frcS :: SubArg => NCofArg => DomArg => a -> b -- apply a substitution and then force. *Not* idempotent!
-                                                -- Applying it multiple times is an error.
+  frc  :: NCofArg => DomArg => a -> b           -- force a value wrt current cof. Idempotent when
+                                                -- the type is (a -> a).
+  frcS :: SubArg => NCofArg => DomArg => a -> b -- apply a substitution and then force. It's always
+                                                -- an *error* to apply it multiple times.
+
 
 instance Force I I where
   frc  i = doSub ?cof i;              {-# inline frc #-}
@@ -1436,7 +1409,7 @@ instance Force Ne Val where
 instance Force NeSys VSys where
   -- TODO: is it better to not do anything with system components in frc?
   -- The current version can pile up frc thunks. They're very cheap though,
-  -- expect for the first one.
+  -- except for the first one.
 
   frc = \case
     NSEmpty      -> vsempty
@@ -1470,6 +1443,14 @@ instance Force NeSysHCom VSysHCom where
       VCNe cof is -> case frcS sys of
         VSHTotal v'      -> VSHTotal v'
         VSHNe (sys, is') -> VSHNe (NSHCons (bindCof cof (frcS (t^.body))) sys // is <> is')
+
+instance Force NeSysHCom' VSysHCom where
+  frc (!sys, !_)  = frc sys; {-# inline frc #-}
+  frcS (!sys, !_) = frcS sys; {-# inline frcS #-}
+
+instance Force NeSys' VSys where
+  frc (!sys, !_)  = frc sys; {-# inline frc #-}
+  frcS (!sys, !_) = frcS sys; {-# inline frcS #-}
 
 instance Force a fa => Force (BindI a) (BindI fa) where
 

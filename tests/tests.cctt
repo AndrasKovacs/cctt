@@ -1,5 +1,154 @@
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × ((x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+ua (A B : U)(f : equiv A B) : A = B :=
+  λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
+
+symufill (A B : U)(P : A = B)(i j : I) : U :=
+  hcom 0 j U [i=0. P; i=1 _. A] A;
+
+symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
+  -- λ i. com 0 1 (symufill A B P i)
+  --              [i=0 j. p j; i=1 j. a] a;
+
+  -- λ i. hcom 0 1 (symufill A B P i 1)
+  --                 [ i=0 j. coe j 1 (symufill A B P i) (p j)
+  -- 	             ; i=1 j. coe j 1 (symufill A B P i) a]
+  --                (coe 0 1 (symufill A B P i) a);
+
+λ {b} {a} i. glue (hcom 0 1 A [i = 0 j. coe j 0 P (coe j 1 P (p {a}
+{b} j)); i = 1 j. coe j 0 (_. A) (coe j 1 (j1. A) a); i = 0 i1. coe i1 0 P (coe
+i1 1 P (p {a} {b} i1)); i = 1 i1. coe i1 0 (_. A) (coe i1 1 (j. A) a)] (hcom 1 0
+A [i = 0 j. coe 1 0 P (coe 0 1 P a); i = 1 j. coe 1 0 (_. A) (coe 0 1 (j1. A)
+a)] (hcom 0 1 A [i = 0 j. coe j 1 (j1. A) (coe j 0 P (coe 0 j P a)); i = 1
+j. coe j 1 (j1. A) (coe j 0 (_. A) (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a))))
+[i = 0. P {A} {B} @1, λ x. coe @1 0 P x, λ x. coe 0 @1 P x, λ x {x} {coe 0 @1 P
+(coe @1 0 P x)} j. hcom j 0 (P {A} {B} j) [j = 0 k. x; j = 1 k. coe k j P (coe j
+k P x)] x, λ x {coe @1 0 P (coe 0 @1 P x)} {x} j. hcom 0 j A [j = 0 k. coe k 0 P
+(coe 0 k P x); j = 1 k. x] x, λ x {λ {coe @1 0 P x} {coe @1 0 P x} _. coe @1 0 P
+x} {λ {coe @1 0 P (coe 0 @1 P (coe @1 0 P x))} {coe @1 0 P x} k. hcom 0 k A [k =
+0 k1. coe k1 0 P (coe 0 k1 P x); k = 1 k1. coe 1 0 P x] (coe k 0 P x)} l {coe l
+0 P (hcom l 0 (P {A} {B} l) [l = 0 k. x; l = 1 k. coe k l P (coe l k P x)] x)}
+{coe l 0 P x} k. hcom l 0 A [k = 0 i1. coe i1 0 P (coe l i1 P (hcom l i1 (P {A}
+{B} l) [l = 0 k1. x; l = 1 k1. coe k1 1 P (coe 1 k1 P x)] x)); k = 1 i1. coe i1
+0 P (coe l i1 P x); l = 0 i1. coe i1 0 P (coe l i1 P x); l = 1 i1. coe i1 0 P
+(hcom i1 l (P {A} {B} i1) [k = 0 k1. coe k1 i1 P (coe i1 k1 P (coe 1 i1 P x)); k
+= 1 k1. coe 1 i1 P x] (coe l i1 P x))] (coe l 0 P x); i = 1. A, λ x. coe @1 0
+(_. A) x, λ x. coe 0 @1 (_. A) x, λ x {x} {coe 0 @1 (_. A) (coe @1 0 (_. A) x)}
+j. hcom j 0 A [j = 0 k. x; j = 1 k. coe k j (_. A) (coe j k (_. A) x)] x, λ x
+{coe @1 0 (_. A) (coe 0 @1 (_. A) x)} {x} j. hcom 0 j A [j = 0 k. coe k 0 (_. A)
+(coe 0 k (_. A) x); j = 1 k. x] x, λ x {λ {coe @1 0 (_. A) x} {coe @1 0 (_. A)
+x} _. coe @1 0 (_. A) x} {λ {coe @1 0 (_. A) (coe 0 @1 (_. A) (coe @1 0 (_. A)
+x))} {coe @1 0 (_. A) x} k. hcom 0 k A [k = 0 k1. coe k1 0 (_. A) (coe 0 k1
+(_. A) x); k = 1 k1. coe 1 0 (_. A) x] (coe k 0 (_. A) x)} l {coe l 0 (_. A)
+(hcom l 0 A [l = 0 k. x; l = 1 k. coe k l (_. A) (coe l k (_. A) x)] x)} {coe l
+0 (_. A) x} k. hcom l 0 A [k = 0 i1. coe i1 0 (_. A) (coe l i1 (_. A) (hcom l i1
+A [l = 0 k1. x; l = 1 k1. coe k1 l (_. A) (coe l k1 (_. A) x)] x)); k = 1
+i1. coe i1 0 (_. A) (coe l i1 (_. A) x); l = 0 i1. coe i1 0 (_. A) (coe l i1
+(_. A) x); l = 1 i1. coe i1 0 (_. A) (hcom i1 l A [k = 0 k1. coe k1 i1 (_. A)
+(coe i1 k1 (_. A) (coe l i1 (_. A) x)); k = 1 k1. coe l i1 (_. A) x] (coe l i1
+(_. A) x))] (coe l 0 (_. A) x)] [i = 0. b; i = 1. a];
+
+-- myfill (A B : U)(P : A = B)(i j : I) : U :=
+-- Glue A [
+--         j = 0. A, idEquiv A
+--       ; i = 0. P j
+--              , λ x. coe j 0 P x
+-- 	     , λ x. coe 0 j P x
+-- 	     , λ x j1. hcom j 0 [j1 = 0 k. x; j1 = 1 k. coe k j P (coe j k P x)] x
+-- 	     , λ x j1. hcom 0 j [j1 = 0 k. coe k 0 P (coe 0 k P x); j1 = 1 k. x] x
+-- 	     , λ x l k. hcom j 0 [k = 0 i1. coe i1 0 P (coe j i1 P (hcom j i1 [l = 0 k1. x; l = 1 k1.
+-- 	                   coe k1 j P (coe j k1 P x)] x)); k = 1 i1. coe i1 0 P (coe j i1 P x); l = 0 i1. coe i1
+-- 	                   0 P (coe j i1 P x); l = 1 i1. coe i1 0 P (hcom i1 j [k = 0 k1. coe
+-- 	                   k1 i1 P (coe i1 k1 P (coe j i1 P x)); k = 1 k1. coe j i1 P x] (coe
+-- 	                   j i1 P x))] (coe j 0 P x)
+--   ];
+
+-- test (A B : U) (P : A = B) (a : A) (i : I) : myfill A B P i 1 :=
+--    coe 0 1 (myfill A B P i) a;
+
+-- myfill (A B : U)(P : A = B)(f : (j:I) → equiv (P j) A)(i j : I) : U :=
+-- Glue A [
+--   i = 0. P j, f j
+--   ];
+
+-- test (A B : U) (P : A = B)(f : (j:I) → equiv (P j) A)(i : I)(a : Glue A [i = 0. A, f 0]) : myfill A B P f i 1 :=
+--    coe 0 1 (myfill A B P f i) a;
+
+-- test (A : U)(B : I → U)(f : (j:I) → equiv (B j) A)(i : I)
+--   (a : Glue A [i = 0. B 0, f 0]) : Glue A [i = 0. B 1, f 1] :=
+
+-- glue (hcom 1 0 [i = 0 j. (f 1).1 (coe 0 1 B a)] (hcom 0 1 [i = 0
+-- j. coe j 1 (j1. A) ((f j).1 (coe 0 j B a))] (coe 0 1 (j. A) (unglue a)))) [i =
+-- 0. coe 0 1 B a];
 
 {-
+
+{-
+
+add : Nat -> Nat -> Nat
+add = elim [suc n hypn. λ m. suc (hypn m)
+           ;zero. λ m. m]
+
+add = split
+  suc n -> λ m. suc (add n m)
+  zero  -> λ m. m
+
+
+-- suc n
+
+-- vsuc `indApp` n
+
+cons : A →(external) List A →(inductive) ListA
+
+cons `appExt` x `indApp` xs
+
+elim motive [methods] (cons `appExt` x `indApp` xs)
+
+     syntactic term in (A : U ⊢ A)
+
+coe r r' (i. List (A i)) (cons `appExt` (x : A) `indApp` xs)
+
+= cons (coe r r' (i. A i) x) (coe r r' (i. List (A i)) xs)
+
+data A (.....)
+  cons (n : ℕ)(v : Vec n Bool)
+
+
+TODO-s
+--------------------------------------------------------------------------------
+
+Code to write:
+- isoToEquiv
+
+To implement:
+1. non-F branch: testing Glue and everything
+2. strict inductives
+3. parameter-free HITs (extra elaboration + runtime tag on strict inductives)
+
+   -- con :  params (i : I)(j : I) [i=0. p j; i=1. q j]
+   -- con :          (path : boundary = ...) →         [α. boundary]
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------------------
+
+
+
 Tracking efficienry-related info
   - forcing
      - values
@@ -7,6 +156,22 @@ Tracking efficienry-related info
      - cofs
      - I
   - off-diagonal
+
+  - values
+  - neutral coe contains a binder
+
+  - usual thing in lambda calculus:
+     you have indices: weakening has action on free vars
+              levels : weakening has action on bound vars
+
+
+
+
+
+  -- under a cof: we lose forcing + off-diagonal
+  let v = frc foo
+  r r'
+  hcom r r' a [α i. coe r r' (v]
 
 
 -}
@@ -33,13 +198,13 @@ symufill (A B : U)(P : A = B)(i j : I) : U :=
   -- Glue (P j) [i=0. P j, coeIsEquiv (P j) A P j 0; i=1. A, coeIsEquiv A A (_.A) j 0]
 
 symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
-  λ i. com 0 1 (symufill A B P i)
-               [i=0 j. p j; i=1 j. a] a;
+  -- λ i. com 0 1 (symufill A B P i)
+  --              [i=0 j. p j; i=1 j. a] a;
 
-  -- λ i. hcom 0 1 (symufill A B P i 1)
-  --                 [ i=0 j. coe j 1 (symufill A B P i) (p j)
-  -- 	             ; i=1 j. coe j 1 (symufill A B P i) a]
-  -- 	           (coe 0 1 (symufill A B P i) a);
+  λ i. hcom 0 1 (symufill A B P i 1)
+                  [ i=0 j. coe j 1 (symufill A B P i) (p j)
+	             ; i=1 j. coe j 1 (symufill A B P i) a]
+                 (coe 0 1 (symufill A B P i) a);
 
 -- BAD with com
 -- λ i. glue (hcom 0 1 [i = 0 j. coe j 0 P (coe j 1 P (p j)); i = 1
@@ -56,3 +221,4 @@ symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
 -- 0 1 P a); i = 1 i1. coe 1 0 (_. A) (coe 0 1 (j. A) a)] (hcom 0 1 [i = 0 j. coe j
 -- 1 (j1. A) (coe j 0 P (coe 0 j P a)); i = 1 j. coe j 1 (j1. A) (coe j 0 (_. A)
 -- (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a)))) [i = 0. b; i = 1. a];
+-}

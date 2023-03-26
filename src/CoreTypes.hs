@@ -217,7 +217,7 @@ data Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
-  | VTyCon Lvl Env                 -- para
+  | VTyCon Lvl Env
   | VDCon Lvl Lvl VDSpine
 
   | VTODO -- placeholder
