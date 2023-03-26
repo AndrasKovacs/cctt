@@ -7,12 +7,6 @@ isEquiv (A B : U)(f : A → B) : U :=
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
 
-test (A B : U)(f : equiv A B)(k : I)(x : Glue B [k=0. (A, f)]) : A :=
-  coe k 0 (i. Glue B [i=0.(A, f)]) x;
-
-{-
-
-
 idEquiv (A : U) : equiv A A :=
   (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
 
@@ -227,5 +221,4 @@ symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
 -- 0 1 P a); i = 1 i1. coe 1 0 (_. A) (coe 0 1 (j. A) a)] (hcom 0 1 [i = 0 j. coe j
 -- 1 (j1. A) (coe j 0 P (coe 0 j P a)); i = 1 j. coe j 1 (j1. A) (coe j 0 (_. A)
 -- (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a)))) [i = 0. b; i = 1. a];
--}
 -}

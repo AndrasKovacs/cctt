@@ -88,36 +88,7 @@ pathToEquiv (A B : U)(p : A = B) : equiv A B :=
   ((λ x. coe 0 1 p x), coeIsEquiv (λ i. p i) 0 1);
 
 uaTrip (A B : U)(f : equiv A B) : equiv A B :=
-  pathToEquiv A B (ua A B f);
-
-test (A B : U)(f : equiv A B)(k : I)(x : Glue B [k=0. (A, f)]) : A :=
-  coe k 0 (i. Glue B [i=0.(A, f)]) x;
-
-
--- hcom 1 0 A [
---   k = 0 i. f.2.2.1 x {x} {f.2.1 f.1 x} i]
---   (f.2.1 (hcom k 0 B [] (coe k 0 (i. B) (hcom 1 0 B [0 = k i. f.1 x; k = 0 j. f.1 x; k = 1 j. hcom 1 0 B [j = 0 i. hcom 1 i B [] (hcom 0 1 B [] (coe 0 1 (i1. B) (f.1 x))); j = 1 i. hcom 0 1 B [] (coe 0 1 (i1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))] (hcom 0 k B [] (coe 0 k (i. B) (f.1 x)))))));
-
--- uaTripnf (A B : U)(f : equiv A B) : equiv A B :=
--- (    λ x. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))
---    , λ x. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))
---    , λ x
---       j.
---       hcom 0 1 A [
---           j = 0 k. x
--- 	; j = 1 k. hcom 1 0 A [k = 0 i. f.2.2.1 x {x} {f.2.1 f.1 x} i]
--- 	          (f.2.1 (hcom k 0 B [] (coe k 0 (l. B) (
--- 	                hcom 1 0 B [0 = k i. f.1 x
--- 	             ; k = 0 j1. f.1 x
--- 		     ; k = 1 j1. hcom 1 0 B [j1 = 0 i. hcom 1 i B [] (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x)))
--- 		                           ; j1 = 1 i. hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x))]
--- 					   (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x)))]
---                      (hcom 0 k B [] (coe 0 k (l. B) (f.1 x)))))))
---        ]
---        x
---   , U);
-
-{-
+  -- pathToEquiv A B (ua A B f);
 
 
 pathToEquiv' (A B : U)(p : A = B) : equiv B A :=
@@ -531,4 +502,3 @@ p x); l = 0 i1. coe i1 1 p (coe 0 i1 p x); l = 1 i1. coe i1 1 p (hcom i1 0 (p
 {A} {B} i1) [k = 0 k1. coe k1 i1 p (coe i1 k1 p (coe 0 i1 p x)); k = 1 k1. coe 0
 i1 p x] (coe 0 i1 p x))] (coe 0 1 p x); i = 1. B, λ x. x, λ x. x, λ x {x} {x}
 _. x, λ x {x} {x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x];
--}
