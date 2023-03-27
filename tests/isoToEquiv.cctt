@@ -1,0 +1,78 @@
+-- Trying to define isoToEquiv for our half-adjoint equiv
+
+
+
+-- yacctt definition of isoToEquiv with contractible fibers
+--------------------------------------------------------------------------------
+
+iso (A B : U) : U :=
+    (f  : A → B)
+  * (g  : B → A)
+  * ((b : B) → f (g b) = b)
+  * ((a : A) → g (f a) = a);
+
+isContr (A : U) : U := (x : A) * ((y : A) → y = x);
+fiber (A B : U) (f : A → B) (b : B) : U := (a : A) * f a = b;
+
+-- contractible fibers
+isEquivCF (A B : U) (f : A → B) : U := (b : B) → isContr (fiber A B f b);
+
+equivCF (A B : U) : U := (f : A → B) * isEquivCF A B f;
+
+-- Version of lemIso with heavy use of line types:
+lemIsoWithLines (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
+
+  let f  : A → B                 := i.1;
+  let g  : B → A                 := i.2.1;
+  let fg : (b : B) → f (g b) = b := i.2.2.1;
+  let gf : (a : A) → g (f a) = a := i.2.2.2;
+  let x0 : A                     := f0.1;
+  let p0 : f x0 = b              := f0.2;
+  let x1 : A                     := f1.1;
+  let p1 : f x1 = b              := f1.2;
+
+  let sq0 (i j : I) : A := hcom 0 j [i=0. gf x0; i=1 x. g b] (g (p0 i));
+  let sq1 (i j : I) : A := hcom 0 j [i=0. gf x1; i=1 x. g b] (g (p1 i));
+  let sq2 (i j : I) : A := hcom 1 j [i=0 k. sq0 k 1;i=1 k. sq1 k 1] (g b);
+
+  λ i. ( sq2 i 0
+       , λ j. hcom 0 1 [i=0. fg (p0 j)
+                       ;i=1. fg (p1 j)
+                       ;j=0. fg (f (sq2 i 0))
+                       ;j=1. fg b]
+                       (f (hcom 1 0 [i=0. sq0 j
+                                    ;i=1. sq1 j
+                                    ;j=0. gf (sq2 i 0)
+                                    ;j=1 _. g b]
+                                    (sq2 i j))));
+
+isoToEquiv (A B : U) (i : iso A B) : equivCF A B :=
+  (i.1, λ b. ((i.2.1 b, i.2.2.1 b), λ fib. lemIsoWithLines A B i b fib (i.2.1 b, i.2.2.1 b)));
+
+--------------------------------------------------------------------------------
+
+-- half adjoint equivalence
+
+isEquivHA (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × ((x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+CFtoHA (A B : U)(f : A → B)(p : isEquivCF A B f) : isEquivHA A B f :=
+
+  let g (b : B) : A := (p b).1.1;
+
+  let linv (a : A) : a = g (f a) := λ i. ((p (f a)).2 (a, refl) i).1;
+
+  let rinv (b : B) : f ((p b).1.1) = b := (p b).1.2;
+
+  let coh (a : A) : (λ _. f a) ={i. f (linv a i) = f a} (rinv (f a)) := U;
+
+      -- (a, refl(f a))         : fib f (f a)
+      -- (g (f a), rinv (f a))  : fib f (f a)
+
+     p (f a) : isContr (fib f (f a))
+     (p (f a)).2
+
+  (g, linv, rinv , coh);

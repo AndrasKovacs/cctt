@@ -8,11 +8,10 @@ import qualified Data.Map.Strict as M
 import System.Exit
 
 import Common hiding (debug)
-import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalf, evalSys)
+import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalSys)
 import CoreTypes
 import Interval
 import Quotation
-import Substitution
 
 import qualified Common
 import qualified Conversion
@@ -48,26 +47,25 @@ convEndpoints t u = if Conversion.conv t u
   then pure ()
   else err $ CantConvertEndpoints (quote t) (quote u)
 
+convReflEndpoints :: Elab (Val -> Val -> IO ())
+convReflEndpoints t u = if Conversion.conv t u
+  then pure ()
+  else err $ CantConvertReflEndpoints (quote t) (quote u)
+
 eval :: NCofArg => DomArg => EnvArg => Tm -> Val
 eval t = let ?sub = idSub (dom ?cof) in Core.eval t
 
-evalSys :: NCofArg => DomArg => EnvArg => Sys -> F VSys
+evalSys :: NCofArg => DomArg => EnvArg => Sys -> VSys
 evalSys sys = let ?sub = idSub (dom ?cof) in Core.evalSys sys
 
-evalf :: NCofArg => DomArg => EnvArg => Tm -> F Val
-evalf t = let ?sub = idSub (dom ?cof) in frc (Core.eval t)
+instantiate :: NCofArg => DomArg => EnvArg => Tm -> I -> Val
+instantiate t i = let ?sub = idSub (dom ?cof) `ext` i in Core.eval t
 
-instantiate :: NCofArg => DomArg => EnvArg => Tm -> F I -> Val
-instantiate t i = let ?sub = idSub (dom ?cof) `ext` unF i in Core.eval t
-
-evalCof :: NCofArg => Cof -> F VCof
+evalCof :: NCofArg => Cof -> VCof
 evalCof cof = let ?sub = idSub (dom ?cof) in Core.evalCof cof
 
-evalI :: NCofArg => I -> F I
+evalI :: NCofArg => I -> I
 evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
-
-evalInf :: NCofArg => I -> I
-evalInf i = let ?sub = idSub (dom ?cof) in unF (Core.evalI i)
 
 debug :: PrettyArgs [String] -> Elab (IO ())
 debug x = withPrettyArgs (Common.debug x)
@@ -93,6 +91,7 @@ type LocalTypes = (?localTypes :: [Box VTy])
 
 type Elab a = TopDefs => TopLvl => LocalTypes => NCofArg
            => DomArg => EnvArg => TableArg => PosArg => a
+
 
 -- | Bind a fibrant variable.
 bind :: Name -> VTy -> Elab (Val -> a) -> Elab a
@@ -165,6 +164,7 @@ data Error
   | CantConvert Tm Tm
   | CantConvertCof Cof Cof
   | CantConvertEndpoints Tm Tm
+  | CantConvertReflEndpoints Tm Tm
   | CantConvertExInf Tm Tm
   | GlueTmSystemMismatch Sys
   | TopShadowing
@@ -220,6 +220,12 @@ showError = \case
     "Can't convert expected path endpoint\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
     "to the inferred endpoint\n\n" ++
+    "  " ++ pretty t
+
+  CantConvertReflEndpoints t u ->
+    "Can't convert endpoints when checking \"refl\":\n\n" ++
+    "  " ++ pretty u ++ "\n\n" ++
+    "\n\n" ++
     "  " ++ pretty t
 
   CantConvertCof c1 c2 ->
@@ -334,21 +340,21 @@ check t topA = case t of
     u <- define x va vt $ check u topA
     pure $! Let x a t u
 
-  t -> case (t, unF (frc topA)) of
+  t -> case (t, frc topA) of
 
     (P.Lam x t, VPi a b) -> do
-      Lam x <$!> bind x a (\v -> check t (capp b v))
+      Lam x <$!> bind x a (\v -> check t (b ∙ v))
 
     (P.Lam x t, VPath a l r) -> do
       t <- bindI x \i -> check t (a ∙ IVar i)
-      convEndpoints l (instantiate t i0f)
-      convEndpoints r (instantiate t i1f)
+      convEndpoints l (instantiate t I0)
+      convEndpoints r (instantiate t I1)
       pure $! PLam (quote l) (quote r) x t
 
     (P.PLam l r x t, VPath a l' r') -> do
       t <- bindI x \i -> check t (a ∙ IVar i)
-      convEndpoints (instantiate t i0f) l'
-      convEndpoints (instantiate t i1f) r'
+      convEndpoints (instantiate t I0) l'
+      convEndpoints (instantiate t I1) r'
       l <- check l (a ∙ I0)
       r <- check r (a ∙ I1)
       convEndpoints (eval l) l'
@@ -357,7 +363,7 @@ check t topA = case t of
 
     (P.Refl, VPath a l r) -> do
       constantICl a
-      convEndpoints l r
+      convReflEndpoints l r
       pure $! Refl (quote l)
 
     (P.Sym p, VPath a y x) -> do
@@ -423,7 +429,7 @@ infer = \case
   P.I  -> err UnexpectedIType
 
   P.DepPath a t u -> do
-    (x, a, _, src, tgt) <- elabBindMaybe a i0f i1f
+    (x, a, _, src, tgt) <- elabBindMaybe a I0 I1
     t <- check t src
     u <- check u tgt
     pure $! Infer (Path x a t u) VU
@@ -456,29 +462,29 @@ infer = \case
 
   P.App t u -> do
     Infer t a <- infer t
-    case unF (frc a) of
+    case frc a of
       VPi a b -> do
         u <- check u a
         pure $! Infer (App t u) (b ∙ eval u)
       VPath a l r -> do
         u <- checkI u
-        pure $! Infer (PApp (quote l) (quote r) t u) (a ∙ evalInf u)
+        pure $! Infer (PApp (quote l) (quote r) t u) (a ∙ evalI u)
       VLine a -> do
         u <- checkI u
-        pure $! Infer (LApp t u) (a ∙ evalInf u)
+        pure $! Infer (LApp t u) (a ∙ evalI u)
       a ->
         err $! ExpectedPiPathLine (quote a)
 
   P.PApp l r t u -> do
     Infer t a <- infer t
-    case unF (frc a) of
+    case frc a of
       VPath a l' r' -> do
         u <- checkI u
         l <- check l (a ∙ I0)
         r <- check r (a ∙ I1)
         convEndpoints l' (eval l)
         convEndpoints r' (eval r)
-        pure $! Infer (PApp l r t u) (a ∙ evalInf u)
+        pure $! Infer (PApp l r t u) (a ∙ evalI u)
       a ->
         err $! ExpectedPath (quote a)
 
@@ -498,14 +504,14 @@ infer = \case
 
   P.Proj1 t -> do
     Infer t a <- infer t
-    case unF (frc a) of
+    case frc a of
       VSg a b -> pure $ Infer (Proj1 t) a
       a       -> err $! ExpectedSg (quote a)
 
   P.Proj2 t -> do
     Infer t a <- infer t
-    case unF (frc a) of
-      VSg a b -> pure $! Infer (Proj2 t) (b ∙ proj1 (evalf t))
+    case frc a of
+      VSg a b -> pure $! Infer (Proj2 t) (b ∙ proj1 (eval t))
       a       -> err $! ExpectedSg (quote a)
 
   P.U ->
@@ -547,7 +553,7 @@ infer = \case
   P.GlueTm base (Just eqs) sys -> do
     Infer base a <- infer base
     eqs <- elabGlueTySys a eqs
-    case unF (evalSys eqs) of
+    case evalSys eqs of
       VSTotal _ -> impossible
       VSNe veqs -> do
         sys <- elabGlueTmSys base sys a (fst veqs)
@@ -558,7 +564,7 @@ infer = \case
 
   P.Unglue t -> do
     Infer t a <- infer t
-    case unF (frc a) of
+    case frc a of
       VGlueTy a sys -> pure $! Infer (Unglue t (quote (fst sys))) a
       a             -> err $! ExpectedGlueTy (quote a)
 
@@ -597,8 +603,10 @@ infer = \case
     Infer p axy <- infer p
     (a', x, y) <- nonDepPath axy
     bindI "i" \(IVar -> i) -> conv (a' ∙ i) a
-    let vf = evalf f
+    let vf = eval f
     pure $ Infer (Ap f (quote x) (quote y) p) (path (b ∙ x) (vf ∙ x) (vf ∙ y))
+
+  P.Elim{} -> uf
 
 
 -- | Ensure that an IClosure is constant.
@@ -611,26 +619,26 @@ constantCl a cl = bind "x" a \x -> bind "y" a \y -> conv (cl ∙ x) (cl ∙ y)
 
 -- | Ensure that a type is a non-dependent function.
 nonDepFun :: Elab (Val -> IO (Val, NamedClosure))
-nonDepFun a = case unF (frc a) of
+nonDepFun a = case frc a of
   VPi a b -> constantCl a b >> pure (a, b)
   a       -> err $! ExpectedNonDepFun (quote a)
 
 -- | Ensure that a type is a non-dependent path type.
 nonDepPath :: Elab (Val -> IO (NamedIClosure, Val, Val))
-nonDepPath a = case unF (frc a) of
+nonDepPath a = case frc a of
   VPath a x y -> constantICl a >> pure (a, x, y)
   a           -> err $! ExpectedPath (quote a)
 
 -- | Return binder name, type under binder, value of type under binder
 --   , source type val, target type val
-elabBindMaybe :: Elab (P.BindMaybe -> F I -> F I -> IO (Name, Tm, Val, Val, Val))
+elabBindMaybe :: Elab (P.BindMaybe -> I -> I -> IO (Name, Tm, Val, Val, Val))
 elabBindMaybe b r r' = case b of
   P.DontBind a -> do
     Infer a aty <- infer a
-    case unF (frc aty) of
+    case frc aty of
       VPath aty lhs rhs -> do
         isConstantU aty
-        let va  = evalf a
+        let va  = eval a
             src = papp lhs rhs va r
             tgt = papp lhs rhs va r'
         let iname = pickIVarName
@@ -639,7 +647,7 @@ elabBindMaybe b r r' = case b of
           pure (iname, a, eval a, src, tgt)
       VLine aty -> do
         isConstantU aty
-        let va  = evalf a
+        let va  = eval a
             src = lapp va r
             tgt = lapp va r'
         let iname = pickIVarName
@@ -681,7 +689,7 @@ checkI = \case
     err ExpectedI
 
 isConstantU :: Elab (NamedIClosure -> IO ())
-isConstantU t = bindI "i" \i -> case unF (t ∘ IVar i) of
+isConstantU t = bindI "i" \i -> case frc (t ∙ IVar i) of
   VU -> pure ()
   a  -> err $ ExpectedPathULineU (quote a)
 
@@ -702,7 +710,7 @@ sysHComCompat :: Elab (Tm -> SysHCom -> IO ())
 sysHComCompat t = \case
   SHEmpty              -> pure ()
   SHCons cof' x t' sys -> do
-    case unF (evalCof cof') of
+    case evalCof cof' of
       VCFalse     -> pure ()
       VCTrue      -> bindI x \_ -> conv (eval t) (eval t')
       VCNe cof' _ -> bindCof cof' (bindI x \_ -> conv (eval t) (eval t'))
@@ -714,7 +722,7 @@ elabSysHCom a r base = \case
     pure SHEmpty
   P.SHCons cof t sys -> do
     cof <- checkCof cof
-    case unF (evalCof cof) of
+    case evalCof cof of
       VCTrue  -> err NonNeutralCofInSystem
       VCFalse -> err NonNeutralCofInSystem
       VCNe ncof _ -> do
@@ -728,7 +736,7 @@ elabSysHCom a r base = \case
               pure (x, t)
             P.DontBind t -> do
               Infer t tty <- infer t
-              case unF (frc tty) of
+              case frc tty of
                 VPath pty lhs rhs -> do
                   let iname = pickIVarName
                   bindI iname \i -> do
@@ -753,7 +761,7 @@ sysCompat :: Elab (Tm -> Sys -> IO ())
 sysCompat t = \case
   SEmpty            -> pure ()
   SCons cof' t' sys -> do
-    case unF (evalCof cof') of
+    case evalCof cof' of
       VCTrue      -> conv (eval t) (eval t')
       VCFalse     -> pure ()
       VCNe cof' _ -> bindCof cof' $ conv (eval t) (eval t')
@@ -765,7 +773,7 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
     pure SEmpty
   (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> do
     cof <- checkCof cof
-    case unF (evalCof cof) of
+    case evalCof cof of
       VCTrue  -> err NonNeutralCofInSystem
       VCFalse -> err NonNeutralCofInSystem
       VCNe ncof _ -> do
@@ -774,7 +782,7 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
         bindCof ncof do
           let fequiv = frc equiv
           t <- check t (proj1 fequiv)
-          conv (proj1f (proj2f fequiv) ∙ eval t) (eval base)
+          conv (proj1 (proj2 fequiv) ∙ eval t) (eval base)
           sysCompat t ts
           pure $ SCons cof t ts
   (ts, equivs) ->
@@ -787,7 +795,7 @@ elabGlueTySys a = \case
   P.SCons cof t sys -> do
     cof <- checkCof cof
     let vcof = evalCof cof
-    case unF vcof of
+    case vcof of
       VCTrue  -> err NonNeutralCofInSystem
       VCFalse -> err NonNeutralCofInSystem
       VCNe ncof _ -> do
@@ -842,6 +850,8 @@ inferTop = \case
 
     top <- defineTop x va vt $ inferTop top
     pure $! TDef x a t top
+
+  P.TData{} -> uf
 
   P.TEmpty ->
     pure TEmpty

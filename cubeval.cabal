@@ -44,14 +44,12 @@ executable cctt
       CoreTypes
       Elaboration
       Interval
-      IVarSet
       LvlSet
       MainInteraction
       Parser
       Presyntax
       Pretty
       Quotation
-      Substitution
       Tests
   hs-source-dirs:
       src

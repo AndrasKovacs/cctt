@@ -33,7 +33,24 @@ coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
 		      x
   );
 
-coeIsEquivnf (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
+coeIsEquiv' (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
+  let f'    (i : I)(x : A r)        : A i := coe r i A x;
+  let g'    (i : I)(x : A i)        : A r := coe i r A x;
+  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x;
+  let rinv' (i : I)(x : A i)(j : I) : A i := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
+
+  ( λ x. g' r' x
+  , λ x j. linv' r' x j
+  , λ x j. rinv' r' x j
+  , λ x l k. hcom r r' (A r')
+                      [k=0 i. coe i r' A (f' i (linv' i x l))
+                      ;k=1 i. coe i r' A (f' i x)
+		      ;l=0 i. coe i r' A (f' i x)
+		      ;l=1 i. coe i r' A (rinv' i (f' i x) k)]
+		      (coe r r' A x)
+  );
+
+coeIsEquivNf (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
 (λ x. coe r' r A x, λ x {x} {coe r' r A (coe r r' A x)} j. hcom r r'
 (A r) [j = 0 k. x; j = 1 k. coe k r A (coe r k A x)] x, λ x {coe r r' A (coe r'
 r A x)} {x} j. hcom r' r (A r') [j = 0 k. coe k r' A (coe r' k A x); j = 1 k. x]
@@ -47,7 +64,13 @@ x); l = 0 i. coe i r' A (coe r i A x); l = 1 i. coe i r' A (hcom i r (A i) [k =
 0 k1. coe k1 i A (coe i k1 A (coe r i A x)); k = 1 k1. coe r i A x] (coe r i A
 x))] (coe r r' A x));
 
-coe01isEquivnf (A : I → U) : isEquiv (A 0) (A 1)  (λ x. coe 0 1 A x) :=
+coeIsEquivNfOK (A : I → U)(r r' : I) : coeIsEquiv A r r' = coeIsEquivNf A r r' :=
+  refl;
+
+coeIsEquivNf'OK (A : I → U)(r r' : I) : coeIsEquiv' A r r' = coeIsEquivNf A r r' :=
+  refl;
+
+coe01isEquivNf (A : I → U) : isEquiv (A 0) (A 1)  (λ x. coe 0 1 A x) :=
 
  (λ x. coe 1 0 A x
 
@@ -72,6 +95,9 @@ coe01isEquivnf (A : I → U) : isEquiv (A 0) (A 1)  (λ x. coe 0 1 A x) :=
 				                 ; k = 1 k1. coe 0 i A x] (coe 0 i A x))]
                     (coe 0 1 A x));
 
+coe01isEquivNfOK (A : I → U) : coe01isEquivNf A = coeIsEquiv A 0 1 :=
+  refl;
+
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
 
@@ -81,7 +107,7 @@ idEquiv (A : U) : equiv A A :=
 ua (A B : U)(f : equiv A B) : A = B :=
   λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
 
-uabeta (A B : U)(f : equiv A B) : (λ x. coe 0 1 (ua A B f) x) ={_.A → B} f.1 :=
+uabeta (A B : U)(f : equiv A B) : (λ x. coe 0 1 (ua A B f) x) ={_. A → B} f.1 :=
   λ i x. hcom 1 i [] (hcom i 1 [] (coe i 1 (i. B) (f.1 x)));
 
 pathToEquiv (A B : U)(p : A = B) : equiv A B :=
@@ -90,239 +116,242 @@ pathToEquiv (A B : U)(p : A = B) : equiv A B :=
 uaTrip (A B : U)(f : equiv A B) : equiv A B :=
   pathToEquiv A B (ua A B f);
 
-uaTripnf (A B : U)(f : equiv A B) : equiv A B :=
+uaTripNf (A B : U)(f : equiv A B) : equiv A B :=
 (λ x. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x))), λ x. hcom
 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))), λ x {x} {hcom 1 0 A []
 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
 (i. B) (f.1 x)))))))} j. hcom 0 1 A [j = 0 k. x; j = 1 k. hcom 1 0 A [k = 0
 i. f.2.2.1 x {x} {f.2.1 (f.1 x)} i] (f.2.1 (hcom k 0 B [] (coe k 0 (l. B) (hcom
-1 0 B [0 = k i. f.1 x; k = 0 i. f.1 x; k = 1 i. hcom 1 0 B [i = 0 i1. hcom 1 i1
-B [] (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x))); i = 1 i1. hcom 0 1 B [] (coe 0 1
+1 0 B [0 = k i. f.1 x; k = 0 j1. f.1 x; k = 1 j1. hcom 1 0 B [j1 = 0 i. hcom 1 i
+B [] (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x))); j1 = 1 i. hcom 0 1 B [] (coe 0 1
 (l. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x)))] (hcom 0 k B [] (coe 0
 k (l. B) (f.1 x)))))))] x, λ x {hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B)
 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))} {x} j. hcom
 1 0 B [j = 0 k. hcom 1 0 B [k = 1 i. x] (hcom k 1 B [] (coe k 1 (l. B) (hcom 1 0
-B [1 = k i. x; k = 0 i. hcom 1 0 B [i = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1
-0 B [] (coe 1 0 (l. B) x)))); i = 1 i1. hcom 1 0 B [] (coe 1 0 (l. B) x)]
+B [1 = k i. x; k = 0 j1. hcom 1 0 B [j1 = 0 i. f.1 (hcom 1 i A [] (f.2.1 (hcom 1
+0 B [] (coe 1 0 (l. B) x)))); j1 = 1 i. hcom 1 0 B [] (coe 1 0 (l. B) x)]
 (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
-0 (l. B) x)))} {hcom 1 0 B [] (coe 1 0 (l. B) x)} i); k = 1 i. x] (hcom 1 k B []
-(coe 1 k (l. B) x))))); j = 1 k. x] x, λ x {λ {hcom 1 0 B [] (hcom 0 1 B [] (coe
-0 1 (i. B) (f.1 x)))} {hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))}
-_. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))} {λ {hcom 1 0 B []
-(hcom 0 1 B [] (coe 0 1 (i. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
-0 (j. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))))))))))} {hcom
-1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))} j. hcom 1 0 B [j = 0 k. hcom
-1 0 B [k = 1 i. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i1. B) (f.1 x)))] (hcom k
-1 B [] (coe k 1 (l. B) (hcom 1 0 B [1 = k i. hcom 1 0 B [] (hcom 0 1 B [] (coe 0
-1 (i1. B) (f.1 x))); k = 0 i. hcom 1 0 B [i = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i2. B)
-(f.1 x)))))))); i = 1 i1. hcom 1 0 B [] (coe 1 0 (l. B) (hcom 1 0 B [] (hcom 0 1
-B [] (coe 0 1 (i2. B) (f.1 x)))))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l. B)
-(hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i1. B) (f.1 x)))))) {f.1 (f.2.1 (hcom 1
-0 B [] (coe 1 0 (l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i1. B) (f.1
-x)))))))} {hcom 1 0 B [] (coe 1 0 (l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
-(i1. B) (f.1 x)))))} i); k = 1 i. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i1. B)
-(f.1 x)))] (hcom 1 k B [] (coe 1 k (l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
-(i. B) (f.1 x))))))))); j = 1 k. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B)
-(f.1 x)))] (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x))))} l {hcom 1 0
-B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 (hcom 0 1 A [l = 0 k. x; l = 1 k. hcom
-1 0 A [k = 0 i. f.2.2.1 x {x} {f.2.1 (f.1 x)} i] (f.2.1 (hcom k 0 B [] (coe k 0
-(l1. B) (hcom 1 0 B [0 = k i. f.1 x; k = 0 i. f.1 x; k = 1 i. hcom 1 0 B [i = 0
-i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); i = 1 i1. hcom 0 1
-B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x)))] (hcom
-0 k B [] (coe 0 k (l1. B) (f.1 x)))))))] x))))} {hcom 1 0 B [] (hcom 0 1 B []
-(coe 0 1 (i. B) (f.1 x)))} k. hcom 0 1 B [k = 0 i. hcom 1 0 B [i = 1 i1. hcom 1
-0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 (hcom 0 1 A [l = 0 k1. x; l = 1
-k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 x {x} {f.2.1 (f.1 x)} i2] (f.2.1 (hcom k1 0 B
-[] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 i2. f.1 x; k1 = 1
-i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0
-1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))))] x))))]
-(hcom i 1 B [] (coe i 1 (j. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0 i1. f.1 x; i
-= 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (j. B)
-(f.1 (hcom 0 1 A [l = 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i3. f.2.2.1 x {x}
-{f.2.1 (f.1 x)} i3] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
-i3. f.1 x; k1 = 0 i3. f.1 x; k1 = 1 i3. hcom 1 0 B [i3 = 0 i4. hcom 1 i4 B []
-(hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); i3 = 1 i4. hcom 0 1 B [] (coe 0 1
+0 (l. B) x)))} {hcom 1 0 B [] (coe 1 0 (l. B) x)} j1); k = 1 j1. x] (hcom 1 k B
+[] (coe 1 k (l. B) x))))); j = 1 k. x] x, λ x {λ {hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (i. B) (f.1 x)))} {hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1
+x)))} _. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))} {λ {hcom 1 0 B
+[] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
+1 0 (j. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))))))))))}
+{hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))} j. hcom 1 0 B [j = 0
+k. hcom 1 0 B [k = 1 i. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i1. B) (f.1 x)))]
+(hcom k 1 B [] (coe k 1 (l. B) (hcom 1 0 B [1 = k i. hcom 1 0 B [] (hcom 0 1 B
+[] (coe 0 1 (i1. B) (f.1 x))); k = 0 j1. hcom 1 0 B [j1 = 0 i. f.1 (hcom 1 i A
+[] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
+(i1. B) (f.1 x)))))))); j1 = 1 i. hcom 1 0 B [] (coe 1 0 (l. B) (hcom 1 0 B []
+(hcom 0 1 B [] (coe 0 1 (i1. B) (f.1 x)))))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))))) {f.1 (f.2.1
+(hcom 1 0 B [] (coe 1 0 (l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B)
+(f.1 x)))))))} {hcom 1 0 B [] (coe 1 0 (l. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe
+0 1 (i. B) (f.1 x)))))} j1); k = 1 j1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
+(i. B) (f.1 x)))] (hcom 1 k B [] (coe 1 k (l. B) (hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (i. B) (f.1 x))))))))); j = 1 k. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
+(i. B) (f.1 x)))] (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x))))} l
+{hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 (hcom 0 1 A [l = 0 k. x; l =
+1 k. hcom 1 0 A [k = 0 i. f.2.2.1 x {x} {f.2.1 (f.1 x)} i] (f.2.1 (hcom k 0 B []
+(coe k 0 (l1. B) (hcom 1 0 B [0 = k i. f.1 x; k = 0 j. f.1 x; k = 1 j. hcom 1 0
+B [j = 0 i. hcom 1 i B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j = 1
+i. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+x)))] (hcom 0 k B [] (coe 0 k (l1. B) (f.1 x)))))))] x))))} {hcom 1 0 B [] (hcom
+0 1 B [] (coe 0 1 (i. B) (f.1 x)))} k. hcom 0 1 B [k = 0 i. hcom 1 0 B [i = 1
+i1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 (hcom 0 1 A [l = 0 k1. x;
+l = 1 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 x {x} {f.2.1 (f.1 x)} i2] (f.2.1 (hcom
+k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 j. f.1 x; k1 =
+1 j. hcom 1 0 B [j = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+x))); j = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1
+(l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))))] x))))] (hcom
+i 1 B [] (coe i 1 (i1. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0 j. f.1 x; i = 1
+j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1
+(hcom 0 1 A [l = 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 x {x} {f.2.1
+(f.1 x)} i2] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
+i2. f.1 x; k1 = 0 j1. f.1 x; k1 = 1 j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B []
+(hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1
 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x)))] (hcom 0 k1 B []
-(coe 0 k1 (l1. B) (f.1 x)))))))] x)))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1 (j. B)
-(f.1 (hcom 0 1 A [l = 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i3. f.2.2.1 x {x}
-{f.2.1 (f.1 x)} i3] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
-i3. f.1 x; k1 = 0 i3. f.1 x; k1 = 1 i3. hcom 1 0 B [i3 = 0 i4. hcom 1 i4 B []
-(hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); i3 = 1 i4. hcom 0 1 B [] (coe 0 1
+(coe 0 k1 (l1. B) (f.1 x)))))))] x)))); j = 1 i1. hcom 0 1 B [] (coe 0 1 (j1. B)
+(f.1 (hcom 0 1 A [l = 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 x {x}
+{f.2.1 (f.1 x)} i2] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
+i2. f.1 x; k1 = 0 j1. f.1 x; k1 = 1 j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B []
+(hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1
 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x)))] (hcom 0 k1 B []
-(coe 0 k1 (l1. B) (f.1 x)))))))] x)))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 (hcom
-0 1 A [l = 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 x {x} {f.2.1 (f.1
-x)} i2] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x;
-k1 = 0 i2. f.1 x; k1 = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B
-[] (coe 0 1 (l1. B) (f.1 x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-x))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1
-(l1. B) (f.1 x)))))))] x))))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 (hcom 0 i A [l
-= 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i1. f.2.2.1 x {x} {f.2.1 (f.1 x)} i1]
-(f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i1. f.1 x; k1 = 0
-i1. f.1 x; k1 = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe
-0 1 (l1. B) (f.1 x))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom
-0 1 B [] (coe 0 1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1
-x)))))))] x))))))); k = 1 i. hcom 1 0 B [i = 1 i1. hcom 1 0 B [] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x)))] (hcom i 1 B [] (coe i 1 (j. B) (hcom 1 0 B [0 = i
-i1. f.1 x; i = 0 i1. f.1 x; i = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0
-i (j. B) (f.1 x)))))); l = 0 i. hcom 1 0 B [i = 1 i1. hcom 1 0 B [] (hcom 0 1 B
-[] (coe 0 1 (j. B) (f.1 x)))] (hcom i 1 B [] (coe i 1 (j. B) (hcom 1 0 B [0 = i
-i1. f.1 x; i = 0 i1. f.1 x; i = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0
-i (j. B) (f.1 x)))))); l = 1 i. hcom 1 0 B [i = 1 i1. hcom 1 0 B [k = 0 k1. hcom
-1 0 B [k1 = 1 i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom
-k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. hcom 1 0 B [] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x))); k1 = 0 i2. hcom 1 0 B [i2 = 0 i3. f.1 (hcom 1 i3 A []
+(coe 0 k1 (l1. B) (f.1 x)))))))] x)))] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1
+(hcom 0 1 A [l = 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i1. f.2.2.1 x {x} {f.2.1
+(f.1 x)} i1] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
+i1. f.1 x; k1 = 0 j1. f.1 x; k1 = 1 j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B []
+(hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1
+(l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x)))] (hcom 0 k1 B []
+(coe 0 k1 (l1. B) (f.1 x)))))))] x))))] (hcom 0 i B [] (coe 0 i (j. B) (f.1
+(hcom 0 i A [l = 0 k1. x; l = 1 k1. hcom 1 0 A [k1 = 0 i1. f.2.2.1 x {x} {f.2.1
+(f.1 x)} i1] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
+i1. f.1 x; k1 = 0 j. f.1 x; k1 = 1 j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [] (hcom
+0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j = 1 i1. hcom 0 1 B [] (coe 0 1 (l1. B)
+(f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1
+(l1. B) (f.1 x)))))))] x))))))); k = 1 i. hcom 1 0 B [i = 1 i1. hcom 1 0 B []
+(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom i 1 B [] (coe i 1 (i1. B) (hcom
+1 0 B [0 = i i1. f.1 x; i = 0 j. f.1 x; i = 1 j. hcom 1 0 B [j = 0 i1. hcom 1 i1
+B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))); j = 1 i1. hcom 0 1 B [] (coe 0 1
+(j1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))] (hcom 0 i B [] (coe
+0 i (j. B) (f.1 x)))))); l = 0 i. hcom 1 0 B [i = 1 i1. hcom 1 0 B [] (hcom 0 1
+B [] (coe 0 1 (j. B) (f.1 x)))] (hcom i 1 B [] (coe i 1 (i1. B) (hcom 1 0 B [0 =
+i i1. f.1 x; i = 0 j. f.1 x; i = 1 j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [] (hcom
+0 1 B [] (coe 0 1 (j1. B) (f.1 x))); j = 1 i1. hcom 0 1 B [] (coe 0 1 (j1. B)
+(f.1 x))] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i
+(j. B) (f.1 x)))))); l = 1 i. hcom 1 0 B [i = 1 i1. hcom 1 0 B [k = 0 k1. hcom 1
+0 B [k1 = 1 i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom k1
+1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (j. B) (f.1 x))); k1 = 0 j. hcom 1 0 B [j = 0 i2. f.1 (hcom 1 i2 A []
 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x)))))))); i2 = 1 i3. hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B)
+(j1. B) (f.1 x)))))))); j = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B []
+(hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))))) {f.1 (f.2.1
+(hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B)
 (f.1 x)))))))} {hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x)))))} i2); k1 = 1 i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0
-1 (j. B) (f.1 x)))] (hcom 1 k1 B [] (coe 1 k1 (l1. B) (hcom 1 0 B [] (hcom 0 1 B
-[] (coe 0 1 (j. B) (f.1 x))))))))); k = 1 k1. hcom 1 0 B [] (hcom 0 1 B [] (coe
-0 1 (j. B) (f.1 x)))] (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))))]
-(hcom i 1 B [] (coe i 1 (j. B) (hcom i 0 B [k = 0 k1. hcom 1 0 B [k1 = i
-i1. hcom 1 0 B [0 = i i2. f.1 x; i = 0 i2. f.1 x; i = 1 i2. hcom 1 0 B [i2 = 0
-i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i2 = 1 i3. hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0
-i B [] (coe 0 i (j. B) (f.1 x))); i = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1
-i2 A [k1 = 0 i3. f.2.2.1 x {x} {f.2.1 (f.1 x)} i3] (f.2.1 (hcom k1 0 B [] (coe
-k1 0 (l1. B) (hcom 1 0 B [0 = k1 i3. f.1 x; k1 = 0 i3. f.1 x; k1 = 1 i3. hcom 1
-0 B [i3 = 0 i4. hcom 1 i4 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); i3 = 1
-i4. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B)
-(f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))))); i1 = 1 i2. hcom k1
-0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i3. f.1 x; k1 = 0 i3. f.1 x; k1 = 1
-i3. hcom 1 0 B [i3 = 0 i4. hcom 1 i4 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-x))); i3 = 1 i4. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0
+(coe 0 1 (j1. B) (f.1 x)))))} j); k1 = 1 j. hcom 1 0 B [] (hcom 0 1 B [] (coe 0
+1 (j1. B) (f.1 x)))] (hcom 1 k1 B [] (coe 1 k1 (l1. B) (hcom 1 0 B [] (hcom 0 1
+B [] (coe 0 1 (j. B) (f.1 x))))))))); k = 1 k1. hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (j. B) (f.1 x)))] (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1
+x))))] (hcom i 1 B [] (coe i 1 (i1. B) (hcom i 0 B [k = 0 k1. hcom 1 0 B [k1 = i
+i1. hcom 1 0 B [0 = i i2. f.1 x; i = 0 j. f.1 x; i = 1 j. hcom 1 0 B [j = 0
+i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))); j = 1 i2. hcom 0 1
+B [] (coe 0 1 (j1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))] (hcom
+0 i B [] (coe 0 i (j. B) (f.1 x))); i = 0 j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1
+i1 A [k1 = 0 i2. f.2.2.1 x {x} {f.2.1 (f.1 x)} i2] (f.2.1 (hcom k1 0 B [] (coe
+k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 j1. f.1 x; k1 = 1 j1. hcom 1
+0 B [j1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j1 = 1
+i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B)
+(f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))))); j = 1 i1. hcom k1 0
+B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 j1. f.1 x; k1 = 1
+j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+x))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0
 1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x))))); k1 = 0
-i2. f.2.2.2.2 x {λ {f.1 x} {f.1 x} _. f.1 x} {f.2.2.2.1 (f.1 x)} i2 {f.1
-(f.2.2.1 x {x} {f.2.1 (f.1 x)} i2)} {f.1 x} i1] (f.2.2.2.1 (hcom k1 0 B [] (coe
-k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 i2. f.1 x; k1 = 1 i2. hcom 1
-0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); i2 = 1
-i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B)
+i1. f.2.2.2.2 x {λ {f.1 x} {f.1 x} _. f.1 x} {f.2.2.2.1 (f.1 x)} i1 {f.1
+(f.2.2.1 x {x} {f.2.1 (f.1 x)} i1)} {f.1 x} j] (f.2.2.2.1 (hcom k1 0 B [] (coe
+k1 0 (l1. B) (hcom 1 0 B [0 = k1 i1. f.1 x; k1 = 0 j1. f.1 x; k1 = 1 j1. hcom 1
+0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j1 = 1
+i1. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B)
 (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))) {f.1 (f.2.1 (hcom k1 0
-B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 i2. f.1 x; k1 = 1
-i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0
+B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i1. f.1 x; k1 = 0 j1. f.1 x; k1 = 1
+j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+x))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0
 1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))))} {hcom k1 0
-B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 i2. f.1 x; k1 = 1
-i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0
-1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))} i1); i = 1
-i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [k1 = 1 i3. hcom 1 0 B [] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x)))] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1
-i3. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); k1 = 0 i3. hcom 1 0
-B [i3 = 0 i4. f.1 (hcom 1 i4 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1
-0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))); i3 = 1 i4. hcom 1 0 B []
-(coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))]
+B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i1. f.1 x; k1 = 0 j1. f.1 x; k1 = 1
+j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+x))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0
+1 (l1. B) (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x)))))} j); i = 1
+j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [k1 = 1 i2. hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (j1. B) (f.1 x)))] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 =
+k1 i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))); k1 = 0 j1. hcom
+1 0 B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B)
+(hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))))); j1 = 1 i2. hcom 1
+0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1
+x)))))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (j2. B) (f.1 x)))))) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom
+1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))))} {hcom 1 0 B [] (coe 1 0
+(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))} j1); k1 = 1
+j1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))] (hcom 1 k1 B []
+(coe 1 k1 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1
+x))))))))); j = 1 i1. hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1
+i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))); k1 = 0 j1. hcom 1 0
+B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1
+0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))))); j1 = 1 i2. hcom 1 0 B []
+(coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))]
 (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0
-1 (j. B) (f.1 x)))))) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))} {hcom 1 0 B [] (coe 1 0 (l1. B)
-(hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))} i3); k1 = 1 i3. hcom
-1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 1 k1 B [] (coe 1 k1
-(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))))))))); i1 = 1
-i2. hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i3. hcom 1 0 B [] (hcom
-0 1 B [] (coe 0 1 (j. B) (f.1 x))); k1 = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom
-1 i4 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x)))))))); i3 = 1 i4. hcom 1 0 B [] (coe 1 0 (l1. B) (hcom
-1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))] (f.2.2.2.1 (hcom 1 0 B []
-(coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))) {f.1
+1 (j2. B) (f.1 x)))))) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B
+[] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))))} {hcom 1 0 B [] (coe 1 0
+(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))} j1); k1 = 1
+j1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))] (hcom 1 k1 B []
+(coe 1 k1 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))))))));
+k1 = 1 i1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))] (hcom k1 1 B
+[] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0
+1 (j1. B) (f.1 x))); k1 = 0 j1. hcom 1 0 B [j1 = 0 i1. f.1 (hcom 1 i1 A []
 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x)))))))} {hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B
-[] (coe 0 1 (j. B) (f.1 x)))))} i3); k1 = 1 i3. hcom 1 0 B [] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x)))] (hcom 1 k1 B [] (coe 1 k1 (l1. B) (hcom 1 0 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))); k1 = 1 i2. hcom 1 0 B [] (hcom 0
-1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B
-[1 = k1 i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); k1 = 0
-i2. hcom 1 0 B [i2 = 0 i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B)
-(f.1 x)))))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x)))))) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B)
-(hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))} {hcom 1 0 B [] (coe
-1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))} i2); k1 =
-1 i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 1 k1 B []
-(coe 1 k1 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))))]
-(hcom k1 i B [] (coe k1 i (l1. B) (hcom 1 0 B [i = k1 i1. hcom 1 0 B [0 = i
-i2. f.1 x; i = 0 i2. f.1 x; i = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0
-i (j. B) (f.1 x))); k1 = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A [i = 0
-i3. f.2.2.1 x {x} {f.2.1 (f.1 x)} i3] (f.2.1 (hcom i 0 B [] (coe i 0 (l1. B)
-(hcom 1 0 B [0 = i i3. f.1 x; i = 0 i3. f.1 x; i = 1 i3. hcom 1 0 B [i3 = 0
-i4. hcom 1 i4 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i3 = 1 i4. hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0
-i B [] (coe 0 i (j. B) (f.1 x)))))))); i1 = 1 i2. hcom i 0 B [] (coe i 0 (l1. B)
-(hcom 1 0 B [0 = i i3. f.1 x; i = 0 i3. f.1 x; i = 1 i3. hcom 1 0 B [i3 = 0
-i4. hcom 1 i4 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i3 = 1 i4. hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0
-i B [] (coe 0 i (j. B) (f.1 x))))); i = 0 i2. f.2.2.2.2 x {λ {f.1 x} {f.1 x}
-_. f.1 x} {f.2.2.2.1 (f.1 x)} i2 {f.1 (f.2.2.1 x {x} {f.2.1 (f.1 x)} i2)} {f.1
-x} i1] (f.2.2.2.1 (hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [0 = i i2. f.1 x;
-i = 0 i2. f.1 x; i = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))]
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1
-x)))))) {f.1 (f.2.1 (hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [0 = i i2. f.1
-x; i = 0 i2. f.1 x; i = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B
-[] (coe 0 1 (j. B) (f.1 x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))]
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1
-x)))))))} {hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [0 = i i2. f.1 x; i = 0
-i2. f.1 x; i = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0
-1 (j. B) (f.1 x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 x)))))} i1);
-k1 = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [i = 1 i3. hcom 1 0 B [] (hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x)))] (hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [0 =
-i i3. f.1 x; i = 0 i3. f.1 x; i = 1 i3. hcom 1 0 B [i3 = 0 i4. hcom 1 i4 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i3 = 1 i4. hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0
-i (j. B) (f.1 x)))))); i1 = 1 i2. hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [0
-= i i3. f.1 x; i = 0 i3. f.1 x; i = 1 i3. hcom 1 0 B [i3 = 0 i4. hcom 1 i4 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i3 = 1 i4. hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0
-i (j. B) (f.1 x))))); i = 1 i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B)
-(f.1 x)))] (hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [0 = i i2. f.1 x; i = 0
-i2. f.1 x; i = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0
-1 (j. B) (f.1 x))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 x))))))]
-(hcom i k1 B [] (coe i k1 (l1. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0 i1. f.1 x;
-i = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (j. B)
-(f.1 x))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1 B []
-(coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 x))))))))); k = 1
-k1. hcom 1 0 B [0 = i i1. f.1 x; i = 0 i1. f.1 x; i = 1 i1. hcom 1 0 B [i1 = 0
-i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); i1 = 1 i2. hcom 0 1
-B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 0
-i B [] (coe 0 i (j. B) (f.1 x))); i = 0 i1. f.1 (hcom 0 i1 A [k = 0 k1. hcom 1 0
-A [k1 = 0 i2. f.2.2.1 x {x} {f.2.1 (f.1 x)} i2] (f.2.1 (hcom k1 0 B [] (coe k1 0
-(l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 i2. f.1 x; k1 = 1 i2. hcom 1 0 B
-[i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); i2 = 1
-i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B)
+(j2. B) (f.1 x)))))))); j1 = 1 i1. hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B []
+(hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))))) {f.1 (f.2.1
+(hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j2. B)
+(f.1 x)))))))} {hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (j2. B) (f.1 x)))))} j1); k1 = 1 j1. hcom 1 0 B [] (hcom 0 1 B [] (coe
+0 1 (j2. B) (f.1 x)))] (hcom 1 k1 B [] (coe 1 k1 (l1. B) (hcom 1 0 B [] (hcom 0
+1 B [] (coe 0 1 (j1. B) (f.1 x)))))))))] (hcom k1 i B [] (coe k1 i (l1. B) (hcom
+1 0 B [i = k1 i1. hcom 1 0 B [0 = i i2. f.1 x; i = 0 j. f.1 x; i = 1 j. hcom 1 0
+B [j = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))); j = 1
+i2. hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j1. B)
+(f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 x))); k1 = 0 j. hcom 1 0 B [j = 0
+i1. f.1 (hcom 1 i1 A [i = 0 i2. f.2.2.1 x {x} {f.2.1 (f.1 x)} i2] (f.2.1 (hcom i
+0 B [] (coe i 0 (l1. B) (hcom 1 0 B [0 = i i2. f.1 x; i = 0 j1. f.1 x; i = 1
+j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1
+x))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))] (hcom 0 1 B [] (coe 0
+1 (j2. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j1. B) (f.1 x)))))))); j = 1
+i1. hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [0 = i i2. f.1 x; i = 0 j1. f.1
+x; i = 1 j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1
+(j2. B) (f.1 x))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))] (hcom 0 1
+B [] (coe 0 1 (j2. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j1. B) (f.1 x))))); i
+= 0 i1. f.2.2.2.2 x {λ {f.1 x} {f.1 x} _. f.1 x} {f.2.2.2.1 (f.1 x)} i1 {f.1
+(f.2.2.1 x {x} {f.2.1 (f.1 x)} i1)} {f.1 x} j] (f.2.2.2.1 (hcom i 0 B [] (coe i
+0 (l1. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0 j1. f.1 x; i = 1 j1. hcom 1 0 B
+[j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))); j1 = 1
+i1. hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j2. B)
+(f.1 x)))] (hcom 0 i B [] (coe 0 i (j1. B) (f.1 x)))))) {f.1 (f.2.1 (hcom i 0 B
+[] (coe i 0 (l1. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0 j1. f.1 x; i = 1
+j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1
+x))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))] (hcom 0 1 B [] (coe 0
+1 (j2. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j1. B) (f.1 x)))))))} {hcom i 0 B
+[] (coe i 0 (l1. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0 j1. f.1 x; i = 1
+j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1
+x))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))] (hcom 0 1 B [] (coe 0
+1 (j2. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j1. B) (f.1 x)))))} j); k1 = 1
+j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [i = 1 i2. hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (j1. B) (f.1 x)))] (hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [0 = i
+i2. f.1 x; i = 0 j1. f.1 x; i = 1 j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B []
+(hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1
+(j2. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))] (hcom 0 i B [] (coe
+0 i (j1. B) (f.1 x)))))); j = 1 i1. hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B
+[0 = i i2. f.1 x; i = 0 j1. f.1 x; i = 1 j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B
+[] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1
+(j2. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x)))] (hcom 0 i B [] (coe
+0 i (j1. B) (f.1 x))))); i = 1 i1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B)
+(f.1 x)))] (hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0
+j1. f.1 x; i = 1 j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0
+1 (j2. B) (f.1 x))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1 (j2. B) (f.1 x))] (hcom 0
+1 B [] (coe 0 1 (j2. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j1. B) (f.1 x))))))]
+(hcom i k1 B [] (coe i k1 (l1. B) (hcom 1 0 B [0 = i i1. f.1 x; i = 0 j. f.1 x;
+i = 1 j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (j1. B)
+(f.1 x))); j = 1 i1. hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))] (hcom 0 1 B []
+(coe 0 1 (j1. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 x))))))))); k =
+1 k1. hcom 1 0 B [0 = i i1. f.1 x; i = 0 j. f.1 x; i = 1 j. hcom 1 0 B [j = 0
+i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))); j = 1 i1. hcom 0 1
+B [] (coe 0 1 (j1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))] (hcom
+0 i B [] (coe 0 i (j. B) (f.1 x))); i = 0 i1. f.1 (hcom 0 i1 A [k = 0 k1. hcom 1
+0 A [k1 = 0 i2. f.2.2.1 x {x} {f.2.1 (f.1 x)} i2] (f.2.1 (hcom k1 0 B [] (coe k1
+0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 x; k1 = 0 j. f.1 x; k1 = 1 j. hcom 1 0 B
+[j = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))); j = 1
+i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l1. B)
 (f.1 x)))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 x))))))); k = 1 k1. x] x); i =
 1 i1. hcom 1 i1 B [k = 0 k1. hcom 1 0 B [k1 = 1 i2. hcom 1 0 B [] (hcom 0 1 B []
 (coe 0 1 (j. B) (f.1 x)))] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1
-i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); k1 = 0 i2. hcom 1 0
-B [i2 = 0 i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1
-0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))); i2 = 1 i3. hcom 1 0 B []
-(coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))]
+i2. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))); k1 = 0 j. hcom 1 0 B
+[j = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0
+B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))))))); j = 1 i2. hcom 1 0 B []
+(coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))))]
 (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0
-1 (j. B) (f.1 x)))))) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B []
-(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))))} {hcom 1 0 B [] (coe 1 0 (l1. B)
-(hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))))} i2); k1 = 1 i2. hcom
-1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 1 k1 B [] (coe 1 k1
-(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))))))))); k = 1
-k1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 1 0 B [] (hcom
-0 1 B [] (coe 0 1 (j. B) (f.1 x))))] (hcom 1 0 B [0 = i i1. f.1 x; i = 0 i1. f.1
-x; i = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1
-(j. B) (f.1 x))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))] (hcom 0 1 B
-[] (coe 0 1 (j. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 x)))))))]
+1 (j1. B) (f.1 x)))))) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) (hcom 1 0 B
+[] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))))))} {hcom 1 0 B [] (coe 1 0
+(l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))))} j); k1 = 1
+j. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x)))] (hcom 1 k1 B [] (coe
+1 k1 (l1. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))))))))); k =
+1 k1. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x)))] (hcom 1 0 B []
+(hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))))] (hcom 1 0 B [0 = i i1. f.1 x; i = 0
+j. f.1 x; i = 1 j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1
+(j1. B) (f.1 x))); j = 1 i1. hcom 0 1 B [] (coe 0 1 (j1. B) (f.1 x))] (hcom 0 1
+B [] (coe 0 1 (j1. B) (f.1 x)))] (hcom 0 i B [] (coe 0 i (j. B) (f.1 x)))))))]
 (hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (i. B) (f.1 x)))));
 
-
+-- BUT THIS FAILS, and both sides re-typecheck!
+uaTripNfOK (A B : U)(f : equiv A B) : uaTrip A B f ={_. equiv A B} uaTripNf A B f :=
+  refl;
 
 pathToEquiv' (A B : U)(p : A = B) : equiv B A :=
   (λ x. coe 1 0 p x, coeIsEquiv (λ i. p i) 1 0);
@@ -330,21 +359,21 @@ pathToEquiv' (A B : U)(p : A = B) : equiv B A :=
 uaTrip' (A B : U)(f : equiv A B) : equiv B A :=
   pathToEquiv' A B (ua A B f);
 
-uaTripnf' (A B : U)(f : equiv A B) : equiv B A :=
+uaTripNf' (A B : U)(f : equiv A B) : equiv B A :=
 (λ x. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) x))), λ
 x. hcom 1 0 B [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 x))), λ x {x} {hcom 1 0 B
 [] (hcom 0 1 B [] (coe 0 1 (j. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
 1 0 (i. B) x)))))))} j. hcom 1 0 B [j = 0 k. x; j = 1 k. hcom 1 0 B [k = 1 i. x]
-(hcom k 1 B [] (coe k 1 (l. B) (hcom 1 0 B [1 = k i. x; k = 0 i. hcom 1 0 B [i =
-0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l. B) x)))); i = 1
-i1. hcom 1 0 B [] (coe 1 0 (l. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l. B)
+(hcom k 1 B [] (coe k 1 (l. B) (hcom 1 0 B [1 = k i. x; k = 0 j1. hcom 1 0 B [j1
+= 0 i. f.1 (hcom 1 i A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l. B) x)))); j1 = 1
+i. hcom 1 0 B [] (coe 1 0 (l. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l. B)
 x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l. B) x)))} {hcom 1 0 B [] (coe 1 0
-(l. B) x)} i); k = 1 i. x] (hcom 1 k B [] (coe 1 k (l. B) x)))))] x, λ x {hcom 1
-0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) (hcom 1 0 B [] (hcom 0 1 B [] (coe
-0 1 (j. B) (f.1 x)))))))} {x} j. hcom 0 1 A [j = 0 k. hcom 1 0 A [k = 0
+(l. B) x)} j1); k = 1 j1. x] (hcom 1 k B [] (coe 1 k (l. B) x)))))] x, λ x {hcom
+1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) (hcom 1 0 B [] (hcom 0 1 B []
+(coe 0 1 (j. B) (f.1 x)))))))} {x} j. hcom 0 1 A [j = 0 k. hcom 1 0 A [k = 0
 i. f.2.2.1 x {x} {f.2.1 (f.1 x)} i] (f.2.1 (hcom k 0 B [] (coe k 0 (l. B) (hcom
-1 0 B [0 = k i. f.1 x; k = 0 i. f.1 x; k = 1 i. hcom 1 0 B [i = 0 i1. hcom 1 i1
-B [] (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x))); i = 1 i1. hcom 0 1 B [] (coe 0 1
+1 0 B [0 = k i. f.1 x; k = 0 j1. f.1 x; k = 1 j1. hcom 1 0 B [j1 = 0 i. hcom 1 i
+B [] (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x))); j1 = 1 i. hcom 0 1 B [] (coe 0 1
 (l. B) (f.1 x))] (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 x)))] (hcom 0 k B [] (coe 0
 k (l. B) (f.1 x))))))); j = 1 k. x] x, λ x {λ {hcom 1 0 A [] (f.2.1 (hcom 1 0 B
 [] (coe 1 0 (i. B) x)))} {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B)
@@ -356,382 +385,310 @@ k. hcom 1 0 A [k = 0 i. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
 (i1. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i1. B) x)))} {f.2.1
 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i1. B) x)))))} i] (f.2.1
 (hcom k 0 B [] (coe k 0 (l. B) (hcom 1 0 B [0 = k i. f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (i1. B) x)))); k = 0 i. f.1 (hcom 1 0 A [] (f.2.1 (hcom
-1 0 B [] (coe 1 0 (i1. B) x)))); k = 1 i. hcom 1 0 B [i = 0 i1. hcom 1 i1 B []
+(hcom 1 0 B [] (coe 1 0 (i1. B) x)))); k = 0 j1. f.1 (hcom 1 0 A [] (f.2.1 (hcom
+1 0 B [] (coe 1 0 (i. B) x)))); k = 1 j1. hcom 1 0 B [j1 = 0 i. hcom 1 i B []
 (hcom 0 1 B [] (coe 0 1 (l. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
-0 (i2. B) x))))))); i = 1 i1. hcom 0 1 B [] (coe 0 1 (l. B) (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (i2. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l. B)
-(f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i1. B) x)))))))] (hcom 0 k B
+0 (i1. B) x))))))); j1 = 1 i. hcom 0 1 B [] (coe 0 1 (l. B) (f.1 (hcom 1 0 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (i1. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l. B)
+(f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) x)))))))] (hcom 0 k B
 [] (coe 0 k (l. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B)
 x))))))))))); j = 1 k. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) x)))]
 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) x))))} l {hcom 1 0 A []
 (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) (hcom 1 0 B [l = 0 k. x; l = 1 k. hcom 1 0
 B [k = 1 i. x] (hcom k 1 B [] (coe k 1 (l1. B) (hcom 1 0 B [1 = k i. x; k = 0
-i. hcom 1 0 B [i = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) x)))); i = 1 i1. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0
+j. hcom 1 0 B [j = 0 i. f.1 (hcom 1 i A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(l1. B) x)))); j = 1 i. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0
 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))}
-{hcom 1 0 B [] (coe 1 0 (l1. B) x)} i); k = 1 i. x] (hcom 1 k B [] (coe 1 k
+{hcom 1 0 B [] (coe 1 0 (l1. B) x)} j); k = 1 j. x] (hcom 1 k B [] (coe 1 k
 (l1. B) x)))))] x))))} {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B)
 x)))} k. hcom 1 0 A [k = 0 i. hcom 1 0 A [i = 0 i1. f.2.2.1 (hcom 1 0 A []
 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1
 0 B [k1 = 1 i2. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x;
-k1 = 0 i2. hcom 1 0 B [i2 = 0 i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe
-1 0 (l1. B) x)))); i2 = 1 i3. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1
-(hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B)
-x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i2); k1 = 1 i2. x] (hcom 1 k1 B []
-(coe 1 k1 (l1. B) x)))))] x))))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1
-B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 i2. hcom 1 0 B [i2 = 0
-i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B []
-(coe 1 0 (l1. B) x)} i2); k1 = 1 i2. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B)
-x)))))] x))))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
+k1 = 0 j. hcom 1 0 B [j = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1
+0 (l1. B) x)))); j = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1
+0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (l1. B) x)} j); k1 = 1 j. x] (hcom 1 k1 B [] (coe 1 k1
+(l1. B) x)))))] x))))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
 (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1 B []
-(coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 i2. hcom 1 0 B [i2 = 0
-i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 j. hcom 1 0 B [j = 0 i2. f.1
+(hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); j = 1 i2. hcom 1 0
+B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)}
+j); k1 = 1 j. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))] x))))} {f.2.1 (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k1. x; l
+= 1 k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B
+[1 = k1 i2. x; k1 = 0 j. hcom 1 0 B [j = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom
+1 0 B [] (coe 1 0 (l1. B) x)))); j = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)]
+(f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
+0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} j); k1 = 1 j. x] (hcom 1 k1
+B [] (coe 1 k1 (l1. B) x)))))] x))))))} i1] (f.2.1 (hcom i 0 B [] (coe i 0
+(i1. B) (hcom 1 0 B [1 = i i1. x; i = 0 j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1 i1
+A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) (hcom 1 0 B [l = 0 k1. x; l = 1
+k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 =
+k1 i2. x; k1 = 0 j1. hcom 1 0 B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0
+B [] (coe 1 0 (l1. B) x)))); j1 = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)]
+(f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
+0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} j1); k1 = 1 j1. x] (hcom 1
+k1 B [] (coe 1 k1 (l1. B) x)))))] x))))); j = 1 i1. hcom 1 0 B [] (coe 1 0
+(j1. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1
+B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 j1. hcom 1 0 B [j1 = 0
+i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); j1 = 1
+i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B []
-(coe 1 0 (l1. B) x)} i2); k1 = 1 i2. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B)
-x)))))] x))))))} i1] (f.2.1 (hcom i 0 B [] (coe i 0 (i1. B) (unglue (glue (hcom
-1 0 B [1 = i i1. x; i = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B
-[k1 = 1 i3. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i3. x; k1 =
-0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom 1 i4 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) x)))); i3 = 1 i4. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1
-0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))}
-{hcom 1 0 B [] (coe 1 0 (l1. B) x)} i3); k1 = 1 i3. x] (hcom 1 k1 B [] (coe 1 k1
-(l1. B) x)))))] x))))); i1 = 1 i2. hcom 1 0 B [] (coe 1 0 (j. B) (hcom 1 0 B [l
-= 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i3. x] (hcom k1 1 B [] (coe k1 1 (l1. B)
-(hcom 1 0 B [1 = k1 i3. x; k1 = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom 1 i4 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i3 = 1 i4. hcom 1 0 B [] (coe 1 0
-(l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0
-B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i3); k1 = 1
-i3. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))] x))] (f.2.2.2.1 (hcom 1 0 B []
-(coe 1 0 (j. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i2. x]
-(hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 i2. hcom 1 0
-B [i2 = 0 i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x))));
-i2 = 1 i3. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B []
-(coe 1 0 (l1. B) x)} i2); k1 = 1 i2. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B)
-x)))))] x))) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) (hcom 1 0 B [l = 0
-k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1 B [] (coe k1 1 (l1. B)
-(hcom 1 0 B [1 = k1 i2. x; k1 = 0 i2. hcom 1 0 B [i2 = 0 i3. f.1 (hcom 1 i3 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i2 = 1 i3. hcom 1 0 B [] (coe 1 0
-(l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0
-B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i2); k1 = 1
-i2. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))] x))))} {hcom 1 0 B [] (coe 1 0
-(j. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1
-B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 i2. hcom 1 0 B [i2 = 0
-i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B []
-(coe 1 0 (l1. B) x)} i2); k1 = 1 i2. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B)
-x)))))] x))} i1); i = 1 i1. x] (hcom 1 i B [] (coe 1 i (j. B) (hcom 1 i B [l = 0
+(coe 1 0 (l1. B) x)} j1); k1 = 1 j1. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B)
+x)))))] x))] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) (hcom 1 0 B [l = 0
 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i1. x] (hcom k1 1 B [] (coe k1 1 (l1. B)
-(hcom 1 0 B [1 = k1 i1. x; k1 = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe 1 0
+(hcom 1 0 B [1 = k1 i1. x; k1 = 0 j1. hcom 1 0 B [j1 = 0 i1. f.1 (hcom 1 i1 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); j1 = 1 i1. hcom 1 0 B [] (coe 1 0
 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0
-B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i1); k1 = 1
-i1. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))] x)))) [i = 0. A, f; i = 1. B, λ
-x1. x1, λ x1. x1, λ x1 {x1} {x1} _. x1, λ x1 {x1} {x1} _. x1, λ x1 {λ {x1} {x1}
-_. x1} {λ {x1} {x1} _. x1} _ {x1} {x1} _. x1] [i = 0. hcom 1 0 A [] (f.2.1 (hcom
-1 0 B [] (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1
-i1. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i1. x; k1 = 0
-i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1
-0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))}
-{hcom 1 0 B [] (coe 1 0 (l1. B) x)} i1); k1 = 1 i1. x] (hcom 1 k1 B [] (coe 1 k1
-(l1. B) x)))))] x)))); i = 1. x]))))); k = 1 i. hcom 1 0 A [i = 0 i1. f.2.2.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0
-B [] (coe 1 0 (j. B) x)))))} i1] (f.2.1 (hcom i 0 B [] (coe i 0 (i1. B) (unglue
-(glue (hcom 1 0 B [1 = i i1. x; i = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2
-A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe
-1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1 (hcom 1
-0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i1); i = 1
-i1. x] (hcom 1 i B [] (coe 1 i (j. B) x))) [i = 0. A, f; i = 1. B, λ x1. x1, λ
-x1. x1, λ x1 {x1} {x1} _. x1, λ x1 {x1} {x1} _. x1, λ x1 {λ {x1} {x1} _. x1} {λ
-{x1} {x1} _. x1} _ {x1} {x1} _. x1] [i = 0. hcom 1 0 A [] (f.2.1 (hcom 1 0 B []
-(coe 1 0 (j. B) x))); i = 1. x]))))); l = 0 i. hcom 1 0 A [i = 0 i1. f.2.2.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0
-B [] (coe 1 0 (j. B) x)))))} i1] (f.2.1 (hcom i 0 B [] (coe i 0 (i1. B) (unglue
-(glue (hcom 1 0 B [1 = i i1. x; i = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2
-A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe
-1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1 (hcom 1
-0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i1); i = 1
-i1. x] (hcom 1 i B [] (coe 1 i (j. B) x))) [i = 0. A, f; i = 1. B, λ x1. x1, λ
-x1. x1, λ x1 {x1} {x1} _. x1, λ x1 {x1} {x1} _. x1, λ x1 {λ {x1} {x1} _. x1} {λ
-{x1} {x1} _. x1} _ {x1} {x1} _. x1] [i = 0. hcom 1 0 A [] (f.2.1 (hcom 1 0 B []
-(coe 1 0 (j. B) x))); i = 1. x]))))); l = 1 i. hcom 1 0 A [i = 0 i1. f.2.2.1
-(hcom 0 1 A [k = 0 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 (hcom 1 0 A [] (f.2.1
+B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} j1); k1 = 1
+j1. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))] x))) {f.1 (f.2.1 (hcom 1 0 B []
+(coe 1 0 (j1. B) (hcom 1 0 B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i1. x]
+(hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i1. x; k1 = 0 j1. hcom 1 0
+B [j1 = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x))));
+j1 = 1 i1. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B []
+(coe 1 0 (l1. B) x)} j1); k1 = 1 j1. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B)
+x)))))] x))))} {hcom 1 0 B [] (coe 1 0 (j1. B) (hcom 1 0 B [l = 0 k1. x; l = 1
+k1. hcom 1 0 B [k1 = 1 i1. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 =
+k1 i1. x; k1 = 0 j1. hcom 1 0 B [j1 = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0
+B [] (coe 1 0 (l1. B) x)))); j1 = 1 i1. hcom 1 0 B [] (coe 1 0 (l1. B) x)]
+(f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
+0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} j1); k1 = 1 j1. x] (hcom 1
+k1 B [] (coe 1 k1 (l1. B) x)))))] x))} j); i = 1 j. x] (hcom 1 i B [] (coe 1 i
+(j. B) (hcom 1 i B [l = 0 k1. x; l = 1 k1. hcom 1 0 B [k1 = 1 i1. x] (hcom k1 1
+B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i1. x; k1 = 0 j. hcom 1 0 B [j = 0
+i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); j = 1
+i1. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B []
+(coe 1 0 (l1. B) x)} j); k1 = 1 j. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))]
+x))))))); k = 1 i. hcom 1 0 A [i = 0 i1. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0
+B [] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
+x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))}
+i1] (f.2.1 (hcom i 0 B [] (coe i 0 (i1. B) (hcom 1 0 B [1 = i i1. x; i = 0
+j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))); j = 1 i1. hcom 1 0 B [] (coe 1 0 (j1. B) x)] (f.2.2.2.1 (hcom 1 0
+B [] (coe 1 0 (j1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (j1. B) x)} j); i = 1 j. x] (hcom 1 i B [] (coe 1 i
+(j. B) x)))))); l = 0 i. hcom 1 0 A [i = 0 i1. f.2.2.1 (hcom 1 0 A [] (f.2.1
 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)))))} i2] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0 i2. f.1 (hcom
-1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 1 i2. hcom 1 0 B [i2
-= 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))); i2 = 1 i3. hcom 0 1 B [] (coe 0
-1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))]
+x)))))} i1] (f.2.1 (hcom i 0 B [] (coe i 0 (i1. B) (hcom 1 0 B [1 = i i1. x; i =
+0 j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))); j = 1 i1. hcom 1 0 B [] (coe 1 0 (j1. B) x)] (f.2.2.2.1 (hcom 1 0
+B [] (coe 1 0 (j1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (j1. B) x)} j); i = 1 j. x] (hcom 1 i B [] (coe 1 i
+(j. B) x)))))); l = 1 i. hcom 1 0 A [i = 0 i1. f.2.2.1 (hcom 0 1 A [k = 0
+k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1
+(f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i2] (f.2.1
+(hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 (hcom 1 0 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0 j. f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j1. B) x)))); k1 = 1 j. hcom 1 0 B [j = 0 i2. hcom 1 i2
+B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B []
+(coe 1 0 (j1. B) x))))))); j = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1
+0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x))))))] (hcom 0 1 B [] (coe 0 1
+(l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))))))]
+(hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
+1 0 (j. B) x))))))))))); k = 1 k1. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j. B) x)))] (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))) {hcom 0
+1 A [k = 0 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B
+[] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
+x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))}
+i2] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 (hcom 1
+0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0 j. f.1 (hcom 1 0 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))); k1 = 1 j. hcom 1 0 B [j = 0
+i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j1. B) x))))))); j = 1 i2. hcom 0 1 B [] (coe 0 1
+(l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x))))))]
 (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
-0 (j. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
+0 (j1. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))))))); k = 1 k1. hcom 1 0 A [] (f.2.1
 (hcom 1 0 B [] (coe 1 0 (j. B) x)))] (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
-0 (j. B) x))))) {hcom 0 1 A [k = 0 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 (hcom 1 0
-A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0
-B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
-1 0 (j. B) x)))))} i2] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 =
-k1 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0
-i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 1
-i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))); i2 = 1 i3. hcom 0
-1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom
-1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom
-1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))))))); k = 1 k1. hcom 1 0
-A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))] (hcom 1 0 A [] (f.2.1 (hcom 1 0
-B [] (coe 1 0 (j. B) x))))} {f.2.1 (f.1 (hcom 0 1 A [k = 0 k1. hcom 1 0 A [k1 =
-0 i2. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1
-0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A []
+0 (j. B) x))))} {f.2.1 (f.1 (hcom 0 1 A [k = 0 k1. hcom 1 0 A [k1 = 0
+i2. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0
+A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A []
 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i2] (f.2.1 (hcom k1 0 B [] (coe k1
 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
-1 0 (j. B) x)))); k1 = 0 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))); k1 = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B []
-(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B []
+1 0 (j. B) x)))); k1 = 0 j. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))); k1 = 1 j. hcom 1 0 B [j = 0 i2. hcom 1 i2 B [] (hcom 0 1 B []
+(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x))))))); j = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j1. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))))))] (hcom 0 k1 B []
 (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
 x))))))))))); k = 1 k1. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
 x)))] (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))} i1] (f.2.1
-(hcom i 0 B [] (coe i 0 (i1. B) (unglue (glue (hcom i 1 B [k = 0 k1. unglue
-(glue (hcom 1 0 B [k1 = i i1. hcom 1 0 B [1 = i i2. x; i = 0 i2. hcom 1 0 B [i2
-= 0 i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0
-(j. B) x)} i2); i = 1 i2. x] (hcom 1 i B [] (coe 1 i (j. B) x)); i = 0 i1. hcom
-1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A [k1 = 0 i3. f.2.2.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
-0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)))))} i3] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i3. f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0 i3. f.1 (hcom
-1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 1 i3. hcom 1 0 B [i3
-= 0 i4. hcom 1 i4 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))); i3 = 1 i4. hcom 0 1 B [] (coe 0
-1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))]
-(hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
-0 (j. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))))))))))); i1 = 1 i2. hcom k1 0 B [] (coe k1
-0 (l1. B) (hcom 1 0 B [0 = k1 i3. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
-1 0 (j. B) x)))); k1 = 0 i3. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))); k1 = 1 i3. hcom 1 0 B [i3 = 0 i4. hcom 1 i4 B [] (hcom 0 1 B []
-(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))); i3 = 1 i4. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B []
-(coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))))); k1 = 0 i2. f.2.2.2.2 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))) {λ {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))}
-{f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))} _. f.1 (hcom 1
-0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))} {f.2.2.2.1 (f.1 (hcom 1 0 A
-[] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i2 {f.1 (f.2.2.1 (hcom 1 0 A []
+(hcom i 0 B [] (coe i 0 (i1. B) (hcom i 1 B [k = 0 k1. hcom 1 0 B [k1 = i
+i1. hcom 1 0 B [1 = i i2. x; i = 0 j. hcom 1 0 B [j = 0 i2. f.1 (hcom 1 i2 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))); j = 1 i2. hcom 1 0 B [] (coe 1 0
+(j1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)) {f.1 (f.2.1 (hcom 1 0
+B [] (coe 1 0 (j1. B) x)))} {hcom 1 0 B [] (coe 1 0 (j1. B) x)} j); i = 1 j. x]
+(hcom 1 i B [] (coe 1 i (j. B) x)); i = 0 j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1
+i1 A [k1 = 0 i2. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))} {f.2.1 (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))))} i2] (f.2.1 (hcom
+k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j1. B) x)))); k1 = 0 j1. f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j2. B) x)))); k1 = 1 j1. hcom 1 0 B [j1 = 0 i2. hcom 1
+i2 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B
+[] (coe 1 0 (j2. B) x))))))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x))))))] (hcom 0 1 B []
+(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B)
+x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0
+B [] (coe 1 0 (j1. B) x)))))))))))); j = 1 i1. hcom k1 0 B [] (coe k1 0 (l1. B)
+(hcom 1 0 B [0 = k1 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))); k1 = 0 j1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x)))); k1 = 1 j1. hcom 1 0 B [j1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B []
+(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B)
+x))))))); j1 = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j2. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))))))] (hcom 0 k1 B []
+(coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x))))))))); k1 = 0 i1. f.2.2.2.2 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))) {λ {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x))))} {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x))))} _. f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x))))} {f.2.2.2.1 (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))))} i1 {f.1 (f.2.2.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))) {hcom 1 0 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j1. B) x)))))} i1)} {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1
+0 B [] (coe 1 0 (j1. B) x))))} j] (f.2.2.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B)
+(hcom 1 0 B [0 = k1 i1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))); k1 = 0 j1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x)))); k1 = 1 j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B []
+(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B)
+x))))))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j2. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))))))] (hcom 0 k1 B []
+(coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x)))))))))) {f.1 (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
+i1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))); k1 = 0
+j1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))); k1 = 1
+j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x))))))); j1 = 1 i1. hcom
+0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j2. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))))))))))} {hcom k1 0 B
+[] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0
+B [] (coe 1 0 (j1. B) x)))); k1 = 0 j1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B []
+(coe 1 0 (j2. B) x)))); k1 = 1 j1. hcom 1 0 B [j1 = 0 i1. hcom 1 i1 B [] (hcom 0
+1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x))))))); j1 = 1 i1. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B)
+(f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))))))] (hcom 0 k1
+B [] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))))))))} j); i = 1 j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [k1 = 1
+i2. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0
+j1. hcom 1 0 B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(l1. B) x)))); j1 = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1
+0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (l1. B) x)} j1); k1 = 1 j1. x] (hcom 1 k1 B [] (coe 1 k1
+(l1. B) x))))); j = 1 i1. hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 = k1
+i2. x; k1 = 0 j1. hcom 1 0 B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B
+[] (coe 1 0 (l1. B) x)))); j1 = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)]
+(f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
+0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} j1); k1 = 1 j1. x] (hcom 1
+k1 B [] (coe 1 k1 (l1. B) x)))); k1 = 1 i1. x] (hcom k1 1 B [] (coe k1 1 (l1. B)
+(hcom 1 0 B [1 = k1 i1. x; k1 = 0 j1. hcom 1 0 B [j1 = 0 i1. f.1 (hcom 1 i1 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); j1 = 1 i1. hcom 1 0 B [] (coe 1 0
+(l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0
+B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} j1); k1 = 1
+j1. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))] (hcom k1 i B [] (coe k1 i
+(l1. B) (hcom 1 0 B [i = k1 i1. hcom 1 0 B [1 = i i2. x; i = 0 j. hcom 1 0 B [j
+= 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))); j = 1
+i2. hcom 1 0 B [] (coe 1 0 (j1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))} {hcom 1 0 B []
+(coe 1 0 (j1. B) x)} j); i = 1 j. x] (hcom 1 i B [] (coe 1 i (j. B) x)); k1 = 0
+j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1 i1 A [i = 0 i2. f.2.2.1 (hcom 1 0 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B
+[] (coe 1 0 (j1. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
+1 0 (j1. B) x)))))} i2] (f.2.1 (hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [1 =
+i i2. x; i = 0 j1. hcom 1 0 B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B
+[] (coe 1 0 (j2. B) x)))); j1 = 1 i2. hcom 1 0 B [] (coe 1 0 (j2. B) x)]
+(f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
+0 (j2. B) x)))} {hcom 1 0 B [] (coe 1 0 (j2. B) x)} j1); i = 1 j1. x] (hcom 1 i
+B [] (coe 1 i (j1. B) x))))))); j = 1 i1. hcom i 0 B [] (coe i 0 (l1. B) (hcom 1
+0 B [1 = i i2. x; i = 0 j1. hcom 1 0 B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j2. B) x)))); j1 = 1 i2. hcom 1 0 B [] (coe 1 0 (j2. B)
+x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B []
+(coe 1 0 (j2. B) x)))} {hcom 1 0 B [] (coe 1 0 (j2. B) x)} j1); i = 1 j1. x]
+(hcom 1 i B [] (coe 1 i (j1. B) x)))); i = 0 i1. f.2.2.2.2 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j1. B) x)))) {λ {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B
+[] (coe 1 0 (j1. B) x))))} {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x))))} _. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x))))} {f.2.2.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x)))))} i1 {f.1 (f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B)
+x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))} {f.2.1 (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))))} i1)} {f.1 (hcom 1
+0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x))))} j] (f.2.2.2.1 (hcom i 0 B
+[] (coe i 0 (l1. B) (hcom 1 0 B [1 = i i1. x; i = 0 j1. hcom 1 0 B [j1 = 0
+i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))); j1 = 1
+i1. hcom 1 0 B [] (coe 1 0 (j2. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))} {hcom 1 0 B []
+(coe 1 0 (j2. B) x)} j1); i = 1 j1. x] (hcom 1 i B [] (coe 1 i (j1. B) x)))))
+{f.1 (f.2.1 (hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [1 = i i1. x; i = 0
+j1. hcom 1 0 B [j1 = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x)))); j1 = 1 i1. hcom 1 0 B [] (coe 1 0 (j2. B) x)] (f.2.2.2.1 (hcom 1
+0 B [] (coe 1 0 (j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (j2. B) x)} j1); i = 1 j1. x] (hcom 1 i B [] (coe 1 i
+(j1. B) x))))))} {hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [1 = i i1. x; i = 0
+j1. hcom 1 0 B [j1 = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x)))); j1 = 1 i1. hcom 1 0 B [] (coe 1 0 (j2. B) x)] (f.2.2.2.1 (hcom 1
+0 B [] (coe 1 0 (j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (j2. B) x)} j1); i = 1 j1. x] (hcom 1 i B [] (coe 1 i
+(j1. B) x))))} j); k1 = 1 j. hcom 1 0 B [j = 0 i1. hcom 1 i1 B [i = 1 i2. x]
+(hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [1 = i i2. x; i = 0 j1. hcom 1 0 B
+[j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))); j1
+= 1 i2. hcom 1 0 B [] (coe 1 0 (j2. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))} {hcom 1 0 B []
+(coe 1 0 (j2. B) x)} j1); i = 1 j1. x] (hcom 1 i B [] (coe 1 i (j1. B) x))))); j
+= 1 i1. hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [1 = i i2. x; i = 0 j1. hcom
+1 0 B [j1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B)
+x)))); j1 = 1 i2. hcom 1 0 B [] (coe 1 0 (j2. B) x)] (f.2.2.2.1 (hcom 1 0 B []
+(coe 1 0 (j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))} {hcom 1 0
+B [] (coe 1 0 (j2. B) x)} j1); i = 1 j1. x] (hcom 1 i B [] (coe 1 i (j1. B)
+x)))); i = 1 i1. x] (hcom i 1 B [] (coe i 1 (l1. B) (hcom 1 0 B [1 = i i1. x; i
+= 0 j1. hcom 1 0 B [j1 = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1
+0 (j2. B) x)))); j1 = 1 i1. hcom 1 0 B [] (coe 1 0 (j2. B) x)] (f.2.2.2.1 (hcom
+1 0 B [] (coe 1 0 (j2. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j2. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (j2. B) x)} j1); i = 1 j1. x] (hcom 1 i B [] (coe 1 i
+(j1. B) x)))))] (hcom i k1 B [] (coe i k1 (l1. B) (hcom 1 0 B [1 = i i1. x; i =
+0 j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))); j = 1 i1. hcom 1 0 B [] (coe 1 0 (j1. B) x)] (f.2.2.2.1 (hcom 1 0
+B [] (coe 1 0 (j1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (j1. B) x)} j); i = 1 j. x] (hcom 1 i B [] (coe 1 i
+(j. B) x)))))))); k = 1 k1. hcom 1 0 B [1 = i i1. x; i = 0 j. hcom 1 0 B [j = 0
+i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))); j = 1
+i1. hcom 1 0 B [] (coe 1 0 (j1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))} {hcom 1 0 B []
+(coe 1 0 (j1. B) x)} j); i = 1 j. x] (hcom 1 i B [] (coe 1 i (j. B) x)); i = 0
+i1. f.1 (hcom 0 i1 A [k = 0 k1. hcom 1 0 A [k1 = 0 i2. f.2.2.1 (hcom 1 0 A []
 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B []
 (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))))} i2)} {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))} i1] (f.2.2.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
+(j. B) x)))))} i2] (f.2.1 (hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1
 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0
-i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 1
-i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))); i2 = 1 i3. hcom 0
+j. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))); k1 = 1
+j. hcom 1 0 B [j = 0 i2. hcom 1 i2 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x))))))); j = 1 i2. hcom 0
 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom
-1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom
-1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))))) {f.1 (f.2.1 (hcom k1
-0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom
-1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B
-[] (coe 1 0 (j. B) x)))); k1 = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom
-0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x))))))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B)
-(f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B
-[] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)))))))))))} {hcom k1 0 B [] (coe k1 0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 0 i2. f.1 (hcom
-1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); k1 = 1 i2. hcom 1 0 B [i2
-= 0 i3. hcom 1 i3 B [] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))); i2 = 1 i3. hcom 0 1 B [] (coe 0
-1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))]
-(hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1
-0 (j. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))))))))} i1); i = 1 i1. hcom 1 0 B [i1 = 0
-i2. hcom 1 i2 B [k1 = 1 i3. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1
-= k1 i3. x; k1 = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom 1 i4 A [] (f.2.1 (hcom 1
-0 B [] (coe 1 0 (l1. B) x)))); i3 = 1 i4. hcom 1 0 B [] (coe 1 0 (l1. B) x)]
+(j1. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
+(hcom 1 0 B [] (coe 1 0 (j1. B) x)))))))] (hcom 0 k1 B [] (coe 0 k1 (l1. B) (f.1
+(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))))))))); k = 1
+k1. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))] (hcom 1 0 A []
+(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))); i = 1 i1. hcom 1 i1 B [k = 0
+k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom 1 0 B [1 =
+k1 i2. x; k1 = 0 j. hcom 1 0 B [j = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1 (hcom 1 0 B
+[] (coe 1 0 (l1. B) x)))); j = 1 i2. hcom 1 0 B [] (coe 1 0 (l1. B) x)]
 (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
-0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i3); k1 = 1 i3. x] (hcom 1
-k1 B [] (coe 1 k1 (l1. B) x))))); i1 = 1 i2. hcom k1 1 B [] (coe k1 1 (l1. B)
-(hcom 1 0 B [1 = k1 i3. x; k1 = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom 1 i4 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i3 = 1 i4. hcom 1 0 B [] (coe 1 0
-(l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0
-B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i3); k1 = 1
-i3. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))); k1 = 1 i2. x] (hcom k1 1 B []
-(coe k1 1 (l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 i2. hcom 1 0 B [i2 = 0
-i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
-(l1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B []
-(coe 1 0 (l1. B) x)} i2); k1 = 1 i2. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B)
-x)))))] (hcom k1 i B [] (coe k1 i (l1. B) (hcom 1 0 B [i = k1 i1. hcom 1 0 B [1
-= i i2. x; i = 0 i2. hcom 1 0 B [i2 = 0 i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0
-B [] (coe 1 0 (j. B) x)))); i2 = 1 i3. hcom 1 0 B [] (coe 1 0 (j. B) x)]
-(f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1
-0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i2); i = 1 i2. x] (hcom 1 i B
-[] (coe 1 i (j. B) x)); k1 = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A [i =
-0 i3. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1
-0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i3] (f.2.1 (hcom i 0 B [] (coe i 0
-(l1. B) (hcom 1 0 B [1 = i i3. x; i = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom 1
-i4 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i3 = 1 i4. hcom 1 0 B []
-(coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i3); i =
-1 i3. x] (hcom 1 i B [] (coe 1 i (j. B) x))))))); i1 = 1 i2. hcom i 0 B [] (coe
-i 0 (l1. B) (hcom 1 0 B [1 = i i3. x; i = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom
-1 i4 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i3 = 1 i4. hcom 1 0 B []
-(coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i3); i =
-1 i3. x] (hcom 1 i B [] (coe 1 i (j. B) x)))); i = 0 i2. f.2.2.2.2 (hcom 1 0 A
-[] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {λ {f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x))))} {f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B []
-(coe 1 0 (j. B) x))))} _. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x))))} {f.2.2.2.1 (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))))} i2 {f.1 (f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))) {hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1
-(f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i2)} {f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))} i1] (f.2.2.2.1 (hcom
-i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [1 = i i2. x; i = 0 i2. hcom 1 0 B [i2 = 0
-i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0
-(j. B) x)} i2); i = 1 i2. x] (hcom 1 i B [] (coe 1 i (j. B) x))))) {f.1 (f.2.1
-(hcom i 0 B [] (coe i 0 (l1. B) (hcom 1 0 B [1 = i i2. x; i = 0 i2. hcom 1 0 B
-[i2 = 0 i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i2
-= 1 i3. hcom 1 0 B [] (coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe
-1 0 (j. B) x)} i2); i = 1 i2. x] (hcom 1 i B [] (coe 1 i (j. B) x))))))} {hcom i
-0 B [] (coe i 0 (l1. B) (hcom 1 0 B [1 = i i2. x; i = 0 i2. hcom 1 0 B [i2 = 0
-i3. f.1 (hcom 1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i2 = 1
-i3. hcom 1 0 B [] (coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0
-(j. B) x)} i2); i = 1 i2. x] (hcom 1 i B [] (coe 1 i (j. B) x))))} i1); k1 = 1
-i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [i = 1 i3. x] (hcom i 1 B [] (coe i 1
-(l1. B) (hcom 1 0 B [1 = i i3. x; i = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom 1
-i4 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i3 = 1 i4. hcom 1 0 B []
-(coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i3); i =
-1 i3. x] (hcom 1 i B [] (coe 1 i (j. B) x))))); i1 = 1 i2. hcom i 1 B [] (coe i
-1 (l1. B) (hcom 1 0 B [1 = i i3. x; i = 0 i3. hcom 1 0 B [i3 = 0 i4. f.1 (hcom 1
-i4 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i3 = 1 i4. hcom 1 0 B []
-(coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i3); i =
-1 i3. x] (hcom 1 i B [] (coe 1 i (j. B) x)))); i = 1 i2. x] (hcom i 1 B [] (coe
-i 1 (l1. B) (hcom 1 0 B [1 = i i2. x; i = 0 i2. hcom 1 0 B [i2 = 0 i3. f.1 (hcom
-1 i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i2 = 1 i3. hcom 1 0 B []
-(coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i2); i =
-1 i2. x] (hcom 1 i B [] (coe 1 i (j. B) x)))))] (hcom i k1 B [] (coe i k1
-(l1. B) (hcom 1 0 B [1 = i i1. x; i = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1
-i2 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i1 = 1 i2. hcom 1 0 B []
-(coe 1 0 (j. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i1); i =
-1 i1. x] (hcom 1 i B [] (coe 1 i (j. B) x))))))))) [i = 0. A, f; i = 1. B, λ
-x1. x1, λ x1. x1, λ x1 {x1} {x1} _. x1, λ x1 {x1} {x1} _. x1, λ x1 {λ {x1} {x1}
-_. x1} {λ {x1} {x1} _. x1} _ {x1} {x1} _. x1] [i = 0. hcom 1 0 A [k1 = 0
-i1. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0
-A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i1] (f.2.1 (hcom k1 0 B [] (coe k1
-0 (l1. B) (hcom 1 0 B [0 = k1 i1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
-1 0 (j. B) x)))); k1 = 0 i1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))); k1 = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B []
-(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B []
-(coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))))))); i = 1. hcom 1 0 B [k1 = 1 i1. x] (hcom k1 1 B [] (coe k1 1 (l1. B)
-(hcom 1 0 B [1 = k1 i1. x; k1 = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe 1 0
-(l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0
-B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i1); k1 = 1
-i1. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x)))))]); k = 1 k1. unglue (glue (hcom
-1 0 B [1 = i i1. x; i = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe 1 0 (j. B)
-x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1 (hcom 1 0 B []
-(coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i1); i = 1 i1. x] (hcom
-1 i B [] (coe 1 i (j. B) x))) [i = 0. A, f; i = 1. B, λ x1. x1, λ x1. x1, λ x1
-{x1} {x1} _. x1, λ x1 {x1} {x1} _. x1, λ x1 {λ {x1} {x1} _. x1} {λ {x1} {x1}
-_. x1} _ {x1} {x1} _. x1] [i = 0. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x))); i = 1. x]); i = 0 i1. f.1 (hcom 0 i1 A [k = 0 k1. hcom 1 0 A [k1 =
-0 i2. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1
-0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i2] (f.2.1 (hcom k1 0 B [] (coe k1
-0 (l1. B) (hcom 1 0 B [0 = k1 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
-1 0 (j. B) x)))); k1 = 0 i2. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))); k1 = 1 i2. hcom 1 0 B [i2 = 0 i3. hcom 1 i3 B [] (hcom 0 1 B []
-(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))); i2 = 1 i3. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B []
-(coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))))))); k = 1 k1. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)))] (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x))))); i = 1
-i1. hcom 1 i1 B [k = 0 k1. hcom 1 0 B [k1 = 1 i2. x] (hcom k1 1 B [] (coe k1 1
-(l1. B) (hcom 1 0 B [1 = k1 i2. x; k1 = 0 i2. hcom 1 0 B [i2 = 0 i3. f.1 (hcom 1
-i3 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i2 = 1 i3. hcom 1 0 B []
-(coe 1 0 (l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1
-(hcom 1 0 B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i2);
-k1 = 1 i2. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x))))); k = 1 k1. x] x] (hcom 1
-0 B [1 = i i1. x; i = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe 1 0 (j. B)
-x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)) {f.1 (f.2.1 (hcom 1 0 B []
-(coe 1 0 (j. B) x)))} {hcom 1 0 B [] (coe 1 0 (j. B) x)} i1); i = 1 i1. x] (hcom
-1 i B [] (coe 1 i (j. B) x)))) [i = 0. A, f; i = 1. B, λ x1. x1, λ x1. x1, λ x1
-{x1} {x1} _. x1, λ x1 {x1} {x1} _. x1, λ x1 {λ {x1} {x1} _. x1} {λ {x1} {x1}
-_. x1} _ {x1} {x1} _. x1] [i = 0. hcom 0 1 A [k = 0 k1. hcom 1 0 A [k1 = 0
-i1. f.2.2.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))) {hcom 1 0
-A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))} {f.2.1 (f.1 (hcom 1 0 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))} i1] (f.2.1 (hcom k1 0 B [] (coe k1
-0 (l1. B) (hcom 1 0 B [0 = k1 i1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe
-1 0 (j. B) x)))); k1 = 0 i1. f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
-(j. B) x)))); k1 = 1 i1. hcom 1 0 B [i1 = 0 i2. hcom 1 i2 B [] (hcom 0 1 B []
-(coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))); i1 = 1 i2. hcom 0 1 B [] (coe 0 1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1
-(hcom 1 0 B [] (coe 1 0 (j. B) x))))))] (hcom 0 1 B [] (coe 0 1 (l1. B) (f.1
-(hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))))))] (hcom 0 k1 B []
-(coe 0 k1 (l1. B) (f.1 (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x))))))))))); k = 1 k1. hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B)
-x)))] (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (j. B) x)))); i = 1. hcom 1
-1 B [k = 0 k1. hcom 1 0 B [k1 = 1 i1. x] (hcom k1 1 B [] (coe k1 1 (l1. B) (hcom
-1 0 B [1 = k1 i1. x; k1 = 0 i1. hcom 1 0 B [i1 = 0 i2. f.1 (hcom 1 i2 A []
-(f.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)))); i1 = 1 i2. hcom 1 0 B [] (coe 1 0
-(l1. B) x)] (f.2.2.2.1 (hcom 1 0 B [] (coe 1 0 (l1. B) x)) {f.1 (f.2.1 (hcom 1 0
-B [] (coe 1 0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} i1); k1 = 1
-i1. x] (hcom 1 k1 B [] (coe 1 k1 (l1. B) x))))); k = 1 k1. x] x])))))] (hcom 1 0
-A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) x)))));
+0 (l1. B) x)))} {hcom 1 0 B [] (coe 1 0 (l1. B) x)} j); k1 = 1 j. x] (hcom 1 k1
+B [] (coe 1 k1 (l1. B) x))))); k = 1 k1. x] x] (hcom 1 0 B [1 = i i1. x; i = 0
+j. hcom 1 0 B [j = 0 i1. f.1 (hcom 1 i1 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0
+(j1. B) x)))); j = 1 i1. hcom 1 0 B [] (coe 1 0 (j1. B) x)] (f.2.2.2.1 (hcom 1 0
+B [] (coe 1 0 (j1. B) x)) {f.1 (f.2.1 (hcom 1 0 B [] (coe 1 0 (j1. B) x)))}
+{hcom 1 0 B [] (coe 1 0 (j1. B) x)} j); i = 1 j. x] (hcom 1 i B [] (coe 1 i
+(j. B) x)))))))] (hcom 1 0 A [] (f.2.1 (hcom 1 0 B [] (coe 1 0 (i. B) x)))));
 
-tripUa (A B : U)(p : A = B) : A = B :=
-  ua A B (pathToEquiv A B p);
-
-tripUanf (A B : U)(p : A = B) : A = B :=
-λ {A} {B} i. Glue B [i = 0. A, λ x. coe 0 1 p x, λ x. coe 1 0 p x, λ x {x}
-{coe 1 0 p (coe 0 1 p x)} j. hcom 0 1 A [j = 0 k. x; j = 1 k. coe k 0 p (coe 0 k
-p x)] x, λ x {coe 0 1 p (coe 1 0 p x)} {x} j. hcom 1 0 B [j = 0 k. coe k 1 p
-(coe 1 k p x); j = 1 k. x] x, λ x {λ {coe 0 1 p x} {coe 0 1 p x} _. coe 0 1 p x}
-{λ {coe 0 1 p (coe 1 0 p (coe 0 1 p x))} {coe 0 1 p x} j. hcom 1 0 B [j = 0
-k. coe k 1 p (coe 1 k p (coe 0 1 p x)); j = 1 k. coe 0 1 p x] (coe 0 1 p x)} l
-{coe 0 1 p (hcom 0 1 A [l = 0 k. x; l = 1 k. coe k 0 p (coe 0 k p x)] x)} {coe 0
-1 p x} k. hcom 0 1 B [k = 0 i1. coe i1 1 p (coe 0 i1 p (hcom 0 i1 A [l = 0
-k1. x; l = 1 k1. coe k1 0 p (coe 0 k1 p x)] x)); k = 1 i1. coe i1 1 p (coe 0 i1
-p x); l = 0 i1. coe i1 1 p (coe 0 i1 p x); l = 1 i1. coe i1 1 p (hcom i1 0 (p
-{A} {B} i1) [k = 0 k1. coe k1 i1 p (coe i1 k1 p (coe 0 i1 p x)); k = 1 k1. coe 0
-i1 p x] (coe 0 i1 p x))] (coe 0 1 p x); i = 1. B, λ x. x, λ x. x, λ x {x} {x}
-_. x, λ x {x} {x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x];
+uaTripNfOK' (A B : U)(f : equiv A B) : uaTrip' A B f = uaTripNf' A B f :=
+  refl;

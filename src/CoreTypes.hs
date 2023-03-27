@@ -2,10 +2,8 @@
 
 module CoreTypes where
 
-import qualified IVarSet as IS
 import Common
 import Interval
-import Substitution
 
 -- Syntax
 --------------------------------------------------------------------------------
@@ -123,7 +121,7 @@ data NeCof' = NeCof' {
 data VCof
   = VCTrue
   | VCFalse
-  | VCNe NeCof' IS.IVarSet
+  | VCNe NeCof' IVarSet
   deriving Show
 
 data Env
@@ -177,18 +175,18 @@ data NeSys
   | NSCons (BindCofLazy Val) NeSys
   deriving Show
 
-type NeSys' = (NeSys, IS.IVarSet)
+type NeSys' = (NeSys, IVarSet)
 
 data NeSysHCom
   = NSHEmpty
   | NSHCons (BindCof (BindILazy Val)) NeSysHCom
   deriving Show
 
-type NeSysHCom' = (NeSysHCom, IS.IVarSet)
+type NeSysHCom' = (NeSysHCom, IVarSet)
 
 -- TODO: unbox
 data VSys
-  = VSTotal (F Val)
+  = VSTotal Val
   | VSNe NeSys'
   deriving Show
 
@@ -206,7 +204,7 @@ data Val
   -- Neutrals. These are annotated with sets of blocking ivars. Glue types are
   -- also neutral, but they're handled separately, because we have to match on
   -- them in coe/hcom.
-  | VNe Ne IS.IVarSet
+  | VNe Ne IVarSet
   | VGlueTy VTy NeSys'
 
   -- canonicals
@@ -219,7 +217,7 @@ data Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
-  | VTyCon Lvl Env                 -- para
+  | VTyCon Lvl Env
   | VDCon Lvl Lvl VDSpine
 
   | VTODO -- placeholder
@@ -258,9 +256,6 @@ data VDSpine
 vVar :: Lvl -> Val
 vVar x = VNe (NLocalVar x) mempty
 {-# inline vVar #-}
-
-i0f = F I0; {-# inline i0f #-}
-i1f = F I1; {-# inline i1f #-}
 
 type DomArg  = (?dom  :: Lvl)    -- fresh LocalVar
 type IDomArg = (?idom :: IVar)   -- fresh LocalVar
@@ -383,13 +378,9 @@ data IClosure
 
 --------------------------------------------------------------------------------
 
-rebind :: F (BindI a) -> b -> BindI b
-rebind (F (BindI x i _)) b = BindI x i b
+rebind :: BindI a -> b -> BindI b
+rebind (BindI x i _) b = BindI x i b
 {-# inline rebind #-}
-
-rebindf :: F (BindI a) -> b -> F (BindI b)
-rebindf (F (BindI x i _)) b = F (BindI x i b)
-{-# inline rebindf #-}
 
 -- Substitution
 ----------------------------------------------------------------------------------------------------

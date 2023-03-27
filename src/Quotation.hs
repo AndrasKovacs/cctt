@@ -2,22 +2,22 @@
 module Quotation where
 
 import Interval
-import Substitution
 import Common
 import CoreTypes
 import Core
 
--- NOTE: every quote method expects forced arguments, except Val which forces its argument.
--- A sneaky complication is in NLApp where a forced NLApp t i does *not* imply that "i" is forced!
+-- Note: neutral inputs (NeSys, Ne, NeSysHCom) are assumed to be forced
+--       other things are not!
 ----------------------------------------------------------------------------------------------------
 
 class Quote a b | a -> b where
   quote :: NCofArg => DomArg => a -> b
 
 instance Quote I I where
-  quote i = i; {-# inline quote #-}
+  quote i = frc i; {-# inline quote #-}
 
 instance Quote Ne Tm where
+  -- forced input
   quote n = case unSubNe n of
     NLocalVar x       -> LocalVar (lvlToIx ?dom x)
     NSub n s          -> impossible
@@ -29,11 +29,11 @@ instance Quote Ne Tm where
     NHCom r r' a ts t -> HCom (quote r) (quote r') (quote a) (quote ts) (quote t)
     NUnglue t sys     -> Unglue (quote t) (quote sys)
     NGlue t s1 s2     -> Glue (quote t) (quote s1) (quote s2)
-    NLApp t i         -> LApp (quote t) (quote (unF (frc i)))
+    NLApp t i         -> LApp (quote t) (quote i)
     NElim mot ms t    -> Elim (quote mot) (quote ms) (quote t)
 
 instance Quote Val Tm where
-  quote t = case unF (frc t) of
+  quote t = case frc t of
     VSub{}           -> impossible
     VNe n _          -> quote n
     VGlueTy a sys    -> GlueTy (quote a) (quote (fst sys))
@@ -71,13 +71,6 @@ instance Quote a b => Quote (BindCof a) b where
 
 instance Quote NeCof' Cof where
   quote (NeCof' _ c) = quote c
-  {-# inline quote #-}
-
-instance Quote VCof Cof where
-  quote = \case
-    VCTrue   -> CTrue
-    VCFalse  -> impossible
-    VCNe c _ -> quote c
   {-# inline quote #-}
 
 instance Quote NeCof Cof where
