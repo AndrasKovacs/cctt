@@ -250,30 +250,32 @@ instance SubAction Sub where
   sub f = mapSub (\_ -> dom ?sub) (\_ i -> sub i) f
   {-# noinline sub #-}
 
+goIsUnblocked :: NCofArg => IVarSet -> IVarSet -> Bool
+goIsUnblocked is varset = popSmallestIS is
+  (\is x -> matchIVar (lookupSub x ?cof)
+     (\x -> memberIS x varset || goIsUnblocked is (insertIVarF x varset))
+     True)
+  False
+
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
 isUnblocked :: NCofArg => IVarSet -> Bool
 isUnblocked is | emptyIS is = False
-isUnblocked is = go is (mempty @IVarSet) where
-  go :: IVarSet -> IVarSet -> Bool
-  go is varset = popSmallestIS is
-    (\is x -> matchIVar (lookupSub x ?cof)
-       (\x -> memberIS x varset || go is (insertIVarF x varset))
-       True)
-    False
+isUnblocked is = goIsUnblocked is mempty
 {-# inline isUnblocked #-}
 
-isUnblockedS :: SubArg => NCofArg => IVarSet -> Bool
-isUnblockedS is | emptyIS is = False
-isUnblockedS is = go is (mempty @IVarSet) where
-  go :: IVarSet -> IVarSet -> Bool
-  go is varset = popSmallestIS is
+goIsUnblockedS :: SubArg => NCofArg => IVarSet -> IVarSet -> Bool
+goIsUnblockedS is varset = popSmallestIS is
     (\is x -> matchIVar (lookupSub x ?sub)
       (\x -> matchIVar (lookupSub x ?cof)
-        (\x -> memberIS x varset || go is (insertIVarF x varset))
+        (\x -> memberIS x varset || goIsUnblockedS is (insertIVarF x varset))
         True)
       True)
     False
+
+isUnblockedS :: SubArg => NCofArg => IVarSet -> Bool
+isUnblockedS is | emptyIS is = False
+isUnblockedS is = goIsUnblockedS is mempty
 {-# inline isUnblockedS #-}
 
 instance SubAction IVarSet where
