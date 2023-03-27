@@ -93,17 +93,37 @@ J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : 
      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
 JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
-  : J A a C d a (λ _. a) = d
-  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
-     let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
-                                           k=1 _. a;
-                                           i=0 _. a;
-                                           i=1 _. a] a;
+  : J A a C d a (λ _. a) = d :=
 
-     λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
-                  [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
-                   k=1 _. d]
-                  d;
+  let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
+  let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
+                                        k=1 _. a;
+                                        i=0 _. a;
+                                        i=1 _. a] a;
+
+  λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
+               [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
+                k=1 _. d]
+               d;
+
+JEqNf (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
+  : J A a C d a (λ _. a) = d :=
+λ {coe 0 1 (i. C (hcom 0 1 A [i = 0 _. a; i = 1 k. a] a) (λ {a} {hcom 0
+1 A [i = 0 _. a; i = 1 k. a] a} j. hcom 0 j A [i = 0 _. a; i = 1 k. a] a)) d}
+{d} k. hcom 0 1 (C a (λ {a} {a} j. a)) [k = 0 i. coe i 1 (i1. C (hcom 0 1 A [i1
+= 0 _. a; i1 = 1 _. a] a) (λ {a} {hcom 0 1 A [i1 = 0 _. a; i1 = 1 _. a] a}
+j. hcom 0 j A [i1 = 0 _. a; i1 = 1 _. a] a)) (coe 0 i (i1. C (hcom 0 1 A [i1 = 0
+_. a; i1 = 1 _. a] a) (λ {a} {hcom 0 1 A [i1 = 0 _. a; i1 = 1 _. a] a} j. hcom 0
+j A [i1 = 0 _. a; i1 = 1 _. a] a)) d); k = 1 _. coe @1 1 (i. C a (λ {a} {a}
+j. a)) d] (coe 0 1 (i. C (hcom 0 1 A [k = 0 x. hcom 0 x A [i = 0 _. a; i = 1
+_. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a] a) (λ {a} {hcom 0 1 A [k = 0
+x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a] a}
+j. hcom 0 j A [k = 0 x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a; i = 0
+_. a; i = 1 _. a] a)) d);
+
+JEqNfOK (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
+  : JEq A a C d = JEqNf A a C d :=
+  refl;
 
 
 -- h-levels
@@ -747,6 +767,9 @@ y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1} {(u0 y).1
 j).1] ((u0 y).2 x {x} {(u0 y).1} k).1] x.1)); @2 = 1 i2. coe i2 1 (i3. B) y]
 (coe 0 1 (i2. B) (x.2 {f x.1} {y} @2)))));
 
+propIsEquivNfOK (A B : U) (f : A → B) : propIsEquiv A B f = propIsEquivNf A B f :=
+  refl;
+
 -- We should adapt this proof!
 connAndNoDiag (A : U) (a b : A) (p : a = b) : (λ _. a) ={i. a = p i} p
   := λ i j. hcom 0 1 [i=0 k. hcom 1 0 [k=0 _. a; k=1. p] (p k)
@@ -898,6 +921,9 @@ k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2; k1 = 1 x. i.2.1 b] (i.2.1
 (i.2.1 (fib.2 {i.1 fib.1} {b} k)); i1 = 1 k. hcom 0 1 A [k = 0 k1. i.2.2.2
 (i.2.1 b) {i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k1; k = 1 x. i.2.1 b] (i.2.1
 (i.2.2.1 b {i.1 (i.2.1 b)} {b} k))] (i.2.1 b)))))));
+
+isoToEquivNfOK (A B : U) (i : iso A B) : isoToEquiv A B i = isoToEquivNf A B i :=
+  refl;
 
 
 -- These require inductive types

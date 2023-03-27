@@ -47,6 +47,11 @@ convEndpoints t u = if Conversion.conv t u
   then pure ()
   else err $ CantConvertEndpoints (quote t) (quote u)
 
+convReflEndpoints :: Elab (Val -> Val -> IO ())
+convReflEndpoints t u = if Conversion.conv t u
+  then pure ()
+  else err $ CantConvertReflEndpoints (quote t) (quote u)
+
 eval :: NCofArg => DomArg => EnvArg => Tm -> Val
 eval t = let ?sub = idSub (dom ?cof) in Core.eval t
 
@@ -159,6 +164,7 @@ data Error
   | CantConvert Tm Tm
   | CantConvertCof Cof Cof
   | CantConvertEndpoints Tm Tm
+  | CantConvertReflEndpoints Tm Tm
   | CantConvertExInf Tm Tm
   | GlueTmSystemMismatch Sys
   | TopShadowing
@@ -214,6 +220,12 @@ showError = \case
     "Can't convert expected path endpoint\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
     "to the inferred endpoint\n\n" ++
+    "  " ++ pretty t
+
+  CantConvertReflEndpoints t u ->
+    "Can't convert endpoints when checking \"refl\":\n\n" ++
+    "  " ++ pretty u ++ "\n\n" ++
+    "\n\n" ++
     "  " ++ pretty t
 
   CantConvertCof c1 c2 ->
@@ -351,7 +363,7 @@ check t topA = case t of
 
     (P.Refl, VPath a l r) -> do
       constantICl a
-      convEndpoints l r
+      convReflEndpoints l r
       pure $! Refl (quote l)
 
     (P.Sym p, VPath a y x) -> do

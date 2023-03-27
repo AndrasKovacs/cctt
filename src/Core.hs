@@ -950,6 +950,8 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       $ ICHComPath r r' a lhs rhs nts base
 
   a@(VNe n is') ->
+    -- case (frc r, frc r') of
+    --   (r, r') ->
         VNe (NHCom r r' a nts base)
             (insertI r $ insertI r' $ is <> is')
 

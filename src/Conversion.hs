@@ -6,8 +6,9 @@ import CoreTypes
 import Core
 import Interval
 
--- NOTE: every conv method expects forced arguments, except Val which forces its argument.
--- A sneaky complication is in NLApp where a forced NLApp t i does *not* imply that "i" is forced!
+
+-- Note: neutral inputs (NeSys, Ne, NeSysHCom) are assumed to be forced
+--       other things are not!
 ----------------------------------------------------------------------------------------------------
 
 class Conv a where
@@ -135,7 +136,7 @@ instance Conv a => Conv (BindCof a) where
   {-# inline conv #-}
 
 instance Conv I where
-  conv r r' = r == r'; {-# inline conv #-}
+  conv r r' = frc r == frc r'; {-# inline conv #-}
 
 instance Conv NeSys where
   conv t t' = case (t, t') of
@@ -154,14 +155,6 @@ instance Conv NamedClosure where
 
 instance Conv NamedIClosure where
   conv t t' = freshI \(IVar -> i) -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
-
-instance Conv VCof where
-  conv c c' = case (c, c') of
-    (VCTrue   , VCTrue    ) -> True
-    (VCFalse  , VCFalse   ) -> True
-    (VCNe c _ , VCNe c' _ ) -> conv c c'
-    _                       -> False
-  {-# inline conv #-}
 
 instance Conv NeCof' where
   conv (NeCof' _ c) (NeCof' _ c') = conv c c'
