@@ -1407,17 +1407,18 @@ instance Force Ne Val where
     NElim mot ms t    -> recFrc (elim (sub mot) (sub ms) (frcS t))
 
 instance Force NeSys VSys where
-  -- TODO: is it better to not do anything with system components in frc?
-  -- The current version can pile up frc thunks. They're very cheap though,
-  -- except for the first one.
 
+  -- NOTE: it could also be a sensible choice to not force component bodies!
+  -- The forcing here is lazy, so we get a thunk accummulation if we do it
+  -- repeatedly. We get thunk accummulation if we force, we get potential
+  -- computation duplication if we don't. Neither looks very bad.
   frc = \case
     NSEmpty      -> vsempty
     NSCons t sys -> vscons (frc (t^.binds)) (frc (t^.body)) (frc sys)
 
   frcS = \case
     NSEmpty      -> vsempty
-    NSCons t sys -> vscons (frcS (t^.binds)) (frcS (t^.body)) (frc sys)
+    NSCons t sys -> vscons (frcS (t^.binds)) (frcS (t^.body)) (frcS sys)
 
 instance Force NeSysHCom VSysHCom where
   -- Definitions are more unrolled and optimized here. The semantic vshcons
