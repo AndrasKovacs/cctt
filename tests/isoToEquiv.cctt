@@ -72,7 +72,7 @@ CFtoHA (A B : U)(f : A → B)(p : isEquivCF A B f) : isEquivHA A B f :=
       -- (a, refl(f a))         : fib f (f a)
       -- (g (f a), rinv (f a))  : fib f (f a)
 
-     p (f a) : isContr (fib f (f a))
-     (p (f a)).2
+     -- p (f a) : isContr (fib f (f a))
+     -- (p (f a)).2
 
   (g, linv, rinv , coh);
