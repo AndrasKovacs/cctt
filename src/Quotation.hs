@@ -47,7 +47,7 @@ instance Quote Val Tm where
     VWrap x a        -> Wrap x (quote a)
     VPack x t        -> Pack x (quote t)
     VU               -> U
-    VTODO            -> TODO
+    VHole i p _ _    -> Hole i p                   -- we forget the context when quoting a hole!
     VLine t          -> Line (t^.name) (quote t)
     VLLam t          -> LLam (t^.name) (quote t)
     VTyCon x ts      -> TyCon x (quote ts)

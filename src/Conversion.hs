@@ -33,10 +33,9 @@ instance Conv Val where
     (VTyCon x ts    , VTyCon x' ts'     ) -> x == x' && conv ts ts'
     (VDCon _ i sp   , VDCon _ i' sp'    ) -> i == i' && conv sp sp'
 
-    -- This is useful for testing elaboration, where it's annoying to fail on
-    -- TODO. This is safe (doesn't affect type safety & termination), but of
-    -- course it can be unsound.
-    (VTODO          , VTODO             ) -> True
+    -- We keep track of evaluation contexts for holes.
+    -- This prevents spurious conversions between holes.
+    (VHole _ p s e  , VHole _ p' s' e'  ) -> p == p' && conv s s' && conv e e'
 
     -- eta
     (VLam t         , t'                ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
@@ -140,6 +139,9 @@ instance Conv a => Conv (BindCof a) where
 
 instance Conv I where
   conv r r' = frc r == frc r'; {-# inline conv #-}
+
+instance Conv Sub where
+  conv s s' = frc s == frc s'; {-# inline conv #-}
 
 instance Conv NeSys where
   conv t t' = case (t, t') of

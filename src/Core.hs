@@ -378,10 +378,10 @@ instance Apply NamedClosure Val Val NCofArg DomArg where
 
 instance Apply Val Val Val NCofArg DomArg where
   (∙) t u = case frc t of
-    VLam t   -> t ∙ u
-    VNe t is -> VNe (NApp t u) is
-    VTODO    -> VTODO
-    _        -> impossible
+    VLam t    -> t ∙ u
+    VNe t is  -> VNe (NApp t u) is
+    v@VHole{} -> v
+    _         -> impossible
   {-# inline (∙) #-}
 
 instance Apply (BindI a) I a (SubAction a) NCofArg where
@@ -402,10 +402,10 @@ instance Apply NamedIClosure I Val NCofArg DomArg where
 infixl 8 ∙~
 (∙~) :: NCofArg => DomArg => Val -> Val -> Val
 (∙~) t ~u = case frc t of
-  VLam t   -> t ∙ u
-  VNe t is -> VNe (NApp t u) is
-  VTODO    -> VTODO
-  _        -> impossible
+  VLam t    -> t ∙ u
+  VNe t is  -> VNe (NApp t u) is
+  v@VHole{} -> v
+  _         -> impossible
 {-# inline (∙~) #-}
 
 ----------------------------------------------------------------------------------------------------
@@ -659,7 +659,7 @@ proj1 :: NCofArg => DomArg => Name -> Val -> Val
 proj1 x t = case frc t of
   VPair _ t _ -> t
   VNe t is    -> VNe (NProj1 t x) is
-  VTODO       -> VTODO
+  v@VHole{}   -> v
   _           -> impossible
 {-# inline proj1 #-}
 
@@ -672,7 +672,7 @@ proj2 :: NCofArg => DomArg => Name -> Val -> Val
 proj2 x t = case frc t of
   VPair _ _ u -> u
   VNe t is    -> VNe (NProj2 t x) is
-  VTODO       -> VTODO
+  v@VHole{}   -> v
   _           -> impossible
 {-# inline proj2 #-}
 
@@ -680,7 +680,7 @@ unpack :: NCofArg => DomArg => Name -> Val -> Val
 unpack x t = case frc t of
   VPack _ t -> t
   VNe t is  -> VNe (NUnpack t x) is
-  VTODO     -> VTODO
+  v@VHole{} -> v
   _         -> impossible
 {-# inline unpack #-}
 
@@ -692,16 +692,16 @@ papp ~l ~r ~t i = case frc i of
   IVar x -> case frc t of
     VPLam _ _ t -> t ∙ IVar x
     VNe t is    -> VNe (NPApp l r t (IVar x)) (insertIVarF x is)
-    VTODO       -> VTODO
+    v@VHole{}   -> v
     _           -> impossible
 {-# inline papp #-}
 
 lapp :: NCofArg => DomArg => Val -> I -> Val
 lapp t i = case frc t of
-  VLLam t  -> t ∙ i
-  VNe t is -> VNe (NLApp t i) is
-  VTODO    -> VTODO
-  _        -> impossible
+  VLLam t   -> t ∙ i
+  VNe t is  -> VNe (NLApp t i) is
+  v@VHole{} -> v
+  _         -> impossible
 {-# inline lapp #-}
 
 -- assumption: r /= r'
@@ -1022,7 +1022,7 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
                           _ -> hcomind  r r a ts ps x i sp
     base@(VNe n is') -> VNe (NHCom r r' a nts base)
                             (insertI r $ insertI r' $ is <> is')
-    VTODO            -> VTODO
+    v@VHole{}        -> v
     _                -> impossible
 
   -- hcom r r' (x : A) [β i. t i] base =
@@ -1141,7 +1141,7 @@ elim :: NCofArg => DomArg => Val -> VMethods -> Val -> Val
 elim ~motive ms val = case frc val of
   VDCon _ i sp -> lookupMethod i motive ms sp
   VNe n is     -> VNe (NElim motive ms n) is
-  VTODO        -> VTODO
+  v@VHole{}    -> v
   _            -> impossible
 {-# inline elim #-}
 
@@ -1317,7 +1317,7 @@ eval = \case
 
   -- Misc
   WkI _ t           -> wkIS (eval t)
-  TODO              -> VTODO
+  Hole x p          -> VHole x p ?sub ?env
 
   -- Builtins
   Refl t            -> refl (eval t)
@@ -1346,6 +1346,10 @@ class Force a b | a -> b where
 instance Force I I where
   frc  i = doSub ?cof i;              {-# inline frc #-}
   frcS i = doSub ?cof (doSub ?sub i); {-# inline frcS #-}
+
+instance Force Sub Sub where
+  frc  s = doSub ?cof s; {-# inline frc #-}
+  frcS s = doSub ?cof (doSub ?sub s); {-# inline frcS #-}
 
 instance Force NeCof VCof where
   frc = \case
@@ -1390,22 +1394,22 @@ instance Force Val Val where
     VNe t is            | isUnblockedS is -> frcS t
     VGlueTy a (sys, is) | isUnblockedS is -> recFrc (glueTy (sub a) (frcS sys))
 
-    VNe t is      -> VNe (sub t) (sub is)
-    VGlueTy a sys -> VGlueTy (sub a) (sub sys)
-    VPi a b       -> VPi (sub a) (sub b)
-    VLam t        -> VLam (sub t)
-    VPath a t u   -> VPath (sub a) (sub t) (sub u)
-    VPLam l r t   -> VPLam (sub l) (sub r) (sub t)
-    VSg a b       -> VSg (sub a) (sub b)
-    VPair x t u   -> VPair x (sub t) (sub u)
-    VWrap x t     -> VWrap x (sub t)
-    VPack x t     -> VPack x (sub t)
-    VU            -> VU
-    VTODO         -> VTODO
-    VLine t       -> VLine (sub t)
-    VLLam t       -> VLLam (sub t)
-    VTyCon x ts   -> VTyCon x (sub ts)
-    VDCon x i sp  -> VDCon x i (sub sp)
+    VNe t is         -> VNe (sub t) (sub is)
+    VGlueTy a sys    -> VGlueTy (sub a) (sub sys)
+    VPi a b          -> VPi (sub a) (sub b)
+    VLam t           -> VLam (sub t)
+    VPath a t u      -> VPath (sub a) (sub t) (sub u)
+    VPLam l r t      -> VPLam (sub l) (sub r) (sub t)
+    VSg a b          -> VSg (sub a) (sub b)
+    VPair x t u      -> VPair x (sub t) (sub u)
+    VWrap x t        -> VWrap x (sub t)
+    VPack x t        -> VPack x (sub t)
+    VU               -> VU
+    VHole x p s env  -> VHole x p (sub s) (sub env)
+    VLine t          -> VLine (sub t)
+    VLLam t          -> VLLam (sub t)
+    VTyCon x ts      -> VTyCon x (sub ts)
+    VDCon x i sp     -> VDCon x i (sub sp)
   {-# noinline frcS #-}
 
 instance Force Ne Val where

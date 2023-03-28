@@ -6,6 +6,7 @@ module Pretty (
   , type NameKey(..)
   , setVerbosity
   , getVerbosity
+  , setErrPrinting
   , Pretty(..)) where
 
 import Prelude hiding (pi)
@@ -27,11 +28,18 @@ verbosity :: IORef Bool
 verbosity = runIO $ newIORef False
 {-# noinline verbosity #-}
 
+errPrinting :: IORef Bool
+errPrinting = runIO $ newIORef False
+{-# noinline errPrinting #-}
+
 getVerbosity :: IO Bool
 getVerbosity = readIORef verbosity
 
 setVerbosity :: Bool -> IO ()
 setVerbosity = writeIORef verbosity
+
+setErrPrinting :: Bool -> IO ()
+setErrPrinting = writeIORef errPrinting
 
 ifVerbose :: a -> a -> a
 ifVerbose t f = runIO $ getVerbosity >>= \case
@@ -289,7 +297,11 @@ tm = \case
   Glue a s1 s2      -> ifVerbose
                          (appp ("glue " <> proj a <> " " <> sys s1 <> " " <> sys s2))
                          (appp ("glue " <> proj a <> " " <> sys s2))
-  TODO              -> "TODO"
+  Hole i p          -> case i of
+                         Just x -> "?" <> str x
+                         _      -> runIO $ readIORef errPrinting >>= \case
+                           True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
+                           _    -> pure "?"
   Com r r' i a t u  -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
                        "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
                               <> pt <> " " <> pu)

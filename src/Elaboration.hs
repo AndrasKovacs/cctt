@@ -3,7 +3,7 @@
 module Elaboration (elabTop) where
 
 import Control.Exception
-import Text.Megaparsec (SourcePos(..), unPos, initialPos)
+import Text.Megaparsec (unPos, initialPos)
 import qualified Data.Map.Strict as M
 import System.Exit
 
@@ -170,6 +170,7 @@ data Error
   | TopShadowing
   | NonNeutralCofInSystem
   | NoSuchField Tm
+  | CantInferHole
   deriving Show
 
 instance Exception Error where
@@ -226,7 +227,6 @@ showError = \case
   CantConvertReflEndpoints t u ->
     "Can't convert endpoints when checking \"refl\":\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
-    "\n\n" ++
     "  " ++ pretty t
 
   CantConvertCof c1 c2 ->
@@ -304,14 +304,19 @@ showError = \case
     "Field projection is not supported by inferred type:\n\n" ++
     "  " ++ pretty a
 
+  CantInferHole ->
+    "Can't infer type for hole"
+
 displayErrInCxt :: String -> ErrInCxt -> IO ()
 displayErrInCxt file (ErrInCxt e) = withPrettyArgs do
+
+  setErrPrinting True
 
   let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
       lnum = show linum
       lpad = map (const ' ') lnum
 
-  putStrLn (show path ++ ":" ++ lnum ++ ":" ++ show colnum)
+  putStrLn ("\nERROR " ++ path ++ ":" ++ lnum ++ ":" ++ show colnum)
   putStrLn (lpad ++ " |")
   putStrLn (lnum ++ " | " ++ (lines file !! (linum - 1)))
   putStrLn (lpad ++ " | " ++ replicate (colnum - 1) ' ' ++ "^")
@@ -403,6 +408,12 @@ check t topA = case t of
       ts   <- elabGlueTmSys base ts a (fst equivs)
       pure $ Glue base eqs ts
 
+    (P.Hole i p, a) -> setPos p do
+      withPrettyArgs do
+        putStrLn ("\nHOLE ?" ++ maybe (sourcePosPretty ?srcPos) id i)
+        putStrLn ("  : " ++ pretty (quote a) ++ "")
+        pure (Hole i p)
+
     (t, VWrap x a) -> do
       t <- check t a
       pure $! Pack x t
@@ -411,6 +422,7 @@ check t topA = case t of
       Infer t a <- infer t
       convExInf a topA
       pure t
+
 
 infer :: Elab (P.Tm -> IO Infer)
 infer = \case
@@ -624,6 +636,10 @@ infer = \case
     pure $ Infer (Ap f (quote x) (quote y) p) (path (b ∙ x) (vf ∙ x) (vf ∙ y))
 
   P.Elim{} -> uf
+
+  P.Hole i p -> setPos p do
+    err CantInferHole
+
 
 elabProjField :: Elab (Name -> Tm -> Val -> VTy -> IO Infer)
 elabProjField x t ~tv a = case frc a of

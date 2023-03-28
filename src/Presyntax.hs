@@ -2,7 +2,6 @@
 module Presyntax where
 
 import Common
-import Text.Megaparsec (SourcePos)
 
 type Ty = Tm
 
@@ -29,8 +28,7 @@ data Tm
   | ProjField Tm Name
 
   | Wrap Name Ty
-  -- | Pack Ty
-  -- | Unpack Tm
+  | Hole (Maybe Name) (DontShow SourcePos)
 
   | U
   | Path Tm Tm                                -- x = y

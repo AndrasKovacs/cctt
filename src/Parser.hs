@@ -81,7 +81,8 @@ atom =
                <|> (Refl  <$  keyword "refl")
                <|> (TopLvl   <$!> (C.string "@@" *> decimal))
                <|> (LocalLvl <$!> (C.char '@'    *> decimal))
-               <|> (Ident    <$!> ident))
+               <|> (do {p <- getSourcePos; char '?'; id <- optional ident; pure (Hole id (coerce p))})
+               <|> (Ident <$!> ident))
 
 goProj :: Tm -> Parser Tm
 goProj t =

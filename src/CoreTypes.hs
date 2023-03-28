@@ -51,7 +51,7 @@ data Tm
   | Glue   Tm ~Sys ~Sys      -- glue a <equiv> <fib>
   | Unglue Tm ~Sys           -- unglue g [α ↦ B]
 
-  | TODO
+  | Hole (Maybe Name) (DontShow SourcePos)
 
   | Com I I Name Tm SysHCom Tm
 
@@ -226,7 +226,7 @@ data Val
   | VTyCon Lvl Env
   | VDCon Lvl Lvl VDSpine
 
-  | VTODO -- placeholder
+  | VHole (Maybe Name) (DontShow SourcePos) Sub Env
   deriving Show
 
 data Ne

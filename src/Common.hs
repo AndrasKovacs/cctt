@@ -3,6 +3,8 @@ module Common (
   , module Control.Monad
   , module Data.Bits
   , module Lens.Micro.Platform
+  , SourcePos(..)
+  , sourcePosPretty
   , oneShot
   , inline
   , noinline
@@ -15,6 +17,7 @@ import Data.Time.Clock
 import GHC.Exts
 import Lens.Micro.Platform
 import System.IO.Unsafe
+import Text.Megaparsec (SourcePos(..), sourcePosPretty)
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
@@ -124,7 +127,7 @@ type LvlArg = (?lvl :: Lvl)
 -- Not printing stuff
 --------------------------------------------------------------------------------
 
-newtype DontShow a = DontShow a
+newtype DontShow a = DontShow a deriving Eq
 
 instance Show (DontShow a) where
   showsPrec _ _ x = x
