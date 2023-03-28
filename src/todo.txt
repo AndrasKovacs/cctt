@@ -1,6 +1,10 @@
 
-- path app/lam endpoint printing/parsing/elaboration!
-  - use it for testing stuff!
+- nominal records
+- unary record type
+- top-level unfolding control
+- holes
+- file includes
+
 
 
 Strict inductives:
