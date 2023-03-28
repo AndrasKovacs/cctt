@@ -24,9 +24,13 @@ data Tm
   | Lam Name Tm
 
   | Sg Name Ty Ty
-  | Pair Tm Tm
-  | Proj1 Tm
-  | Proj2 Tm
+  | Pair Name Tm Tm
+  | Proj1 Tm Name
+  | Proj2 Tm Name
+
+  | Wrap Name Ty
+  | Pack Name Tm
+  | Unpack Tm Name
 
   | U
 
@@ -213,7 +217,9 @@ data Val
   | VPath NamedIClosure Val Val
   | VPLam ~Val ~Val NamedIClosure  -- annotated with endpoints
   | VSg VTy NamedClosure
-  | VPair Val Val
+  | VPair Name Val Val
+  | VWrap Name VTy
+  | VPack Name Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
@@ -229,8 +235,9 @@ data Ne
   | NApp Ne Val
   | NPApp ~Val ~Val Ne I
   | NLApp Ne I
-  | NProj1 Ne
-  | NProj2 Ne
+  | NProj1 Ne Name
+  | NProj2 Ne Name
+  | NUnpack Ne Name
   | NCoe I I (BindI Val) Val
   | NHCom I I VTy NeSysHCom Val
   | NUnglue Ne NeSys

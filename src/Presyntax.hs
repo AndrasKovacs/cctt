@@ -21,10 +21,17 @@ data Tm
   | PApp Tm Tm Tm Tm    -- explicit endpoints: t {l}{r} u
   | Lam Name Tm
   | PLam Tm Tm Name Tm  -- explicit endpoints: λ {l}{r} x. t
+
   | Sg Name Ty Ty
   | Pair Tm Tm
   | Proj1 Tm
   | Proj2 Tm
+  | ProjField Tm Name
+
+  | Wrap Name Ty
+  | Pack Ty
+  | Unpack Tm
+
   | U
   | Path Tm Tm                                -- x = y
   | DepPath BindMaybe Tm Tm                   -- x ={i.A} y | x ={p} y

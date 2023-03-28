@@ -386,7 +386,7 @@ check t topA = case t of
     (P.Pair t u, VSg a b) -> do
       t <- check t a
       u <- check u (b ∙ eval t)
-      pure $! Pair t u
+      pure $! Pair (b^.name) t u
 
     (P.GlueTm base eqs ts, VGlueTy a equivs) -> do
       ~eqs <- case eqs of
@@ -505,13 +505,13 @@ infer = \case
   P.Proj1 t -> do
     Infer t a <- infer t
     case frc a of
-      VSg a b -> pure $ Infer (Proj1 t) a
+      VSg a b -> pure $ Infer (Proj1 t (b^.name)) a
       a       -> err $! ExpectedSg (quote a)
 
   P.Proj2 t -> do
     Infer t a <- infer t
     case frc a of
-      VSg a b -> pure $! Infer (Proj2 t) (b ∙ proj1 (eval t))
+      VSg a b -> pure $! Infer (Proj2 t (b^.name)) (b ∙ proj1 (b^.name) (eval t))
       a       -> err $! ExpectedSg (quote a)
 
   P.U ->
@@ -781,8 +781,8 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
         ts <- elabGlueTmSys base ts a equivs
         bindCof ncof do
           let fequiv = frc equiv
-          t <- check t (proj1 fequiv)
-          conv (proj1 (proj2 fequiv) ∙ eval t) (eval base)
+          t <- check t (proj1 "Ty" fequiv)
+          conv (proj1 "f" (proj2 "Ty" fequiv) ∙ eval t) (eval base)
           sysCompat t ts
           pure $ SCons cof t ts
   (ts, equivs) ->

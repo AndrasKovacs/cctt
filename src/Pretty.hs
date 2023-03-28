@@ -237,6 +237,12 @@ coeTy i (PApp _ _ t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
 coeTy i (LApp t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
 coeTy i t = " (" <> i <> ". " <> pair t <> ") "
 
+unProject :: Tm -> Name -> Maybe Tm
+unProject t x = case t of
+  Proj2 t x' | x == x' -> Nothing
+             | True    -> unProject t x
+  t                    -> Just t
+
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
   TopVar x _        -> topVar x
@@ -257,9 +263,11 @@ tm = \case
                        sigmap (pa <> " × " <> sigma b)
   Sg x a b          -> let pa = pair a in fresh x \x ->
                        sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
-  Pair t u          -> pairp (let_ t <> ", " <> pair u)
-  Proj1 t           -> projp (proj t <> ".1")
-  Proj2 t           -> projp (proj t <> ".2")
+  Pair x t u        -> pairp (let_ t <> ", " <> pair u)
+  Proj1 t x         -> case unProject t x of
+                         Nothing -> projp (proj t <> ".1")
+                         Just t  -> projp (proj t <> "." <> str x)
+  Proj2 t x         -> projp (proj t <> ".2")
   U                 -> "U"
   Path "_" _ t u    -> eqp (trans t <> " = " <> trans u)
   Path x a t u      -> let pt = trans t; pu = trans u in freshI x \x ->
@@ -296,6 +304,11 @@ tm = \case
   DCon x _ sp       -> appp (topVar x <> dSpine sp)
   Elim mot met t    -> appp ("elim " <> proj mot <> " [" <> methods met <> "] " <> proj t)
 
+  Wrap x a          -> "(" <> str x <> " : " <> pair a <> ")"
+  Pack x t          -> tm t
+  Unpack t x        -> case unProject t x of
+                         Nothing -> projp (proj t <> ".1")
+                         Just t  -> projp (proj t <> "." <> str x)
 
 top :: Names => LvlArg => Top -> Txt
 top = \case

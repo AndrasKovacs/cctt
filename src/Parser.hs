@@ -36,8 +36,6 @@ parens p   = char '(' *> p <* char ')'
 arrow      = symbol "→" <|> symbol "->"
 bind       = ident <|> symbol "_"
 lambda     = char '\\' <|> char 'λ'
-p1         = symbol ".1" <|> symbol ".₁"
-p2         = symbol ".2" <|> symbol ".₂"
 prod       = char '*' <|> char '×'
 
 branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
@@ -87,10 +85,13 @@ atom =
 
 goProj :: Tm -> Parser Tm
 goProj t =
-       (p1 *> goProj (Proj1 t)
-   <|> (p2 *> goProj (Proj2 t)))
-   <|> (symbol "⁻¹" *> goProj (Sym t))
-   <|> (pure t)
+  branch (char '.')
+    (\_ -> (char '1' *> goProj (Proj1 t))
+       <|> (char '₁' *> goProj (Proj1 t))
+       <|> (char '2' *> goProj (Proj2 t))
+       <|> (char '₂' *> goProj (Proj2 t))
+       <|> (do {x <- ident; goProj (ProjField t x)}))
+    ((symbol "⁻¹" *> goProj (Sym t)) <|> pure t)
 
 proj :: Parser Tm
 proj = goProj =<< atom
@@ -230,9 +231,11 @@ sigma =
     (\x -> do
         a <- tm
         char ')'
-        prod
-        b <- sigma
-        pure $ Sg x a b)
+        branch prod
+          (\_ -> do
+             b <- sigma
+             pure $ Sg x a b)
+          (pure (Wrap x a)))
     (do t <- eq
         branch prod
           (\_ -> Sg "_" t <$!> sigma)
@@ -248,11 +251,13 @@ pi =
     (\case
         [([x], a)] -> branch arrow
           (\_ -> Pi x a <$!> pi)
-          (do prod
+          (branch prod
+            (\_ -> do
               dom <- Sg x a <$!> sigma
               branch arrow
                 (\_ -> Pi "_" dom <$!> pi)
                 (pure dom))
+            (pure (Wrap x a)))
         bs -> do
           arrow
           b <- pi

@@ -24,8 +24,9 @@ instance Conv Val where
     (VLam t         , VLam t'           ) -> conv t t'
     (VPath a t u    , VPath a' t' u'    ) -> conv a a' && conv t t' && conv u u'
     (VPLam _ _ t    , VPLam _ _ t'      ) -> conv t t'
-    (VSg a b        , VSg a' b'         ) -> conv a a' && conv b b'
-    (VPair t u      , VPair t' u'       ) -> conv t t' && conv u u'
+    (VSg a b        , VSg a' b'         ) -> b^.name == b'^.name && conv a a' && conv b b'
+    (VWrap x a      , VWrap x' a'       ) -> x == x' && conv a a'
+    (VPair _ t u    , VPair _ t' u'     ) -> conv t t' && conv u u'
     (VU             , VU                ) -> True
     (VLine a        , VLine a'          ) -> conv a a'
     (VLLam t        , VLLam t'          ) -> conv t t'
@@ -40,12 +41,14 @@ instance Conv Val where
     -- eta
     (VLam t         , t'                ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
     (t              , VLam t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
-    (VPair t u      , t'                ) -> conv t (proj1 t') && conv u (proj2 t')
-    (t              , VPair t' u'       ) -> conv (proj1 t) t' && conv (proj2 t) u'
+    (VPair x t u    , t'                ) -> conv t (proj1 x t') && conv u (proj2 x t')
+    (t              , VPair x t' u'     ) -> conv (proj1 x t) t' && conv (proj2 x t) u'
     (VPLam l r t    , t'                ) -> freshI \(IVar -> i) -> conv (t ∙ i) (papp l r t' i)
     (t              , VPLam l r t'      ) -> freshI \(IVar -> i) -> conv (papp l r t i) (t' ∙ i)
     (VLLam t        , t'                ) -> freshI \(IVar -> i) -> conv (t ∙ i) (lapp t' i)
     (t              , VLLam t'          ) -> freshI \(IVar -> i) -> conv (lapp t i) (t' ∙ i)
+    (VPack x t      , t'                ) -> conv t (unpack x t')
+    (t              , VPack x t'        ) -> conv (unpack x t) t'
 
     (VSub{}         , _                 ) -> impossible
     (ft             , VSub{}            ) -> impossible
@@ -57,8 +60,8 @@ instance Conv Ne where
     (NLocalVar x   , NLocalVar x'      ) -> x == x'
     (NApp t u      , NApp t' u'        ) -> conv t t' && conv u u'
     (NPApp p t u r , NPApp p' t' u' r' ) -> conv p p' && conv r r'
-    (NProj1 n      , NProj1 n'         ) -> conv n n'
-    (NProj2 n      , NProj2 n'         ) -> conv n n'
+    (NProj1 n _    , NProj1 n' _       ) -> conv n n'
+    (NProj2 n _    , NProj2 n' _       ) -> conv n n'
     (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv (frc i) (frc i')
 
     (NCoe r1 r2 a t, NCoe r1' r2' a' t') ->

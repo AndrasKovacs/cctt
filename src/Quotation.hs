@@ -23,8 +23,9 @@ instance Quote Ne Tm where
     NSub n s          -> impossible
     NApp t u          -> App (quote t) (quote u)
     NPApp t l r i     -> PApp (quote t) (quote l) (quote r) (quote i)
-    NProj1 t          -> Proj1 (quote t)
-    NProj2 t          -> Proj2 (quote t)
+    NProj1 t x        -> Proj1 (quote t) x
+    NProj2 t x        -> Proj2 (quote t) x
+    NUnpack t x       -> Unpack (quote t) x
     NCoe r r' a t     -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
     NHCom r r' a ts t -> HCom (quote r) (quote r') (quote a) (quote ts) (quote t)
     NUnglue t sys     -> Unglue (quote t) (quote sys)
@@ -42,7 +43,9 @@ instance Quote Val Tm where
     VPath a lhs rhs  -> Path (a^.name) (quote a) (quote lhs) (quote rhs)
     VPLam lhs rhs t  -> PLam (quote lhs) (quote rhs) (t^.name) (quote t)
     VSg a b          -> Sg (b^.name) (quote a) (quote b)
-    VPair t u        -> Pair (quote t) (quote u)
+    VPair x t u      -> Pair x (quote t) (quote u)
+    VWrap x a        -> Wrap x (quote a)
+    VPack x t        -> Pack x (quote t)
     VU               -> U
     VTODO            -> TODO
     VLine t          -> Line (t^.name) (quote t)

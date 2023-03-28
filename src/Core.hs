@@ -289,8 +289,8 @@ umapBindI (BindI x i a) f =
   seq ?cof (BindI x i (f a))
 {-# inline umapBindI #-}
 
-proj1BindIFromLazy :: NCofArg => DomArg => BindILazy Val -> BindI Val
-proj1BindIFromLazy t = umapBindI (bindIToLazy t) proj1
+proj1BindIFromLazy :: NCofArg => DomArg => Name -> BindILazy Val -> BindI Val
+proj1BindIFromLazy x t = umapBindI (bindIToLazy t) (proj1 x)
 {-# inline proj1BindIFromLazy #-}
 
 mapNeSys :: NCofArg => (NCofArg => Val -> Val) -> NeSys -> NeSys
@@ -452,7 +452,7 @@ capp (NCl _ t) ~u = case t of
     VSg (VPi b $ NCl "x" $ CIsEquiv5 b f g) $ NCl "rinv" $ CIsEquiv3 a b f g linv
 
   CIsEquiv3 a b f g linv -> let ~rinv = u in
-    VPi a $ NCl "a" $ CIsEquiv6 b f g linv rinv
+    VWrap "coh" (VPi a $ NCl "a" $ CIsEquiv6 b f g linv rinv)
 
   CIsEquiv4 a f g -> let ~x = u in path a x (g ∙ (f ∙ x))
   CIsEquiv5 b f g -> let ~x = u in path b (f ∙ (g ∙ x)) x
@@ -655,12 +655,12 @@ icapp (NICl _ t) arg = case t of
   ICAp f x y p ->
     let i = arg in f ∙ papp x y p i
 
-proj1 :: NCofArg => DomArg => Val -> Val
-proj1 t = case frc t of
-  VPair t _ -> t
-  VNe t is  -> VNe (NProj1 t) is
-  VTODO     -> VTODO
-  _         -> impossible
+proj1 :: NCofArg => DomArg => Name -> Val -> Val
+proj1 x t = case frc t of
+  VPair _ t _ -> t
+  VNe t is    -> VNe (NProj1 t x) is
+  VTODO       -> VTODO
+  _           -> impossible
 {-# inline proj1 #-}
 
 -- -- | Project under a binder.
@@ -668,13 +668,21 @@ proj1 t = case frc t of
 -- proj1BindILazy t = umapBindILazy t proj1
 -- {-# inline proj1BindILazy #-}
 
-proj2 :: NCofArg => DomArg => Val -> Val
-proj2 t = case frc t of
-  VPair _ u -> u
-  VNe t is  -> VNe (NProj2 t) is
+proj2 :: NCofArg => DomArg => Name -> Val -> Val
+proj2 x t = case frc t of
+  VPair _ _ u -> u
+  VNe t is    -> VNe (NProj2 t x) is
+  VTODO       -> VTODO
+  _           -> impossible
+{-# inline proj2 #-}
+
+unpack :: NCofArg => DomArg => Name -> Val -> Val
+unpack x t = case frc t of
+  VPack _ t -> t
+  VNe t is  -> VNe (NUnpack t x) is
   VTODO     -> VTODO
   _         -> impossible
-{-# inline proj2 #-}
+{-# inline unpack #-}
 
 -- | Apply a path.
 papp :: NCofArg => DomArg => Val -> Val -> Val -> I -> Val
@@ -704,9 +712,10 @@ coed r r' topA t = case (frc topA) ^. body of
     VLam $ NCl (b^.body.name) $ CCoePi r r' a b t
 
   VSg (rebind topA -> a) (rebind topA -> b) ->
-    let t1 = proj1 t
-        t2 = proj2 t
-    in VPair (coed r r' a t1)
+    let t1 = proj1 (b^.body.name) t
+        t2 = proj2 (b^.body.name) t
+    in VPair (b^.body.name)
+             (coed r r' a t1)
              (coed r r' (bindI "j" \j -> coe r j a t1) t2)
 
   VPath (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
@@ -801,7 +810,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
     ~ar' = hcomdn r r' _Ar'
              (mapNeSysHCom'
-                (\i tf -> coe i r' a (proj1 (proj2 (tf ∙ i)) ∙ coe r i (proj1BindIFromLazy tf) gr))
+                (\i tf -> coe i r' a (  proj1 "f" (proj2 "Ty" (tf ∙ i))
+                                      ∙ coe r i (proj1BindIFromLazy "Ty" tf) gr))
                 forallTopSys)
              (coed r r' a (unglue gr (frc topSysr)))
 
@@ -809,17 +819,17 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     mkComponent tfr' = let
 
       ~equiv1  = tfr'
-      ~equiv2  = proj2 equiv1
-      ~equiv3  = proj2 equiv2
-      ~equiv4  = proj2 equiv3
-      ~equiv5  = proj2 equiv4
+      ~equiv2  = proj2 "Ty"   equiv1
+      ~equiv3  = proj2 "f"    equiv2
+      ~equiv4  = proj2 "g"    equiv3
+      ~equiv5  = proj2 "linv" equiv4
 
-      ~tr'     = proj1 equiv1
-      ~fr'     = proj1 equiv2
-      ~fr'inv  = proj1 equiv3
-      ~r'linv  = proj1 equiv4
-      ~r'rinv  = proj1 equiv5
-      ~r'coh   = proj2 equiv5
+      ~tr'     = proj1 "Ty"   equiv1
+      ~fr'     = proj1 "f"    equiv2
+      ~fr'inv  = proj1 "g"    equiv3
+      ~r'linv  = proj1 "linv" equiv4
+      ~r'rinv  = proj1 "rinv" equiv5
+      ~r'coh   = unpack "coh" (proj2 "rinv"  equiv5)
 
       ~fibval  = fr'inv ∙ ar'
       ~fibpath = r'rinv ∙ ar'
@@ -844,7 +854,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       --         ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
       ~valSys =
           vshcons (ceq r r') "i" (\i -> app_r'linv gr i) $
-          mapVSysHCom (\i tf -> app_r'linv (coe r r' (proj1BindIFromLazy tf) gr) i) $
+          mapVSysHCom (\i tf -> app_r'linv (coe r r' (proj1BindIFromLazy "Ty" tf) gr) i) $
           forallTopSysf
 
 
@@ -866,7 +876,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
           (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcom I1 i tr' valSys fibval) $
            vshcons (ceq j I1) "i" (\i -> ar') $
            vshcons (ceq r r') "i" (\i -> app_r'coh gr i j) $
-           mapVSysHCom (\i tf -> app_r'coh (coe r r' (proj1BindIFromLazy tf) gr) i j) $
+           mapVSysHCom (\i tf -> app_r'coh (coe r r' (proj1BindIFromLazy "Ty" tf) gr) i j) $
            forallTopSysf
           )
           (papp (fr' ∙ fibval) ar' fibpath j)
@@ -897,6 +907,10 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
          topSysr'f
          fibvals
 
+  -- coe r r' (i. Wrap x (a i)) t = pack (coe r r' (i. a i) (t.unpackₓ))
+  VWrap x (rebind topA -> a) ->
+    VPack x $ coed r r' a (unpack x t)
+
   a ->
     error $ show (?cof, a)
 
@@ -915,31 +929,32 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
 
   VSg a b ->
     VPair
+      (b^.name)
       (hcomdn r r' a
-        (mapNeSysHCom' (\i t -> proj1 (t ∙ i)) ts)
-        (proj1 base))
+        (mapNeSysHCom' (\i t -> proj1 (b^.name) (t ∙ i)) ts)
+        (proj1 (b^.name) base))
 
       (hcomdn r r'
         (b ∙ hcomn r r' a
-             (mapNeSysHCom' (\i t -> proj1 (t ∙ i)) ts)
-             (proj1 base))
+             (mapNeSysHCom' (\i t -> proj1 (b^.name) (t ∙ i)) ts)
+             (proj1 (b^.name) base))
 
         (mapNeSysHCom'
           (\i t ->
            coe i r'
              (bindI "i" \i ->
                 b ∙ hcom r i a
-                     (mapVSysHCom (\i t -> proj1 (t ∙ i)) (frc ts))
-                     (proj1 base))
-             (proj2 (t ∙ i)))
+                     (mapVSysHCom (\i t -> proj1 (b^.name) (t ∙ i)) (frc ts))
+                     (proj1 (b^.name) base))
+             (proj2 (b^.name) (t ∙ i)))
           ts)
 
         (coed r r'
            (bindI "i" \i ->
               b ∙ hcomn r i a
-                   (mapNeSysHCom' (\i t -> proj1 (t ∙ i)) ts)
-                   (proj1 base))
-           (proj2 base)))
+                   (mapNeSysHCom' (\i t -> proj1 (b^.name) (t ∙ i)) ts)
+                   (proj1 (b^.name) base))
+           (proj2 (b^.name) base)))
 
   -- (  hcom r r' A [α i. (t i).1] b.1
   --  , com r r' (i. B (hcom r i A [α j. (t j).1] b.1)) [α i. (t i).2] b.2)
@@ -961,9 +976,9 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
   VU -> let
 
     -- NOTE: r = r' can be false or neutral
-    sys = nscons (ceq r r') (VPair base (theIdEquiv base)) $
+    sys = nscons (ceq r r') (VPair "Ty" base (theIdEquiv base)) $
           mapNeSysFromH
-            (\t -> VPair (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
+            (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
             nts
 
     in VGlueTy base (sys // insertI r (insertI r' is))
@@ -980,7 +995,7 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
         betasys = ts
 
             -- [α. hcom r r' T [β i. t i] gr]
-        fib = mapNeSys' (\t -> hcom r r' (proj1 t) (frc betasys) gr) alphasys
+        fib = mapNeSys' (\t -> hcom r r' (proj1 "Ty" t) (frc betasys) gr) alphasys
 
         -- hcom r r' A [  β i. unglue (t i)
         --              ; α i. f (hcom r i T [β. t] gr)]
@@ -988,8 +1003,9 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
         hcombase =
           hcomdn r r' a
             (catNeSysHCom'
-               (mapNeSysHCom' (\i t -> unglue (t ∙ i) (frc alphasys))                            betasys)
-               (mapNeSysToH'  (\i tf -> proj1 (proj2 tf) ∙ hcom r i (proj1 tf) (frc betasys) gr) alphasys))
+               (mapNeSysHCom' (\i t -> unglue (t ∙ i) (frc alphasys)) betasys)
+               (mapNeSysToH'  (\i tf -> proj1 "f" (proj2 "Ty" tf)
+                                      ∙ hcom r i (proj1 "Ty" tf) (frc betasys) gr) alphasys))
             (ungluen gr alphasys)
 
     in VNe (NGlue hcombase (fst alphasys) (fst fib))
@@ -1008,6 +1024,13 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
                             (insertI r $ insertI r' $ is <> is')
     VTODO            -> VTODO
     _                -> impossible
+
+  -- hcom r r' (x : A) [β i. t i] base =
+  --   pack (hcom r r' A [β i. (t i).unpackₓ] (base.unpackₓ))
+  VWrap x a ->
+    VPack x $ hcomdn r r' a
+      (mapNeSysHCom' (\i t -> unpack x (t ∙ i)) ts)
+      (unpack x base)
 
   a ->
     error $ show a
@@ -1040,13 +1063,13 @@ hcomd r r' ~a ~sys ~b = case sys of
 
 glueTy :: NCofArg => DomArg => Val -> VSys -> Val
 glueTy ~a sys = case sys of
-  VSTotal b -> proj1 b
+  VSTotal b -> proj1 "Ty" b
   VSNe sys  -> VGlueTy a sys
 {-# inline glueTy #-}
 
 glueTyNoinline :: NCofArg => DomArg => Val -> VSys -> Val
 glueTyNoinline ~a sys = case sys of
-  VSTotal b -> proj1 b
+  VSTotal b -> proj1 "Ty" b
   VSNe sys  -> VGlueTy a sys
 {-# noinline glueTyNoinline #-}
 
@@ -1059,7 +1082,7 @@ glue ~t eqs sys = case (eqs, sys) of
 
 unglue :: NCofArg => DomArg => Val -> VSys -> Val
 unglue ~t sys = case sys of
-  VSTotal teqv   -> proj1 (proj2 teqv) ∙ t
+  VSTotal teqv   -> proj1 "f" (proj2 "Ty" teqv) ∙ t
   VSNe (sys, is) -> case frc t of
     VNe n is' -> case unSubNe n of
       NGlue base _ _ -> base
@@ -1261,9 +1284,14 @@ eval = \case
 
   -- Sigma
   Sg x a b          -> VSg (eval a) (NCl x (CEval (EC ?sub ?env b)))
-  Pair t u          -> VPair (eval t) (eval u)
-  Proj1 t           -> proj1 (eval t)
-  Proj2 t           -> proj2 (eval t)
+  Pair x t u        -> VPair x (eval t) (eval u)
+  Proj1 t x         -> proj1 x (eval t)
+  Proj2 t x         -> proj2 x (eval t)
+
+  -- Wrap
+  Wrap x a          -> VWrap x (eval a)
+  Pack x t          -> VPack x (eval t)
+  Unpack t x        -> unpack x (eval t)
 
   -- U
   U                 -> VU
@@ -1369,7 +1397,9 @@ instance Force Val Val where
     VPath a t u   -> VPath (sub a) (sub t) (sub u)
     VPLam l r t   -> VPLam (sub l) (sub r) (sub t)
     VSg a b       -> VSg (sub a) (sub b)
-    VPair t u     -> VPair (sub t) (sub u)
+    VPair x t u   -> VPair x (sub t) (sub u)
+    VWrap x t     -> VWrap x (sub t)
+    VPack x t     -> VPack x (sub t)
     VU            -> VU
     VTODO         -> VTODO
     VLine t       -> VLine (sub t)
@@ -1384,8 +1414,9 @@ instance Force Ne Val where
     NSub n s          -> let ?sub = s in frcS n
     NApp t u          -> recFrc (frc t ∙ u)
     NPApp l r t i     -> recFrc (papp l r (frc t) i)
-    NProj1 t          -> recFrc (proj1 (frc t))
-    NProj2 t          -> recFrc (proj2 (frc t))
+    NProj1 t x        -> recFrc (proj1 x (frc t))
+    NProj2 t x        -> recFrc (proj2 x (frc t))
+    NUnpack t x       -> recFrc (unpack x (frc t))
     NCoe r r' a t     -> recFrc (coe r r' (frc a) (frc t))
     NHCom r r' a ts t -> recFrc (hcom r r' (frc a) (frc ts) t)
     NUnglue t sys     -> recFrc (unglue (frc t) (frc sys))
@@ -1399,8 +1430,9 @@ instance Force Ne Val where
     NSub n s          -> let ?sub = sub s in frcS n
     NApp t u          -> recFrc (frcS t ∙ sub u)
     NPApp l r t i     -> recFrc (papp (sub l) (sub r) (frcS t) (frcS i))
-    NProj1 t          -> recFrc (proj1 (frcS t))
-    NProj2 t          -> recFrc (proj2 (frcS t))
+    NProj1 t x        -> recFrc (proj1 x (frcS t))
+    NProj2 t x        -> recFrc (proj2 x (frcS t))
+    NUnpack t x       -> recFrc (unpack x (frcS t))
     NCoe r r' a t     -> recFrc (coe (frcS r) (frcS r') (frcS a) (frcS t))
     NHCom r r' a ts t -> recFrc (hcom (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t))
     NUnglue t sys     -> recFrc (unglue (frcS t) (frcS sys))
@@ -1498,8 +1530,9 @@ unSubNeS = \case
   NLocalVar x        -> NLocalVar x
   NApp t u           -> NApp (sub t) (sub u)
   NPApp l r p i      -> NPApp (sub l) (sub r) (sub p) (sub i)
-  NProj1 t           -> NProj1 (sub t)
-  NProj2 t           -> NProj2 (sub t)
+  NProj1 t x         -> NProj1 (sub t) x
+  NProj2 t x         -> NProj2 (sub t) x
+  NUnpack t x        -> NUnpack (sub t) x
   NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
   NHCom r r' a sys t -> NHCom (sub r) (sub r') (sub a) (sub sys) (sub t)
   NUnglue a sys      -> NUnglue (sub a) (sub sys)
@@ -1547,25 +1580,23 @@ isEquiv a b f = VSg (fun b a) $ NCl "g" $ CIsEquiv1 a b f
 
 -- | U -> U -> U
 equiv :: Val -> Val -> Val
-equiv a b = VSg (fun a b) $ NCl "g" $ CEquiv a b
+equiv a b = VSg (fun a b) $ NCl "f" $ CEquiv a b
 
 -- | U -> U
 equivInto :: Val -> Val
-equivInto a = VSg VU $ NCl "b" $ CEquivInto a
+equivInto a = VSg VU $ NCl "Ty" $ CEquivInto a
 
 -- | idIsEquiv : (A : U) -> isEquiv (\(x:A).x)
 idIsEquiv :: Val -> Val
 idIsEquiv a =
-  VPair (VLam $ NCl "a" C'λ'a''a) $
-  VPair (VLam $ NCl "a" C'λ'a'i''a) $
-  VPair (VLam $ NCl "b" C'λ'a'i''a) $
-        (VLam $ NCl "a" C'λ'a'i'j''a)
+  VPair "g"    (VLam $ NCl "a" C'λ'a''a)     $
+  VPair "linv" (VLam $ NCl "a" C'λ'a'i''a)   $
+  VPair "rinv" (VLam $ NCl "b" C'λ'a'i''a)   $
+  VPack "coh"  (VLam $ NCl "a" C'λ'a'i'j''a)
 
 -- | Identity function packed together with isEquiv.
 theIdEquiv :: Val -> Val
-theIdEquiv a =
-  VPair (VLam $ NCl "x" C'λ'a''a)
-        (idIsEquiv a)
+theIdEquiv a = VPair "f" (VLam $ NCl "x" C'λ'a''a) (idIsEquiv a)
 
 
 -- Coercion is an equivalence
@@ -1624,13 +1655,11 @@ coeCoherence a r r' x l k =
 
 coeIsEquiv :: BindI Val -> I -> I -> Val
 coeIsEquiv a r r' =
-  VPair (VLam $ NCl "x" $ CCoeAlong a r' r) $
-  VPair (VLam $ NCl "x" $ CCoeLinv0 a r r') $
-  VPair (VLam $ NCl "x" $ CCoeRinv0 a r r') $
-        (VLam $ NCl "x" $ CCoeCoh0  a r r')
+  VPair "g"    (VLam $ NCl "x" $ CCoeAlong a r' r) $
+  VPair "linv" (VLam $ NCl "x" $ CCoeLinv0 a r r') $
+  VPair "rinv" (VLam $ NCl "x" $ CCoeRinv0 a r r') $
+  VPack "coh"  (VLam $ NCl "x" $ CCoeCoh0  a r r')
 
 -- | Coercion function packed together with isEquiv.
 theCoeEquiv :: BindI Val -> I -> I -> Val
-theCoeEquiv a r r' =
-  VPair (VLam $ NCl "x" $ CCoeAlong a r r')
-        (coeIsEquiv a r r')
+theCoeEquiv a r r' = VPair "f" (VLam $ NCl "x" $ CCoeAlong a r r') (coeIsEquiv a r r')
