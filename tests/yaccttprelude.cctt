@@ -1,9 +1,5 @@
 
 
--- TODO already possible: isoToEquiv
-
-
-
 -- Adaptation of most of the yacctt prelude:
 --   https://github.com/mortberg/yacctt/blob/master/examples/prelude.ytt
 --------------------------------------------------------------------------------
@@ -75,32 +71,39 @@ i1 1 P (p {a} {b} i1)); i = 1 i1. coe 1 0 (_. A) (coe i1 1 (j. A) a)] (hcom 1 0
 A [i = 0 j. coe 1 0 P (coe 0 1 P a); i = 1 j. coe 1 0 (_. A) (coe 0 1 (j1. A)
 a)] (hcom 0 1 A [i = 0 j. coe j 1 (j1. A) (coe j 0 P (coe 0 j P a)); i = 1
 j. coe j 1 (j1. A) (coe j 0 (_. A) (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a))))
-[i = 0. B, λ x. coe 1 0 P x, λ x. coe 0 1 P x, λ x {x} {coe 0 1 P (coe 1 0 P x)}
-j. hcom 1 0 B [j = 0 k. x; j = 1 k. coe k 1 P (coe 1 k P x)] x, λ x {coe 1 0 P
-(coe 0 1 P x)} {x} j. hcom 0 1 A [j = 0 k. coe k 0 P (coe 0 k P x); j = 1 k. x]
-x, λ x {λ {coe 1 0 P x} {coe 1 0 P x} _. coe 1 0 P x} {λ {coe 1 0 P (coe 0 1 P
-(coe 1 0 P x))} {coe 1 0 P x} k. hcom 0 1 A [k = 0 k1. coe k1 0 P (coe 0 k1 P
-(coe 1 0 P x)); k = 1 k1. coe 1 0 P x] (coe 1 0 P x)} l {coe 1 0 P (hcom 1 0 B
-[l = 0 k. x; l = 1 k. coe k 1 P (coe 1 k P x)] x)} {coe 1 0 P x} k. hcom 1 0 A
-[k = 0 i1. coe i1 0 P (coe 1 i1 P (hcom 1 i1 B [l = 0 k1. x; l = 1 k1. coe k1 1
-P (coe 1 k1 P x)] x)); k = 1 i1. coe i1 0 P (coe 1 i1 P x); l = 0 i1. coe i1 0 P
-(coe 1 i1 P x); l = 1 i1. coe i1 0 P (hcom i1 1 (P {A} {B} i1) [k = 0 k1. coe k1
-i1 P (coe i1 k1 P (coe 1 i1 P x)); k = 1 k1. coe 1 i1 P x] (coe 1 i1 P x))] (coe
-1 0 P x); i = 1. A, λ x. coe 1 0 (_. A) x, λ x. coe 0 1 (_. A) x, λ x {x} {coe 0
-1 (_. A) (coe 1 0 (_. A) x)} j. hcom 1 0 A [j = 0 k. x; j = 1 k. coe k 1 (_. A)
-(coe 1 k (_. A) x)] x, λ x {coe 1 0 (_. A) (coe 0 1 (_. A) x)} {x} j. hcom 0 1 A
-[j = 0 k. coe k 0 (_. A) (coe 0 k (_. A) x); j = 1 k. x] x, λ x {λ {coe 1 0
-(_. A) x} {coe 1 0 (_. A) x} _. coe 1 0 (_. A) x} {λ {coe 1 0 (_. A) (coe 0 1
-(_. A) (coe 1 0 (_. A) x))} {coe 1 0 (_. A) x} k. hcom 0 1 A [k = 0 k1. coe k1 0
-(_. A) (coe 0 k1 (_. A) (coe 1 0 (_. A) x)); k = 1 k1. coe 1 0 (_. A) x] (coe 1
-0 (_. A) x)} l {coe 1 0 (_. A) (hcom 1 0 A [l = 0 k. x; l = 1 k. coe k 1 (_. A)
-(coe 1 k (_. A) x)] x)} {coe 1 0 (_. A) x} k. hcom 1 0 A [k = 0 i1. coe i1 0
-(_. A) (coe 1 i1 (_. A) (hcom 1 i1 A [l = 0 k1. x; l = 1 k1. coe k1 1 (_. A)
-(coe 1 k1 (_. A) x)] x)); k = 1 i1. coe i1 0 (_. A) (coe 1 i1 (_. A) x); l = 0
-i1. coe i1 0 (_. A) (coe 1 i1 (_. A) x); l = 1 i1. coe i1 0 (_. A) (hcom i1 1 A
-[k = 0 k1. coe k1 i1 (_. A) (coe i1 k1 (_. A) (coe 1 i1 (_. A) x)); k = 1
-k1. coe 1 i1 (_. A) x] (coe 1 i1 (_. A) x))] (coe 1 0 (_. A) x)] [i = 0. b; i =
-1. a];
+
+[i = 0. B
+    , λ x. coe 1 0 P x
+    , λ x. coe 0 1 P x
+    , λ x j. hcom 1 0 B [j = 0 k. x; j = 1 k. coe k 1 P (coe 1 k P x)] x
+    , λ x j. hcom 0 1 A [j = 0 k. coe k 0 P (coe 0 k P x); j = 1 k. x] x
+    , λ x l k. hcom 1 0 A
+        [k = 0 i1. coe i1 0 P (coe 1 i1 P (hcom 1 i1 B [l = 0 k1. x; l = 1 k1. coe k1 1
+	           P (coe 1 k1 P x)] x))
+       ; k = 1 i1. coe i1 0 P (coe 1 i1 P x)
+       ; l = 0 i1. coe i1 0 P (coe 1 i1 P x)
+       ; l = 1 i1. coe i1 0 P (hcom i1 1 (P {A} {B} i1)
+                          [k = 0 k1. coe k1 i1 P (coe i1 k1 P (coe 1 i1 P x))
+			; k = 1 k1. coe 1 i1 P x] (coe 1 i1 P x))]
+        (coe 1 0 P x)
+
+; i = 1. A
+  , λ x. coe 1 0 (_. A) x
+  , λ x. coe 0 1 (_. A) x
+  , λ x j. hcom 1 0 A [j = 0 k. x; j = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x
+  , λ x j. hcom 0 1 A [j = 0 k. coe k 0 (_. A) (coe 0 k (_. A) x); j = 1 k. x] x
+  , λ x l k. hcom 1 0 A [
+      k = 0 i1. coe i1 0 (_. A)
+        (coe 1 i1 (_. A) (hcom 1 i1 A [l = 0 k1. x; l = 1 k1. coe k1 1 (_. A)
+        (coe 1 k1 (_. A) x)] x))
+    ; k = 1 i1. coe i1 0 (_. A) (coe 1 i1 (_. A) x)
+    ; l = 0 i1. coe i1 0 (_. A) (coe 1 i1 (_. A) x)
+    ; l = 1 i1. coe i1 0 (_. A) (hcom i1 1 A [k = 0 k1. coe k1 i1 (_. A) (coe i1 k1 (_. A) (coe 1 i1
+               (_. A) x))
+    ; k = 1 k1. coe 1 i1 (_. A) x] (coe 1 i1 (_. A) x))]
+    (coe 1 0 (_. A) x)]
+[i = 0. b; i = 1. a];
+
 
 symDepNfOK (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) :
   symDep A B P a b p = symDepNf A B P a b p := refl;
@@ -206,7 +209,7 @@ lemPropF (A : U) (P : A → U) (pP : (x : A) → prop (P x)) (a0 a1 : A)
          b0 ={ap P p} b1
   := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
 
-Sigma (A : U) (B : A → U) : U := (a : A) × B a;
+Sigma (A : U) (B : A → U) : U := (x : A) × B x;
 
 lemSig (A : U) (B : A → U) (pB : (a : A) → prop (B a))
        (u v : Sigma A B) (p : u.1 = v.1) : u = v
@@ -239,8 +242,7 @@ isContrToIsInhProp (A : U) (h : isContr A) : isInhProp A
   := (h.1, λ x y i. hcom 1 0 [i=0. h.2 x; i=1. h.2 y] h.1);
 
 fiber (A B : U) (f : A → B) (b : B) : U
-  := (a : A) * f a = b;
-
+  := (x : A) * f x = b;
 
 isInhPropProp (A : U) (h : isInhProp A) : prop A
   := h.2;
@@ -840,16 +842,16 @@ propIsEquivDirect (A B : U) (f : A → B) : prop (isEquiv A B f)
 
 
 iso (A B : U) : U :=
-    (f  : A → B)
-  * (g  : B → A)
-  * ((b : B) → f (g b) = b)
-  * ((a : A) → g (f a) = a);
+    (f    : A → B)
+  * (g    : B → A)
+  * (linv : (b : B) → f (g b) = b)
+  * (rinv : (a : A) → g (f a) = a);
 
 lemIso (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
-  let f  : A → B                 := i.1;
-  let g  : B → A                 := i.2.1;
-  let fg : (b : B) → f (g b) = b := i.2.2.1;
-  let gf : (a : A) → g (f a) = a := i.2.2.2;
+  let f  : A → B                 := i.f;
+  let g  : B → A                 := i.g;
+  let fg : (b : B) → f (g b) = b := i.linv;
+  let gf : (a : A) → g (f a) = a := i.rinv;
   let x0 : A                     := f0.1;
   let p0 : f x0 = b              := f0.2;
   let x1 : A                     := f1.1;
@@ -882,82 +884,74 @@ lemIso (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
 
 
 -- Version of lemIso with heavy use of line types:
-lemIsoWithLines (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
+lemIsoWithLines (A B : U) (is : iso A B) (b : B) (f0 f1 : fiber A B is.f b) : f0 = f1 :=
 
-  let f  : A → B                 := i.1;
-  let g  : B → A                 := i.2.1;
-  let fg : (b : B) → f (g b) = b := i.2.2.1;
-  let gf : (a : A) → g (f a) = a := i.2.2.2;
   let x0 : A                     := f0.1;
-  let p0 : f x0 = b              := f0.2;
+  let p0 : is.f x0 = b           := f0.2;
   let x1 : A                     := f1.1;
-  let p1 : f x1 = b              := f1.2;
+  let p1 : is.f x1 = b           := f1.2;
 
-  let sq0 (i j : I) : A := hcom 0 j [i=0. gf x0; i=1 x. g b] (g (p0 i));
-  let sq1 (i j : I) : A := hcom 0 j [i=0. gf x1; i=1 x. g b] (g (p1 i));
-  let sq2 (i j : I) : A := hcom 1 j [i=0 k. sq0 k 1;i=1 k. sq1 k 1] (g b);
+  let sq0 (i j : I) : A := hcom 0 j [i=0. is.rinv x0; i=1 x. is.g b] (is.g (p0 i));
+  let sq1 (i j : I) : A := hcom 0 j [i=0. is.rinv x1; i=1 x. is.g b] (is.g (p1 i));
+  let sq2 (i j : I) : A := hcom 1 j [i=0 k. sq0 k 1;i=1 k. sq1 k 1] (is.g b);
 
   λ i. ( sq2 i 0
-       , λ j. hcom 0 1 [i=0. fg (p0 j)
-                       ;i=1. fg (p1 j)
-                       ;j=0. fg (f (sq2 i 0))
-                       ;j=1. fg b]
-                       (f (hcom 1 0 [i=0. sq0 j
-                                    ;i=1. sq1 j
-                                    ;j=0. gf (sq2 i 0)
-                                    ;j=1 _. g b]
-                                    (sq2 i j))));
+       , λ j. hcom 0 1 [i=0. is.linv (p0 j)
+                       ;i=1. is.linv (p1 j)
+                       ;j=0. is.linv (is.f (sq2 i 0))
+                       ;j=1. is.linv b]
+                       (is.f (hcom 1 0 [i=0. sq0 j
+                                       ;i=1. sq1 j
+                                       ;j=0. is.rinv (sq2 i 0)
+                                       ;j=1 _. is.g b]
+                                       (sq2 i j))));
 
 isoToEquiv (A B : U) (i : iso A B) : equiv A B :=
   (i.1, λ b. ((i.2.1 b, i.2.2.1 b), λ fib. lemIsoWithLines A B i b fib (i.2.1 b, i.2.2.1 b)));
 
 isoToEquivNf (A B : U) (i : iso A B) : equiv A B :=
-(i.1, λ b. ((i.2.1 b, i.2.2.1 b), λ fib {fib} {i.2.1 b, i.2.2.1 b}
-i1. (hcom 1 0 A [i1 = 0 k. hcom 0 1 A [k = 0 k1. i.2.2.2 fib.1 {i.2.1 (i.1
-fib.1)} {fib.1} k1; k = 1 x. i.2.1 b] (i.2.1 (fib.2 {i.1 fib.1} {b} k)); i1 = 1
-k. hcom 0 1 A [k = 0 k1. i.2.2.2 (i.2.1 b) {i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k1;
-k = 1 x. i.2.1 b] (i.2.1 (i.2.2.1 b {i.1 (i.2.1 b)} {b} k))] (i.2.1 b), λ {i.1
-(hcom 1 0 A [i1 = 0 k. hcom 0 1 A [k = 0 k1. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)}
-{fib.1} k1; k = 1 x. i.2.1 b] (i.2.1 (fib.2 {i.1 fib.1} {b} k)); i1 = 1 k. hcom
-0 1 A [k = 0 k1. i.2.2.2 (i.2.1 b) {i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k1; k = 1
-x. i.2.1 b] (i.2.1 (i.2.2.1 b {i.1 (i.2.1 b)} {b} k))] (i.2.1 b))} {b} j. hcom 0
-1 B [i1 = 0 k. i.2.2.1 (fib.2 {i.1 fib.1} {b} j) {i.1 (i.2.1 (fib.2 {i.1 fib.1}
-{b} j))} {fib.2 {i.1 fib.1} {b} j} k; i1 = 1 k. i.2.2.1 (i.2.2.1 b {i.1 (i.2.1
-b)} {b} j) {i.1 (i.2.1 (i.2.2.1 b {i.1 (i.2.1 b)} {b} j))} {i.2.2.1 b {i.1
-(i.2.1 b)} {b} j} k; j = 0 k. i.2.2.1 (i.1 (hcom 1 0 A [i1 = 0 k1. hcom 0 1 A
-[k1 = 0 k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2; k1 = 1 x. i.2.1 b]
-(i.2.1 (fib.2 {i.1 fib.1} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0 k2. i.2.2.2
-(i.2.1 b) {i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k2; k1 = 1 x. i.2.1 b] (i.2.1
-(i.2.2.1 b {i.1 (i.2.1 b)} {b} k1))] (i.2.1 b))) {i.1 (i.2.1 (i.1 (hcom 1 0 A
-[i1 = 0 k1. hcom 0 1 A [k1 = 0 k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2;
-k1 = 1 x. i.2.1 b] (i.2.1 (fib.2 {i.1 fib.1} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1
-= 0 k2. i.2.2.2 (i.2.1 b) {i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k2; k1 = 1 x. i.2.1
-b] (i.2.1 (i.2.2.1 b {i.1 (i.2.1 b)} {b} k1))] (i.2.1 b))))} {i.1 (hcom 1 0 A
-[i1 = 0 k1. hcom 0 1 A [k1 = 0 k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2;
-k1 = 1 x. i.2.1 b] (i.2.1 (fib.2 {i.1 fib.1} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1
-= 0 k2. i.2.2.2 (i.2.1 b) {i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k2; k1 = 1 x. i.2.1
-b] (i.2.1 (i.2.2.1 b {i.1 (i.2.1 b)} {b} k1))] (i.2.1 b))} k; j = 1 k. i.2.2.1 b
-{i.1 (i.2.1 b)} {b} k] (i.1 (hcom 1 0 A [i1 = 0 k. hcom 0 k A [j = 0 k1. i.2.2.2
-fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k1; j = 1 x. i.2.1 b] (i.2.1 (fib.2 {i.1
-fib.1} {b} j)); i1 = 1 k. hcom 0 k A [j = 0 k1. i.2.2.2 (i.2.1 b) {i.2.1 (i.1
-(i.2.1 b))} {i.2.1 b} k1; j = 1 x. i.2.1 b] (i.2.1 (i.2.2.1 b {i.1 (i.2.1 b)}
-{b} j)); j = 0 k. i.2.2.2 (hcom 1 0 A [i1 = 0 k1. hcom 0 1 A [k1 = 0 k2. i.2.2.2
-fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2; k1 = 1 x. i.2.1 b] (i.2.1 (fib.2 {i.1
-fib.1} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0 k2. i.2.2.2 (i.2.1 b) {i.2.1 (i.1
-(i.2.1 b))} {i.2.1 b} k2; k1 = 1 x. i.2.1 b] (i.2.1 (i.2.2.1 b {i.1 (i.2.1 b)}
-{b} k1))] (i.2.1 b)) {i.2.1 (i.1 (hcom 1 0 A [i1 = 0 k1. hcom 0 1 A [k1 = 0
-k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2; k1 = 1 x. i.2.1 b] (i.2.1
-(fib.2 {i.1 fib.1} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0 k2. i.2.2.2 (i.2.1 b)
-{i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k2; k1 = 1 x. i.2.1 b] (i.2.1 (i.2.2.1 b {i.1
-(i.2.1 b)} {b} k1))] (i.2.1 b)))} {hcom 1 0 A [i1 = 0 k1. hcom 0 1 A [k1 = 0
-k2. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k2; k1 = 1 x. i.2.1 b] (i.2.1
-(fib.2 {i.1 fib.1} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0 k2. i.2.2.2 (i.2.1 b)
-{i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k2; k1 = 1 x. i.2.1 b] (i.2.1 (i.2.2.1 b {i.1
-(i.2.1 b)} {b} k1))] (i.2.1 b)} k; j = 1 _. i.2.1 b] (hcom 1 j A [i1 = 0 k. hcom
-0 1 A [k = 0 k1. i.2.2.2 fib.1 {i.2.1 (i.1 fib.1)} {fib.1} k1; k = 1 x. i.2.1 b]
-(i.2.1 (fib.2 {i.1 fib.1} {b} k)); i1 = 1 k. hcom 0 1 A [k = 0 k1. i.2.2.2
-(i.2.1 b) {i.2.1 (i.1 (i.2.1 b))} {i.2.1 b} k1; k = 1 x. i.2.1 b] (i.2.1
-(i.2.2.1 b {i.1 (i.2.1 b)} {b} k))] (i.2.1 b)))))));
+(i.f, λ b. ((i.g b, i.linv b), λ fib {fib} {i.g b, i.linv b} i1. (hcom
+1 0 A [i1 = 0 k. hcom 0 1 A [k = 0 k1. i.rinv fib.x {i.g (i.f fib.x)} {fib.x}
+k1; k = 1 x. i.g b] (i.g (fib.2 {i.f fib.x} {b} k)); i1 = 1 k. hcom 0 1 A [k = 0
+k1. i.rinv (i.g b) {i.g (i.f (i.g b))} {i.g b} k1; k = 1 x. i.g b] (i.g (i.linv
+b {i.f (i.g b)} {b} k))] (i.g b), λ {i.f (hcom 1 0 A [i1 = 0 k. hcom 0 1 A [k =
+0 k1. i.rinv fib.x {i.g (i.f fib.x)} {fib.x} k1; k = 1 x. i.g b] (i.g (fib.2
+{i.f fib.x} {b} k)); i1 = 1 k. hcom 0 1 A [k = 0 k1. i.rinv (i.g b) {i.g (i.f
+(i.g b))} {i.g b} k1; k = 1 x. i.g b] (i.g (i.linv b {i.f (i.g b)} {b} k))] (i.g
+b))} {b} j. hcom 0 1 B [i1 = 0 k. i.linv (fib.2 {i.f fib.x} {b} j) {i.f (i.g
+(fib.2 {i.f fib.x} {b} j))} {fib.2 {i.f fib.x} {b} j} k; i1 = 1 k. i.linv
+(i.linv b {i.f (i.g b)} {b} j) {i.f (i.g (i.linv b {i.f (i.g b)} {b} j))}
+{i.linv b {i.f (i.g b)} {b} j} k; j = 0 k. i.linv (i.f (hcom 1 0 A [i1 = 0
+k1. hcom 0 1 A [k1 = 0 k2. i.rinv fib.x {i.g (i.f fib.x)} {fib.x} k2; k1 = 1
+x. i.g b] (i.g (fib.2 {i.f fib.x} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0
+k2. i.rinv (i.g b) {i.g (i.f (i.g b))} {i.g b} k2; k1 = 1 x. i.g b] (i.g (i.linv
+b {i.f (i.g b)} {b} k1))] (i.g b))) {i.f (i.g (i.f (hcom 1 0 A [i1 = 0 k1. hcom
+0 1 A [k1 = 0 k2. i.rinv fib.x {i.g (i.f fib.x)} {fib.x} k2; k1 = 1 x. i.g b]
+(i.g (fib.2 {i.f fib.x} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0 k2. i.rinv (i.g
+b) {i.g (i.f (i.g b))} {i.g b} k2; k1 = 1 x. i.g b] (i.g (i.linv b {i.f (i.g b)}
+{b} k1))] (i.g b))))} {i.f (hcom 1 0 A [i1 = 0 k1. hcom 0 1 A [k1 = 0 k2. i.rinv
+fib.x {i.g (i.f fib.x)} {fib.x} k2; k1 = 1 x. i.g b] (i.g (fib.2 {i.f fib.x} {b}
+k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0 k2. i.rinv (i.g b) {i.g (i.f (i.g b))} {i.g
+b} k2; k1 = 1 x. i.g b] (i.g (i.linv b {i.f (i.g b)} {b} k1))] (i.g b))} k; j =
+1 k. i.linv b {i.f (i.g b)} {b} k] (i.f (hcom 1 0 A [i1 = 0 k. hcom 0 k A [j = 0
+k1. i.rinv fib.x {i.g (i.f fib.x)} {fib.x} k1; j = 1 x. i.g b] (i.g (fib.2 {i.f
+fib.x} {b} j)); i1 = 1 k. hcom 0 k A [j = 0 k1. i.rinv (i.g b) {i.g (i.f (i.g
+b))} {i.g b} k1; j = 1 x. i.g b] (i.g (i.linv b {i.f (i.g b)} {b} j)); j = 0
+k. i.rinv (hcom 1 0 A [i1 = 0 k1. hcom 0 1 A [k1 = 0 k2. i.rinv fib.x {i.g (i.f
+fib.x)} {fib.x} k2; k1 = 1 x. i.g b] (i.g (fib.2 {i.f fib.x} {b} k1)); i1 = 1
+k1. hcom 0 1 A [k1 = 0 k2. i.rinv (i.g b) {i.g (i.f (i.g b))} {i.g b} k2; k1 = 1
+x. i.g b] (i.g (i.linv b {i.f (i.g b)} {b} k1))] (i.g b)) {i.g (i.f (hcom 1 0 A
+[i1 = 0 k1. hcom 0 1 A [k1 = 0 k2. i.rinv fib.x {i.g (i.f fib.x)} {fib.x} k2; k1
+= 1 x. i.g b] (i.g (fib.2 {i.f fib.x} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0
+k2. i.rinv (i.g b) {i.g (i.f (i.g b))} {i.g b} k2; k1 = 1 x. i.g b] (i.g (i.linv
+b {i.f (i.g b)} {b} k1))] (i.g b)))} {hcom 1 0 A [i1 = 0 k1. hcom 0 1 A [k1 = 0
+k2. i.rinv fib.x {i.g (i.f fib.x)} {fib.x} k2; k1 = 1 x. i.g b] (i.g (fib.2 {i.f
+fib.x} {b} k1)); i1 = 1 k1. hcom 0 1 A [k1 = 0 k2. i.rinv (i.g b) {i.g (i.f (i.g
+b))} {i.g b} k2; k1 = 1 x. i.g b] (i.g (i.linv b {i.f (i.g b)} {b} k1))] (i.g
+b)} k; j = 1 _. i.g b] (hcom 1 j A [i1 = 0 k. hcom 0 1 A [k = 0 k1. i.rinv fib.x
+{i.g (i.f fib.x)} {fib.x} k1; k = 1 x. i.g b] (i.g (fib.2 {i.f fib.x} {b} k));
+i1 = 1 k. hcom 0 1 A [k = 0 k1. i.rinv (i.g b) {i.g (i.f (i.g b))} {i.g b} k1; k
+= 1 x. i.g b] (i.g (i.linv b {i.f (i.g b)} {b} k))] (i.g b)))))));
 
 isoToEquivNfOK (A B : U) (i : iso A B) : isoToEquiv A B i = isoToEquivNf A B i :=
   refl;

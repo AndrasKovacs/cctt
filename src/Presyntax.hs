@@ -29,8 +29,8 @@ data Tm
   | ProjField Tm Name
 
   | Wrap Name Ty
-  | Pack Ty
-  | Unpack Tm
+  -- | Pack Ty
+  -- | Unpack Tm
 
   | U
   | Path Tm Tm                                -- x = y

@@ -1,7 +1,5 @@
 -- Trying to define isoToEquiv for our half-adjoint equiv
 
-
-
 -- yacctt definition of isoToEquiv with contractible fibers
 --------------------------------------------------------------------------------
 

@@ -169,6 +169,7 @@ data Error
   | GlueTmSystemMismatch Sys
   | TopShadowing
   | NonNeutralCofInSystem
+  | NoSuchField Tm
   deriving Show
 
 instance Exception Error where
@@ -299,6 +300,10 @@ showError = \case
   NonNeutralCofInSystem ->
     "Only neutral cofibrations are allowed in systems"
 
+  NoSuchField a ->
+    "Field projection is not supported by inferred type:\n\n" ++
+    "  " ++ pretty a
+
 displayErrInCxt :: String -> ErrInCxt -> IO ()
 displayErrInCxt file (ErrInCxt e) = withPrettyArgs do
 
@@ -397,6 +402,10 @@ check t topA = case t of
       base <- check base a
       ts   <- elabGlueTmSys base ts a (fst equivs)
       pure $ Glue base eqs ts
+
+    (t, VWrap x a) -> do
+      t <- check t a
+      pure $! Pack x t
 
     (t, topA) -> do
       Infer t a <- infer t
@@ -514,6 +523,14 @@ infer = \case
       VSg a b -> pure $! Infer (Proj2 t (b^.name)) (b ∙ proj1 (b^.name) (eval t))
       a       -> err $! ExpectedSg (quote a)
 
+  P.Wrap x a -> do
+    a <- check a VU
+    pure $! Infer (Wrap x a) VU
+
+  P.ProjField t x -> do
+    Infer t a <- infer t
+    elabProjField x t (eval t) a
+
   P.U ->
     pure $ Infer U VU
 
@@ -608,6 +625,19 @@ infer = \case
 
   P.Elim{} -> uf
 
+elabProjField :: Elab (Name -> Tm -> Val -> VTy -> IO Infer)
+elabProjField x t ~tv a = case frc a of
+  VSg a b    -> if x == b^.name then
+                  pure (Infer (Proj1 t x) a)
+                else
+                  elabProjField x (Proj2 t (b^.name))
+                                  (proj2 (b^.name) tv)
+                                  (b ∙ proj1 (b^.name) tv)
+  VWrap x' a -> if x == x' then
+                  pure (Infer (Unpack t x) a)
+                else
+                  err $ NoSuchField (quote (VWrap x' a))
+  a          -> err $ NoSuchField (quote a)
 
 -- | Ensure that an IClosure is constant.
 constantICl :: Elab (NamedIClosure -> IO ())
