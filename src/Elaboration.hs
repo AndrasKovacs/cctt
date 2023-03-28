@@ -5,6 +5,7 @@ module Elaboration (elabTop) where
 import Control.Exception
 import Text.Megaparsec (unPos, initialPos)
 import qualified Data.Map.Strict as M
+-- import qualified Data.Set as S
 import System.Exit
 
 import Common hiding (debug)
@@ -75,8 +76,8 @@ debug x = withPrettyArgs (Common.debug x)
 ----------------------------------------------------------------------------------------------------
 
 data Entry
-  = Top Lvl VTy ~Val      -- level, type, value
-  | Local Lvl VTy         -- level, type
+  = Top Lvl VTy ~Val SourcePos   -- level, type, value
+  | Local Lvl VTy                -- level, type
   | LocalInt IVar
   deriving Show
 
@@ -167,7 +168,7 @@ data Error
   | CantConvertReflEndpoints Tm Tm
   | CantConvertExInf Tm Tm
   | GlueTmSystemMismatch Sys
-  | TopShadowing
+  | TopShadowing SourcePos
   | NonNeutralCofInSystem
   | NoSuchField Tm
   | CantInferHole
@@ -190,9 +191,9 @@ err e = throwIO $ ErrInCxt e
 withPrettyArgs :: TableArg => DomArg => NCofArg => PrettyArgs a -> a
 withPrettyArgs act =
   let entryToNameKey = \case
-        Top x _ _  -> NKTop x
-        Local x _  -> NKLocal x
-        LocalInt x -> NKLocalI x in
+        Top x _ _ _  -> NKTop x
+        Local x _    -> NKLocal x
+        LocalInt x   -> NKLocalI x in
   let ?idom   = dom ?cof
       ?names  = M.foldlWithKey'
                   (\acc name e -> M.insert (entryToNameKey e) name acc)
@@ -244,8 +245,9 @@ showError = \case
   TopLvlNotInScope ->
     "Top-level De Bruijn level not in scope"
 
-  TopShadowing ->
-    "Duplicate top-level name"
+  TopShadowing pos ->
+       "Duplicate top-level name.\n"
+    ++ "Previously defined at: " ++ sourcePosPretty pos
 
   UnexpectedI ->
     "Unexpected interval expression"
@@ -429,9 +431,9 @@ infer = \case
   P.Ident x -> case M.lookup x ?tbl of
     Nothing -> err $ NameNotInScope x
     Just e  -> case e of
-      Top l a v  -> pure $! Infer (TopVar l (DontShow v)) a
-      Local l a  -> pure $! Infer (LocalVar (lvlToIx ?dom l)) a
-      LocalInt l -> err UnexpectedI
+      Top l a v _ -> pure $! Infer (TopVar l (DontShow v)) a
+      Local l a   -> pure $! Infer (LocalVar (lvlToIx ?dom l)) a
+      LocalInt l  -> err UnexpectedI
 
   P.LocalLvl x -> do
     unless (0 <= x && x < ?dom) (err LocalLvlNotInScope)
@@ -855,10 +857,10 @@ elabGlueTySys a = \case
 
 type ElabTop a = (?printnf :: Maybe Name) => Elab a
 
-defineTop :: Name -> VTy -> Val -> ElabTop a -> ElabTop a
-defineTop x ~a ~v act =
+defineTop :: Name -> VTy -> Val -> SourcePos -> ElabTop a -> ElabTop a
+defineTop x ~a ~v pos act =
   let ?topLvl  = ?topLvl + 1
-      ?tbl     = M.insert x (Top ?topLvl a v) ?tbl
+      ?tbl     = M.insert x (Top ?topLvl a v pos) ?tbl
       ?topDefs = (a, v) : ?topDefs in
   let _ = ?topLvl; _ = ?tbl in
   act
@@ -870,8 +872,9 @@ inferTop = \case
   P.TDef pos x ma t top -> setPos pos do
 
     case M.lookup x ?tbl of
-      Just{} -> err TopShadowing
-      _      -> pure ()
+      Just (Top _ _ _ pos) -> err $ TopShadowing pos
+      Just _               -> impossible
+      _                    -> pure ()
 
     (a, va, t) <- case ma of
       Nothing -> do
@@ -894,7 +897,7 @@ inferTop = \case
         putStrLn ""
       _ -> pure ()
 
-    top <- defineTop x va vt $ inferTop top
+    top <- defineTop x va vt (coerce pos) $ inferTop top
     pure $! TDef x a t top
 
   P.TData{} -> uf

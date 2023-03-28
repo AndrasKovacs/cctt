@@ -41,5 +41,6 @@ coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
 -- bar : foo = U := refl;
 
 hole1 (A : U) : U := ?;
+hole1 (A : U) : U := ?;
 
-foo : hole1 U = hole1 (U → U) := refl;
+-- foo : hole1 U = hole1 (U → U) := refl;
