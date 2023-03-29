@@ -43,6 +43,8 @@ executable cctt
       Core
       CoreTypes
       Elaboration
+      ElabState
+      Errors
       Interval
       LvlSet
       MainInteraction
@@ -94,6 +96,7 @@ executable cctt
   build-depends:
       base >=4.7 && <5
     , containers
+    , filepath
     , ghc-prim
     , megaparsec
     , microlens-platform

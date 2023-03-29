@@ -3,9 +3,7 @@
 module Elaboration (elabTop) where
 
 import Control.Exception
-import Text.Megaparsec (unPos, initialPos)
 import qualified Data.Map.Strict as M
--- import qualified Data.Set as S
 import System.Exit
 
 import Common hiding (debug)
@@ -13,6 +11,8 @@ import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalSys)
 import CoreTypes
 import Interval
 import Quotation
+import ElabState
+import Errors
 
 import qualified Common
 import qualified Conversion
@@ -21,6 +21,8 @@ import qualified Presyntax as P
 
 import Pretty
 
+
+-- Wrapped functions
 ----------------------------------------------------------------------------------------------------
 
 conv :: Elab (Val -> Val -> IO ())
@@ -71,264 +73,10 @@ evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
 debug :: PrettyArgs [String] -> Elab (IO ())
 debug x = withPrettyArgs (Common.debug x)
 
-----------------------------------------------------------------------------------------------------
--- Elaboration context
-----------------------------------------------------------------------------------------------------
-
-data Entry
-  = Top Lvl VTy ~Val SourcePos   -- level, type, value
-  | Local Lvl VTy                -- level, type
-  | LocalInt IVar
-  deriving Show
-
-data Box a = Box ~a deriving (Show)
-
-type Table      = M.Map Name Entry
-type TableArg   = (?tbl        :: Table)
-type PosArg     = (?srcPos     :: SourcePos)
-type TopDefs    = (?topDefs    :: [(Val, VTy)])
-type TopLvl     = (?topLvl     :: Lvl)
-type LocalTypes = (?localTypes :: [Box VTy])
-
-type Elab a = TopDefs => TopLvl => LocalTypes => NCofArg
-           => DomArg => EnvArg => TableArg => PosArg => a
-
-
--- | Bind a fibrant variable.
-bind :: Name -> VTy -> Elab (Val -> a) -> Elab a
-bind x ~a act =
-  let v           = vVar ?dom in
-  let ?dom        = ?dom + 1
-      ?env        = EDef ?env v
-      ?tbl        = M.insert x (Local ?dom a) ?tbl
-      ?localTypes = Box a : ?localTypes in
-  let _ = ?dom; _ = ?env; _ = ?tbl in
-  act v
-{-# inline bind #-}
-
--- | Define a fibrant variable.
-define :: Name -> VTy -> Val -> Elab a -> Elab a
-define x ~a ~v act =
-  let ?env        = EDef ?env v
-      ?dom        = ?dom + 1
-      ?tbl        = M.insert x (Local ?dom a) ?tbl
-      ?localTypes = Box a : ?localTypes in
-  let _ = ?env; _ = ?tbl; _ = ?dom in
-  act
-{-# inline define #-}
-
--- | Bind an ivar.
-bindI :: Name -> Elab (IVar -> a) -> Elab a
-bindI x act =
-  let fresh = dom ?cof in
-  let ?cof  = setDom (fresh + 1) ?cof `ext` IVar fresh
-      ?tbl  = M.insert x (LocalInt fresh) ?tbl in
-  let _ = ?cof; _ = ?tbl in
-  act fresh
-{-# inline bindI #-}
-
-bindCof :: NeCof' -> Elab a -> Elab a
-bindCof (NeCof' cof c) act = let ?cof = cof in act; {-# inline bindCof #-}
-
--- | Try to pick an informative fresh ivar name.
-pickIVarName :: Elab Name
-pickIVarName
-  | M.notMember "i" ?tbl = "i"
-  | M.notMember "j" ?tbl = "j"
-  | M.notMember "k" ?tbl = "k"
-  | M.notMember "l" ?tbl = "l"
-  | M.notMember "m" ?tbl = "m"
-  | True                 = "i"
-
-----------------------------------------------------------------------------------------------------
--- Errors
-----------------------------------------------------------------------------------------------------
-
-data Error
-  = NameNotInScope Name
-  | LocalLvlNotInScope
-  | TopLvlNotInScope
-  | UnexpectedI
-  | UnexpectedIType
-  | ExpectedI
-  | ExpectedPiPathLine Tm
-  | ExpectedSg Tm
-  | ExpectedGlueTy Tm
-  | ExpectedPathLine Tm
-  | ExpectedPath Tm
-  | ExpectedPathULineU Tm
-  | ExpectedNonDepFun Tm
-  | CantInferLam
-  | CantInferPair
-  | CantInfer
-  | CantInferGlueTm
-  | CantConvert Tm Tm
-  | CantConvertCof Cof Cof
-  | CantConvertEndpoints Tm Tm
-  | CantConvertReflEndpoints Tm Tm
-  | CantConvertExInf Tm Tm
-  | GlueTmSystemMismatch Sys
-  | TopShadowing SourcePos
-  | NonNeutralCofInSystem
-  | NoSuchField Tm
-  | CantInferHole
-  deriving Show
-
-instance Exception Error where
-
-data ErrInCxt where
-  ErrInCxt :: (TableArg, PosArg, NCofArg, DomArg) => Error -> ErrInCxt
-
-instance Show ErrInCxt where
-  show (ErrInCxt e) = show e
-
-instance Exception ErrInCxt
-
-err :: TableArg => PosArg => NCofArg => DomArg => Error -> IO a
-err e = throwIO $ ErrInCxt e
-
--- | Convert the symbol table to a printing environment.
-withPrettyArgs :: TableArg => DomArg => NCofArg => PrettyArgs a -> a
-withPrettyArgs act =
-  let entryToNameKey = \case
-        Top x _ _ _  -> NKTop x
-        Local x _    -> NKLocal x
-        LocalInt x   -> NKLocalI x in
-  let ?idom   = dom ?cof
-      ?names  = M.foldlWithKey'
-                  (\acc name e -> M.insert (entryToNameKey e) name acc)
-                  mempty ?tbl
-      ?shadow = mempty in
-  act
-{-# inline withPrettyArgs #-}
-
-showError :: PrettyArgs (Error -> String)
-showError = \case
-  CantConvertExInf t u ->
-    "Can't convert expected type\n\n" ++
-    "  " ++ pretty u ++ "\n\n" ++
-    "and inferred type\n\n" ++
-    "  " ++ pretty t
-
-  CantInfer ->
-    "Can't infer type for expression"
-
-  CantConvert t u ->
-    "Can't convert\n\n" ++
-    "  " ++ pretty u ++ "\n\n" ++
-    "and\n\n" ++
-    "  " ++ pretty t
-
-  CantConvertEndpoints t u ->
-    "Can't convert expected path endpoint\n\n" ++
-    "  " ++ pretty u ++ "\n\n" ++
-    "to the inferred endpoint\n\n" ++
-    "  " ++ pretty t
-
-  CantConvertReflEndpoints t u ->
-    "Can't convert endpoints when checking \"refl\":\n\n" ++
-    "  " ++ pretty u ++ "\n\n" ++
-    "  " ++ pretty t
-
-  CantConvertCof c1 c2 ->
-    "Can't convert expected path endpoint\n\n" ++
-    "  " ++ pretty c1 ++ "\n\n" ++
-    "to\n\n" ++
-    "  " ++ pretty c2
-
-  NameNotInScope x ->
-    "Name not in scope: " ++ x
-
-  LocalLvlNotInScope ->
-    "Local De Bruijn level not in scope"
-
-  TopLvlNotInScope ->
-    "Top-level De Bruijn level not in scope"
-
-  TopShadowing pos ->
-       "Duplicate top-level name.\n"
-    ++ "Previously defined at: " ++ sourcePosPretty pos
-
-  UnexpectedI ->
-    "Unexpected interval expression"
-
-  ExpectedI ->
-    "Expected an interval expression"
-
-  ExpectedPath a ->
-    "Expected a path type, inferred\n\n" ++
-    "  " ++ pretty a
-
-  ExpectedPiPathLine a ->
-    "Expected a function, line or path type, inferred\n\n" ++
-    "  " ++ pretty a
-
-  ExpectedSg a ->
-    "Expected a sigma type, inferred\n\n" ++
-    "  " ++ pretty a
-
-  ExpectedGlueTy a ->
-    "Expected a glue type, inferred\n\n" ++
-    "  " ++ pretty a
-
-  ExpectedPathLine a ->
-    "Expected a path type or a line type, inferred\n\n" ++
-    "  " ++ pretty a
-
-  ExpectedPathULineU a ->
-    "Expected a path type or a line type in U, inferred\n\n" ++
-    "  " ++ pretty a
-
-  ExpectedNonDepFun a ->
-    "Expected a non-dependent function type, inferred\n\n" ++
-    "  " ++ pretty a
-
-  CantInferLam ->
-    "Can't infer type for lambda expression"
-
-  CantInferPair ->
-    "Can't infer type for pair expression"
-
-  CantInferGlueTm ->
-    "Can't infer type for glue expression"
-
-  GlueTmSystemMismatch sys ->
-    "Can't match glue system with expected Glue type system\n\n" ++
-    "  " ++ pretty sys
-
-  UnexpectedIType ->
-    "The type of intervals I can be only used in function domains"
-
-  NonNeutralCofInSystem ->
-    "Only neutral cofibrations are allowed in systems"
-
-  NoSuchField a ->
-    "Field projection is not supported by inferred type:\n\n" ++
-    "  " ++ pretty a
-
-  CantInferHole ->
-    "Can't infer type for hole"
-
-displayErrInCxt :: String -> ErrInCxt -> IO ()
-displayErrInCxt file (ErrInCxt e) = withPrettyArgs do
-
-  setErrPrinting True
-
-  let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
-      lnum = show linum
-      lpad = map (const ' ') lnum
-
-  putStrLn ("\nERROR " ++ path ++ ":" ++ lnum ++ ":" ++ show colnum)
-  putStrLn (lpad ++ " |")
-  putStrLn (lnum ++ " | " ++ (lines file !! (linum - 1)))
-  putStrLn (lpad ++ " | " ++ replicate (colnum - 1) ' ' ++ "^")
-  putStrLn (showError e)
-  putStrLn ""
-
-----------------------------------------------------------------------------------------------------
-
 setPos :: DontShow SourcePos -> (PosArg => a) -> a
 setPos pos act = let ?srcPos = coerce pos in act; {-# inline setPos #-}
+
+----------------------------------------------------------------------------------------------------
 
 data Infer = Infer Tm ~VTy
 
@@ -442,8 +190,9 @@ infer = \case
     pure $! Infer (LocalVar ix) a
 
   P.TopLvl x -> do
-    unless (0 <= x && x < ?topLvl) (err TopLvlNotInScope)
-    let (a, v) = ?topDefs !! fromIntegral (lvlToIx ?topLvl x)
+    top <- getTop
+    unless (0 <= x && x < (top^.lvl)) (err TopLvlNotInScope)
+    let (a, v) = (top^.defs) !! fromIntegral (lvlToIx (top^.lvl) x)
     pure $! Infer (TopVar x (coerce v)) a
 
   P.ILvl{} -> err UnexpectedI
@@ -855,21 +604,18 @@ elabGlueTySys a = \case
 
 ----------------------------------------------------------------------------------------------------
 
-type ElabTop a = (?printnf :: Maybe Name) => Elab a
-
-defineTop :: Name -> VTy -> Val -> SourcePos -> ElabTop a -> ElabTop a
-defineTop x ~a ~v pos act =
-  let ?topLvl  = ?topLvl + 1
-      ?tbl     = M.insert x (Top ?topLvl a v pos) ?tbl
-      ?topDefs = (a, v) : ?topDefs in
-  let _ = ?topLvl; _ = ?tbl in
-  act
+defineTop :: Name -> VTy -> Val -> SourcePos -> IO ()
+defineTop x ~a ~v pos =
+  modTop \top ->
+     top & lvl  +~ 1
+         & tbl  %~ M.insert x (Top (top^.lvl) a v pos)
+         & defs %~ ((a, v):)
 {-# inline defineTop #-}
 
-inferTop :: ElabTop (P.Top -> IO Top)
+inferTop :: P.Top -> IO Top
 inferTop = \case
 
-  P.TDef pos x ma t top -> setPos pos do
+  P.TDef pos x ma t top -> withTopElab $ setPos pos do
 
     case M.lookup x ?tbl of
       Just (Top _ _ _ pos) -> err $ TopShadowing pos
@@ -889,33 +635,23 @@ inferTop = \case
     let ~vt = eval t
 
     -- withPrettyArgs $ putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
-
-    case ?printnf of
+    printnf <- getTop <&> (^.printNf)
+    case printnf of
       Just x' | x == x' -> withPrettyArgs do
         putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
         -- putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ show (quote vt)
         putStrLn ""
       _ -> pure ()
-
-    top <- defineTop x va vt (coerce pos) $ inferTop top
-    pure $! TDef x a t top
+    defineTop x va vt (coerce pos)
+    top <- inferTop top
+    pure $ TDef x a t top
 
   P.TData{} -> uf
 
   P.TEmpty ->
     pure TEmpty
 
-elabTop :: Maybe Name -> FilePath -> String -> P.Top -> IO Top
-elabTop printnf path file top = do
-  let ?cof        = idSub 0
-      ?dom        = 0
-      ?env        = ENil
-      ?tbl        = mempty
-      ?srcPos     = initialPos path
-      ?topLvl     = 0
-      ?printnf    = printnf
-      ?topDefs    = []
-      ?localTypes = []
-  catch (inferTop top) \(e :: ErrInCxt) -> do
-    displayErrInCxt file e
-    exitSuccess
+elabTop :: P.Top -> IO Top
+elabTop inp = catch (inferTop inp) \(e :: ErrInCxt) -> do
+  displayErrInCxt e
+  exitSuccess

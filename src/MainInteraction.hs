@@ -7,15 +7,19 @@ import System.Exit
 import Common
 import CoreTypes
 import Elaboration
+import ElabState
 import Parser
 import Pretty
 
 -- | Elaborate a string, render output.
 elabString :: String -> IO ()
 elabString str = do
-  top <- parseString "(interactive)" str
-  top <- elabTop Nothing "(interactive)" str top
-  putStrLn $ pretty top
+  let path = "(interactive)"
+  raw <- parseString path str
+  modTop ((currentPath .~ path)
+        . (currentSrc .~ str))
+  out <- elabTop raw
+  putStrLn $ pretty out
 
 helpMsg = unlines [
    "usage: cctt <file> [nf <topdef>] [elab] [verbose]"
@@ -52,13 +56,19 @@ parseArgs args = do
 
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
-  setVerbosity False
-  (path, printnf, printelab, verbose) <- parseArgs =<< getArgs
-  when verbose $ setVerbosity True
-  file <- readFile path
+  resetTop
+  (path, printnf, printelab, verbosity) <- parseArgs =<< getArgs
+
+  file          <- readFile path
   (top, tparse) <- timed (parseString path file)
   putStrLn (path ++ " parsed in " ++ show tparse)
-  (top, tcheck) <- timed (elabTop printnf path file top)
+
+  modTop $
+      (verbose .~ verbosity)
+    . (currentPath .~ path)
+    . (currentSrc .~ file)
+    . (printNf .~ printnf)
+  (top, tcheck) <- timed (elabTop top)
   putStrLn (path ++ " checked in " ++ show tcheck)
   putStrLn ("checked " ++ show (topLen top) ++ " definitions")
   putStrLn ("total time: " ++ show (tparse + tcheck))

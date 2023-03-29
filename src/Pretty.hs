@@ -4,45 +4,21 @@ module Pretty (
   , type Shadow
   , type PrettyArgs
   , type NameKey(..)
-  , setVerbosity
-  , getVerbosity
-  , setErrPrinting
   , Pretty(..)) where
 
 import Prelude hiding (pi)
 import Data.String
 import qualified Data.Map.Strict as M
-import Data.IORef
 
 import Common
 import CoreTypes
 import Interval
-
--- import Debug.Trace
+import ElabState
 
 --------------------------------------------------------------------------------
 
--- | When verbosity is true, we print all hcom base types and all path abstraction/application
---   endpoints.
-verbosity :: IORef Bool
-verbosity = runIO $ newIORef False
-{-# noinline verbosity #-}
-
-errPrinting :: IORef Bool
-errPrinting = runIO $ newIORef False
-{-# noinline errPrinting #-}
-
-getVerbosity :: IO Bool
-getVerbosity = readIORef verbosity
-
-setVerbosity :: Bool -> IO ()
-setVerbosity = writeIORef verbosity
-
-setErrPrinting :: Bool -> IO ()
-setErrPrinting = writeIORef errPrinting
-
 ifVerbose :: a -> a -> a
-ifVerbose t f = runIO $ getVerbosity >>= \case
+ifVerbose t f = runIO $ getTop <&> (^.verbose) >>= \case
   True  -> pure t
   False -> pure f
 {-# inline ifVerbose #-}
@@ -299,7 +275,7 @@ tm = \case
                          (appp ("glue " <> proj a <> " " <> sys s2))
   Hole i p          -> case i of
                          Just x -> "?" <> str x
-                         _      -> runIO $ readIORef errPrinting >>= \case
+                         _      -> runIO $ (getTop <&> (^.errPrinting)) >>= \case
                            True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
                            _    -> pure "?"
   Com r r' i a t u  -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->

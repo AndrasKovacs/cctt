@@ -5,6 +5,9 @@ module Common (
   , module Lens.Micro.Platform
   , SourcePos(..)
   , sourcePosPretty
+  , initialPos
+  , Pos
+  , unPos
   , oneShot
   , inline
   , noinline
@@ -17,7 +20,7 @@ import Data.Time.Clock
 import GHC.Exts
 import Lens.Micro.Platform
 import System.IO.Unsafe
-import Text.Megaparsec (SourcePos(..), sourcePosPretty)
+import Text.Megaparsec (SourcePos(..), sourcePosPretty, initialPos, Pos, unPos)
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
