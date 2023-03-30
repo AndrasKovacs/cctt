@@ -1,5 +1,5 @@
 
-import Basics;
+import basics;
 
 coeIsEquiv' (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
   let f'    (i : I)(x : A r)        : A i := coe r i A x;
