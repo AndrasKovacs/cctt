@@ -1,9 +1,11 @@
 {-# options_ghc -Wno-unused-top-binds #-}
 
-module Elaboration (elabTop) where
+module Elaboration (elaborate) where
 
 import Control.Exception
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
+import System.FilePath
 import System.Exit
 
 import Common hiding (debug)
@@ -13,6 +15,7 @@ import Interval
 import Quotation
 import ElabState
 import Errors
+import Parser
 
 import qualified Common
 import qualified Conversion
@@ -612,8 +615,8 @@ defineTop x ~a ~v pos =
          & defs %~ ((a, v):)
 {-# inline defineTop #-}
 
-inferTop :: P.Top -> IO Top
-inferTop = \case
+elabTop :: P.Top -> IO Top
+elabTop = \case
 
   P.TDef pos x ma t top -> withTopElab $ setPos pos do
 
@@ -634,24 +637,62 @@ inferTop = \case
 
     let ~vt = eval t
 
-    -- withPrettyArgs $ putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
     printnf <- getTop <&> (^.printNf)
     case printnf of
       Just x' | x == x' -> withPrettyArgs do
         putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote vt)
-        -- putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ show (quote vt)
         putStrLn ""
       _ -> pure ()
+
     defineTop x va vt (coerce pos)
-    top <- inferTop top
+    top <- elabTop top
     pure $ TDef x a t top
+
+  P.TImport pos modname top -> withTopElab $ setPos pos do
+    topst <- getTop
+    let dirpath = takeDirectory (topst^.currentPath)
+        newpath = dirpath </> (modname <.> "cctt")
+    if S.member newpath (topst^.loadedFiles) then do
+      elabTop top
+    else if elem newpath (topst^.loadCycle) then do
+      err $ ImportCycle (topst^.currentPath) (topst^.loadCycle)
+    else do
+      importTop <- elabPath (Just pos) newpath
+      top <- elabTop top
+      pure $! importTop <> top
 
   P.TData{} -> uf
 
   P.TEmpty ->
     pure TEmpty
 
-elabTop :: P.Top -> IO Top
-elabTop inp = catch (inferTop inp) \(e :: ErrInCxt) -> do
+
+elabPath :: Maybe (DontShow SourcePos) -> FilePath -> IO Top
+elabPath pos path = do
+  oldpath  <- getTop <&> (^.currentPath)
+  oldCycle <- getTop <&> (^.loadCycle)
+  oldSrc   <- getTop <&> (^.currentSrc)
+  file <- readFile path `catch` \(e :: IOError) -> do
+    case pos of
+      Nothing -> do
+        putStrLn $ "Can't open file: " ++ path
+        exitSuccess
+      Just pos -> withTopElab $ setPos pos do
+        err $ CantOpenFile path
+
+  (!top, !tparse) <- timed (parseString path file)
+  modTop $ (currentPath .~ path)
+         . (loadCycle   .~ (path : oldCycle))
+         . (parsingTime +~ tparse)
+         . (currentSrc  .~ file)
+  top <- elabTop top
+  modTop $ (currentPath .~ oldpath)
+         . (loadCycle   .~ oldCycle)
+         . (currentSrc  .~ oldSrc)
+         . (loadedFiles %~ S.insert path)
+  pure top
+
+elaborate :: FilePath -> IO Top
+elaborate path = elabPath Nothing path `catch` \(e :: ErrInCxt) -> do
   displayErrInCxt e
   exitSuccess

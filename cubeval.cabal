@@ -52,7 +52,6 @@ executable cctt
       Presyntax
       Pretty
       Quotation
-      Tests
   hs-source-dirs:
       src
   default-extensions:

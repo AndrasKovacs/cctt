@@ -94,6 +94,13 @@ data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
 data Top = TDef Name Ty Tm Top | TEmpty
   deriving Show
 
+instance Monoid Top where
+  mempty = TEmpty
+
+instance Semigroup Top where
+  TEmpty         <> top' = top'
+  TDef x a t top <> top' = TDef x a t (top <> top')
+
 topLen :: Top -> Int
 topLen = go 0 where
   go acc TEmpty           = acc

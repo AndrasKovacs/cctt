@@ -8,18 +8,7 @@ import Common
 import CoreTypes
 import Elaboration
 import ElabState
-import Parser
 import Pretty
-
--- | Elaborate a string, render output.
-elabString :: String -> IO ()
-elabString str = do
-  let path = "(interactive)"
-  raw <- parseString path str
-  modTop ((currentPath .~ path)
-        . (currentSrc .~ str))
-  out <- elabTop raw
-  putStrLn $ pretty out
 
 helpMsg = unlines [
    "usage: cctt <file> [nf <topdef>] [elab] [verbose]"
@@ -30,8 +19,8 @@ helpMsg = unlines [
   ,"  verbose       prints path endpoints and hcom types explicitly"
   ]
 
-elabFile :: FilePath -> [String] -> IO ()
-elabFile path args = mainWith (pure $ path : args)
+elabPath :: FilePath -> [String] -> IO ()
+elabPath path args = mainWith (pure $ path : args)
 
 mainInteraction :: IO ()
 mainInteraction = mainWith getArgs
@@ -54,24 +43,23 @@ parseArgs args = do
     _            -> exit
   pure (path, printnf, elab, verbose)
 
+
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   resetTop
   (path, printnf, printelab, verbosity) <- parseArgs =<< getArgs
 
-  file          <- readFile path
-  (top, tparse) <- timed (parseString path file)
-  putStrLn (path ++ " parsed in " ++ show tparse)
-
   modTop $
       (verbose .~ verbosity)
-    . (currentPath .~ path)
-    . (currentSrc .~ file)
     . (printNf .~ printnf)
-  (top, tcheck) <- timed (elabTop top)
-  putStrLn (path ++ " checked in " ++ show tcheck)
+
+  (top, totaltime) <- timed (elaborate path)
+  parsetime <- getTop <&> (^.parsingTime)
+
+  putStrLn (path ++ " checked in " ++ show totaltime)
+  putStrLn ("parsing time: " ++ show parsetime)
   putStrLn ("checked " ++ show (topLen top) ++ " definitions")
-  putStrLn ("total time: " ++ show (tparse + tcheck))
+
   when printelab do
     putStrLn ""
     putStrLn $ pretty top

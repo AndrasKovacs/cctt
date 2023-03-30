@@ -68,6 +68,7 @@ data SysHCom = SHEmpty | SHCons Cof BindMaybe SysHCom
 data Top
   = TDef (DontShow SourcePos) Name (Maybe Ty) Tm Top
   | TData (DontShow SourcePos) Name [(Name, Ty)] [(Name, [(Name, Ty)])] Top
+  | TImport (DontShow SourcePos) Name Top
   | TEmpty
   deriving Show
 

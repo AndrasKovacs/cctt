@@ -41,22 +41,44 @@ prod       = char '*' <|> char '×'
 branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
 branch p t f = (t =<< p) <|> f
 
+-- isKeyword :: String -> Bool
+-- isKeyword = \case
+--   "Glue"   -> True
+--   "I"      -> True
+--   "U"      -> True
+--   "ap"     -> True
+--   "coe"    -> True
+--   "com"    -> True
+--   "data"   -> True
+--   "elim"   -> True
+--   "glue"   -> True
+--   "hcom"   -> True
+--   "import" -> True
+--   "let"    -> True
+--   "refl"   -> True
+--   "unglue" -> True
+--   "λ"      -> True
+--   _        -> False
+
 isKeyword :: String -> Bool
-isKeyword x =
-     x == "let"
-  || x == "λ"
-  || x == "U"
-  || x == "coe"
-  || x == "hcom"
-  || x == "Glue"
-  || x == "glue"
-  || x == "data"
-  || x == "unglue"
-  || x == "elim"
-  || x == "com"
-  || x == "I"
-  || x == "refl"
-  || x == "ap"
+isKeyword = \case
+  'G':'l':'u':'e':[]         -> True
+  'I':[]                     -> True
+  'U':[]                     -> True
+  'a':'p':[]                 -> True
+  'c':'o':'e':[]             -> True
+  'c':'o':'m':[]             -> True
+  'd':'a':'t':'a':[]         -> True
+  'e':'l':'i':'m':[]         -> True
+  'g':'l':'u':'e':[]         -> True
+  'h':'c':'o':'m':[]         -> True
+  'i':'m':'p':'o':'r':'t':[] -> True
+  'l':'e':'t':[]             -> True
+  'r':'e':'f':'l':[]         -> True
+  'u':'n':'g':'l':'u':'e':[] -> True
+  'λ':[]                     -> True
+  _                          -> False
+
 
 ident :: Parser Name
 ident = try do
@@ -364,7 +386,12 @@ top =
         char ';'
         u <- top
         pure $! TDef (coerce pos) x ma t u)
-      (pure TEmpty))
+      (branch ((,) <$!> getSourcePos <*!> (keyword "import" *> ident))
+        (\(pos, file) -> do
+            char ';'
+            u <- top
+            pure $ TImport (coerce pos) file u)
+        (pure TEmpty)))
 
 src :: Parser Top
 src = ws *> top <* eof

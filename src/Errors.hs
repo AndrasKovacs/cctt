@@ -3,6 +3,7 @@ module Errors where
 
 import Control.Exception
 import qualified Data.Map.Strict as M
+import Data.List
 
 import Common
 import CoreTypes
@@ -38,6 +39,8 @@ data Error
   | NonNeutralCofInSystem
   | NoSuchField Tm
   | CantInferHole
+  | ImportCycle FilePath [FilePath]
+  | CantOpenFile FilePath
   deriving Show
 
 instance Exception Error where
@@ -174,6 +177,13 @@ showError = \case
 
   CantInferHole ->
     "Can't infer type for hole"
+
+  ImportCycle path cycle ->
+    "Imports form a cycle:\n\n"
+    ++ intercalate " -> " (dropWhile (/=path) cycle ++ [path])
+
+  CantOpenFile path ->
+    "Can't open file: " ++ path
 
 displayErrInCxt :: ErrInCxt -> IO ()
 displayErrInCxt (ErrInCxt e) = withPrettyArgs do

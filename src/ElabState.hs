@@ -4,6 +4,7 @@ module ElabState where
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.IORef
+import Data.Time.Clock
 
 import Common
 import CoreTypes
@@ -25,20 +26,21 @@ type TopLvl     = (?topLvl     :: Lvl)
 type LocalTypes = (?localTypes :: [Box VTy])
 
 data TopState = TopState {
-    topStateDefs        :: [(Val, VTy)]
-  , topStateLvl         :: Lvl
-  , topStateTbl         :: Table
-  , topStateLoadedFiles :: S.Set FilePath
-  , topStateLoadCycle   :: S.Set FilePath
-  , topStatePrintNf     :: Maybe Name
-  , topStateCurrentPath :: FilePath
-  , topStateCurrentSrc  :: String
-  , topStateVerbose     :: Bool
-  , topStateErrPrinting :: Bool }
+    topStateDefs         :: [(Val, VTy)]
+  , topStateLvl          :: Lvl
+  , topStateTbl          :: Table
+  , topStateLoadedFiles  :: S.Set FilePath
+  , topStateLoadCycle    :: [FilePath]
+  , topStatePrintNf      :: Maybe Name
+  , topStateCurrentPath  :: FilePath
+  , topStateCurrentSrc   :: String
+  , topStateVerbose      :: Bool
+  , topStateErrPrinting  :: Bool
+  , topStateParsingTime  :: NominalDiffTime}
 makeFields ''TopState
 
 initialTop :: TopState
-initialTop = TopState [] 0 mempty mempty mempty Nothing "" "" False False
+initialTop = TopState [] 0 mempty mempty mempty Nothing "" "" False False 0
 
 topState :: IORef TopState
 topState = runIO $ newIORef initialTop
