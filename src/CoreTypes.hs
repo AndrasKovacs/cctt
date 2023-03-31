@@ -388,6 +388,8 @@ data IClosure
   | ICSym Val ~Val ~Val Val
   | ICTrans Val ~Val ~Val ~Val Val Val
   | ICAp Val ~Val ~Val Val
+
+  | ICBindI (BindI Val)
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -517,6 +519,7 @@ instance SubAction IClosure where
     ICCoeCoh1 a r r' x      -> ICCoeCoh1 (sub a) (sub r) (sub r') (sub x)
     ICCoeCoh2 a r r' x l    -> ICCoeCoh2 (sub a) (sub r) (sub r') (sub x) (sub l)
     ICCoeCoh0Rhs a r r' x   -> ICCoeCoh0Rhs (sub a) (sub r) (sub r') (sub x)
+    ICBindI a               -> ICBindI (sub a)
 
 instance SubAction VMethods where
   sub = \case

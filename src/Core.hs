@@ -655,6 +655,9 @@ icapp (NICl _ t) arg = case t of
   ICAp f x y p ->
     let i = arg in f ∙ papp x y p i
 
+  ICBindI a ->
+    a ∙ arg
+
 proj1 :: NCofArg => DomArg => Name -> Val -> Val
 proj1 x t = case frc t of
   VPair _ t _ -> t

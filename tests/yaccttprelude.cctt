@@ -9,14 +9,14 @@ Square (A : U) (a0 a1 b0 b1 : A)
                (r0 : a0 = b0) (r1 : a1 = b1) : U
  := r0 ={i. u i = v i} r1;
 
-the (A : U) (x : A) : A := x;
+the (A : U) (x : A) := x;
 
 Path (A : U)(x y : A) : U := x = y;
 PathP (A : I → U)(x : A 0)(y : A 1) : U := x ={i. A i} y;
 
 refl' (A : U)(x : A) : x = x := λ _. x;
 
-reflLine (A : U) (a : A) : I → A := λ _. a;
+reflLine (A : U) (a : A) (i : I) := a;
 
 testPathEta (A : U) (a b : A) (p : a = b) : p = (λ i. p i)
   := refl;
@@ -135,8 +135,8 @@ J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : 
 JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
   : J A a C d a (λ _. a) = d :=
 
-  let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
-  let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
+  let sq (i j : I)      := hcom 0 j [i=0 _. a; i=1 _. a] a;
+  let cube (i j k : I)  := hcom 0 j [k=0 x. sq i x;
                                         k=1 _. a;
                                         i=0 _. a;
                                         i=1 _. a] a;
@@ -886,14 +886,14 @@ lemIso (A B : U) (i : iso A B) (b : B) (f0 f1 : fiber A B i.1 b) : f0 = f1 :=
 -- Version of lemIso with heavy use of line types:
 lemIsoWithLines (A B : U) (is : iso A B) (b : B) (f0 f1 : fiber A B is.f b) : f0 = f1 :=
 
-  let x0 : A                     := f0.1;
-  let p0 : is.f x0 = b           := f0.2;
-  let x1 : A                     := f1.1;
-  let p1 : is.f x1 = b           := f1.2;
+  let x0 := f0.1;
+  let p0 := f0.2;
+  let x1 := f1.1;
+  let p1 := f1.2;
 
-  let sq0 (i j : I) : A := hcom 0 j [i=0. is.rinv x0; i=1 x. is.g b] (is.g (p0 i));
-  let sq1 (i j : I) : A := hcom 0 j [i=0. is.rinv x1; i=1 x. is.g b] (is.g (p1 i));
-  let sq2 (i j : I) : A := hcom 1 j [i=0 k. sq0 k 1;i=1 k. sq1 k 1] (is.g b);
+  let sq0 (i j : I) := hcom 0 j [i=0. is.rinv x0; i=1 x. is.g b] (is.g (p0 i));
+  let sq1 (i j : I) := hcom 0 j [i=0. is.rinv x1; i=1 x. is.g b] (is.g (p1 i));
+  let sq2 (i j : I) := hcom 1 j [i=0 k. sq0 k 1;i=1 k. sq1 k 1] (is.g b);
 
   λ i. ( sq2 i 0
        , λ j. hcom 0 1 [i=0. is.linv (p0 j)

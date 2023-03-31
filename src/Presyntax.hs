@@ -17,9 +17,9 @@ data Tm
   | Let Name (Maybe Ty) Tm Tm
   | Pi Name Ty Ty
   | App Tm Tm
-  | PApp Tm Tm Tm Tm    -- explicit endpoints: t {l}{r} u
-  | Lam Name Tm
-  | PLam Tm Tm Name Tm  -- explicit endpoints: λ {l}{r} x. t
+  | PApp Tm Tm Tm Tm        -- explicit endpoints: t {l}{r} u
+  | Lam Name (Maybe Ty) Tm
+  | PLam Tm Tm Name Tm      -- explicit endpoints: λ {l}{r} x. t
 
   | Sg Name Ty Ty
   | Pair Tm Tm

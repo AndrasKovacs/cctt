@@ -105,10 +105,16 @@ check t topA = case t of
 
   t -> case (t, frc topA) of
 
-    (P.Lam x t, VPi a b) -> do
+    (P.Lam x ann t, VPi a b) -> do
+      case ann of Nothing -> pure ()
+                  Just a' -> do a' <- check a' VU
+                                conv (eval a') a
       Lam x <$!> bind x a (\v -> check t (b ∙ v))
 
-    (P.Lam x t, VPath a l r) -> do
+    (P.Lam x ann t, VPath a l r) -> do
+      case ann of Nothing               -> pure ()
+                  Just (P.unPos -> P.I) -> pure ()
+                  Just _                -> err $ GenericError "Expected an interval binder"
       t <- bindI x \i -> check t (a ∙ IVar i)
       convEndpoints l (instantiate t I0)
       convEndpoints r (instantiate t I1)
@@ -142,7 +148,10 @@ check t topA = case t of
       q <- check q (VPath a y z)
       pure $! Trans (quote a) (quote x) (quote y) (quote z) p q
 
-    (P.Lam x t, VLine a) -> do
+    (P.Lam x ma t, VLine a) -> do
+      case ma of Nothing               -> pure ()
+                 Just (P.unPos -> P.I) -> pure ()
+                 Just _                -> err $ GenericError "Expected an interval binder"
       t <- bindI x \r -> check t (a ∙ IVar r)
       pure $ LLam x t
 
@@ -163,8 +172,8 @@ check t topA = case t of
 
     (P.Hole i p, a) -> setPos p do
       withPrettyArgs do
-        putStrLn ("\nHOLE ?" ++ maybe (sourcePosPretty ?srcPos) id i)
-        putStrLn ("  : " ++ pretty (quote a) ++ "")
+        putStrLn ("HOLE:" ++ sourcePosPretty ?srcPos ++ maybe "" ("?"++) i)
+        putStrLn ("  : " ++ pretty (quote a) ++ "\n")
         pure (Hole i p)
 
     (t, VWrap x a) -> do
@@ -263,11 +272,32 @@ infer = \case
       a ->
         err $! ExpectedPath (quote a)
 
-  P.Lam{} ->
+  P.Lam x Nothing t ->
     err CantInferLam
 
-  P.PLam{} ->
-    err CantInferLam
+  P.Lam x (Just a) t -> case P.unPos a of
+    -- line type
+    P.I -> bindI x \i -> do
+      Infer t a <- infer t
+      pure $! Infer (LLam x t) (VLine $ NICl x $ ICBindI (BindI x i a))
+
+    a -> do
+      a <- eval <$!> check a VU
+      (t, b, qb) <- bind x a \_ -> do Infer t b <- infer t
+                                      let qb = quote b
+                                      pure (t, b, qb)
+      pure $! Infer (Lam x t) (VPi a $ NCl x $ CEval (EC (idSub (dom ?cof)) ?env qb))
+
+  -- we infer non-dependent path types to explicit path lambdas.
+  P.PLam l r x t -> do
+    Infer l a <- infer l
+    r <- check r a
+    t <- bindI x \i -> check t a
+    let vl = eval l
+        vr = eval r
+    convEndpoints vl (instantiate t I0)
+    convEndpoints vr (instantiate t I1)
+    pure $! Infer (PLam l r x t) (VPath (NICl x (ICConst a)) vl vr)
 
   P.Sg x a b -> do
     a <- check a VU

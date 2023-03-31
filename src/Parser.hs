@@ -41,24 +41,8 @@ prod       = char '*' <|> char '×'
 branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
 branch p t f = (t =<< p) <|> f
 
--- isKeyword :: String -> Bool
--- isKeyword = \case
---   "Glue"   -> True
---   "I"      -> True
---   "U"      -> True
---   "ap"     -> True
---   "coe"    -> True
---   "com"    -> True
---   "data"   -> True
---   "elim"   -> True
---   "glue"   -> True
---   "hcom"   -> True
---   "import" -> True
---   "let"    -> True
---   "refl"   -> True
---   "unglue" -> True
---   "λ"      -> True
---   _        -> False
+-- keywords = ["Glue", "I", "U", "ap", "coe", "com", "data", "elim", "glue",
+--             "hcom", "import", "let", "refl", "unglue", "λ"]
 
 isKeyword :: String -> Bool
 isKeyword = \case
@@ -198,7 +182,7 @@ goCom = do
 methods :: Parser [([Name], Tm)]
 methods =
   char '[' *>
-  sepBy ((,) <$!> ((:) <$!> ident <*!> many bind) <*!> (char '.' *> tm)) (char ';')
+  sepBy ((//) <$!> ((:) <$!> ident <*!> many bind) <*!> (char '.' *> tm)) (char ';')
   <* char ']'
 
 goElim :: Parser Tm
@@ -266,7 +250,7 @@ sigma =
 
 piBinder :: Parser ([Name], Ty)
 piBinder =
-  (,) <$!> (char '(' *> some bind) <*!> (char ':' *> tm <* char ')')
+  (//) <$!> (char '(' *> some bind) <*!> (char ':' *> tm <* char ')')
 
 pi :: Parser Tm
 pi =
@@ -291,52 +275,48 @@ pi =
           (\_ -> Pi "_" t <$!> pi)
           (pure t))
 
-data LamBind = LBind Name | LPLam Tm Tm Name
+data LamBind = LBind Name (Maybe Tm) | LPLam Tm Tm Name
 
 lamBind :: Parser LamBind
 lamBind =
       do {l <- char '{' *> tm <* char '}'; r <- char '{' *> tm <* char '}';
           x <- bind; pure $ LPLam l r x}
-  <|> (LBind <$!> bind)
+  <|> do {char '('; x <- bind; char ':'; a <- tm; char ')'; pure (LBind x (Just a))}
+  <|> (LBind <$!> bind <*!> pure Nothing)
 
 lam :: Parser Tm
 lam = do
   lambda
-  bs <- some ((,) <$!> getSourcePos <*!> lamBind)
+  bs <- some ((//) <$!> getSourcePos <*!> lamBind)
   char '.'
   t <- lamlet
   pure $! foldr'
     (\(pos,b) t -> case b of
-        LBind x     -> Pos (coerce pos) (Lam x t)
+        LBind x ma  -> Pos (coerce pos) (Lam x ma t)
         LPLam l r x -> Pos (coerce pos) (PLam l r x t))
     t bs
   -- pure $! foldr' (\(pos, x) t -> Pos (coerce pos) (Lam x t)) t bs
 
 -- | Desugar Coq-style definition args.
 desugarIdentArgs :: [([Name], Ty)] -> Maybe Ty -> Tm -> (Tm, Maybe Ty)
-desugarIdentArgs args mty rhs = (tm, ty) where
+desugarIdentArgs args mty rhs = case mty of
+  -- if there's no return type annotation, we desugar to annotated lambdas
+  Nothing -> let
+    tm = foldr' (\(xs, a) t -> foldr' (\x t -> Lam x (Just a) t) t xs) rhs args
+    in tm // Nothing
 
-  mkTy :: [([Name], Ty)] -> Ty -> Ty
-  mkTy args a = foldr' (\(xs, a) b -> foldr' (\x -> Pi x a) b xs) a args
-
-  mkTm :: [([Name], Ty)] -> Tm -> Tm
-  mkTm args t = foldr' (\(xs, _) t -> foldr' Lam t xs) t args
-
-  ty = fmap (mkTy args) mty
-  tm = mkTm args rhs
+  -- if there's a return type, we desugar to a vanilla annotated "let".
+  Just a  -> let
+    tm = foldr' (\(xs, _) t -> foldr' (\x t -> Lam x Nothing t) t xs) rhs args
+    ty = foldr' (\(xs, a) b -> foldr' (\x -> Pi x a) b xs) a args
+    in tm // Just ty
 
 pLet :: Parser Tm
 pLet = do
   keyword "let"
   x <- ident
   args <- many piBinder
-  ma <- case args of
-    [] -> optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
-    _  -> do o <- getOffset
-             char ':'
-             branch (char '=')
-               (\_ -> setOffset o >> fail "Expected a type annotation")
-               (Just <$!> tm)
+  ma   <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
   symbol ":="
   t <- tm
   (t, ma) <- pure $! desugarIdentArgs args ma t
@@ -361,32 +341,26 @@ telescope = do
 
 top :: Parser Top
 top =
-  branch ((,) <$!> getSourcePos <*> (keyword "data" *> ident))
+  branch ((//) <$!> getSourcePos <*> (keyword "data" *> ident))
     (\(pos, x) -> do
         params <- telescope
         symbol ":="
-        constructors <- sepBy ((,) <$!> ident <*!> telescope) (char '|')
+        constructors <- sepBy ((//) <$!> ident <*!> telescope) (char '|')
         char ';'
         u <- top
         pure $! TData (coerce pos) x params constructors u
     )
-    (branch ((,) <$!> getSourcePos <*!> ident)
+    (branch ((//) <$!> getSourcePos <*!> ident)
       (\(pos, x) -> do
         args <- many piBinder
-        ma <- case args of
-          [] -> optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
-          _  -> do o <- getOffset
-                   char ':'
-                   branch (char '=')
-                     (\_ -> setOffset o >> fail "Expected a type annotation")
-                     (Just <$!> tm)
+        ma   <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
         symbol ":="
         t <- tm
         (t, ma) <- pure $! desugarIdentArgs args ma t
         char ';'
         u <- top
         pure $! TDef (coerce pos) x ma t u)
-      (branch ((,) <$!> getSourcePos <*!> (keyword "import" *> ident))
+      (branch ((//) <$!> getSourcePos <*!> (keyword "import" *> ident))
         (\(pos, file) -> do
             char ';'
             u <- top

@@ -61,6 +61,5 @@ mainWith getArgs = do
   putStrLn ("checked " ++ show (topLen top) ++ " definitions")
 
   when printelab do
-    putStrLn ""
     putStrLn $ pretty top
   pure ()

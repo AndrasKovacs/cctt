@@ -41,6 +41,7 @@ data Error
   | CantInferHole
   | ImportCycle FilePath [FilePath]
   | CantOpenFile FilePath
+  | GenericError String
   deriving Show
 
 instance Exception Error where
@@ -73,6 +74,9 @@ withPrettyArgs act =
 
 showError :: PrettyArgs (Error -> String)
 showError = \case
+  GenericError msg ->
+    msg
+
   CantConvertExInf t u ->
     "Can't convert expected type\n\n" ++
     "  " ++ pretty u ++ "\n\n" ++
