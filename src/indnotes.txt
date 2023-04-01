@@ -1,0 +1,112 @@
+
+Strict inductive types in Mini-TT style
+
+data D params =
+    C1 fs
+  | C2 fs
+  | C3 fs
+
+Previous constructors are in the scope of later ones, e.g:
+
+  data Foo = C1 | C2 (p : C1 = C2)
+
+No positivity checking
+
+Type and data constructors must be saturated
+
+Checking a declaration
+
+  1 check that D params are fine
+  2 add D to cxt as a TyCon, but disable casing on it
+  3 push params to context
+  4 check that each "fs" is a well-typed telescope. No positivity checking.
+  5 pop params, enable casing on D.
+
+- TyCon symbols store the list of their DCons.
+- DCon symbol entries store their field telescope and return type
+    (the return type is in the param+fields) context.
+- DCon does not store parameters
+
+Checking a TyCon:
+  0 get head of a presyntactic spine, see if the symbol is a tycon
+  1 check params against tycon param telescope
+    (we need an accumulating env)
+
+Checking a DCon with (TyCon params)
+  0 get head of a presyntactic spine, see if the symbol is a DCon
+  1 initial accummulating env is params, then check fields against
+    telescope, while pushing lazy field values to accummulating env
+
+Recursion:
+  - only top-level recursion!
+  - when we go under a topdef, if there's a type annotation available, we add it
+    to the elabcxt and mark the name as recursive. If there's no top annotation,
+    we get an error on recursion.
+  - when we get out from under the topdef, it's not recursive anymore
+  - when we go under a split, we disable recursive unfolding
+
+We use type-annotated case splits. LambdaCases are syntactic sugar on top of it.
+
+Elaborating a case:
+  1 infer type for scrutinee
+  2 elaborate return type annotation
+  3 scrutinee type must be TyCon params
+  4   all constructors must be listed in order
+      check all case bodies under extended env, with instantiated ret type
+
+  Sugars:
+    - when ret type is omitted, infer non-dependent ret type from first branch
+    - sugar for lambda case
+       λ C1 _ _. ...; C2 _ _ _. ...; C3. ...
+       -->
+       λ x. case x (x.B) of
+         C1 _ _. ...;
+	 C2 _ _. ...;
+	 C3.     ...
+
+       This is desugared during elaboration, not parsing, because we
+       want a checking VPi
+
+    - un-annotated case can be also checked with constant expected type
+
+  Example:
+
+    add : Nat → Nat → Nat
+    add := λ
+      zero.  λ y. y;
+      suc x. λ y. suc (add x y);
+
+    add (x y : Nat) : Nat := case x of    -- non-dependent case
+      zero. y;
+      suc x. suc (add x y);
+
+Evaluating a case:
+  - eval scrutinee
+  - if DCon fs, lookup case branch, push fs to env, eval case body
+  - if neutral, neutral
+
+hcom r r' (TyCon ps) [α i. t] b =
+  - if b is neutral, neutral
+  - if b is canonical
+    - if dom is 0, lazily project the system
+    - if dom /= 0, try to project the system, block on neutral
+    - compute field types from syntactic DCon fields telescope + TyCon params
+
+coe r r' (i. TyCon (ps i)) b =
+  - if b is neutral, neutral
+  - if b is canonical
+    - recursively coe all fields
+    - field coe types computed from ps and syntactic DCon field types
+    - we accummulate an env under the "i" binder
+    - for each field
+       - eval field type under env to get A
+       - "coe r r' (i. A i) field" goes into output
+       - We extend the accummulated env with "coe r i A field", i.e. the coeFill
+
+     e.g:
+
+      data T (A : U) (B : A → U) := C (x : A) (y : B x)
+
+      coe r r' (i. T (A i) (B i)) (C x y)
+      =
+      C (coe r r' A x) (coe r r' (i. B (coe r i A x)) y)
