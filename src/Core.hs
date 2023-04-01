@@ -666,11 +666,6 @@ proj1 x t = case frc t of
   _           -> impossible
 {-# inline proj1 #-}
 
--- -- | Project under a binder.
--- proj1BindILazy :: NCofArg => DomArg => BindILazy Val -> BindILazy Val
--- proj1BindILazy t = umapBindILazy t proj1
--- {-# inline proj1BindILazy #-}
-
 proj2 :: NCofArg => DomArg => Name -> Val -> Val
 proj2 x t = case frc t of
   VPair _ _ u -> u
