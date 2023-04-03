@@ -194,21 +194,25 @@ topVar x = str (?names `showVar` NKTop x)
 dSpine :: PrettyArgs (DSpine -> Txt)
 dSpine = \case
   DNil         -> mempty
-  DInd t sp    -> " " <> proj t <> dSpine sp
-  DHInd t _ sp -> " " <> proj t <> dSpine sp
-  DExt t _ sp  -> " " <> proj t <> dSpine sp
+  DCons t sp   -> " " <> proj t <> dSpine sp
 
-sepby :: (a -> Txt) -> [a] -> Txt -> Txt
-sepby f []     sep = mempty
-sepby f [a]    sep = f a
-sepby f (a:as) sep = f a <> sep <> sepby f as sep
-{-# inline sepby #-}
+-- sepby :: (a -> Txt) -> [a] -> Txt -> Txt
+-- sepby f []     sep = mempty
+-- sepby f [a]    sep = f a
+-- sepby f (a:as) sep = f a <> sep <> sepby f as sep
+-- {-# inline sepby #-}
 
-methods :: PrettyArgs (Methods -> Txt)
-methods = \case
-  MNil            -> mempty
-  MCons xs t MNil -> sepby str xs " " <> ". " <> proj t
-  MCons xs t ms   -> sepby str xs " " <> ". " <> proj t <> "; " <> methods ms
+caseBody :: PrettyArgs ([Name] -> Tm -> Txt)
+caseBody xs t = case xs of
+  []   -> ". " <> proj t
+  [x]  -> fresh x \x -> " " <> x <> ". " <> proj t
+  x:xs -> fresh x \x -> " " <> x <> caseBody xs t
+
+cases :: PrettyArgs (Cases -> Txt)
+cases = \case
+  CSNil               -> mempty
+  CSCons x xs t CSNil -> str x <> caseBody xs t
+  CSCons x xs t cs    -> str x <> caseBody xs t <> "; " <> cases cs
 
 tyParams :: PrettyArgs (TyParams -> Txt)
 tyParams = \case
@@ -230,6 +234,7 @@ unProject t x = case t of
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
   TopVar x _        -> topVar x
+  RecursiveCall x   -> topVar x
   LocalVar x        -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
   Let x a t u       -> let pa = let_ a; pt = let_ t in fresh x \x ->
                        letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
@@ -290,8 +295,10 @@ tm = \case
   TyCon x ts        -> appp (topVar x <> tyParams ts)
   DCon x _ DNil     -> topVar x
   DCon x _ sp       -> appp (topVar x <> dSpine sp)
-  Elim mot met t    -> appp ("elim " <> proj mot <> " [" <> methods met <> "] " <> proj t)
-
+  Case t x b cs     -> ifVerbose
+                        (let pt = proj t; pcs = cases cs in fresh x \x ->
+                         appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
+                        (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
   Wrap x a          -> "(" <> str x <> " : " <> pair a <> ")"
   Pack x t          -> tm t
   Unpack t x        -> case unProject t x of

@@ -59,13 +59,13 @@ convReflEndpoints t u = if Conversion.conv t u
   else err $ CantConvertReflEndpoints (quote t) (quote u)
 
 eval :: NCofArg => DomArg => EnvArg => Tm -> Val
-eval t = let ?sub = idSub (dom ?cof) in Core.eval t
+eval t = let ?sub = idSub (dom ?cof); ?recurse = DontRecurse in Core.eval t
 
 evalSys :: NCofArg => DomArg => EnvArg => Sys -> VSys
-evalSys sys = let ?sub = idSub (dom ?cof) in Core.evalSys sys
+evalSys sys = let ?sub = idSub (dom ?cof); ?recurse = DontRecurse in Core.evalSys sys
 
 instantiate :: NCofArg => DomArg => EnvArg => Tm -> I -> Val
-instantiate t i = let ?sub = idSub (dom ?cof) `ext` i in Core.eval t
+instantiate t i = let ?sub = idSub (dom ?cof) `ext` i in eval t
 
 evalCof :: NCofArg => Cof -> VCof
 evalCof cof = let ?sub = idSub (dom ?cof) in Core.evalCof cof
@@ -286,7 +286,7 @@ infer = \case
       (t, b, qb) <- bind x a \_ -> do Infer t b <- infer t
                                       let qb = quote b
                                       pure (t, b, qb)
-      pure $! Infer (Lam x t) (VPi a $ NCl x $ CEval (EC (idSub (dom ?cof)) ?env qb))
+      pure $! Infer (Lam x t) (VPi a $ NCl x $ CEval (EC (idSub (dom ?cof)) ?env DontRecurse qb))
 
   -- we infer non-dependent path types to explicit path lambdas.
   P.PLam l r x t -> do
@@ -418,8 +418,6 @@ infer = \case
     bindI "i" \(IVar -> i) -> conv (a' ∙ i) a
     let vf = eval f
     pure $ Infer (Ap f (quote x) (quote y) p) (path (b ∙ x) (vf ∙ x) (vf ∙ y))
-
-  P.Elim{} -> uf
 
   P.Hole i p -> setPos p do
     err CantInferHole

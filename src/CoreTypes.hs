@@ -12,12 +12,13 @@ type Ty = Tm
 
 data Tm
   = TopVar Lvl ~(DontShow Val)
+  | RecursiveCall Lvl
   | LocalVar Ix
   | Let Name Tm Ty Tm
 
   | TyCon Lvl TyParams
   | DCon Lvl Lvl DSpine         -- con lvl, con lvl relative to tycon (TODO: pack)
-  | Elim ~Tm Methods Tm         -- motive, methods, scrutinee
+  | Case Tm Name ~Tm Cases
 
   | Pi Name Ty Ty
   | App Tm Tm
@@ -64,17 +65,14 @@ data Tm
   | Ap Tm ~Tm ~Tm Tm
   deriving Show
 
-data Methods
-  = MNil
-  | MCons [Name] Tm Methods
+data Cases
+  = CSNil
+  | CSCons Name [Name] Tm Cases
   deriving Show
 
 data DSpine
   = DNil
-  | DInd Tm DSpine       -- inductive argument
-  | DHInd Tm Ty DSpine   -- infinitary inductive argument, there's exactly one
-                         -- function param with in-signature type Ty.
-  | DExt Tm Ty DSpine    -- external param with signature type Ty.
+  | DCons Tm DSpine
   deriving Show
 
 -- | Atomic equation.
@@ -231,13 +229,14 @@ data Val
   | VLine NamedIClosure
   | VLLam NamedIClosure
   | VTyCon Lvl Env
-  | VDCon Lvl Lvl VDSpine
+  | VDCon Lvl Lvl VDSpine          -- con lvl, relative lvl
 
   | VHole (Maybe Name) (DontShow SourcePos) Sub Env
   deriving Show
 
 data Ne
   = NLocalVar Lvl
+  | NDontRecurse Lvl
   | NSub Ne Sub
   | NApp Ne Val
   | NPApp ~Val ~Val Ne I
@@ -249,20 +248,12 @@ data Ne
   | NHCom I I VTy NeSysHCom Val
   | NUnglue Ne NeSys
   | NGlue Val ~NeSys NeSys
-  | NElim ~Val VMethods Ne -- motive, methods, scrutinee
-  deriving Show
-
-data VMethods
-  = VMNil
-  | VMCons [Name] EvalClosure VMethods
+  | NCase Ne NamedClosure (EvalClosure Cases)
   deriving Show
 
 data VDSpine
   = VDNil
-  | VDInd Val VDSpine       -- inductive argument
-  | VDHInd Val Ty VDSpine   -- infinitary inductive argument, there's exactly one
-                            -- function param with in-signature type Ty.
-  | VDExt Val Ty VDSpine    -- external param with signature type Ty.
+  | VDCons Val VDSpine
   deriving Show
 
 --------------------------------------------------------------------------------
@@ -276,13 +267,18 @@ type IDomArg = (?idom :: IVar)   -- fresh LocalVar
 
 --------------------------------------------------------------------------------
 
-data EvalClosure = EC Sub Env Tm
+data Recurse = Recurse ~Val | DontRecurse
+  deriving Show
+
+type RecurseArg = (?recurse :: Recurse)
+
+data EvalClosure a = EC Sub Env Recurse a
   deriving Show
 
 -- | Defunctionalized closures.
 data Closure
   -- ^ Body of vanilla term evaluation.
-  = CEval EvalClosure
+  = CEval (EvalClosure Tm)
 
   -- ^ Body of function coercions.
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
@@ -344,14 +340,11 @@ data Closure
   -- [A]  (B* : U) × equiv B A
   | CEquivInto Val
 
-  -- λ x. elim motive methods (val ∙ x)
-  | CHInd Val VMethods Val   -- motive, methods, val
-
   deriving Show
 
 -- | Defunctionalized closures for ivar abstraction
 data IClosure
-  = ICEval Sub Env Tm
+  = ICEval Sub Env Recurse Tm
   | ICCoePath I I (BindI NamedIClosure) (BindI Val) (BindI Val) Val
   | ICHComPath I I NamedIClosure Val Val NeSysHCom Val
   | ICConst Val
@@ -461,8 +454,8 @@ instance SubAction NamedIClosure where
   sub (NICl x cl) = NICl x (sub cl)
   {-# inline sub #-}
 
-instance SubAction EvalClosure where
-  sub (EC s' env t) = EC (sub s') (sub env) t
+instance SubAction (EvalClosure a) where
+  sub (EC s' env rc t) = EC (sub s') (sub env) rc t
   {-# inline sub #-}
 
 instance SubAction Closure where
@@ -493,12 +486,11 @@ instance SubAction Closure where
     CCoeLinv0 a r r'          -> CCoeLinv0 (sub a) (sub r) (sub r')
     CCoeRinv0 a r r'          -> CCoeRinv0 (sub a) (sub r) (sub r')
     CCoeCoh0 a r r'           -> CCoeCoh0 (sub a) (sub r) (sub r')
-    CHInd mot ms t            -> CHInd (sub mot) (sub ms) (sub t)
 
 instance SubAction IClosure where
   sub cl = case cl of
-    ICEval s' env t ->
-      ICEval (sub s') (sub env) t
+    ICEval s' env rc t ->
+      ICEval (sub s') (sub env) rc t
 
     -- recursive sub here as well!
     ICCoePath r r' a lh rh p ->
@@ -521,11 +513,6 @@ instance SubAction IClosure where
     ICCoeCoh0Rhs a r r' x   -> ICCoeCoh0Rhs (sub a) (sub r) (sub r') (sub x)
     ICBindI a               -> ICBindI (sub a)
 
-instance SubAction VMethods where
-  sub = \case
-    VMNil          -> VMNil
-    VMCons xs t ms -> VMCons xs (sub t) (sub ms)
-
 instance SubAction a => SubAction [a] where
   sub = \case
     []   -> []
@@ -534,10 +521,8 @@ instance SubAction a => SubAction [a] where
 
 instance SubAction VDSpine where
   sub = \case
-    VDNil         -> VDNil
-    VDInd t sp    -> VDInd (sub t) (sub sp)
-    VDHInd t a sp -> VDHInd (sub t) a (sub sp)
-    VDExt t a sp  -> VDExt (sub t) a (sub sp)
+    VDNil       -> VDNil
+    VDCons v vs -> VDCons (sub v) (sub vs)
 
 --------------------------------------------------------------------------------
 

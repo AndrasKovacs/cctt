@@ -38,12 +38,13 @@ Checking a DCon with (TyCon params)
     telescope, while pushing lazy field values to accummulating env
 
 Recursion:
-  - only top-level recursion!
-  - when we go under a topdef, if there's a type annotation available, we add it
-    to the elabcxt and mark the name as recursive. If there's no top annotation,
-    we get an error on recursion.
-  - when we get out from under the topdef, it's not recursive anymore
-  - when we go under a split, we disable recursive unfolding
+  - only top-level recursion
+  - in syntax, recursive calls are distinct from topdefs
+    - Recursive calls are by Lvl, not by ~Val. That's because it is not possible
+      to plug in the value during elaboration (we don't yet have the value!)
+    - We pass the recursive call during evaluation, as Maybe Val. Going under
+      a case locks the recursive call (turns it to Nothing)
+
 
 We use type-annotated case splits. LambdaCases are syntactic sugar on top of it.
 

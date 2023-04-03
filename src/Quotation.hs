@@ -31,7 +31,8 @@ instance Quote Ne Tm where
     NUnglue t sys     -> Unglue (quote t) (quote sys)
     NGlue t s1 s2     -> Glue (quote t) (quote s1) (quote s2)
     NLApp t i         -> LApp (quote t) (quote i)
-    NElim mot ms t    -> Elim (quote mot) (quote ms) (quote t)
+    NDontRecurse x    -> RecursiveCall x
+    NCase t b cs      -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
 
 instance Quote Val Tm where
   quote t = case frc t of
@@ -53,6 +54,31 @@ instance Quote Val Tm where
     VTyCon x ts      -> TyCon x (quote ts)
     VDCon x i sp     -> DCon x i (quote sp)
 
+--------------------------------------------------------------------------------
+
+quoteCases' :: EvalArgs (Cases -> Cases)
+quoteCases' = \case
+  CSNil               -> CSNil
+  CSCons x xs body cs ->
+    CSCons x xs
+      (let (env, dom) = pushVars ?env xs in
+       let ?env = env; ?dom = dom in
+       quote (eval body))
+      (quoteCases' cs)
+
+-- We don't do recursive unfolding under Case binders
+quoteCases :: NCofArg => DomArg => EvalClosure Cases -> Cases
+quoteCases (EC sub env _ cs) =
+  let ?sub = sub; ?env = env; ?recurse = DontRecurse in quoteCases' cs
+{-# inline quoteCases #-}
+
+--------------------------------------------------------------------------------
+
+instance Quote VDSpine DSpine where
+  quote = \case
+    VDNil       -> DNil
+    VDCons t sp -> DCons (quote t) (quote sp)
+
 instance Quote a b => Quote (BindCofLazy a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
 
@@ -61,13 +87,6 @@ instance Quote a b => Quote [a] [b] where
     []   -> []
     a:as -> (:) $$! quote a $$! quote as
   {-# inline quote #-}
-
-instance Quote VDSpine DSpine where
-  quote = \case
-    VDNil         -> DNil
-    VDInd t sp    -> DInd (quote t) (quote sp)
-    VDHInd t a sp -> DHInd (quote t) a (quote sp)
-    VDExt t a sp  -> DExt (quote t) a (quote sp)
 
 instance Quote a b => Quote (BindCof a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
@@ -104,17 +123,7 @@ instance Quote NamedClosure Tm where
 instance Quote NamedIClosure Tm where
   quote t = freshI \(IVar -> i) -> quote (t ∙ i); {-# inline quote #-}
 
-instance Quote VMethods Methods where
-  quote = \case
-    VMNil          -> MNil
-    VMCons xs t ms -> MCons xs (quoteMethod xs t) (quote ms)
-
 instance Quote Env TyParams where
   quote = \case
     ENil       -> TPNil
     EDef env t -> TPSnoc (quote env) (quote t)
-
-quoteMethod :: NCofArg => DomArg => [Name] -> EvalClosure -> Tm
-quoteMethod xs (EC s e t) = case xs of
-  []   -> let ?sub = s; ?env = e in quote (eval t)
-  _:xs -> fresh \x -> quoteMethod xs (EC s (EDef e x) t)

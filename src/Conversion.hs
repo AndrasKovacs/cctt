@@ -9,6 +9,7 @@ import Interval
 
 -- Note: neutral inputs (NeSys, Ne, NeSysHCom) are assumed to be forced
 --       other things are not!
+-- Also: neutral inputs may have different types!
 ----------------------------------------------------------------------------------------------------
 
 class Conv a where
@@ -50,24 +51,25 @@ instance Conv Val where
     (t              , VPack x t'        ) -> conv (unpack x t) t'
 
     (VSub{}         , _                 ) -> impossible
-    (ft             , VSub{}            ) -> impossible
+    (_              , VSub{}            ) -> impossible
     _                                     -> False
 
 instance Conv Ne where
 
   conv t t' = case unSubNe t // unSubNe t' of
     (NLocalVar x   , NLocalVar x'      ) -> x == x'
+    (NDontRecurse x, NDontRecurse x'   ) -> x == x'
     (NApp t u      , NApp t' u'        ) -> conv t t' && conv u u'
     (NPApp p t u r , NPApp p' t' u' r' ) -> conv p p' && conv r r'
     (NProj1 n _    , NProj1 n' _       ) -> conv n n'
     (NProj2 n _    , NProj2 n' _       ) -> conv n n'
-    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv (frc i) (frc i')
+    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv i i'
 
     (NCoe r1 r2 a t, NCoe r1' r2' a' t') ->
       conv r1 r1' && conv r2 r2' && conv a a' && conv t t'
 
-    (NHCom r1 r2 _ sys t, NHCom r1' r2' _ sys' t') ->
-      conv r1 r1' && conv r2 r2' && conv sys sys' && conv t t'
+    (NHCom r1 r2 a sys t, NHCom r1' r2' a' sys' t') ->
+      conv r1 r1' && conv r2 r2' && conv a a' && conv sys sys' && conv t t'
 
     -- the types of the "a"-s can be different Glue-s a priori, that's
     -- why we first convert sys-es. Neutrals of different types can
@@ -76,8 +78,8 @@ instance Conv Ne where
     (NUnglue a sys    , NUnglue a' sys'      ) -> conv sys sys' && conv a a'
 
 
-    (NElim _   ms t   , NElim _ ms' t'       ) -> conv t t' && conv ms ms'
-    (NGlue b _ fib    , NGlue b' _ fib'      ) -> conv b b' && conv fib fib'
+    (NCase t b cs     , NCase t' b' cs'      ) -> conv t t' && conv b b' && convCases cs cs'
+    (NGlue b sys fib  , NGlue b' sys' fib'   ) -> conv b b' && conv sys sys' && conv fib fib'
 
     -- Glue eta
     -- A bit ugly that we put "mempty"-s there, and potentially dodgy, but the only
@@ -89,6 +91,25 @@ instance Conv Ne where
     (t      , NSub{} ) -> impossible
     _                  -> False
 
+convCases' :: NCofArg => DomArg => RecurseArg => Sub -> Env -> Cases -> Sub -> Env -> Cases -> Bool
+convCases' sub env cs sub' env' cs' = case (cs, cs') of
+  (CSNil            , CSNil             ) -> True
+  (CSCons _ xs t cs , CSCons _ _  t' cs') ->
+    (let (env , dom) = pushVars env  xs
+         (env', _  ) = pushVars env' xs in
+     let ?dom = dom in
+     let v  = (let ?env = env ; ?sub = sub  in eval t ) in
+     let v' = (let ?env = env'; ?sub = sub' in eval t') in
+     conv v v')
+    &&
+    convCases' sub env cs sub' env' cs'
+  _ ->
+    impossible
+
+convCases :: NCofArg => DomArg => EvalClosure Cases -> EvalClosure Cases -> Bool
+convCases (EC sub env _ cs) (EC sub' env' _ cs') =
+  let ?recurse = DontRecurse in convCases' sub env cs sub' env' cs'
+
 instance Conv NeCof where
   conv c c' = case (c, c') of
     (NCEq i j   , NCEq i' j'   ) -> conv i i' && conv j j'
@@ -98,21 +119,8 @@ instance Conv NeCof where
 instance Conv VDSpine where
   conv sp sp' = case (sp, sp') of
     (VDNil         , VDNil           ) -> True
-    (VDInd t sp    , VDInd t' sp'    ) -> conv t t' && conv sp sp'
-    (VDHInd t _ sp , VDHInd t' _ sp' ) -> conv t t' && conv sp sp'
-    (VDExt t _ sp  , VDExt t' _ sp'  ) -> conv t t' && conv sp sp'
+    (VDCons t sp   , VDCons t' sp'   ) -> conv t t' && conv sp sp'
     _                                  -> impossible
-
-instance Conv VMethods where
-  conv ms ms' = case (ms, ms') of
-    (VMNil         , VMNil          ) -> True
-    (VMCons xs t ms, VMCons _ t' ms') -> convMethod xs t t' && conv ms ms'
-    _                                 -> impossible
-
-convMethod :: NCofArg => DomArg => [Name] -> EvalClosure -> EvalClosure -> Bool
-convMethod xs (EC s e t) (EC s' e' t') = case xs of
-  []   -> conv (let ?env = e; ?sub = s in eval t) (let ?env = e'; ?sub = s' in eval t')
-  _:xs -> fresh \x -> convMethod xs (EC s (EDef e x) t) (EC s' (EDef e x) t')
 
 instance Conv a => Conv [a] where
   conv as as' = case (as, as') of

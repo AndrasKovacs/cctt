@@ -41,7 +41,7 @@ prod       = char '*' <|> char '×'
 branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
 branch p t f = (t =<< p) <|> f
 
--- keywords = ["Glue", "I", "U", "ap", "coe", "com", "data", "elim", "glue",
+-- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "data", "elim", "glue",
 --             "hcom", "import", "let", "refl", "unglue", "λ"]
 
 isKeyword :: String -> Bool
@@ -50,6 +50,7 @@ isKeyword = \case
   'I':[]                     -> True
   'U':[]                     -> True
   'a':'p':[]                 -> True
+  'c':'a':'s':'e':[]         -> True
   'c':'o':'e':[]             -> True
   'c':'o':'m':[]             -> True
   'd':'a':'t':'a':[]         -> True
@@ -179,19 +180,6 @@ goCom = do
   t   <- proj
   pure $ Com r r' a sys t
 
-methods :: Parser [([Name], Tm)]
-methods =
-  char '[' *>
-  sepBy ((//) <$!> ((:) <$!> ident <*!> many bind) <*!> (char '.' *> tm)) (char ';')
-  <* char ']'
-
-goElim :: Parser Tm
-goElim = do
-  motive  <- optional proj
-  methods <- methods
-  arg     <- optional proj
-  pure $ Elim motive methods arg
-
 goGlue :: Parser Tm
 goGlue = do
   base <- proj
@@ -201,11 +189,24 @@ goGlue = do
     Nothing   -> pure $ GlueTm base Nothing sys1
     Just sys2 -> pure $ GlueTm base (Just sys1) sys2
 
+goCase :: Parser Tm
+goCase = do
+  t <- proj
+  char '('
+  x <- bind
+  char '.'
+  b <- tm
+  char ')'
+  char '['
+  cases <- sepBy ((//) <$!> some ident <*!> (char '.' *> tm)) (char ';')
+  char ']'
+  pure $ Case t x b cases
+
 app :: Parser Tm
 app = withPos (
        (keyword "coe"     *> goCoe)
+  <|>  (keyword "case"    *> goCase)
   <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
-  <|>  (keyword "elim"    *> goElim)
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
   <|>  (keyword "glue"    *> goGlue)
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
@@ -295,7 +296,6 @@ lam = do
         LBind x ma  -> Pos (coerce pos) (Lam x ma t)
         LPLam l r x -> Pos (coerce pos) (PLam l r x t))
     t bs
-  -- pure $! foldr' (\(pos, x) t -> Pos (coerce pos) (Lam x t)) t bs
 
 -- | Desugar Coq-style definition args.
 desugarIdentArgs :: [([Name], Ty)] -> Maybe Ty -> Tm -> (Tm, Maybe Ty)

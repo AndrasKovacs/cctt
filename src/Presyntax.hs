@@ -30,11 +30,11 @@ data Tm
   | Wrap Name Ty
   | Hole (Maybe Name) (DontShow SourcePos)
 
+  | Case Tm Name Ty [([Name], Tm)]
+
   | U
   | Path Tm Tm                                -- x = y
   | DepPath BindMaybe Tm Tm                   -- x ={i.A} y | x ={p} y
-
-  | Elim (Maybe Tm) [([Name], Tm)] (Maybe Tm) -- elim {P} [con x y z. t] {x}
 
   | Coe Tm Tm BindMaybe Tm                    -- coe r r' i A t
   | HCom Tm Tm (Maybe Ty) SysHCom Tm          -- hcom r r' {A} [α x. t] u
