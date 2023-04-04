@@ -58,7 +58,7 @@ showVar m k =
         NKLocal x  -> '@':show x
         NKTop x    -> "@@"++show x
         NKLocalI x -> "@"++show x
-        NKDCon i j -> "@@"++show i++"."++show j
+        NKDCon i j -> "@@"++show i++"#"++show j
   in case M.lookup k m of
     Nothing      -> gokey
     Just ('_':_) -> gokey

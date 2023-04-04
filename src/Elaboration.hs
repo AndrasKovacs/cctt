@@ -194,14 +194,35 @@ check t topA = case t of
       convExInf a topA
       pure t
 
+inferDCon :: Elab (Lvl -> Lvl -> IO Infer)
+inferDCon x y = do
+  top <- getTop
+  case LM.lookup x (top^.topInfo) of
+    Just (TPEInductive [] cons) ->
+      if fromIntegral y < length cons then do
+        case cons !! fromIntegral y of
+          (con, []) -> pure $ Infer (DCon x y DNil) (VTyCon x ENil)
+          (con, _)  -> err $ GenericError "Data constructor should be fully applied"
+      else do
+        err $ GenericError "No such data constructor"
+    Just (TPEInductive _ _) ->
+      err $ GenericError "Can't infer type for data constructor with type parameters"
+    Just TPEDef{} ->
+      err $ GenericError "Expected the De Bruijn level of a type constructor, got a top-level definition instead"
+    Nothing ->
+      err TopLvlNotInScope
+
 infer :: Elab (P.Tm -> IO Infer)
 infer = \case
   P.Ident x -> case M.lookup x ?tbl of
     Nothing -> err $ NameNotInScope x
     Just e  -> case e of
-      Top l a v _ -> pure $! Infer (TopVar l (DontShow v)) a
-      Local l a   -> pure $! Infer (LocalVar (lvlToIx ?dom l)) a
-      LocalInt l  -> err UnexpectedI
+      TBETop l a v _  -> pure $! Infer (TopVar l (DontShow v)) a
+      TBELocal l a    -> pure $! Infer (LocalVar (lvlToIx ?dom l)) a
+      TBETyCon l [] _ -> pure $! Infer (TyCon l TPNil) VU
+      TBETyCon l _ _  -> err $ GenericError "Type constructors should be fully applied"
+      TBELocalInt l   -> err UnexpectedI
+      TBEDCon x y _   -> inferDCon x y
 
   P.LocalLvl x -> do
     unless (0 <= x && x < ?dom) (err LocalLvlNotInScope)
@@ -209,15 +230,20 @@ infer = \case
     let Box a = ?localTypes !! fromIntegral ix
     pure $! Infer (LocalVar ix) a
 
-  -- P.TopLvl x (Just y) -> do
-  --   _
+  P.TopLvl x (Just y) ->
+    inferDCon x y
 
-  -- P.TopLvl x Nothing -> do
-  --   top <- getTop
-  --   case LM.lookup x (top^.topInfo) of
-  --     Just (TopDef a v)      -> pure $! Infer (TopVar x (coerce v)) a
-  --     -- Just (TopInductive _ _
-  --     _                      -> err TopLvlNotInScope
+  P.TopLvl x Nothing -> do
+    top <- getTop
+    case LM.lookup x (top^.topInfo) of
+      Just (TPEDef a v) ->
+        pure $! Infer (TopVar x (coerce v)) a
+      Just (TPEInductive [] _) ->
+        pure $ Infer (TopVar x (coerce (VTyCon x ENil))) VU
+      Just (TPEInductive _ _) ->
+        err $ GenericError "Type constructor should be fully applied"
+      _ ->
+        err TopLvlNotInScope
 
   P.ILvl{} -> err UnexpectedI
   P.I0 -> err UnexpectedI
@@ -556,9 +582,9 @@ checkI = \case
 
   P.Ident x -> do
     case M.lookup x ?tbl of
-      Nothing           -> err $ NameNotInScope x
-      Just (LocalInt l) -> pure $ IVar l
-      Just _            -> err ExpectedI
+      Nothing              -> err $ NameNotInScope x
+      Just (TBELocalInt l) -> pure $ IVar l
+      Just _               -> err ExpectedI
 
   P.ILvl x -> do
     unless (0 <= x && x < dom ?cof) (err LocalLvlNotInScope)
@@ -694,8 +720,8 @@ defineTop :: Name -> VTy -> Val -> SourcePos -> IO ()
 defineTop x ~a ~v pos =
   modTop \top ->
      top & lvl     +~ 1
-         & tbl     %~ M.insert x (Top (top^.lvl) a v pos)
-         & topInfo %~ LM.insert (top^.lvl) (TopDef a v)
+         & tbl     %~ M.insert x (TBETop (top^.lvl) a v pos)
+         & topInfo %~ LM.insert (top^.lvl) (TPEDef a v)
 {-# inline defineTop #-}
 
 elabTop :: P.Top -> IO Top
@@ -704,9 +730,9 @@ elabTop = \case
   P.TDef pos x ma t top -> withTopElab $ setPos pos do
 
     case M.lookup x ?tbl of
-      Just (Top _ _ _ pos) -> err $ TopShadowing pos
-      Just _               -> impossible
-      _                    -> pure ()
+      Just (TBETop _ _ _ pos) -> err $ TopShadowing pos
+      Just _                  -> impossible
+      _                       -> pure ()
 
     (a, va, t) <- case ma of
       Nothing -> do

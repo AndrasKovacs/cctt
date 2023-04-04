@@ -12,9 +12,11 @@ import Interval
 import qualified LvlMap as LM
 
 data TblEntry
-  = Top Lvl VTy ~Val SourcePos   -- level, type, value
-  | Local Lvl VTy                -- level, type
-  | LocalInt IVar
+  = TBETop Lvl VTy ~Val SourcePos   -- level, type, value
+  | TBELocal Lvl VTy                -- level, type
+  | TBELocalInt IVar
+  | TBETyCon Lvl [(Name, Ty)] [(Name, [(Name, Ty)])]
+  | TBEDCon Lvl Lvl [(Name, Ty)]
   deriving Show
 
 data Box a = Box ~a deriving (Show)
@@ -26,8 +28,8 @@ type TopLvl     = (?topLvl     :: Lvl)
 type LocalTypes = (?localTypes :: [Box VTy])
 
 data TopEntry
-  = TopDef VTy ~Val
-  | TopInductive [(Name, Ty)] [(Name, [(Name, Ty)])]
+  = TPEDef VTy ~Val
+  | TPEInductive [(Name, Ty)] [(Name, [(Name, Ty)])]
   deriving Show
 
 data TopState = TopState {
@@ -55,7 +57,7 @@ indTypeInfo :: Elab (Lvl -> IO ([(Name, Ty)], [(Name, [(Name, Ty)])]))
 indTypeInfo typeid = do
   top <- getTop
   case LM.lookup typeid (top^.topInfo) of
-    Just (TopInductive paramtypes contypes) -> pure (paramtypes, contypes)
+    Just (TPEInductive paramtypes contypes) -> pure (paramtypes, contypes)
     _                                       -> impossible
 
 modTop :: (TopState -> TopState) -> IO ()
@@ -87,7 +89,7 @@ bind x ~a act =
   let v           = vVar ?dom in
   let ?dom        = ?dom + 1
       ?env        = EDef ?env v
-      ?tbl        = M.insert x (Local ?dom a) ?tbl
+      ?tbl        = M.insert x (TBELocal ?dom a) ?tbl
       ?localTypes = Box a : ?localTypes in
   let _ = ?dom; _ = ?env; _ = ?tbl in
   act v
@@ -98,7 +100,7 @@ define :: Name -> VTy -> Val -> Elab a -> Elab a
 define x ~a ~v act =
   let ?env        = EDef ?env v
       ?dom        = ?dom + 1
-      ?tbl        = M.insert x (Local ?dom a) ?tbl
+      ?tbl        = M.insert x (TBELocal ?dom a) ?tbl
       ?localTypes = Box a : ?localTypes in
   let _ = ?env; _ = ?tbl; _ = ?dom in
   act
@@ -109,7 +111,7 @@ bindI :: Name -> Elab (IVar -> a) -> Elab a
 bindI x act =
   let fresh = dom ?cof in
   let ?cof  = setDom (fresh + 1) ?cof `ext` IVar fresh
-      ?tbl  = M.insert x (LocalInt fresh) ?tbl in
+      ?tbl  = M.insert x (TBELocalInt fresh) ?tbl in
   let _ = ?cof; _ = ?tbl in
   act fresh
 {-# inline bindI #-}
