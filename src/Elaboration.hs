@@ -209,11 +209,15 @@ infer = \case
     let Box a = ?localTypes !! fromIntegral ix
     pure $! Infer (LocalVar ix) a
 
-  P.TopLvl x -> do
-    top <- getTop
-    case LM.lookup x (top^.topInfo) of
-      Just (TopDef a v) -> pure $! Infer (TopVar x (coerce v)) a
-      _                 -> err TopLvlNotInScope
+  -- P.TopLvl x (Just y) -> do
+  --   _
+
+  -- P.TopLvl x Nothing -> do
+  --   top <- getTop
+  --   case LM.lookup x (top^.topInfo) of
+  --     Just (TopDef a v)      -> pure $! Infer (TopVar x (coerce v)) a
+  --     -- Just (TopInductive _ _
+  --     _                      -> err TopLvlNotInScope
 
   P.ILvl{} -> err UnexpectedI
   P.I0 -> err UnexpectedI

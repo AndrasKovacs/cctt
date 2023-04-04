@@ -8,7 +8,7 @@ type Ty = Tm
 data Tm
   = Ident Name
   | LocalLvl Lvl                  -- @n
-  | TopLvl Lvl                    -- @@n
+  | TopLvl Lvl (Maybe Lvl)        -- @@n   or   @@n.m    (the latter identifies a data constructor)
   | Pos (DontShow SourcePos) Tm
   | I
   | ILvl IVar
