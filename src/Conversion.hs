@@ -32,7 +32,7 @@ instance Conv Val where
     (VLine a        , VLine a'          ) -> conv a a'
     (VLLam t        , VLLam t'          ) -> conv t t'
     (VTyCon x ts    , VTyCon x' ts'     ) -> x == x' && conv ts ts'
-    (VDCon _ i sp   , VDCon _ i' sp'    ) -> i == i' && conv sp sp'
+    (VDCon x i sp   , VDCon x' i' sp'   ) -> x == x' && i == i' && conv sp sp'
 
     -- We keep track of evaluation contexts for holes.
     -- This prevents spurious conversions between holes.

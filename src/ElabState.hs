@@ -9,8 +9,9 @@ import Data.Time.Clock
 import Common
 import CoreTypes
 import Interval
+import qualified LvlMap as LM
 
-data Entry
+data TblEntry
   = Top Lvl VTy ~Val SourcePos   -- level, type, value
   | Local Lvl VTy                -- level, type
   | LocalInt IVar
@@ -18,15 +19,19 @@ data Entry
 
 data Box a = Box ~a deriving (Show)
 
-type Table      = M.Map Name Entry
+type Table      = M.Map Name TblEntry
 type TableArg   = (?tbl        :: Table)
 type PosArg     = (?srcPos     :: SourcePos)
-type TopDefs    = (?topDefs    :: [(Val, VTy)])
 type TopLvl     = (?topLvl     :: Lvl)
 type LocalTypes = (?localTypes :: [Box VTy])
 
+data TopEntry
+  = TopDef VTy ~Val
+  | TopInductive [(Name, Ty)] [(Name, [(Name, Ty)])]
+  deriving Show
+
 data TopState = TopState {
-    topStateDefs         :: [(Val, VTy)]
+    topStateTopInfo      :: LM.LvlMap TopEntry
   , topStateLvl          :: Lvl
   , topStateTbl          :: Table
   , topStateLoadedFiles  :: S.Set FilePath
@@ -40,11 +45,18 @@ data TopState = TopState {
 makeFields ''TopState
 
 initialTop :: TopState
-initialTop = TopState [] 0 mempty mempty mempty Nothing "" "" False False 0
+initialTop = TopState mempty 0 mempty mempty mempty Nothing "" "" False False 0
 
 topState :: IORef TopState
 topState = runIO $ newIORef initialTop
 {-# noinline topState #-}
+
+indTypeInfo :: Elab (Lvl -> IO ([(Name, Ty)], [(Name, [(Name, Ty)])]))
+indTypeInfo typeid = do
+  top <- getTop
+  case LM.lookup typeid (top^.topInfo) of
+    Just (TopInductive paramtypes contypes) -> pure (paramtypes, contypes)
+    _                                       -> impossible
 
 modTop :: (TopState -> TopState) -> IO ()
 modTop = modifyIORef' topState

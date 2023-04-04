@@ -17,7 +17,7 @@ data Tm
   | Let Name Tm Ty Tm
 
   | TyCon Lvl TyParams
-  | DCon Lvl Lvl DSpine         -- con lvl, con lvl relative to tycon (TODO: pack)
+  | DCon Lvl Lvl DSpine         -- type lvl, con lvl (relative) (TODO: pack)
   | Case Tm Name ~Tm Cases
 
   | Pi Name Ty Ty
@@ -89,20 +89,25 @@ data Sys = SEmpty | SCons Cof Tm Sys
 data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
   deriving Show
 
-data Top = TDef Name Ty Tm Top | TEmpty
+data Top
+  = TData Name [(Name, Ty)] [(Name, [(Name, Ty)])] Top
+  | TDef Name Ty Tm Top
+  | TEmpty
   deriving Show
 
 instance Monoid Top where
   mempty = TEmpty
 
 instance Semigroup Top where
-  TEmpty         <> top' = top'
-  TDef x a t top <> top' = TDef x a t (top <> top')
+  TEmpty                  <> top' = top'
+  TDef x a t top          <> top' = TDef x a t (top <> top')
+  TData x params cons top <> top' = TData x params cons (top <> top')
 
 topLen :: Top -> Int
 topLen = go 0 where
-  go acc TEmpty           = acc
-  go acc (TDef _ _ _ top) = go (acc + 1) top
+  go acc TEmpty            = acc
+  go acc (TDef _ _ _ top)  = go (acc + 1) top
+  go acc (TData _ _ _ top) = go (acc + 1) top
 
 -- Values
 --------------------------------------------------------------------------------
@@ -229,7 +234,7 @@ data Val
   | VLine NamedIClosure
   | VLLam NamedIClosure
   | VTyCon Lvl Env
-  | VDCon Lvl Lvl VDSpine          -- con lvl, relative lvl
+  | VDCon Lvl Lvl VDSpine          -- type lvl, con index
 
   | VHole (Maybe Name) (DontShow SourcePos) Sub Env
   deriving Show

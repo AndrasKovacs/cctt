@@ -14,6 +14,7 @@ import Common
 import CoreTypes
 import Interval
 import ElabState
+import Data.Foldable
 
 --------------------------------------------------------------------------------
 
@@ -45,7 +46,7 @@ instance Show Txt where
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
 
-data NameKey = NKLocal Lvl | NKTop Lvl | NKLocalI IVar deriving (Eq, Ord)
+data NameKey = NKLocal Lvl | NKTop Lvl | NKLocalI IVar | NKDCon Lvl Lvl deriving (Eq, Ord)
 
 type Prec     = (?prec   :: Int)
 type Names    = (?names  :: M.Map NameKey Name)
@@ -57,6 +58,7 @@ showVar m k =
         NKLocal x  -> '@':show x
         NKTop x    -> "@@"++show x
         NKLocalI x -> "@"++show x
+        NKDCon i j -> "@@"++show i++"."++show j
   in case M.lookup k m of
     Nothing      -> gokey
     Just ('_':_) -> gokey
@@ -191,16 +193,13 @@ sys s = "[" <> goSys s <> "]"
 topVar :: PrettyArgs (Lvl -> Txt)
 topVar x = str (?names `showVar` NKTop x)
 
+dataCon :: PrettyArgs (Lvl -> Lvl -> Txt)
+dataCon i j = str (?names `showVar` NKDCon i j)
+
 dSpine :: PrettyArgs (DSpine -> Txt)
 dSpine = \case
   DNil         -> mempty
   DCons t sp   -> " " <> proj t <> dSpine sp
-
--- sepby :: (a -> Txt) -> [a] -> Txt -> Txt
--- sepby f []     sep = mempty
--- sepby f [a]    sep = f a
--- sepby f (a:as) sep = f a <> sep <> sepby f as sep
--- {-# inline sepby #-}
 
 caseBody :: PrettyArgs ([Name] -> Tm -> Txt)
 caseBody xs t = case xs of
@@ -293,8 +292,8 @@ tm = \case
   Ap f _ _ p        -> appp ("ap " <> proj f <> " " <> proj p)
   TyCon x TPNil     -> topVar x
   TyCon x ts        -> appp (topVar x <> tyParams ts)
-  DCon x _ DNil     -> topVar x
-  DCon x _ sp       -> appp (topVar x <> dSpine sp)
+  DCon i j DNil     -> dataCon i j
+  DCon i j sp       -> appp (dataCon i j <> dSpine sp)
   Case t x b cs     -> ifVerbose
                         (let pt = proj t; pcs = cases cs in fresh x \x ->
                          appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
@@ -305,13 +304,44 @@ tm = \case
                          Nothing -> projp (proj t <> ".1")
                          Just t  -> projp (proj t <> "." <> str x)
 
-top :: Names => LvlArg => Top -> Txt
-top = \case
+  -- NKData i j        -> str (?names `showVar` NKData  i j)
+----------------------------------------------------------------------------------------------------
+
+dataFields :: PrettyArgs ([(Name, Ty)] -> Txt)
+dataFields = \case
+  []        -> mempty
+  (x, a):fs -> let pa = pair a in fresh x \x ->
+               "(" <> x <> " : " <> pa <> ")" <> dataFields fs
+
+dataCons :: PrettyArgs ([(Name, [(Name, Ty)])] -> Txt)
+dataCons = \case
+  []         -> mempty
+  [(x, fs)]  -> str x <> " " <> dataFields fs
+  (x, fs):cs -> str x <> " " <> dataFields fs <> "\n  | " <> dataCons cs
+
+inductive :: PrettyArgs ([(Name, Tm)] -> [(Name, [(Name, Ty)])] -> Txt)
+inductive ps cs = case ps of
+  []        -> " :=\n  " <> dataCons cs
+  (x, a):ps -> let pa = pair a in fresh x \x ->
+               "(" <> x <> " : " <> pa <> ")" <> inductive ps cs
+
+top_ :: Names => LvlArg => Top -> Txt
+top_ = \case
   TEmpty       -> mempty
   TDef x a t u ->
     let ?dom = 0; ?idom = 0; ?shadow = mempty in
     "\n" <> str x <> " : " <> pair a <> "\n  := " <> pair t <> ";\n" <>
-    (let ?names = M.insert (NKTop ?lvl) x ?names; ?lvl = ?lvl + 1 in top u)
+    (let ?names = M.insert (NKTop ?lvl) x ?names; ?lvl = ?lvl + 1 in top_ u)
+  TData x ps cons top ->
+    (let ?dom = 0; ?idom = 0; ?shadow = uf in "\ndata " <> str x <> inductive ps cons)
+    <>
+    (let ?lvl   = ?lvl + 1
+         ?names = foldl'
+           (\ns (conid, x) -> M.insert (NKDCon ?lvl conid) x ns)
+           (M.insert (NKTop ?lvl) x ?names)
+           (zipWith (\conid (x, _) -> (conid, x)) [0..] cons) in
+     top_ top)
+
 
 ----------------------------------------------------------------------------------------------------
 
@@ -321,9 +351,9 @@ class Pretty c c0 a | a -> c c0 where
   prettydbg :: a -> String -- ^ Print all vars as indices.
 
 instance Pretty () () Top where
-  pretty  t   = let ?names = mempty; ?lvl = 0 in runTxt (top t)
-  pretty0 t   = let ?names = mempty; ?lvl = 0 in runTxt (top t)
-  prettydbg t = let ?names = mempty; ?lvl = 0 in runTxt (top t)
+  pretty  t   = let ?names = mempty; ?lvl = 0 in runTxt (top_ t)
+  pretty0 t   = let ?names = mempty; ?lvl = 0 in runTxt (top_ t)
+  prettydbg t = let ?names = mempty; ?lvl = 0 in runTxt (top_ t)
 
 instance Pretty (Names, DomArg, IDomArg) Names Tm where
   pretty    t = let ?shadow = mempty in runTxt (pair t)

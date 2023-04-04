@@ -18,6 +18,8 @@ FORCING
 
 -}
 
+type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
+
 ----------------------------------------------------------------------------------------------------
 -- Context manipulation primitives
 ----------------------------------------------------------------------------------------------------
@@ -1111,6 +1113,37 @@ dSpine = \case
   DNil         -> VDNil
   DCons t ts   -> VDCons (eval t) (dSpine ts)
 
+recursiveCall :: RecurseArg => Lvl -> Val
+recursiveCall x = case ?recurse of
+  Recurse v   -> v
+  DontRecurse -> VNe (NDontRecurse x) mempty
+{-# inline recursiveCall #-}
+
+pushVars :: DomArg => Env -> [Name] -> (Env, Lvl)
+pushVars env = \case
+  []   -> (env, ?dom)
+  _:ns -> let v = VNe (NLocalVar ?dom) mempty in
+          let ?dom = ?dom + 1 in
+          pushVars (EDef env v) ns
+
+pushSp :: Env -> VDSpine -> Env
+pushSp env = \case
+  VDNil       -> env
+  VDCons v sp -> pushSp (EDef env v) sp
+
+lookupCase :: EvalArgs (Lvl -> VDSpine -> Cases -> Val)
+lookupCase i sp cs = case i // cs of
+  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp in eval body
+  (i, CSCons _ _  _    cs) -> lookupCase (i - 1) sp cs
+  _                        -> impossible
+
+case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
+case_ t b ecs@(EC sub env rc cs) = case frc t of
+  VDCon _ i sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase i sp cs
+  VNe n i      -> VNe (NCase n b ecs) i
+  _            -> impossible
+{-# inline case_ #-}
+
 -- methods :: SubArg => EnvArg => Methods -> VMethods
 -- methods = \case
 --   MNil          -> VMNil
@@ -1266,38 +1299,6 @@ dSpine = \case
 ----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
-type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
-
-recursiveCall :: RecurseArg => Lvl -> Val
-recursiveCall x = case ?recurse of
-  Recurse v   -> v
-  DontRecurse -> VNe (NDontRecurse x) mempty
-{-# inline recursiveCall #-}
-
-pushVars :: DomArg => Env -> [Name] -> (Env, Lvl)
-pushVars env = \case
-  []   -> (env, ?dom)
-  _:ns -> let v = VNe (NLocalVar ?dom) mempty in
-          let ?dom = ?dom + 1 in
-          pushVars (EDef env v) ns
-
-pushSp :: Env -> VDSpine -> Env
-pushSp env = \case
-  VDNil       -> env
-  VDCons v sp -> pushSp (EDef env v) sp
-
-lookupCase :: EvalArgs (Lvl -> VDSpine -> Cases -> Val)
-lookupCase i sp cs = case i // cs of
-  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp in eval body
-  (i, CSCons _ _  _    cs) -> lookupCase (i - 1) sp cs
-  _                        -> impossible
-
-case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
-case_ t b ecs@(EC sub env rc cs) = case frc t of
-  VDCon x i sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase i sp cs
-  VNe n i      -> VNe (NCase n b ecs) i
-  _            -> impossible
-{-# inline case_ #-}
 
 --------------------------------------------------------------------------------
 

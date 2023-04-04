@@ -21,6 +21,7 @@ import qualified Common
 import qualified Conversion
 import qualified Core
 import qualified Presyntax as P
+import qualified LvlMap as LM
 
 import Pretty
 
@@ -61,6 +62,9 @@ convReflEndpoints t u = if Conversion.conv t u
 eval :: NCofArg => DomArg => EnvArg => Tm -> Val
 eval t = let ?sub = idSub (dom ?cof); ?recurse = DontRecurse in Core.eval t
 
+evalIn :: NCofArg => DomArg => Env -> Tm -> Val
+evalIn env t = let ?env = env in eval t
+
 evalSys :: NCofArg => DomArg => EnvArg => Sys -> VSys
 evalSys sys = let ?sub = idSub (dom ?cof); ?recurse = DontRecurse in Core.evalSys sys
 
@@ -78,6 +82,11 @@ debug x = withPrettyArgs (Common.debug x)
 
 setPos :: DontShow SourcePos -> (PosArg => a) -> a
 setPos pos act = let ?srcPos = coerce pos in act; {-# inline setPos #-}
+
+-- | Create fibrant closure from term in extended context.
+makeNCl :: Elab (Name -> Tm -> NamedClosure)
+makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
+{-# inline makeNCl #-}
 
 ----------------------------------------------------------------------------------------------------
 
@@ -185,7 +194,6 @@ check t topA = case t of
       convExInf a topA
       pure t
 
-
 infer :: Elab (P.Tm -> IO Infer)
 infer = \case
   P.Ident x -> case M.lookup x ?tbl of
@@ -203,9 +211,9 @@ infer = \case
 
   P.TopLvl x -> do
     top <- getTop
-    unless (0 <= x && x < (top^.lvl)) (err TopLvlNotInScope)
-    let (a, v) = (top^.defs) !! fromIntegral (lvlToIx (top^.lvl) x)
-    pure $! Infer (TopVar x (coerce v)) a
+    case LM.lookup x (top^.topInfo) of
+      Just (TopDef a v) -> pure $! Infer (TopVar x (coerce v)) a
+      _                 -> err TopLvlNotInScope
 
   P.ILvl{} -> err UnexpectedI
   P.I0 -> err UnexpectedI
@@ -286,7 +294,7 @@ infer = \case
       (t, b, qb) <- bind x a \_ -> do Infer t b <- infer t
                                       let qb = quote b
                                       pure (t, b, qb)
-      pure $! Infer (Lam x t) (VPi a $ NCl x $ CEval (EC (idSub (dom ?cof)) ?env DontRecurse qb))
+      pure $! Infer (Lam x t) (VPi a (makeNCl x qb))
 
   -- we infer non-dependent path types to explicit path lambdas.
   P.PLam l r x t -> do
@@ -422,6 +430,49 @@ infer = \case
   P.Hole i p -> setPos p do
     err CantInferHole
 
+  P.Case t x b cs -> do
+    Infer t a <- infer t
+    (typeid, params) <- case frc a of
+      VTyCon i ps -> pure (i, ps)
+      a           -> err $ ExpectedInductiveType (quote a)
+    b <- bind x a \_ -> check b VU
+    let bv = makeNCl x b
+    (paramtypes, contypes) <- indTypeInfo typeid
+    cs <- elabCases typeid 0 params bv contypes cs
+    pure $! Infer (Case t x b cs) (bv ∙ eval t)
+
+----------------------------------------------------------------------------------------------------
+
+elabCase :: Elab (Lvl -> Lvl -> Env -> [(Name, Ty)] -> Val -> [Name] -> P.Tm -> IO Tm)
+elabCase typeid conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) of
+  ([], []) ->
+    check body rhstype
+  ((_, a):fieldtypes, x:xs) ->
+    bind x (evalIn tyenv a) \x ->
+      elabCase typeid conid (EDef tyenv x) fieldtypes rhstype xs body
+  _ -> do
+    err $ GenericError "Wrong number of constructor fields"
+
+caseLhsVal :: Lvl -> Lvl -> Lvl -> [Name] -> Val
+caseLhsVal typeid conid dom xs = VDCon typeid conid (go dom xs) where
+  go dom []     = VDNil
+  go dom (_:xs) = VDCons (VNe (NLocalVar dom) mempty) (go (dom + 1) xs)
+
+elabCases :: Elab (
+     Lvl -> Lvl -> Env -> NamedClosure
+  -> [(Name, [(Name, Ty)])] -> [(Name, [Name], P.Tm)] -> IO Cases)
+elabCases typeid conid params b contypes cs = case (contypes, cs) of
+  ([], []) ->
+    pure CSNil
+  ((x, fieldtypes):contypes, (x', xs, body):cs) | x == x' -> do
+    let rhstype = b ∙ caseLhsVal typeid conid ?dom xs
+    t  <- elabCase typeid conid params fieldtypes rhstype xs body
+    cs <- elabCases typeid conid params b contypes cs
+    pure $ CSCons x xs t cs
+  _ -> do
+    err CaseMismatch
+
+----------------------------------------------------------------------------------------------------
 
 elabProjField :: Elab (Name -> Tm -> Val -> VTy -> IO Infer)
 elabProjField x t ~tv a = case frc a of
@@ -638,9 +689,9 @@ elabGlueTySys a = \case
 defineTop :: Name -> VTy -> Val -> SourcePos -> IO ()
 defineTop x ~a ~v pos =
   modTop \top ->
-     top & lvl  +~ 1
-         & tbl  %~ M.insert x (Top (top^.lvl) a v pos)
-         & defs %~ ((a, v):)
+     top & lvl     +~ 1
+         & tbl     %~ M.insert x (Top (top^.lvl) a v pos)
+         & topInfo %~ LM.insert (top^.lvl) (TopDef a v)
 {-# inline defineTop #-}
 
 elabTop :: P.Top -> IO Top

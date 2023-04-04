@@ -42,6 +42,8 @@ data Error
   | ImportCycle FilePath [FilePath]
   | CantOpenFile FilePath
   | GenericError String
+  | ExpectedInductiveType Tm
+  | CaseMismatch
   deriving Show
 
 instance Exception Error where
@@ -74,6 +76,9 @@ withPrettyArgs act =
 
 showError :: PrettyArgs (Error -> String)
 showError = \case
+  CaseMismatch ->
+    "Case expressions must cover all constructors of an inductive type in the order of declaration"
+
   GenericError msg ->
     msg
 
@@ -188,6 +193,10 @@ showError = \case
 
   CantOpenFile path ->
     "Can't open file: " ++ path
+
+  ExpectedInductiveType a ->
+    "Expected an inductive type, inferred\n\n" ++
+    "  " ++ pretty a
 
 displayErrInCxt :: ErrInCxt -> IO ()
 displayErrInCxt (ErrInCxt e) = withPrettyArgs do

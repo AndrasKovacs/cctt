@@ -198,7 +198,12 @@ goCase = do
   b <- tm
   char ')'
   char '['
-  cases <- sepBy ((//) <$!> some ident <*!> (char '.' *> tm)) (char ';')
+  let case_ = do
+        x:xs <- some ident
+        char '.'
+        body <- tm
+        pure (x, xs, body)
+  cases <- sepBy case_ (char ';')
   char ']'
   pure $ Case t x b cases
 
