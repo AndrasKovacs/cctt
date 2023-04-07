@@ -25,6 +25,13 @@ import qualified LvlMap as LM
 
 import Pretty
 
+{-
+TODO: unify TyCon and DCon spines in Tm
+      enough to write one checkSpine for TyCon and DCon spines
+      finishes infer & check
+
+-}
+
 
 -- Wrapped functions
 ----------------------------------------------------------------------------------------------------
@@ -83,6 +90,12 @@ debug x = withPrettyArgs (Common.debug x)
 setPos :: DontShow SourcePos -> (PosArg => a) -> a
 setPos pos act = let ?srcPos = coerce pos in act; {-# inline setPos #-}
 
+frcPos :: P.Tm -> (PosArg => P.Tm -> a) -> PosArg => a
+frcPos t act = case t of
+  P.Pos p t -> setPos p (act t)
+  t         -> act t
+{-# inline frcPos #-}
+
 -- | Create fibrant closure from term in extended context.
 makeNCl :: Elab (Name -> Tm -> NamedClosure)
 makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
@@ -90,13 +103,16 @@ makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
 
 ----------------------------------------------------------------------------------------------------
 
-data Infer = Infer Tm ~VTy
+data Infer = Infer Tm ~VTy deriving Show
+
+data Split
+  = DConHead Lvl Lvl [(Name, Ty)] [(Name, Ty)] [P.Tm]
+  | TyConHead Lvl [(Name, Ty)] [P.Tm]
+  | SplitInfer {-# unpack #-} Infer
+  deriving Show
 
 check :: Elab (P.Tm -> VTy -> IO Tm)
-check t topA = case t of
-
-  P.Pos pos t ->
-    setPos pos $ check t topA
+check t topA = frcPos t \case
 
   P.Let x ma t u -> do
     (a, va, t) <- case ma of
@@ -179,50 +195,141 @@ check t topA = case t of
       ts   <- elabGlueTmSys base ts a (fst equivs)
       pure $ Glue base eqs ts
 
-    (P.Hole i p, a) -> setPos p do
-      withPrettyArgs do
-        putStrLn ("HOLE:" ++ sourcePosPretty ?srcPos ++ maybe "" ("?"++) i)
-        putStrLn ("  : " ++ pretty (quote a) ++ "\n")
-        pure (Hole i p)
+    (P.Hole i p, a) ->
+      pure $ Hole i p
 
     (t, VWrap x a) -> do
       t <- check t a
       pure $! Pack x t
+
+    (t, VTyCon tyid ps) -> do
+      split t >>= \case
+        DConHead conid tyid' ps' fs sp -> do
+          unless (tyid' == tyid) $ withPrettyArgs $
+            err $ GenericError $
+              "No such constructor for expected type:\n\n  " ++ pretty (quote (VTyCon tyid ps))
+          sp <- checkSp ps sp fs
+          pure $ DCon conid tyid sp
+
+        TyConHead{} ->
+          err $ GenericError $ withPrettyArgs $
+            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps)) ++
+            "\n\nbut the expression is a type constructor"
+
+        SplitInfer (Infer t a) -> do
+          convExInf a topA
+          pure t
 
     (t, topA) -> do
       Infer t a <- infer t
       convExInf a topA
       pure t
 
-inferDCon :: Elab (Lvl -> Lvl -> IO Infer)
-inferDCon x y = do
-  top <- getTop
-  case LM.lookup x (top^.topInfo) of
-    Just (TPEInductive [] cons) ->
-      if fromIntegral y < length cons then do
-        case cons !! fromIntegral y of
-          (con, []) -> pure $ Infer (DCon x y DNil) (VTyCon x ENil)
-          (con, _)  -> err $ GenericError "Data constructor should be fully applied"
-      else do
-        err $ GenericError "No such data constructor"
-    Just (TPEInductive _ _) ->
-      err $ GenericError "Can't infer type for data constructor with type parameters"
-    Just TPEDef{} ->
-      err $ GenericError "Expected the De Bruijn level of a type constructor, got a top-level definition instead"
+goSplit :: Elab (P.Tm -> [P.Tm] -> P.Tm -> IO Split)
+goSplit t sp topT = frcPos t \case
+
+  P.Ident x -> case M.lookup x ?tbl of
     Nothing ->
-      err TopLvlNotInScope
+      err $ NameNotInScope x
+    Just (TBETyCon l ps cs) ->
+      pure $ TyConHead l ps sp
+    Just (TBEDCon tyid conid fs) -> do
+      (ps, _) <- indTypeInfo tyid
+      pure $ DConHead tyid conid ps fs sp
+    Just (TBELocal l a) -> do
+      pure $! SplitInfer $! Infer (LocalVar (lvlToIx ?dom l)) a
+    Just TBELocalInt{} -> do
+      err UnexpectedI
+    Just (TBETop l a v _)  ->
+      pure $! SplitInfer $! Infer (TopVar l (DontShow v)) a
+
+  P.App t u ->
+    goSplit t (u:sp) topT
+
+  P.TopLvl tyid (Just conid) -> do
+    top <- getTop
+    case LM.lookup tyid (top^.topInfo) of
+      Nothing ->
+        err TopLvlNotInScope
+      Just (TPEInductive ps cons) ->
+        if fromIntegral conid < length cons then do
+          case cons !! fromIntegral conid of
+            (_, fs) -> pure $ DConHead tyid conid ps fs sp
+        else do
+          err $ GenericError "No such data constructor"
+      Just (TPEDef a v) -> do
+        err $ GenericError $ "No type constructor with De Bruijn level " ++ show tyid
+
+  P.TopLvl x Nothing -> do
+    top <- getTop
+    case LM.lookup x (top^.topInfo) of
+      Nothing -> do
+        err TopLvlNotInScope
+      Just (TPEInductive ps cons) -> do
+        pure $ TyConHead x ps sp
+      Just (TPEDef a v) -> do
+        pure $! SplitInfer $! Infer (TopVar x (coerce v)) a
+
+  t -> do
+    Infer t a <- inferNonSplit t
+    SplitInfer <$!> inferSp t a sp
+
+split :: Elab (P.Tm -> IO Split)
+split t = goSplit t [] t
+
+inferSp :: Elab (Tm -> VTy -> [P.Tm] -> IO Infer)
+inferSp t a sp = case sp of
+  []   -> pure $ Infer t a
+  u:sp -> case frc a of
+    VPi a b -> do
+      u <- check u a
+      inferSp (App t u) (b ∙ eval u) sp
+    VPath a l r -> do
+      u <- checkI u
+      inferSp (PApp (quote l) (quote r) t u) (a ∙ evalI u) sp
+    VLine a -> do
+      u <- checkI u
+      inferSp (LApp t u) (a ∙ evalI u) sp
+    a ->
+      err $! ExpectedPiPathLine (quote a)
+
+checkSp :: Elab (Env -> [P.Tm] -> [(Name, Ty)] -> IO Spine)
+checkSp env sp fs = case (sp, fs) of
+  (t:sp, (x, a):fs) -> do
+    t  <- check t (evalIn env a)
+    sp <- checkSp (EDef env (eval t)) sp fs
+    pure $ SPCons t sp
+  ([], []) ->
+    pure $ SPNil
+  (_:_, []) ->
+    err $ GenericError "Constructor applied to too few arguments"
+  ([], _:_) ->
+    err $ GenericError "Constructor applied to too many arguments"
 
 infer :: Elab (P.Tm -> IO Infer)
-infer = \case
-  P.Ident x -> case M.lookup x ?tbl of
-    Nothing -> err $ NameNotInScope x
-    Just e  -> case e of
-      TBETop l a v _  -> pure $! Infer (TopVar l (DontShow v)) a
-      TBELocal l a    -> pure $! Infer (LocalVar (lvlToIx ?dom l)) a
-      TBETyCon l [] _ -> pure $! Infer (TyCon l TPNil) VU
-      TBETyCon l _ _  -> err $ GenericError "Type constructors should be fully applied"
-      TBELocalInt l   -> err UnexpectedI
-      TBEDCon x y _   -> inferDCon x y
+infer t = split t >>= \case
+
+  -- no params + saturated
+  DConHead tyid conid params fields sp -> case params of
+    [] -> do
+      sp <- checkSp ENil sp fields
+      pure $ Infer (DCon tyid conid sp) (VTyCon tyid ENil)
+    _  -> err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
+
+  -- saturated
+  TyConHead tyid ps sp -> do
+    sp <- checkSp ENil sp ps
+    pure $ Infer (TyCon tyid sp) VU
+
+  SplitInfer inf ->
+    pure inf
+
+inferNonSplit :: Elab (P.Tm -> IO Infer)
+inferNonSplit t = frcPos t \case
+  P.Pos{}    -> impossible
+  P.Ident{}  -> impossible
+  P.TopLvl{} -> impossible
+  P.App{}    -> impossible
 
   P.LocalLvl x -> do
     unless (0 <= x && x < ?dom) (err LocalLvlNotInScope)
@@ -230,34 +337,16 @@ infer = \case
     let Box a = ?localTypes !! fromIntegral ix
     pure $! Infer (LocalVar ix) a
 
-  P.TopLvl x (Just y) ->
-    inferDCon x y
-
-  P.TopLvl x Nothing -> do
-    top <- getTop
-    case LM.lookup x (top^.topInfo) of
-      Just (TPEDef a v) ->
-        pure $! Infer (TopVar x (coerce v)) a
-      Just (TPEInductive [] _) ->
-        pure $ Infer (TopVar x (coerce (VTyCon x ENil))) VU
-      Just (TPEInductive _ _) ->
-        err $ GenericError "Type constructor should be fully applied"
-      _ ->
-        err TopLvlNotInScope
-
   P.ILvl{} -> err UnexpectedI
-  P.I0 -> err UnexpectedI
-  P.I1 -> err UnexpectedI
-  P.I  -> err UnexpectedIType
+  P.I0     -> err UnexpectedI
+  P.I1     -> err UnexpectedI
+  P.I      -> err UnexpectedIType
 
   P.DepPath a t u -> do
     (x, a, _, src, tgt) <- elabBindMaybe a I0 I1
     t <- check t src
     u <- check u tgt
     pure $! Infer (Path x a t u) VU
-
-  P.Pos pos t ->
-    setPos pos $ infer t
 
   P.Let x ma t u -> do
     (a, va, t) <- case ma of
@@ -281,21 +370,6 @@ infer = \case
     a <- check a VU
     b <- bind x (eval a) \_ -> check b VU
     pure $ Infer (Pi x a b) VU
-
-  P.App t u -> do
-    Infer t a <- infer t
-    case frc a of
-      VPi a b -> do
-        u <- check u a
-        pure $! Infer (App t u) (b ∙ eval u)
-      VPath a l r -> do
-        u <- checkI u
-        pure $! Infer (PApp (quote l) (quote r) t u) (a ∙ evalI u)
-      VLine a -> do
-        u <- checkI u
-        pure $! Infer (LApp t u) (a ∙ evalI u)
-      a ->
-        err $! ExpectedPiPathLine (quote a)
 
   P.PApp l r t u -> do
     Infer t a <- infer t

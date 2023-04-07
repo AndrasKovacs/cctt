@@ -10,14 +10,19 @@ import Interval
 
 type Ty = Tm
 
+data Spine
+  = SPNil
+  | SPCons Tm Spine
+  deriving Show
+
 data Tm
   = TopVar Lvl ~(DontShow Val)
   | RecursiveCall Lvl
   | LocalVar Ix
   | Let Name Tm Ty Tm
 
-  | TyCon Lvl TyParams
-  | DCon Lvl Lvl DSpine         -- type lvl, con lvl (relative) (TODO: pack)
+  | TyCon Lvl Spine
+  | DCon Lvl Lvl Spine         -- type lvl, con lvl (relative) (TODO: pack)
   | Case Tm Name ~Tm Cases
 
   | Pi Name Ty Ty
@@ -68,11 +73,6 @@ data Tm
 data Cases
   = CSNil
   | CSCons Name [Name] Tm Cases
-  deriving Show
-
-data DSpine
-  = DNil
-  | DCons Tm DSpine
   deriving Show
 
 -- | Atomic equation.
@@ -174,15 +174,6 @@ data BindCofLazy a = BindCofLazy {
   deriving Show
 
 --------------------------------------------------------------------------------
-
-data TyParams
-  = TPNil
-  | TPSnoc TyParams Tm
-
-instance Show TyParams where
-  show = show . go [] where
-    go acc TPNil         = acc
-    go acc (TPSnoc ts t) = go (t:acc) ts
 
 data NeSys
   = NSEmpty

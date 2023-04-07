@@ -1103,15 +1103,18 @@ ungluen t (!sys, !is) = case frc t of
 -- Strict inductive types
 ----------------------------------------------------------------------------------------------------
 
+goTyParams :: EvalArgs (Env -> Spine -> Env)
+goTyParams env = \case
+  SPNil       -> env
+  SPCons a as -> goTyParams (EDef env (eval a)) as
 
-tyParams :: EvalArgs (TyParams -> Env)
-tyParams TPNil         = ENil
-tyParams (TPSnoc as a) = EDef (tyParams as) (eval a)
+tyParams :: EvalArgs (Spine -> Env)
+tyParams = goTyParams ENil
 
-dSpine :: EvalArgs (DSpine -> VDSpine)
-dSpine = \case
-  DNil         -> VDNil
-  DCons t ts   -> VDCons (eval t) (dSpine ts)
+spine :: EvalArgs (Spine -> VDSpine)
+spine = \case
+  SPNil         -> VDNil
+  SPCons t ts   -> VDCons (eval t) (spine ts)
 
 recursiveCall :: RecurseArg => Lvl -> Val
 recursiveCall x = case ?recurse of
@@ -1319,7 +1322,7 @@ eval = \case
 
   -- Inductives
   TyCon x ts        -> VTyCon x (tyParams ts)
-  DCon x i sp       -> VDCon x i (dSpine sp)
+  DCon x i sp       -> VDCon x i (spine sp)
   Case t x b cs     -> case_ (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
 
   -- Pi

@@ -196,10 +196,10 @@ topVar x = str (?names `showVar` NKTop x)
 dataCon :: PrettyArgs (Lvl -> Lvl -> Txt)
 dataCon i j = str (?names `showVar` NKDCon i j)
 
-dSpine :: PrettyArgs (DSpine -> Txt)
-dSpine = \case
-  DNil         -> mempty
-  DCons t sp   -> " " <> proj t <> dSpine sp
+spine :: PrettyArgs (Spine -> Txt)
+spine = \case
+  SPNil         -> mempty
+  SPCons t sp   -> " " <> proj t <> spine sp
 
 caseBody :: PrettyArgs ([Name] -> Tm -> Txt)
 caseBody xs t = case xs of
@@ -212,12 +212,6 @@ cases = \case
   CSNil               -> mempty
   CSCons x xs t CSNil -> str x <> caseBody xs t
   CSCons x xs t cs    -> str x <> caseBody xs t <> "; " <> cases cs
-
-tyParams :: PrettyArgs (TyParams -> Txt)
-tyParams = \case
-  TPNil          -> mempty
-  TPSnoc TPNil t -> proj t
-  TPSnoc ts t    -> tyParams ts <> " " <> proj t
 
 coeTy :: PrettyArgs (Txt -> Tm -> Txt)
 coeTy i (PApp _ _ t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
@@ -290,10 +284,10 @@ tm = \case
   Sym _ _ _ p       -> projp (proj p <> "⁻¹")
   Trans _ _ _ _ p q -> transp (app p <> " ∙ " <> trans q)
   Ap f _ _ p        -> appp ("ap " <> proj f <> " " <> proj p)
-  TyCon x TPNil     -> topVar x
-  TyCon x ts        -> appp (topVar x <> tyParams ts)
-  DCon i j DNil     -> dataCon i j
-  DCon i j sp       -> appp (dataCon i j <> dSpine sp)
+  TyCon x SPNil     -> topVar x
+  TyCon x ts        -> appp (topVar x <> spine ts)
+  DCon i j SPNil    -> dataCon i j
+  DCon i j sp       -> appp (dataCon i j <> spine sp)
   Case t x b cs     -> ifVerbose
                         (let pt = proj t; pcs = cases cs in fresh x \x ->
                          appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))

@@ -74,10 +74,10 @@ quoteCases (EC sub env _ cs) =
 
 --------------------------------------------------------------------------------
 
-instance Quote VDSpine DSpine where
+instance Quote VDSpine Spine where
   quote = \case
-    VDNil       -> DNil
-    VDCons t sp -> DCons (quote t) (quote sp)
+    VDNil       -> SPNil
+    VDCons t sp -> SPCons (quote t) (quote sp)
 
 instance Quote a b => Quote (BindCofLazy a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
@@ -123,7 +123,8 @@ instance Quote NamedClosure Tm where
 instance Quote NamedIClosure Tm where
   quote t = freshI \(IVar -> i) -> quote (t ∙ i); {-# inline quote #-}
 
-instance Quote Env TyParams where
-  quote = \case
-    ENil       -> TPNil
-    EDef env t -> TPSnoc (quote env) (quote t)
+instance Quote Env Spine where
+  quote = go SPNil where
+    go acc = \case
+      ENil       -> acc
+      EDef env v -> go (SPCons (quote v) acc) env

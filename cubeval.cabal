@@ -46,6 +46,7 @@ executable cctt
       ElabState
       Errors
       Interval
+      LvlMap
       LvlSet
       MainInteraction
       Parser
