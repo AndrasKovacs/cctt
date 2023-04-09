@@ -1,2 +1,26 @@
 
-id (A : U) (x : A) : A := x;
+data Foo := R | G | B;
+foo : Foo := G;
+
+data Nat := zero | suc Nat;
+
+czero (n : Nat) : Nat :=
+  case n (_. Nat) [
+    zero. zero;
+    suc n. czero n];
+
+add (n : Nat) (m : Nat) : Nat :=
+  case n (_. Nat) [
+    zero. m;
+    suc n. suc (add n m)];
+
+five := suc (suc (suc (suc (suc zero))));
+
+ten := add five five;
+
+mul (n m : Nat) : Nat :=
+  case n (_. Nat) [
+    zero. zero;
+    suc n. add m (mul n m)];
+
+n100 := mul ten ten;

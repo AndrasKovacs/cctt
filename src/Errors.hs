@@ -67,7 +67,8 @@ withPrettyArgs act =
         TBELocal x _      -> NKLocal x
         TBELocalInt x     -> NKLocalI x
         TBETyCon x _ _ _  -> NKTop x
-        TBEDCon x y _ _   -> NKDCon x y in
+        TBEDCon x y _ _   -> NKDCon x y
+        TBETopRec x _ _   -> NKTop x in
   let ?idom   = dom ?cof
       ?names  = M.foldlWithKey'
                   (\acc name e -> M.insert (entryToNameKey e) name acc)
@@ -126,7 +127,7 @@ showError = \case
     "Top-level De Bruijn level not in scope"
 
   TopShadowing pos ->
-       "Duplicate top-level name.\n"
+       "Duplicate top-level name\n"
     ++ "Previously defined at: " ++ sourcePosPretty pos
 
   UnexpectedI ->

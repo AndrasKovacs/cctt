@@ -46,7 +46,7 @@ instance Show Txt where
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
 
-data NameKey = NKLocal Lvl | NKTop Lvl | NKLocalI IVar | NKDCon Lvl Lvl deriving (Eq, Ord)
+data NameKey = NKLocal Lvl | NKTop Lvl | NKLocalI IVar | NKDCon Lvl Lvl deriving (Eq, Ord, Show)
 
 type Prec     = (?prec   :: Int)
 type Names    = (?names  :: M.Map NameKey Name)
@@ -60,7 +60,7 @@ showVar m k =
         NKLocalI x -> "@"++show x
         NKDCon i j -> "@@"++show i++"#"++show j
   in case M.lookup k m of
-    Nothing      -> gokey
+    Nothing      -> "(ERR " ++ show k ++ ")"
     Just ('_':_) -> gokey
     Just n       -> n
 
@@ -310,12 +310,12 @@ dataFields = \case
 dataCons :: PrettyArgs ([(Name, [(Name, Ty)])] -> Txt)
 dataCons = \case
   []         -> mempty
-  [(x, fs)]  -> str x <> " " <> dataFields fs
-  (x, fs):cs -> str x <> " " <> dataFields fs <> "\n  | " <> dataCons cs
+  [(x, fs)]  -> str x <> dataFields fs
+  (x, fs):cs -> str x <> dataFields fs <> "\n  | " <> dataCons cs
 
 inductive :: PrettyArgs ([(Name, Tm)] -> [(Name, [(Name, Ty)])] -> Txt)
 inductive ps cs = case ps of
-  []        -> " :=\n  " <> dataCons cs
+  []        -> " :=\n    " <> dataCons cs
   (x, a):ps -> let pa = pair a in fresh x \x ->
                "(" <> x <> " : " <> pa <> ")" <> inductive ps cs
 
@@ -323,19 +323,22 @@ top_ :: Names => LvlArg => Top -> Txt
 top_ = \case
   TEmpty       -> mempty
   TDef x a t u ->
-    let ?dom = 0; ?idom = 0; ?shadow = mempty in
-    "\n" <> str x <> " : " <> pair a <> "\n  := " <> pair t <> ";\n" <>
-    (let ?names = M.insert (NKTop ?lvl) x ?names; ?lvl = ?lvl + 1 in top_ u)
+    let ?dom    = 0
+        ?idom   = 0
+        ?names  = M.insert (NKTop ?lvl) x ?names
+        ?lvl    = ?lvl + 1
+        ?shadow = mempty in
+    "\n" <> str x <> " : " <> pair a <> " :=\n  " <> pair t <> ";\n" <> top_ u
   TData x ps cons top ->
-    (let ?dom = 0; ?idom = 0; ?shadow = uf in "\ndata " <> str x <> inductive ps cons)
-    <>
-    (let ?lvl   = ?lvl + 1
-         ?names = foldl'
-           (\ns (conid, x) -> M.insert (NKDCon ?lvl conid) x ns)
+    let ?dom    = 0
+        ?idom   = 0
+        ?shadow = mempty
+        ?lvl    = ?lvl + 1
+        ?names  = foldl'
+           (\ns (!conid, !x) -> M.insert (NKDCon ?lvl conid) x ns)
            (M.insert (NKTop ?lvl) x ?names)
            (zipWith (\conid (x, _) -> (conid, x)) [0..] cons) in
-     top_ top)
-
+    "\ndata " <> str x <> inductive ps cons <> ";\n" <> top_ top
 
 ----------------------------------------------------------------------------------------------------
 

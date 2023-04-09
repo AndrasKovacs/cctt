@@ -14,11 +14,12 @@ import qualified LvlMap as LM
 type Constructors = LM.Map (Name, [(Name, Ty)])
 
 data TblEntry
-  = TBETopDef Lvl VTy ~Val SourcePos   -- level, type, value
-  | TBETyCon Lvl [(Name, Ty)] Constructors SourcePos
-  | TBEDCon Lvl Lvl [(Name, Ty)] SourcePos
+  = TBETopDef Lvl VTy ~Val (DontShow SourcePos)   -- level, type, value
+  | TBETyCon Lvl [(Name, Ty)] Constructors (DontShow SourcePos)
+  | TBEDCon Lvl Lvl [(Name, Ty)] (DontShow SourcePos)
   | TBELocal Lvl VTy                   -- level, type
   | TBELocalInt IVar
+  | TBETopRec Lvl (Maybe VTy) (DontShow SourcePos)
   deriving Show
 
 data Box a = Box ~a deriving (Show)
@@ -35,6 +36,7 @@ type IsCaseAllowed = Bool
 data TopEntry
   = TPEDef VTy ~Val
   | TPETyCon [(Name, Ty)] Constructors IsCaseAllowed
+  | TPERec (Maybe VTy)
   deriving Show
 
 data TopState = TopState {
@@ -49,6 +51,7 @@ data TopState = TopState {
   , topStateVerbose      :: Bool
   , topStateErrPrinting  :: Bool
   , topStateParsingTime  :: NominalDiffTime}
+  deriving Show
 makeFields ''TopState
 
 initialTop :: TopState
@@ -58,8 +61,8 @@ topState :: IORef TopState
 topState = runIO $ newIORef initialTop
 {-# noinline topState #-}
 
-indTypeInfo :: Lvl -> IO ([(Name, Ty)], Constructors, Bool)
-indTypeInfo typeid = do
+tyConInfo :: Lvl -> IO ([(Name, Ty)], Constructors, Bool)
+tyConInfo typeid = do
   top <- getTop
   case LM.lookup typeid (top^.topInfo) of
     Just (TPETyCon paramtypes contypes canCase) -> pure (paramtypes, contypes, canCase)
@@ -74,17 +77,17 @@ getTop = readIORef topState
 putTop :: TopState -> IO ()
 putTop = writeIORef topState
 
-modIndTypeInfo ::
+modTyConInfo ::
        Lvl
     -> (([(Name, Ty)], Constructors, Bool) -> ([(Name, Ty)], Constructors, Bool))
     -> IO ()
-modIndTypeInfo tyid f = do
+modTyConInfo tyid f = do
   modTop $
     topInfo %~ flip LM.adjust tyid
       \case TPETyCon ps cs canCase -> case f (ps, cs, canCase) of
               (!ps, !cs, !canCase) -> TPETyCon ps cs canCase
             _ -> impossible
-{-# inline modIndTypeInfo #-}
+{-# inline modTyConInfo #-}
 
 type Elab a = LocalTypes => NCofArg => DomArg => EnvArg => TableArg => PosArg => a
 
@@ -103,35 +106,56 @@ withTopElab act = do
   act
 {-# inline withTopElab #-}
 
-defineTop :: Name -> VTy -> Val -> SourcePos -> IO ()
-defineTop x ~a ~v pos =
+declareTopDef :: Name -> Maybe VTy -> DontShow SourcePos -> (TableArg => Lvl -> IO a) -> TableArg => IO a
+declareTopDef x a pos act = do
+  top <- getTop
+  let l    = top^.lvl
+  let tbl' = M.insert x (TBETopRec l a pos) (top^.tbl)
+  putTop $
+    top & lvl     .~ l + 1
+        & tbl     .~ tbl'
+        & topInfo %~ LM.insert l (TPERec a)
+  let ?tbl = tbl'
+  act l
+{-# inline declareTopDef #-}
+
+-- | Convert a declared topdef to a type-annotated one.
+finalizeTopDef :: Lvl -> Name -> VTy -> Val -> DontShow SourcePos -> IO ()
+finalizeTopDef l x ~a ~v pos =
   modTop \top ->
-     top & lvl     +~ 1
-         & tbl     %~ M.insert x (TBETopDef (top^.lvl) a v pos)
-         & topInfo %~ LM.insert (top^.lvl) (TPEDef a v)
+     top & tbl     %~ M.insert x (TBETopDef l a v pos)
+         & topInfo %~ LM.insert l (TPEDef a v)
 
 -- | Declare a TyCon without constructors. This happens before the constructors are
 --   elaborated.
-declareNewTyCon :: Name -> [(Name, Ty)] -> SourcePos -> IO Lvl
-declareNewTyCon x ps pos = do
+declareNewTyCon ::
+  Name -> [(Name, Ty)] -> DontShow SourcePos -> (TableArg => Lvl -> IO a) -> (TableArg => IO a)
+declareNewTyCon x ps pos act = do
   top <- getTop
   let tyid = top^.lvl
+  let tbl' = M.insert x (TBETyCon tyid ps mempty pos) (top^.tbl)
   putTop $
     top & lvl     +~ 1
-        & tbl     %~ M.insert x (TBETyCon tyid ps mempty pos)
+        & tbl     .~ tbl'
         & topInfo %~ LM.insert tyid (TPETyCon ps mempty False)
-  pure tyid
+  let ?tbl = tbl'
+  act tyid
+{-# inline declareNewTyCon #-}
 
 -- | Set the TyCon as case-able.
 finalizeTyCon :: Lvl -> IO ()
 finalizeTyCon tyid = do
-  modIndTypeInfo tyid \(ps, cs, canCase) -> (ps, cs, True)
+  modTyConInfo tyid \(ps, cs, canCase) -> (ps, cs, True)
 
 -- | Extend a TyCon with an extra constructor.
-addDCon :: Name -> Lvl -> Lvl -> [(Name, Ty)] -> SourcePos -> IO ()
-addDCon x tyid conid fields pos =
-  modIndTypeInfo tyid \(ps, cs, canCase) ->
-    (ps, LM.insert conid (x, fields) cs, canCase)
+addDCon :: Name -> Lvl -> Lvl -> [(Name, Ty)] -> DontShow SourcePos -> (TableArg => IO a) -> IO a
+addDCon x tyid conid fields pos act = do
+  modTyConInfo tyid \(ps, cs, canCase) -> (ps, LM.insert conid (x, fields) cs, canCase)
+  top <- getTop
+  let ?tbl = M.insert x (TBEDCon tyid conid fields pos) (top^.tbl)
+  putTop (top & tbl .~ ?tbl)
+  act
+{-# inline addDCon #-}
 
 -- | Bind a fibrant variable.
 bind :: Name -> VTy -> Elab (Val -> a) -> Elab a

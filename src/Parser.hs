@@ -339,14 +339,20 @@ tm = withPos do
     (\_ -> Pair t <$!> tm)
     (pure t)
 
+telBinder :: Parser ([Name], Ty)
+telBinder =
+       ((//) <$!> try (char '(' *> some bind <* char ':') <*!> (tm <* char ')'))
+  <|>  do {t <- proj; pure (["_"], t)}
+
 telescope :: Parser [(Name, Ty)]
 telescope = do
-  bs <- many piBinder
+  bs <- many telBinder
   pure $! foldr' (\(xs, a) acc -> foldr' (\x acc -> (x, a):acc) acc xs) [] bs
 
 top :: Parser Top
 top =
   branch ((//) <$!> getSourcePos <*> (keyword "data" *> ident))
+
     (\(pos, x) -> do
         params <- telescope
         symbol ":="
