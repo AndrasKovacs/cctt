@@ -11,12 +11,14 @@ import CoreTypes
 import Interval
 import qualified LvlMap as LM
 
+type Constructors = LM.Map (Name, [(Name, Ty)])
+
 data TblEntry
-  = TBETop Lvl VTy ~Val SourcePos   -- level, type, value
-  | TBELocal Lvl VTy                -- level, type
+  = TBETopDef Lvl VTy ~Val SourcePos   -- level, type, value
+  | TBETyCon Lvl [(Name, Ty)] Constructors SourcePos
+  | TBEDCon Lvl Lvl [(Name, Ty)] SourcePos
+  | TBELocal Lvl VTy                   -- level, type
   | TBELocalInt IVar
-  | TBETyCon Lvl [(Name, Ty)] [(Name, [(Name, Ty)])]
-  | TBEDCon Lvl Lvl [(Name, Ty)]
   deriving Show
 
 data Box a = Box ~a deriving (Show)
@@ -27,13 +29,16 @@ type PosArg     = (?srcPos     :: SourcePos)
 type TopLvl     = (?topLvl     :: Lvl)
 type LocalTypes = (?localTypes :: [Box VTy])
 
+-- | Case expressions are not allowed on a TyCon whose constructors are being defined.
+type IsCaseAllowed = Bool
+
 data TopEntry
   = TPEDef VTy ~Val
-  | TPEInductive [(Name, Ty)] [(Name, [(Name, Ty)])]
+  | TPETyCon [(Name, Ty)] Constructors IsCaseAllowed
   deriving Show
 
 data TopState = TopState {
-    topStateTopInfo      :: LM.LvlMap TopEntry
+    topStateTopInfo      :: LM.Map TopEntry
   , topStateLvl          :: Lvl
   , topStateTbl          :: Table
   , topStateLoadedFiles  :: S.Set FilePath
@@ -53,18 +58,33 @@ topState :: IORef TopState
 topState = runIO $ newIORef initialTop
 {-# noinline topState #-}
 
-indTypeInfo :: Elab (Lvl -> IO ([(Name, Ty)], [(Name, [(Name, Ty)])]))
+indTypeInfo :: Lvl -> IO ([(Name, Ty)], Constructors, Bool)
 indTypeInfo typeid = do
   top <- getTop
   case LM.lookup typeid (top^.topInfo) of
-    Just (TPEInductive paramtypes contypes) -> pure (paramtypes, contypes)
-    _                                       -> impossible
+    Just (TPETyCon paramtypes contypes canCase) -> pure (paramtypes, contypes, canCase)
+    _ -> impossible
 
 modTop :: (TopState -> TopState) -> IO ()
 modTop = modifyIORef' topState
 
 getTop :: IO TopState
 getTop = readIORef topState
+
+putTop :: TopState -> IO ()
+putTop = writeIORef topState
+
+modIndTypeInfo ::
+       Lvl
+    -> (([(Name, Ty)], Constructors, Bool) -> ([(Name, Ty)], Constructors, Bool))
+    -> IO ()
+modIndTypeInfo tyid f = do
+  modTop $
+    topInfo %~ flip LM.adjust tyid
+      \case TPETyCon ps cs canCase -> case f (ps, cs, canCase) of
+              (!ps, !cs, !canCase) -> TPETyCon ps cs canCase
+            _ -> impossible
+{-# inline modIndTypeInfo #-}
 
 type Elab a = LocalTypes => NCofArg => DomArg => EnvArg => TableArg => PosArg => a
 
@@ -82,6 +102,36 @@ withTopElab act = do
       ?localTypes = []
   act
 {-# inline withTopElab #-}
+
+defineTop :: Name -> VTy -> Val -> SourcePos -> IO ()
+defineTop x ~a ~v pos =
+  modTop \top ->
+     top & lvl     +~ 1
+         & tbl     %~ M.insert x (TBETopDef (top^.lvl) a v pos)
+         & topInfo %~ LM.insert (top^.lvl) (TPEDef a v)
+
+-- | Declare a TyCon without constructors. This happens before the constructors are
+--   elaborated.
+declareNewTyCon :: Name -> [(Name, Ty)] -> SourcePos -> IO Lvl
+declareNewTyCon x ps pos = do
+  top <- getTop
+  let tyid = top^.lvl
+  putTop $
+    top & lvl     +~ 1
+        & tbl     %~ M.insert x (TBETyCon tyid ps mempty pos)
+        & topInfo %~ LM.insert tyid (TPETyCon ps mempty False)
+  pure tyid
+
+-- | Set the TyCon as case-able.
+finalizeTyCon :: Lvl -> IO ()
+finalizeTyCon tyid = do
+  modIndTypeInfo tyid \(ps, cs, canCase) -> (ps, cs, True)
+
+-- | Extend a TyCon with an extra constructor.
+addDCon :: Name -> Lvl -> Lvl -> [(Name, Ty)] -> SourcePos -> IO ()
+addDCon x tyid conid fields pos =
+  modIndTypeInfo tyid \(ps, cs, canCase) ->
+    (ps, LM.insert conid (x, fields) cs, canCase)
 
 -- | Bind a fibrant variable.
 bind :: Name -> VTy -> Elab (Val -> a) -> Elab a

@@ -350,11 +350,13 @@ top =
     (\(pos, x) -> do
         params <- telescope
         symbol ":="
-        constructors <- sepBy ((//) <$!> ident <*!> telescope) (char '|')
+        constructors <- sepBy ((,,) <$!> (coerce <$> getSourcePos) <*!> ident <*!> telescope)
+                              (char '|')
         char ';'
         u <- top
         pure $! TData (coerce pos) x params constructors u
     )
+
     (branch ((//) <$!> getSourcePos <*!> ident)
       (\(pos, x) -> do
         args <- many piBinder
@@ -365,11 +367,13 @@ top =
         char ';'
         u <- top
         pure $! TDef (coerce pos) x ma t u)
+
       (branch ((//) <$!> getSourcePos <*!> (keyword "import" *> ident))
         (\(pos, file) -> do
             char ';'
             u <- top
             pure $ TImport (coerce pos) file u)
+
         (pure TEmpty)))
 
 src :: Parser Top

@@ -231,16 +231,16 @@ goSplit t sp topT = frcPos t \case
   P.Ident x -> case M.lookup x ?tbl of
     Nothing ->
       err $ NameNotInScope x
-    Just (TBETyCon l ps cs) ->
+    Just (TBETyCon l ps cs _) ->
       pure $ TyConHead l ps sp
-    Just (TBEDCon tyid conid fs) -> do
-      (ps, _) <- indTypeInfo tyid
+    Just (TBEDCon tyid conid fs _) -> do
+      (ps, _, _) <- indTypeInfo tyid
       pure $ DConHead tyid conid ps fs sp
     Just (TBELocal l a) -> do
       pure $! SplitInfer $! Infer (LocalVar (lvlToIx ?dom l)) a
     Just TBELocalInt{} -> do
       err UnexpectedI
-    Just (TBETop l a v _)  ->
+    Just (TBETopDef l a v _)  ->
       pure $! SplitInfer $! Infer (TopVar l (DontShow v)) a
 
   P.App t u ->
@@ -251,12 +251,10 @@ goSplit t sp topT = frcPos t \case
     case LM.lookup tyid (top^.topInfo) of
       Nothing ->
         err TopLvlNotInScope
-      Just (TPEInductive ps cons) ->
-        if fromIntegral conid < length cons then do
-          case cons !! fromIntegral conid of
-            (_, fs) -> pure $ DConHead tyid conid ps fs sp
-        else do
-          err $ GenericError "No such data constructor"
+      Just (TPETyCon ps cons _) ->
+        case LM.lookup conid cons of
+          Just (_, fs) -> pure $ DConHead tyid conid ps fs sp
+          Nothing      -> err $ GenericError "No such data constructor"
       Just (TPEDef a v) -> do
         err $ GenericError $ "No type constructor with De Bruijn level " ++ show tyid
 
@@ -265,7 +263,7 @@ goSplit t sp topT = frcPos t \case
     case LM.lookup x (top^.topInfo) of
       Nothing -> do
         err TopLvlNotInScope
-      Just (TPEInductive ps cons) -> do
+      Just (TPETyCon ps cons _) -> do
         pure $ TyConHead x ps sp
       Just (TPEDef a v) -> do
         pure $! SplitInfer $! Infer (TopVar x (coerce v)) a
@@ -541,8 +539,9 @@ inferNonSplit t = frcPos t \case
       a           -> err $ ExpectedInductiveType (quote a)
     b <- bind x a \_ -> check b VU
     let bv = makeNCl x b
-    (paramtypes, contypes) <- indTypeInfo typeid
-    cs <- elabCases typeid 0 params bv contypes cs
+    (paramtypes, cons, canCase) <- indTypeInfo typeid
+    unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
+    cs <- elabCases typeid 0 params bv (LM.elems cons) cs
     pure $! Infer (Case t x b cs) (bv ∙ eval t)
 
 ----------------------------------------------------------------------------------------------------
@@ -790,23 +789,19 @@ elabGlueTySys a = \case
 
 ----------------------------------------------------------------------------------------------------
 
-defineTop :: Name -> VTy -> Val -> SourcePos -> IO ()
-defineTop x ~a ~v pos =
-  modTop \top ->
-     top & lvl     +~ 1
-         & tbl     %~ M.insert x (TBETop (top^.lvl) a v pos)
-         & topInfo %~ LM.insert (top^.lvl) (TPEDef a v)
-{-# inline defineTop #-}
+guardTopShadowing :: Elab (Name -> IO ())
+guardTopShadowing x =     case M.lookup x ?tbl of
+  Just (TBETopDef _ _ _ pos) -> err $ TopShadowing pos
+  Just (TBETyCon _ _ _ pos)  -> err $ TopShadowing pos
+  Just (TBEDCon _ _ _ pos)   -> err $ TopShadowing pos
+  Just _                     -> impossible
+  _                          -> pure ()
 
 elabTop :: P.Top -> IO Top
 elabTop = \case
 
   P.TDef pos x ma t top -> withTopElab $ setPos pos do
-
-    case M.lookup x ?tbl of
-      Just (TBETop _ _ _ pos) -> err $ TopShadowing pos
-      Just _                  -> impossible
-      _                       -> pure ()
+    guardTopShadowing x
 
     (a, va, t) <- case ma of
       Nothing -> do
@@ -844,11 +839,48 @@ elabTop = \case
       top <- elabTop top
       pure $! importTop <> top
 
-  P.TData{} -> uf
+  P.TData pos tyname ps cs top -> withTopElab $ setPos pos do
+    guardTopShadowing tyname
+    ps   <- elabTelescope ps
+    tyid <- declareNewTyCon tyname ps (coerce pos)
+    cs   <- bindTelescope ps $ elabConstructors tyid 0 cs
+    finalizeTyCon tyid
+    top  <- elabTop top
+    pure $ TData tyname ps cs top
 
   P.TEmpty ->
     pure TEmpty
 
+----------------------------------------------------------------------------------------------------
+
+elabConstructors :: Elab (Lvl -> Lvl -> [(DontShow SourcePos, Name, [(Name, P.Ty)])]
+                          -> IO [(Name, [(Name, Ty)])])
+elabConstructors tyid conid = \case
+  [] ->
+    pure []
+  (pos, x, fs):cs -> setPos pos do
+    guardTopShadowing x
+    fs <- elabTelescope fs
+    addDCon x tyid conid fs (coerce pos)
+    cs <- elabConstructors tyid (conid + 1) cs
+    pure ((x, fs):cs)
+
+elabTelescope :: Elab ([(Name, P.Ty)] -> IO [(Name, Ty)])
+elabTelescope = \case
+  [] -> pure []
+  (x, a):ps -> do
+    a <- check a VU
+    bind x (eval a) \_ -> do
+      ps <- elabTelescope ps
+      pure ((x, a):ps)
+
+bindTelescope :: [(Name, Ty)] -> Elab a -> Elab a
+bindTelescope ps act = go ps where
+  go []          = act
+  go ((x, a):ps) = bind x (eval a) \_ -> go ps
+{-# inline bindTelescope #-}
+
+----------------------------------------------------------------------------------------------------
 
 elabPath :: Maybe (DontShow SourcePos) -> FilePath -> IO Top
 elabPath pos path = do
