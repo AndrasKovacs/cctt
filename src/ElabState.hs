@@ -148,12 +148,15 @@ finalizeTyCon tyid = do
   modTyConInfo tyid \(ps, cs, canCase) -> (ps, cs, True)
 
 -- | Extend a TyCon with an extra constructor.
-addDCon :: Name -> Lvl -> Lvl -> [(Name, Ty)] -> DontShow SourcePos -> (TableArg => IO a) -> IO a
+addDCon :: Name -> Lvl -> Lvl -> [(Name, Ty)] -> DontShow SourcePos -> (TableArg => IO a) -> TableArg => IO a
 addDCon x tyid conid fields pos act = do
+  -- extend topcxt
   modTyConInfo tyid \(ps, cs, canCase) -> (ps, LM.insert conid (x, fields) cs, canCase)
-  top <- getTop
-  let ?tbl = M.insert x (TBEDCon tyid conid fields pos) (top^.tbl)
-  putTop (top & tbl .~ ?tbl)
+  modTop (tbl %~ M.insert x (TBEDCon tyid conid fields pos))
+
+  -- but independently, extend local cxt, because this one contains the type params as well,
+  -- while the topcxt does not!
+  let ?tbl = M.insert x (TBEDCon tyid conid fields pos) ?tbl
   act
 {-# inline addDCon #-}
 

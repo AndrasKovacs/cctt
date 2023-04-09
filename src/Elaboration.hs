@@ -25,13 +25,6 @@ import qualified LvlMap as LM
 
 import Pretty
 
-{-
-TODO: unify TyCon and DCon spines in Tm
-      enough to write one checkSpine for TyCon and DCon spines
-      finishes infer & check
-
--}
-
 
 -- Wrapped functions
 ----------------------------------------------------------------------------------------------------
@@ -862,7 +855,8 @@ elabTop = \case
     guardTopShadowing tyname
     ps   <- elabTelescope ps
     (tyid, cs) <- declareNewTyCon tyname ps (coerce pos) \tyid -> do
-      cs <- bindTelescope ps $ elabConstructors tyid 0 cs
+      cs <- bindTelescope ps do
+        elabConstructors tyid 0 cs
       pure (tyid, cs)
     finalizeTyCon tyid
     tbl  <- getTop <&> (^.tbl)
@@ -896,9 +890,9 @@ elabTelescope = \case
       pure ((x, a):ps)
 
 bindTelescope :: [(Name, Ty)] -> Elab a -> Elab a
-bindTelescope ps act = go ps where
-  go []          = act
-  go ((x, a):ps) = bind x (eval a) \_ -> go ps
+bindTelescope ps act = case ps of
+  []        -> act
+  (x, a):ps -> bind x (eval a) \_ -> bindTelescope ps act
 {-# inline bindTelescope #-}
 
 ----------------------------------------------------------------------------------------------------

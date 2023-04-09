@@ -1,16 +1,33 @@
 
+{-
+
+Sugar & stuff.
+
+- Add Split as primitive presyntax and core syntax
+  - Evaluate split directly to the semantic (λ x. case x ...) closure
+  - Split is checkable
+
+- Allow omitted return type in case
+  - infer constant return type from first branch
+
+
+-}
+
+
+--------------------------------------------------------------------------------
+
 data Foo := R | G | B;
 foo : Foo := G;
 
-data Nat := zero | suc Nat;
+data ℕ := zero | suc ℕ;
 
-czero (n : Nat) : Nat :=
-  case n (_. Nat) [
+czero (n : ℕ) : ℕ :=
+  case n (_. ℕ) [
     zero. zero;
     suc n. czero n];
 
-add (n : Nat) (m : Nat) : Nat :=
-  case n (_. Nat) [
+add (n : ℕ) (m : ℕ) : ℕ :=
+  case n (_. ℕ) [
     zero. m;
     suc n. suc (add n m)];
 
@@ -18,9 +35,81 @@ five := suc (suc (suc (suc (suc zero))));
 
 ten := add five five;
 
-mul (n m : Nat) : Nat :=
-  case n (_. Nat) [
+mul (n m : ℕ) : ℕ :=
+  case n (_. ℕ) [
     zero. zero;
     suc n. add m (mul n m)];
 
 n100 := mul ten ten;
+
+--------------------------------------------------------------------------------
+
+data List (A : U) := nil | cons A (List A);
+
+map (A B : U) (f : A → B)(as : List A) : List B :=
+  case as (_. List B) [
+    nil. nil;
+    cons a as. cons (f a) (map A B f as)];
+
+list1 : List ℕ := cons ten (cons ten (cons ten nil));
+list2 := map ℕ ℕ (λ _. zero) list1;
+
+--------------------------------------------------------------------------------
+
+data Bad := mkBad (Bad → Bad);
+
+data 𝟙 := tt;
+
+data 𝟘 :=;
+
+𝟘-elim (A : U)(p : 𝟘) : A := case p (_. A) [];
+
+data W (A : U)(B : A → U) := sup (a : A)(f : B a → W A B);
+
+data O := ozero | osuc O | olim (ℕ → O);
+
+fromℕ (n : ℕ) : O := case n (_. O) [
+  zero. ozero;
+  suc n. osuc (fromℕ n)];
+
+oten := fromℕ ten;
+
+ω := olim fromℕ;
+
+iter (A : U)(n : ℕ) (f : A → A) (a : A) : A := case n (_. A) [
+  zero. a;
+  suc n. f (iter A n f a)];
+
+-- fast-growing function
+fgf (o : O) (n : ℕ) : ℕ := case o (_. ℕ) [
+  ozero . suc n;
+  osuc o. iter ℕ n (fgf o) n;
+  olim f. fgf (f n) n];
+
+fω2 := fgf ω (suc (suc zero));
+
+--------------------------------------------------------------------------------
+
+data Vec (A : U) (n : ℕ) :=
+    vnil (n = zero)
+  | vcons (m : ℕ) (n = suc m) A (Vec A m) ;
+
+vmap (A B : U)(n : ℕ)(f : A → B)(as : Vec A n) : Vec B n :=
+  case as (_. Vec B n) [
+    vnil p. vnil p;
+    vcons m p a as. vcons m p (f a) (vmap A B m f as)];
+
+v1 : Vec ℕ (suc (suc zero)) :=
+  vcons (suc zero) refl ten (vcons zero refl ten (vnil refl));
+
+v2 := vmap ℕ ℕ (suc (suc zero)) (add ten) v1;
+
+
+-- Recursive identities
+--------------------------------------------------------------------------------
+
+data RecId :=
+    Base
+  | Path (Base = Base);
+
+recid1 := Path refl⁻¹;

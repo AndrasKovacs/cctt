@@ -317,7 +317,7 @@ inductive :: PrettyArgs ([(Name, Tm)] -> [(Name, [(Name, Ty)])] -> Txt)
 inductive ps cs = case ps of
   []        -> " :=\n    " <> dataCons cs
   (x, a):ps -> let pa = pair a in fresh x \x ->
-               "(" <> x <> " : " <> pa <> ")" <> inductive ps cs
+               " (" <> x <> " : " <> pa <> ")" <> inductive ps cs
 
 top_ :: Names => LvlArg => Top -> Txt
 top_ = \case
