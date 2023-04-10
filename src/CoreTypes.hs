@@ -24,6 +24,7 @@ data Tm
   | TyCon Lvl Spine
   | DCon Lvl Lvl Spine         -- type lvl, con lvl (relative) (TODO: pack)
   | Case Tm Name ~Tm Cases
+  | Split Name ~Tm Cases
 
   | Pi Name Ty Ty
   | App Tm Tm
@@ -276,6 +277,9 @@ data Closure
   -- ^ Body of vanilla term evaluation.
   = CEval (EvalClosure Tm)
 
+  -- ^ Body of lambdaCase
+  | CSplit NamedClosure (EvalClosure Cases)
+
   -- ^ Body of function coercions.
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
 
@@ -456,7 +460,8 @@ instance SubAction (EvalClosure a) where
 
 instance SubAction Closure where
   sub cl = case cl of
-    CEval ecl -> CEval (sub ecl)
+    CEval ecl    -> CEval (sub ecl)
+    CSplit b ecl -> CSplit (sub b) (sub ecl)
 
     -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.

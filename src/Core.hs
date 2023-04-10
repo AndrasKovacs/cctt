@@ -423,6 +423,7 @@ localVar x = go ?env x where
 capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
   CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = s; ?recurse = rc in eval t
+  CSplit b ecs          -> case_ u b ecs
 
   CCoePi r r' a b t ->
     let ~x = u in
@@ -1032,8 +1033,11 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       (mapNeSysHCom' (\i t -> unpack x (t ∙ i)) ts)
       (unpack x base)
 
+  VTyCon tyid ps ->
+    error "inductive hcom TODO"
+
   a ->
-    error $ show a
+    error $ "Unknown hcom type: " ++ show a
 
 
 ----------------------------------------------------------------------------------------------------
@@ -1302,6 +1306,7 @@ eval = \case
   TyCon x ts        -> VTyCon x (tyParams ts)
   DCon x i sp       -> VDCon x i (spine sp)
   Case t x b cs     -> case_ (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
+  Split x b cs      -> VLam $ NCl x $ CSplit (evalClosure x b) (EC ?sub ?env ?recurse cs)
 
   -- Pi
   Pi x a b          -> VPi (eval a) (evalClosure x b)

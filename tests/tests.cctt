@@ -1,18 +1,9 @@
 
 {-
-
-Sugar & stuff.
-
-- Add Split as primitive presyntax and core syntax
-  - Evaluate split directly to the semantic (λ x. case x ...) closure
-  - Split is checkable
-
-- Allow omitted return type in case
-  - infer constant return type from first branch
-
-
+Sugar:
+- When checking case with variable scrutinee, infer motive
+- When checking case with non-variable scrutinee, infer non-dependent motive
 -}
-
 
 --------------------------------------------------------------------------------
 
@@ -26,10 +17,9 @@ czero (n : ℕ) : ℕ :=
     zero. zero;
     suc n. czero n];
 
-add (n : ℕ) (m : ℕ) : ℕ :=
-  case n (_. ℕ) [
-    zero. m;
-    suc n. suc (add n m)];
+add : ℕ → ℕ → ℕ := λ[
+  zero. λ x. x;
+  suc n. λ x. suc (add n x)];
 
 five := suc (suc (suc (suc (suc zero))));
 
@@ -113,3 +103,33 @@ data RecId :=
   | Path (Base = Base);
 
 recid1 := Path refl⁻¹;
+
+--------------------------------------------------------------------------------
+
+data Sum (A B : U) := Left A | Right B;
+Dec (A : U) := Sum A (A → 𝟘);
+
+the (A : U)(x : A) := x;
+
+ℕ-Elim : (P : ℕ → U)(pz : P zero)(ps : (n : ℕ) → P n → P (suc n))(n : ℕ) → P n :=
+  λ P pz ps. λ[
+    zero. pz;
+    suc n. ps n (ℕ-Elim P pz ps n)];
+
+not (A : U) := A → 𝟘;
+
+zeroNotSuc (n : ℕ)(p : zero = suc n) : 𝟘 :=
+  let f : ℕ → U := λ[zero. 𝟙; suc _. 𝟘];
+  coe 0 1 (ap f p) tt;
+
+pred : ℕ → ℕ := λ[zero. zero; suc n. n];
+
+ℕ-Dec : (n m : ℕ) → Dec (n = m) :=
+  λ [zero.  λ [zero. Left refl;
+               suc m. Right (zeroNotSuc m)];
+     suc n. λ [zero. Right (λ p. zeroNotSuc n p⁻¹);
+               suc m. case (ℕ-Dec n m) (_. Dec (suc n = suc m)) [
+	          Left  p. Left (λ i. suc (p i));
+		  Right p. Right (λ q. p (ap pred q))]]];
+
+test := ℕ-Dec (suc zero) zero;

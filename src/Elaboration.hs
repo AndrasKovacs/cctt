@@ -69,7 +69,8 @@ evalSys :: NCofArg => DomArg => EnvArg => Sys -> VSys
 evalSys sys = let ?sub = idSub (dom ?cof); ?recurse = DontRecurse in Core.evalSys sys
 
 instantiate :: NCofArg => DomArg => EnvArg => Tm -> I -> Val
-instantiate t i = let ?sub = idSub (dom ?cof) `ext` i in eval t
+instantiate t i = let ?sub = idSub (dom ?cof) `ext` i; ?recurse = DontRecurse
+                  in Core.eval t
 
 evalCof :: NCofArg => Cof -> VCof
 evalCof cof = let ?sub = idSub (dom ?cof) in Core.evalCof cof
@@ -128,6 +129,15 @@ check t topA = frcPos t \case
                   Just a' -> do a' <- check a' VU
                                 conv (eval a') a
       Lam x <$!> bind x a (\v -> check t (b ∙ v))
+
+    (P.Split cs, VPi a b) -> do
+      (typeid, params) <- case frc a of
+        VTyCon i ps -> pure (i, ps)
+        a           -> err $ ExpectedInductiveType (quote a)
+      (paramtypes, cons, canCase) <- tyConInfo typeid
+      unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
+      cs <- elabCases typeid 0 params b (LM.elems cons) cs
+      pure $! Split (b^.name) (quote b) cs
 
     (P.Lam x ann t, VPath a l r) -> do
       case ann of Nothing               -> pure ()
@@ -553,6 +563,9 @@ inferNonSplit t = frcPos t \case
     cs <- elabCases typeid 0 params bv (LM.elems cons) cs
     pure $! Infer (Case t x b cs) (bv ∙ eval t)
 
+  P.Split _ ->
+    err $ GenericError "Can't infer type for case splitting function"
+
 ----------------------------------------------------------------------------------------------------
 
 elabCase :: Elab (Lvl -> Lvl -> Env -> [(Name, Ty)] -> Val -> [Name] -> P.Tm -> IO Tm)
@@ -580,7 +593,7 @@ elabCases typeid conid params b contypes cs = case (contypes, cs) of
   ((x, fieldtypes):contypes, (x', xs, body):cs) | x == x' -> do
     let rhstype = b ∙ caseLhsVal typeid conid ?dom xs
     t  <- elabCase typeid conid params fieldtypes rhstype xs body
-    cs <- elabCases typeid conid params b contypes cs
+    cs <- elabCases typeid (conid + 1) params b contypes cs
     pure $ CSCons x xs t cs
   _ -> do
     err CaseMismatch

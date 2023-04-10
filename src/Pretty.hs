@@ -297,8 +297,8 @@ tm = \case
   Unpack t x        -> case unProject t x of
                          Nothing -> projp (proj t <> ".1")
                          Just t  -> projp (proj t <> "." <> str x)
+  Split x b cs      -> appp ("λ[" <> cases cs <> "]")
 
-  -- NKData i j        -> str (?names `showVar` NKData  i j)
 ----------------------------------------------------------------------------------------------------
 
 dataFields :: PrettyArgs ([(Name, Ty)] -> Txt)

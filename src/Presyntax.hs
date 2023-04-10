@@ -31,6 +31,7 @@ data Tm
   | Hole (Maybe Name) (DontShow SourcePos)
 
   | Case Tm Name Ty [(Name, [Name], Tm)]
+  | Split [(Name, [Name], Tm)]
 
   | U
   | Path Tm Tm                                -- x = y

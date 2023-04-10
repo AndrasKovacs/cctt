@@ -78,6 +78,17 @@ keyword kw = try do
   C.string kw
   (takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'') *> empty) <|> ws
 
+goSplit :: Parser Tm
+goSplit = do
+  let case_ = do
+        x:xs <- some bind
+        char '.'
+        body <- tm
+        pure (x, xs, body)
+  cases <- sepBy case_ (char ';')
+  char ']'
+  pure $ Split cases
+
 atom :: Parser Tm
 atom =
       parens tm
@@ -199,7 +210,7 @@ goCase = do
   char ')'
   char '['
   let case_ = do
-        x:xs <- some ident
+        x:xs <- some bind
         char '.'
         body <- tm
         pure (x, xs, body)
@@ -209,7 +220,8 @@ goCase = do
 
 app :: Parser Tm
 app = withPos (
-       (keyword "coe"     *> goCoe)
+       (do {try (keyword "λ" *> char '['); goSplit})
+  <|>  (keyword "coe"     *> goCoe)
   <|>  (keyword "case"    *> goCase)
   <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
@@ -330,7 +342,7 @@ pLet = do
   pure $ Let x ma t u
 
 lamlet :: Parser Tm
-lamlet = lam <|> pLet <|> pi
+lamlet = try lam <|> pLet <|> pi
 
 tm :: Parser Tm
 tm = withPos do
