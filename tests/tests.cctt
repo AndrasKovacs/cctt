@@ -1,9 +1,4 @@
 
-{-
-Sugar:
-- When checking case with variable scrutinee, infer motive
-- When checking case with non-variable scrutinee, infer non-dependent motive
--}
 
 --------------------------------------------------------------------------------
 
@@ -32,6 +27,10 @@ mul (n m : ℕ) : ℕ :=
 
 n100 := mul ten ten;
 
+mul2 (n m : ℕ) : ℕ := case n [zero. zero; suc n. add m (mul2 n m)];
+
+n1k := mul2 ten n100;
+
 --------------------------------------------------------------------------------
 
 data List (A : U) := nil | cons A (List A);
@@ -48,17 +47,17 @@ list2 := map ℕ ℕ (λ _. zero) list1;
 
 data Bad := mkBad (Bad → Bad);
 
-data 𝟙 := tt;
+data Top := tt;
 
-data 𝟘 :=;
+data Bot :=;
 
-𝟘-elim (A : U)(p : 𝟘) : A := case p (_. A) [];
+Bot-elim (A : U)(p : Bot) : A := case p (_. A) [];
 
 data W (A : U)(B : A → U) := sup (a : A)(f : B a → W A B);
 
 data O := ozero | osuc O | olim (ℕ → O);
 
-fromℕ (n : ℕ) : O := case n (_. O) [
+fromℕ : ℕ → O := λ[
   zero. ozero;
   suc n. osuc (fromℕ n)];
 
@@ -71,7 +70,7 @@ iter (A : U)(n : ℕ) (f : A → A) (a : A) : A := case n (_. A) [
   suc n. f (iter A n f a)];
 
 -- fast-growing function
-fgf (o : O) (n : ℕ) : ℕ := case o (_. ℕ) [
+fgf (o : O) (n : ℕ) : ℕ := case o [
   ozero . suc n;
   osuc o. iter ℕ n (fgf o) n;
   olim f. fgf (f n) n];
@@ -106,8 +105,10 @@ recid1 := Path refl⁻¹;
 
 --------------------------------------------------------------------------------
 
+not (A : U) := A → Bot;
+
 data Sum (A B : U) := Left A | Right B;
-Dec (A : U) := Sum A (A → 𝟘);
+Dec (A : U) := Sum A (not A);
 
 the (A : U)(x : A) := x;
 
@@ -116,10 +117,8 @@ the (A : U)(x : A) := x;
     zero. pz;
     suc n. ps n (ℕ-Elim P pz ps n)];
 
-not (A : U) := A → 𝟘;
-
-zeroNotSuc (n : ℕ)(p : zero = suc n) : 𝟘 :=
-  let f : ℕ → U := λ[zero. 𝟙; suc _. 𝟘];
+zeroNotSuc (n : ℕ)(p : zero = suc n) : Bot :=
+  let f : ℕ → U := λ[zero. Top; suc _. Bot];
   coe 0 1 (ap f p) tt;
 
 pred : ℕ → ℕ := λ[zero. zero; suc n. n];

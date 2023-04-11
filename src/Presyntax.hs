@@ -30,7 +30,7 @@ data Tm
   | Wrap Name Ty
   | Hole (Maybe Name) (DontShow SourcePos)
 
-  | Case Tm Name Ty [(Name, [Name], Tm)]
+  | Case Tm (Maybe (Name, Ty)) [(Name, [Name], Tm)]
   | Split [(Name, [Name], Tm)]
 
   | U

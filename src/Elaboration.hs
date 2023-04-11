@@ -198,6 +198,19 @@ check t topA = frcPos t \case
       ts   <- elabGlueTmSys base ts a (fst equivs)
       pure $ Glue base eqs ts
 
+    -- inferring non-dependent motive for case
+    (P.Case t Nothing cs, b) -> do
+      Infer t a <- infer t
+      (typeid, params) <- case frc a of
+        VTyCon i ps -> pure (i, ps)
+        a           -> err $ ExpectedInductiveType (quote a)
+      let qb = bind "_" a \_ -> quote b
+      let bv = NCl "_" $ CConst b
+      (paramtypes, cons, canCase) <- tyConInfo typeid
+      unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
+      cs <- elabCases typeid 0 params bv (LM.elems cons) cs
+      pure $ Case t "_" qb cs
+
     (P.Hole i p, a) -> setPos p $ withPrettyArgs do
       putStrLn ("HOLE ?" ++ maybe (sourcePosPretty ?srcPos) id i)
       putStrLn ("  : " ++ pretty (quote a) ++ "\n")
@@ -551,7 +564,7 @@ inferNonSplit t = frcPos t \case
   P.Hole i p -> setPos p do
     err CantInferHole
 
-  P.Case t x b cs -> do
+  P.Case t (Just (x, b)) cs -> do
     Infer t a <- infer t
     (typeid, params) <- case frc a of
       VTyCon i ps -> pure (i, ps)
@@ -562,6 +575,9 @@ inferNonSplit t = frcPos t \case
     unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
     cs <- elabCases typeid 0 params bv (LM.elems cons) cs
     pure $! Infer (Case t x b cs) (bv ∙ eval t)
+
+  P.Case _ Nothing _ ->
+    err $ GenericError "Can't infer type for case expression"
 
   P.Split _ ->
     err $ GenericError "Can't infer type for case splitting function"

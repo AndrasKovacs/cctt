@@ -203,11 +203,7 @@ goGlue = do
 goCase :: Parser Tm
 goCase = do
   t <- proj
-  char '('
-  x <- bind
-  char '.'
-  b <- tm
-  char ')'
+  b <- optional ((//) <$!> (char '(' *> bind) <*!> (char '.' *> tm <* char ')'))
   char '['
   let case_ = do
         x:xs <- some bind
@@ -216,7 +212,7 @@ goCase = do
         pure (x, xs, body)
   cases <- sepBy case_ (char ';')
   char ']'
-  pure $ Case t x b cases
+  pure $ Case t b cases
 
 app :: Parser Tm
 app = withPos (
