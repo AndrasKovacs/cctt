@@ -51,7 +51,7 @@ instance Quote Val Tm where
     VHole i p _ _    -> Hole i p                   -- we forget the context when quoting a hole!
     VLine t          -> Line (t^.name) (quote t)
     VLLam t          -> LLam (t^.name) (quote t)
-    VTyCon x ts      -> TyCon x (quote ts)
+    VTyCon x ts cs   -> TyCon x (quote ts) cs
     VDCon x i sp     -> DCon x i (quote sp)
 
 --------------------------------------------------------------------------------

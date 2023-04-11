@@ -62,11 +62,3 @@ JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
                [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
                 k=1 _. d]
                d;
-
-mallac1 : U := ?foobar;
-
-mallac2 : U := ?;
-
-mallac3 : U := ?;
-
-mallac4 : U := ?;

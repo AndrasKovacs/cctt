@@ -732,10 +732,10 @@ coed r r' topA t = case (frc topA) ^. body of
     t
 
   -- closed inductives
-  VTyCon x ENil ->
+  VTyCon x ENil cs ->
     t
 
-  VTyCon x (rebind topA -> ps) ->
+  VTyCon x (rebind topA -> ps) cs ->
     uf
 
   -- Note: I don't need to rebind the "is"! It can be immediately weakened
@@ -1033,7 +1033,7 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       (mapNeSysHCom' (\i t -> unpack x (t ∙ i)) ts)
       (unpack x base)
 
-  VTyCon tyid ps ->
+  VTyCon tyid ps cs ->
     error "inductive hcom TODO"
 
   a ->
@@ -1303,7 +1303,7 @@ eval = \case
   Let x _ t u       -> define (eval t) (eval u)
 
   -- Inductives
-  TyCon x ts        -> VTyCon x (tyParams ts)
+  TyCon x ts cs     -> VTyCon x (tyParams ts) cs
   DCon x i sp       -> VDCon x i (spine sp)
   Case t x b cs     -> case_ (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
   Split x b cs      -> VLam $ NCl x $ CSplit (evalClosure x b) (EC ?sub ?env ?recurse cs)
@@ -1436,7 +1436,7 @@ instance Force Val Val where
     VHole x p s env  -> VHole x p (sub s) (sub env)
     VLine t          -> VLine (sub t)
     VLLam t          -> VLLam (sub t)
-    VTyCon x ts      -> VTyCon x (sub ts)
+    VTyCon x ts cs   -> VTyCon x (sub ts) cs
     VDCon x i sp     -> VDCon x i (sub sp)
   {-# noinline frcS #-}
 

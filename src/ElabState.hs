@@ -11,8 +11,6 @@ import CoreTypes
 import Interval
 import qualified LvlMap as LM
 
-type Constructors = LM.Map (Name, [(Name, Ty)])
-
 data TblEntry
   = TBETopDef Lvl VTy ~Val (DontShow SourcePos)   -- level, type, value
   | TBETyCon Lvl [(Name, Ty)] Constructors (DontShow SourcePos)

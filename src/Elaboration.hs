@@ -100,8 +100,8 @@ makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
 data Infer = Infer Tm ~VTy deriving Show
 
 data Split
-  = DConHead Lvl Lvl [(Name, Ty)] [(Name, Ty)] [P.Tm]
-  | TyConHead Lvl [(Name, Ty)] [P.Tm]
+  = DConHead Lvl Lvl [(Name, Ty)] [(Name, Ty)] Constructors [P.Tm]
+  | TyConHead Lvl [(Name, Ty)] Constructors [P.Tm]
   | SplitInfer {-# unpack #-} Infer
   deriving Show
 
@@ -132,8 +132,8 @@ check t topA = frcPos t \case
 
     (P.Split cs, VPi a b) -> do
       (typeid, params) <- case frc a of
-        VTyCon i ps -> pure (i, ps)
-        a           -> err $ ExpectedInductiveType (quote a)
+        VTyCon i ps _ -> pure (i, ps)
+        a             -> err $ ExpectedInductiveType (quote a)
       (paramtypes, cons, canCase) <- tyConInfo typeid
       unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
       cs <- elabCases typeid 0 params b (LM.elems cons) cs
@@ -202,8 +202,8 @@ check t topA = frcPos t \case
     (P.Case t Nothing cs, b) -> do
       Infer t a <- infer t
       (typeid, params) <- case frc a of
-        VTyCon i ps -> pure (i, ps)
-        a           -> err $ ExpectedInductiveType (quote a)
+        VTyCon i ps _ -> pure (i, ps)
+        a             -> err $ ExpectedInductiveType (quote a)
       let qb = bind "_" a \_ -> quote b
       let bv = NCl "_" $ CConst b
       (paramtypes, cons, canCase) <- tyConInfo typeid
@@ -220,18 +220,18 @@ check t topA = frcPos t \case
       t <- check t a
       pure $! Pack x t
 
-    (t, VTyCon tyid ps) -> do
+    (t, VTyCon tyid ps _) -> do
       split t >>= \case
-        DConHead tyid' conid ps' fs sp -> do
+        DConHead tyid' conid ps' fs cons sp -> do
           unless (tyid' == tyid) $ withPrettyArgs $
             err $ GenericError $
-              "No such constructor for expected type:\n\n  " ++ pretty (quote (VTyCon tyid ps))
+              "No such constructor for expected type:\n\n  " ++ pretty (quote (VTyCon tyid ps cons))
           sp <- checkSp ps sp fs
           pure $ DCon tyid conid sp
 
         TyConHead{} ->
           err $ GenericError $ withPrettyArgs $
-            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps)) ++
+            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps mempty)) ++
             "\n\nbut the expression is a type constructor"
 
         SplitInfer (Infer t a) -> do
@@ -251,10 +251,10 @@ goSplit t sp topT = frcPos t \case
       Nothing ->
         err $ NameNotInScope x
       Just (TBETyCon l ps cs _) ->
-        pure $ TyConHead l ps sp
+        pure $ TyConHead l ps cs sp
       Just (TBEDCon tyid conid fs _) -> do
-        (ps, _, _) <- tyConInfo tyid
-        pure $ DConHead tyid conid ps fs sp
+        (ps, cs, _) <- tyConInfo tyid
+        pure $ DConHead tyid conid ps fs cs sp
       Just (TBELocal l a) ->
         SplitInfer <$!> inferSp (LocalVar (lvlToIx ?dom l)) a sp
       Just TBELocalInt{} ->
@@ -278,7 +278,7 @@ goSplit t sp topT = frcPos t \case
         err TopLvlNotInScope
       Just (TPETyCon ps cons _) ->
         case LM.lookup conid cons of
-          Just (_, fs) -> pure $ DConHead tyid conid ps fs sp
+          Just (_, fs) -> pure $ DConHead tyid conid ps fs cons sp
           Nothing      -> err $ GenericError "No such data constructor"
       Just (TPEDef a v) -> do
         err $ GenericError $ "No type constructor with De Bruijn level " ++ show tyid
@@ -291,7 +291,7 @@ goSplit t sp topT = frcPos t \case
       Nothing -> do
         err TopLvlNotInScope
       Just (TPETyCon ps cons _) -> do
-        pure $ TyConHead x ps sp
+        pure $ TyConHead x ps cons sp
       Just (TPEDef a v) -> do
         SplitInfer <$!> inferSp (TopVar x (coerce v)) a sp
       Just (TPERec Nothing) ->
@@ -340,16 +340,16 @@ infer :: Elab (P.Tm -> IO Infer)
 infer t = split t >>= \case
 
   -- no params + saturated
-  DConHead tyid conid params fields sp -> case params of
+  DConHead tyid conid params fields cons sp -> case params of
     [] -> do
       sp <- checkSp ENil sp fields
-      pure $ Infer (DCon tyid conid sp) (VTyCon tyid ENil)
+      pure $ Infer (DCon tyid conid sp) (VTyCon tyid ENil cons)
     _  -> err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
 
   -- saturated
-  TyConHead tyid ps sp -> do
+  TyConHead tyid ps cons sp -> do
     sp <- checkSp ENil sp ps
-    pure $ Infer (TyCon tyid sp) VU
+    pure $ Infer (TyCon tyid sp cons) VU
 
   SplitInfer inf -> do
     pure inf
@@ -567,8 +567,8 @@ inferNonSplit t = frcPos t \case
   P.Case t (Just (x, b)) cs -> do
     Infer t a <- infer t
     (typeid, params) <- case frc a of
-      VTyCon i ps -> pure (i, ps)
-      a           -> err $ ExpectedInductiveType (quote a)
+      VTyCon i ps _ -> pure (i, ps)
+      a             -> err $ ExpectedInductiveType (quote a)
     b <- bind x a \_ -> check b VU
     let bv = makeNCl x b
     (paramtypes, cons, canCase) <- tyConInfo typeid

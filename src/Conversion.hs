@@ -31,7 +31,7 @@ instance Conv Val where
     (VU             , VU                ) -> True
     (VLine a        , VLine a'          ) -> conv a a'
     (VLLam t        , VLLam t'          ) -> conv t t'
-    (VTyCon x ts    , VTyCon x' ts'     ) -> x == x' && conv ts ts'
+    (VTyCon x ts _  , VTyCon x' ts' _   ) -> x == x' && conv ts ts'
     (VDCon x i sp   , VDCon x' i' sp'   ) -> x == x' && i == i' && conv sp sp'
 
     -- We keep track of evaluation contexts for holes.

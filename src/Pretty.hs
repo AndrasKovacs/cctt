@@ -284,8 +284,8 @@ tm = \case
   Sym _ _ _ p       -> projp (proj p <> "⁻¹")
   Trans _ _ _ _ p q -> transp (app p <> " ∙ " <> trans q)
   Ap f _ _ p        -> appp ("ap " <> proj f <> " " <> proj p)
-  TyCon x SPNil     -> topVar x
-  TyCon x ts        -> appp (topVar x <> spine ts)
+  TyCon x SPNil _   -> topVar x
+  TyCon x ts _      -> appp (topVar x <> spine ts)
   DCon i j SPNil    -> dataCon i j
   DCon i j sp       -> appp (dataCon i j <> spine sp)
   Case t x b cs     -> ifVerbose

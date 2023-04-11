@@ -4,6 +4,7 @@ module CoreTypes where
 
 import Common
 import Interval
+import qualified LvlMap as LM
 
 -- Syntax
 --------------------------------------------------------------------------------
@@ -15,14 +16,16 @@ data Spine
   | SPCons Tm Spine
   deriving Show
 
+type Constructors = LM.Map (Name, [(Name, Ty)])
+
 data Tm
   = TopVar Lvl ~(DontShow Val)
   | RecursiveCall Lvl
   | LocalVar Ix
   | Let Name Tm Ty Tm
 
-  | TyCon Lvl Spine
-  | DCon Lvl Lvl Spine         -- type lvl, con lvl (relative) (TODO: pack)
+  | TyCon Lvl Spine Constructors -- typid, params, constructors
+  | DCon Lvl Lvl Spine           -- type lvl, con lvl (relative) (TODO: pack)
   | Case Tm Name ~Tm Cases
   | Split Name ~Tm Cases
 
@@ -225,7 +228,7 @@ data Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
-  | VTyCon Lvl Env
+  | VTyCon Lvl Env Constructors
   | VDCon Lvl Lvl VDSpine          -- type lvl, con index
 
   | VHole (Maybe Name) (DontShow SourcePos) Sub Env
