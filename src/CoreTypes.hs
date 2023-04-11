@@ -29,7 +29,7 @@ data Tm
   | LocalVar Ix
   | Let Name Tm Ty Tm
 
-  | TyCon Lvl Spine Constructors -- typid, params, constructors
+  | TyCon Lvl Spine (DontShow Constructors) -- typid, params, constructors
   | DCon Lvl Lvl Spine           -- type lvl, con lvl (relative) (TODO: pack)
   | Case Tm Name ~Tm Cases
   | Split Name ~Tm Cases
@@ -233,7 +233,7 @@ data Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
-  | VTyCon Lvl Env Constructors
+  | VTyCon Lvl Env (DontShow Constructors)
   | VDCon Lvl Lvl VDSpine          -- type lvl, con index
 
   | VHole (Maybe Name) (DontShow SourcePos) Sub Env
@@ -272,7 +272,7 @@ type IDomArg = (?idom :: IVar)   -- fresh LocalVar
 
 --------------------------------------------------------------------------------
 
-data Recurse = Recurse ~Val | DontRecurse
+data Recurse = Recurse ~(DontShow Val) | DontRecurse
   deriving Show
 
 type RecurseArg = (?recurse :: Recurse)

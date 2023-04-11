@@ -251,7 +251,10 @@ tm = \case
                          Just t  -> projp (proj t <> "." <> str x)
   Proj2 t x         -> projp (proj t <> ".2")
   U                 -> "U"
-  Path "_" _ t u    -> eqp (trans t <> " = " <> trans u)
+  Path "_" a t u    -> ifVerbose
+                        (let pt = trans t; pu = trans u in freshI "_" \_ ->
+                         eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
+                        (eqp (trans t <> " = " <> trans u))
   Path x a t u      -> let pt = trans t; pu = trans u in freshI x \x ->
                        eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
   PApp l r t u      -> ifVerbose

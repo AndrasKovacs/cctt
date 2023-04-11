@@ -1,0 +1,6 @@
+
+foo := coe 0 0 (_. U → U) (λ x. x) U;
+
+-- data Unit := tt;
+-- idunit (x : Unit) : Unit := case x (_. Unit) [tt. tt];
+-- test : idunit ={_. Unit → Unit} idunit := refl;

@@ -741,7 +741,7 @@ coed r r' topA t = case (frc topA) ^. body of
     t
   a@(VTyCon x (rebind topA -> ps) cs) -> case frc t of
     VDCon tyid conid sp ->
-      coeind r r' ps tyid conid sp (snd (cs LM.! conid))
+      coeind r r' ps tyid conid sp (snd (unDontShow cs LM.! conid))
     t@(VNe _ is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
     _ ->
@@ -1033,8 +1033,8 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
 
   VTyCon tyid ps cs -> case frc base of
     VDCon _ conid sp -> case ?dom of
-      0 -> hcomind0 r r' topA ts ps tyid conid sp (snd (cs LM.! conid))
-      _ -> hcomind  r r' topA ts ps tyid conid sp (snd (cs LM.! conid))
+      0 -> hcomind0 r r' topA ts ps tyid conid sp (snd (unDontShow cs LM.! conid))
+      _ -> hcomind  r r' topA ts ps tyid conid sp (snd (unDontShow cs LM.! conid))
     base@(VNe n is') ->
       VNe (NHCom r r' topA nts base) (insertI r $ insertI r' $ is <> is')
     base@VHole{} ->
@@ -1129,7 +1129,7 @@ spine = \case
 
 recursiveCall :: RecurseArg => Lvl -> Val
 recursiveCall x = case ?recurse of
-  Recurse v   -> v
+  Recurse v   -> coerce v
   DontRecurse -> VNe (NDontRecurse x) mempty
 {-# inline recursiveCall #-}
 

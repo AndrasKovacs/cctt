@@ -144,8 +144,8 @@ check t topA = frcPos t \case
                   Just (P.unPos -> P.I) -> pure ()
                   Just _                -> err $ GenericError "Expected an interval binder"
       t <- bindI x \i -> check t (a ∙ IVar i)
-      convEndpoints l (instantiate t I0)
-      convEndpoints r (instantiate t I1)
+      convEndpoints (instantiate t I0) l
+      convEndpoints (instantiate t I1) r
       pure $! PLam (quote l) (quote r) x t
 
     (P.PLam l r x t, VPath a l' r') -> do
@@ -225,13 +225,14 @@ check t topA = frcPos t \case
         DConHead tyid' conid ps' fs cons sp -> do
           unless (tyid' == tyid) $ withPrettyArgs $
             err $ GenericError $
-              "No such constructor for expected type:\n\n  " ++ pretty (quote (VTyCon tyid ps cons))
+              "No such constructor for expected type:\n\n  "
+              ++ pretty (quote (VTyCon tyid ps (coerce cons)))
           sp <- checkSp ps sp fs
           pure $ DCon tyid conid sp
 
         TyConHead{} ->
           err $ GenericError $ withPrettyArgs $
-            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps mempty)) ++
+            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps (DontShow mempty))) ++
             "\n\nbut the expression is a type constructor"
 
         SplitInfer (Infer t a) -> do
@@ -343,13 +344,13 @@ infer t = split t >>= \case
   DConHead tyid conid params fields cons sp -> case params of
     TNil -> do
       sp <- checkSp ENil sp fields
-      pure $ Infer (DCon tyid conid sp) (VTyCon tyid ENil cons)
+      pure $ Infer (DCon tyid conid sp) (VTyCon tyid ENil (coerce cons))
     _  -> err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
 
   -- saturated
   TyConHead tyid ps cons sp -> do
     sp <- checkSp ENil sp ps
-    pure $ Infer (TyCon tyid sp cons) VU
+    pure $ Infer (TyCon tyid sp (coerce cons)) VU
 
   SplitInfer inf -> do
     pure inf
@@ -589,7 +590,6 @@ elabCase typeid conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) o
   (TNil, []) ->
     check body rhstype
   (TCons _ a fieldtypes, x:xs) -> do
-
     bind x (evalIn tyenv a) \x ->
       elabCase typeid conid (EDef tyenv x) fieldtypes rhstype xs body
   _ -> do
@@ -853,7 +853,7 @@ elabTop = \case
         Just (a, va) -> do {t <- check t va; pure (t, a, va)}
 
       -- recursive evaluation
-      let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse tv in Core.eval t)
+      let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse (coerce tv) in Core.eval t)
 
       finalizeTopDef l x va tv (coerce pos)
 

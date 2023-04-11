@@ -220,11 +220,12 @@ app = withPos (
   <|>  (keyword "coe"     *> goCoe)
   <|>  (keyword "case"    *> goCase)
   <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
-  <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
-  <|>  (keyword "glue"    *> goGlue)
   <|>  (keyword "unglue"  *> (Unglue <$!> proj))
   <|>  (keyword "com"     *> goCom)
   <|>  (keyword "ap"      *> (Ap <$!> proj <*!> proj))
+
+  <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
+  <|>  (keyword "glue"    *> goGlue)
   <|>  (goApp =<< proj))
 
 trans :: Parser Tm

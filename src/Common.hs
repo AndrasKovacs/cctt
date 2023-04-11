@@ -130,7 +130,7 @@ type LvlArg = (?lvl :: Lvl)
 -- Not printing stuff
 --------------------------------------------------------------------------------
 
-newtype DontShow a = DontShow a deriving Eq
+newtype DontShow a = DontShow {unDontShow :: a} deriving Eq
 
 instance Show (DontShow a) where
   showsPrec _ _ x = x

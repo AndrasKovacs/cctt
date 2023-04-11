@@ -61,7 +61,7 @@ quoteCases' = \case
   CSNil               -> CSNil
   CSCons x xs body cs ->
     CSCons x xs
-      (let (env, dom) = pushVars ?env xs in
+      (let (!env, !dom) = pushVars ?env xs in
        let ?env = env; ?dom = dom in
        quote (eval body))
       (quoteCases' cs)

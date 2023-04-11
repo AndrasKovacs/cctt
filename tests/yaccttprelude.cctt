@@ -957,66 +957,82 @@ isoToEquivNfOK (A B : U) (i : iso A B) : isoToEquiv A B i = isoToEquivNf A B i :
   refl;
 
 
--- These require inductive types
 --------------------------------------------------------------------------------
 
--- data N0 =
+data N0 :=;
 
--- efq (A : U) : N0 → A = split {}
--- not (A : U) : U = A → N0
+efq (A : U) : N0 → A := λ[];
+not (A : U) : U := A → N0;
 
--- data Unit = tt
+data Unit := tt;
 
--- propUnit : prop Unit = split
---  tt → split@((x:Unit) → Path Unit tt x) with
---   tt → <i> tt
+propUnit : prop Unit := λ[tt. λ[tt. refl]];
 
--- setUnit : set Unit = propSet Unit propUnit
+setUnit : set Unit := propSet Unit propUnit;
 
--- data or (A B : U) = inl (a : A)
---                   | inr (b : B)
+data or (A B : U) := inl (a : A) | inr (b : B);
 
--- propOr (A B : U) (hA : prop A) (hB : prop B) (h : A → not B) : prop (or A B) = split
---     inl a' → split@((b : or A B) → Path (or A B) (inl a') b) with
---         inl b' → <i> inl (hA a' b' @ i)
---         inr b' → efq (Path (or A B) (inl a') (inr b')) (h a' b')
---     inr a' → split@((b : or A B) → Path (or A B) (inr a') b) with
---         inl b' → efq (Path (or A B) (inr a') (inl b')) (h b' a')
---         inr b' → <i> inr (hB a' b' @ i)
+propOr (A B : U) (hA : prop A) (hB : prop B) (h : A → not B) : prop (or A B) := λ[
+  inl a'. λ[inl b'. λ i. inl (hA a' b' i);
+            inr b'. case (h a' b') []];
+  inr a'. λ[inl b'. case (h b' a') [];
+            inr b'. λ i. inr (hB a' b' i)]
+  ];
 
--- stable (A:U) : U = not (not A) → A
+propOrNf (A B : U) (hA : prop A) (hB : prop B) (h : A → not B) : prop (or A B) :=
+λ a. case a (a1. (b : or A B) → a1 ={_. or A B} b) [
+  inl a'. (λ b. case b (b1. inl a' ={_. or A B} b1) [
+                       inl b'. (λ {inl a'} {inl b'} i. inl (hA a' b' {a'} {b'} i))
+		     ; inr b'. (case (h a' b') (_. (inl a' ={_. or A B} inr b')) [])])
+; inr a'. (λ b. case b (b1. inr a' ={_. or A B} b1) [
+                       inl b'. (case (h b' a') (_. (inr a' ={_. or A B} inl b')) [])
+		     ; inr b'. (λ {inr a'} {inr b'} i. inr (hB a' b' {a'} {b'} i))])];
 
--- const (A : U) (f : A → A) : U = (x y : A) → Path A (f x) (f y)
+propOrNfOK : propOr = propOrNf :=
+  refl;
 
--- exConst (A : U) : U = (f:A → A) * const A f
+stable (A:U) : U := not (not A) → A;
 
--- propN0 : prop N0 = \ (x y:N0) → efq (Path N0 x y) x
+const (A : U) (f : A → A) : U := (x y : A) → f x = f y;
 
--- propNot (A:U) : prop (not A) = \ (f g:not A) → <i>\(x:A) → (propN0 (f x) (g x))@i
+exConst (A : U) : U := (f:A → A) * const A f;
 
--- dNot (A:U) (a:A) : not (not A) = \ (h : not A) → h a
+propN0 : prop N0 := λ[];
 
--- dec (A : U) : U = or A (not A)
+propNot (A : U) : prop (not A) := λ f g i x. propN0 (f x) (g x) i;
 
--- propDec (A : U) (h : prop A) : prop (dec A) =
---   propOr A (not A) h (propNot A) (\(x : A) (h : not A) → h x)
+dNot (A : U) (a : A) : not (not A) := λ f. f a;
 
--- decEqCong (A B : U) (f : A → B) (g : B → A) : dec A → dec B = split
---   inl a → inl (f a)
---   inr h → inr (\ (b:B) → h (g b))
+dec (A : U) : U := or A (not A);
 
--- decStable (A:U) : dec A → stable A = split
---  inl a → \ (h :not (not A)) → a
---  inr b → \ (h :not (not A)) → efq A (h b)
+propDec (A : U) (h : prop A) : prop (dec A) :=
+  propOr A (not A) h (propNot A) (λ x h. h x);
 
--- decConst (A : U) : dec A → exConst A = split
---   inl a → (\ (x:A)  → a, \ (x y:A) → refl)
---   inr h → (\ (x:A) → x, \ (x y:A) → efq (Path A x y) (h x))
+propDecNf (A : U) (h : prop A) : prop (dec A)  :=
+λ a. case a (a1. (b : or A (A → N0)) → a1 ={_. or A (A → N0)} b) [
+  inl a'. (λ b. case b (b1. inl a' ={_. or A (A → N0)} b1) [
+                       inl b'. (λ {inl a'} {inl b'} i. inl (h a' b' {a'} {b'} i))
+		     ; inr b'. (case (b' a') (_. (inl a' ={_. or A (A → N0)} inr b')) [])])
+; inr a'. (λ b. case b (b1. inr a' ={_. or A (A → N0)} b1) [
+                       inl b'. (case (a' b') (_. (inr a' ={_. or A (A → N0)} inl b')) [])
+		     ; inr b'. (λ {inr a'} {inr b'} i.
+		           inr (λ x. case (a' x) (a1. ((b1 : N0) → a1 ={_. N0} b1)) []
+			       (b' x) {a' x} {b' x} i))])];
 
--- stableConst (A : U) (sA: stable A) : exConst A =
---  (\ (x:A) → sA (dNot A x),\ (x y:A) → <i>sA (propNot (not A) (dNot A x) (dNot A y) @ i))
+decEqCong (A B : U) (f : A → B) (g : B → A) : dec A → dec B := λ[
+  inl a. inl (f a);
+  inr h. inr (λ b. h (g b))];
 
--- discrete (A : U) : U = (a b : A) → dec (Path A a b)
+decStable (A : U) : dec A → stable A := λ[
+ inl a. λ _. a;
+ inr b. λ h. case (h b) []];
 
--- injective (A B : U) (f : A → B) : U =
---   (a0 a1 : A) → Path B (f a0) (f a1) → Path A a0 a1
+decConst (A : U) : dec A → exConst A := λ[
+  inl a. (λ _. a, λ _ _. refl);
+  inr h. (λ x. x, λ x y. case (h x) [])];
+
+stableConst (A : U) (sA : stable A) : exConst A :=
+  (λ x. sA (dNot A x), λ x y i. sA (propNot (not A) (dNot A x) (dNot A y) i));
+
+discrete (A B : U) (f : A → B) : U :=
+  (a0 a1 : A) → f a0 = f a1 → a0 = a1;

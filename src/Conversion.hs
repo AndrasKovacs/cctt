@@ -94,13 +94,14 @@ instance Conv Ne where
 convCases' :: NCofArg => DomArg => RecurseArg => Sub -> Env -> Cases -> Sub -> Env -> Cases -> Bool
 convCases' sub env cs sub' env' cs' = case (cs, cs') of
   (CSNil            , CSNil             ) -> True
-  (CSCons _ xs t cs , CSCons _ _  t' cs') ->
-    (let (env , dom) = pushVars env  xs
-         (env', _  ) = pushVars env' xs in
-     let ?dom = dom in
-     let v  = (let ?env = env ; ?sub = sub  in eval t ) in
-     let v' = (let ?env = env'; ?sub = sub' in eval t') in
-     conv v v')
+  (CSCons x xs t cs , CSCons _ _  t' cs') ->
+    (case pushVars env xs of
+      (!env, !dom) -> case pushVars env' xs of
+        (!env', !_) ->
+          let ?dom = dom in
+          let v  = (let ?env = env ; ?sub = sub  in eval t ) in
+          let v' = (let ?env = env'; ?sub = sub' in eval t') in
+          conv v v')
     &&
     convCases' sub env cs sub' env' cs'
   _ ->
@@ -108,7 +109,8 @@ convCases' sub env cs sub' env' cs' = case (cs, cs') of
 
 convCases :: NCofArg => DomArg => EvalClosure Cases -> EvalClosure Cases -> Bool
 convCases (EC sub env _ cs) (EC sub' env' _ cs') =
-  let ?recurse = DontRecurse in convCases' sub env cs sub' env' cs'
+  let ?recurse = DontRecurse
+  in convCases' sub env cs sub' env' cs'
 
 instance Conv NeCof where
   conv c c' = case (c, c') of
