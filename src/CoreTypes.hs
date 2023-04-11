@@ -11,12 +11,17 @@ import qualified LvlMap as LM
 
 type Ty = Tm
 
+data Tel
+  = TNil
+  | TCons Name Ty Tel
+  deriving Show
+
 data Spine
   = SPNil
   | SPCons Tm Spine
   deriving Show
 
-type Constructors = LM.Map (Name, [(Name, Ty)])
+type Constructors = LM.Map (Name, Tel)
 
 data Tm
   = TopVar Lvl ~(DontShow Val)
@@ -94,7 +99,7 @@ data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
   deriving Show
 
 data Top
-  = TData Name [(Name, Ty)] [(Name, [(Name, Ty)])] Top
+  = TData Name Tel [(Name, Tel)] Top
   | TDef Name Ty Tm Top
   | TEmpty
   deriving Show

@@ -100,8 +100,8 @@ makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
 data Infer = Infer Tm ~VTy deriving Show
 
 data Split
-  = DConHead Lvl Lvl [(Name, Ty)] [(Name, Ty)] Constructors [P.Tm]
-  | TyConHead Lvl [(Name, Ty)] Constructors [P.Tm]
+  = DConHead Lvl Lvl Tel Tel Constructors [P.Tm]
+  | TyConHead Lvl Tel Constructors [P.Tm]
   | SplitInfer {-# unpack #-} Infer
   deriving Show
 
@@ -323,17 +323,17 @@ inferSp t a sp = case sp of
     a ->
       err $! ExpectedPiPathLine (quote a)
 
-checkSp :: Elab (Env -> [P.Tm] -> [(Name, Ty)] -> IO Spine)
+checkSp :: Elab (Env -> [P.Tm] -> Tel -> IO Spine)
 checkSp env sp fs = case (sp, fs) of
-  (t:sp, (x, a):fs) -> do
+  (t:sp, TCons x a fs) -> do
     t  <- check t (evalIn env a)
     sp <- checkSp (EDef env (eval t)) sp fs
     pure $ SPCons t sp
-  ([], []) ->
+  ([], TNil) ->
     pure $ SPNil
-  (_:_, []) ->
+  (_:_, TNil) ->
     err $ GenericError "Constructor applied to too few arguments"
-  ([], _:_) ->
+  ([], TCons{}) ->
     err $ GenericError "Constructor applied to too many arguments"
 
 infer :: Elab (P.Tm -> IO Infer)
@@ -341,7 +341,7 @@ infer t = split t >>= \case
 
   -- no params + saturated
   DConHead tyid conid params fields cons sp -> case params of
-    [] -> do
+    TNil -> do
       sp <- checkSp ENil sp fields
       pure $ Infer (DCon tyid conid sp) (VTyCon tyid ENil cons)
     _  -> err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
@@ -584,11 +584,11 @@ inferNonSplit t = frcPos t \case
 
 ----------------------------------------------------------------------------------------------------
 
-elabCase :: Elab (Lvl -> Lvl -> Env -> [(Name, Ty)] -> Val -> [Name] -> P.Tm -> IO Tm)
+elabCase :: Elab (Lvl -> Lvl -> Env -> Tel -> Val -> [Name] -> P.Tm -> IO Tm)
 elabCase typeid conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) of
-  ([], []) ->
+  (TNil, []) ->
     check body rhstype
-  ((_, a):fieldtypes, x:xs) -> do
+  (TCons _ a fieldtypes, x:xs) -> do
 
     bind x (evalIn tyenv a) \x ->
       elabCase typeid conid (EDef tyenv x) fieldtypes rhstype xs body
@@ -602,7 +602,7 @@ caseLhsVal typeid conid dom xs = VDCon typeid conid (go dom xs) where
 
 elabCases :: Elab (
      Lvl -> Lvl -> Env -> NamedClosure
-  -> [(Name, [(Name, Ty)])] -> [(Name, [Name], P.Tm)] -> IO Cases)
+  -> [(Name, Tel)] -> [(Name, [Name], P.Tm)] -> IO Cases)
 elabCases typeid conid params b contypes cs = case (contypes, cs) of
   ([], []) ->
     pure CSNil
@@ -898,7 +898,7 @@ elabTop = \case
 ----------------------------------------------------------------------------------------------------
 
 elabConstructors :: Elab (Lvl -> Lvl -> [(DontShow SourcePos, Name, [(Name, P.Ty)])]
-                          -> IO [(Name, [(Name, Ty)])])
+                          -> IO [(Name, Tel)])
 elabConstructors tyid conid = \case
   [] ->
     pure []
@@ -909,19 +909,19 @@ elabConstructors tyid conid = \case
       elabConstructors tyid (conid + 1) cs
     pure ((x, fs):cs)
 
-elabTelescope :: Elab ([(Name, P.Ty)] -> IO [(Name, Ty)])
+elabTelescope :: Elab ([(Name, P.Ty)] -> IO Tel)
 elabTelescope = \case
-  [] -> pure []
+  [] -> pure TNil
   (x, a):ps -> do
     a <- check a VU
     bind x (eval a) \_ -> do
       ps <- elabTelescope ps
-      pure ((x, a):ps)
+      pure $ TCons x a ps
 
-bindTelescope :: [(Name, Ty)] -> Elab a -> Elab a
+bindTelescope :: Tel -> Elab a -> Elab a
 bindTelescope ps act = case ps of
-  []        -> act
-  (x, a):ps -> bind x (eval a) \_ -> bindTelescope ps act
+  TNil         -> act
+  TCons x a ps -> bind x (eval a) \_ -> bindTelescope ps act
 {-# inline bindTelescope #-}
 
 ----------------------------------------------------------------------------------------------------

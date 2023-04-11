@@ -301,23 +301,23 @@ tm = \case
 
 ----------------------------------------------------------------------------------------------------
 
-dataFields :: PrettyArgs ([(Name, Ty)] -> Txt)
+dataFields :: PrettyArgs (Tel -> Txt)
 dataFields = \case
-  []        -> mempty
-  (x, a):fs -> let pa = pair a in fresh x \x ->
-               "(" <> x <> " : " <> pa <> ")" <> dataFields fs
+  TNil         -> mempty
+  TCons x a fs -> let pa = pair a in fresh x \x ->
+                  "(" <> x <> " : " <> pa <> ")" <> dataFields fs
 
-dataCons :: PrettyArgs ([(Name, [(Name, Ty)])] -> Txt)
+dataCons :: PrettyArgs ([(Name, Tel)] -> Txt)
 dataCons = \case
   []         -> mempty
   [(x, fs)]  -> str x <> dataFields fs
   (x, fs):cs -> str x <> dataFields fs <> "\n  | " <> dataCons cs
 
-inductive :: PrettyArgs ([(Name, Tm)] -> [(Name, [(Name, Ty)])] -> Txt)
+inductive :: PrettyArgs (Tel -> [(Name, Tel)] -> Txt)
 inductive ps cs = case ps of
-  []        -> " :=\n    " <> dataCons cs
-  (x, a):ps -> let pa = pair a in fresh x \x ->
-               " (" <> x <> " : " <> pa <> ")" <> inductive ps cs
+  TNil         -> " :=\n    " <> dataCons cs
+  TCons x a ps -> let pa = pair a in fresh x \x ->
+                  " (" <> x <> " : " <> pa <> ")" <> inductive ps cs
 
 top_ :: Names => LvlArg => Top -> Txt
 top_ = \case

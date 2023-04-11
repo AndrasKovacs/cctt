@@ -13,8 +13,8 @@ import qualified LvlMap as LM
 
 data TblEntry
   = TBETopDef Lvl VTy ~Val (DontShow SourcePos)   -- level, type, value
-  | TBETyCon Lvl [(Name, Ty)] Constructors (DontShow SourcePos)
-  | TBEDCon Lvl Lvl [(Name, Ty)] (DontShow SourcePos)
+  | TBETyCon Lvl Tel Constructors (DontShow SourcePos)
+  | TBEDCon Lvl Lvl Tel (DontShow SourcePos)
   | TBELocal Lvl VTy                   -- level, type
   | TBELocalInt IVar
   | TBETopRec Lvl (Maybe VTy) (DontShow SourcePos)
@@ -33,7 +33,7 @@ type IsCaseAllowed = Bool
 
 data TopEntry
   = TPEDef VTy ~Val
-  | TPETyCon [(Name, Ty)] Constructors IsCaseAllowed
+  | TPETyCon Tel Constructors IsCaseAllowed
   | TPERec (Maybe VTy)
   deriving Show
 
@@ -59,7 +59,7 @@ topState :: IORef TopState
 topState = runIO $ newIORef initialTop
 {-# noinline topState #-}
 
-tyConInfo :: Lvl -> IO ([(Name, Ty)], Constructors, Bool)
+tyConInfo :: Lvl -> IO (Tel, Constructors, Bool)
 tyConInfo typeid = do
   top <- getTop
   case LM.lookup typeid (top^.topInfo) of
@@ -77,7 +77,7 @@ putTop = writeIORef topState
 
 modTyConInfo ::
        Lvl
-    -> (([(Name, Ty)], Constructors, Bool) -> ([(Name, Ty)], Constructors, Bool))
+    -> ((Tel, Constructors, Bool) -> (Tel, Constructors, Bool))
     -> IO ()
 modTyConInfo tyid f = do
   modTop $
@@ -127,7 +127,7 @@ finalizeTopDef l x ~a ~v pos =
 -- | Declare a TyCon without constructors. This happens before the constructors are
 --   elaborated.
 declareNewTyCon ::
-  Name -> [(Name, Ty)] -> DontShow SourcePos -> (TableArg => Lvl -> IO a) -> (TableArg => IO a)
+  Name -> Tel -> DontShow SourcePos -> (TableArg => Lvl -> IO a) -> (TableArg => IO a)
 declareNewTyCon x ps pos act = do
   top <- getTop
   let tyid = top^.lvl
@@ -146,7 +146,7 @@ finalizeTyCon tyid = do
   modTyConInfo tyid \(ps, cs, canCase) -> (ps, cs, True)
 
 -- | Extend a TyCon with an extra constructor.
-addDCon :: Name -> Lvl -> Lvl -> [(Name, Ty)] -> DontShow SourcePos -> (TableArg => IO a) -> TableArg => IO a
+addDCon :: Name -> Lvl -> Lvl -> Tel -> DontShow SourcePos -> (TableArg => IO a) -> TableArg => IO a
 addDCon x tyid conid fields pos act = do
   -- extend topcxt
   modTyConInfo tyid \(ps, cs, canCase) -> (ps, LM.insert conid (x, fields) cs, canCase)

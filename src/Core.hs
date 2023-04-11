@@ -1198,10 +1198,11 @@ case_ t b ecs@(EC sub env rc cs) = case frc t of
 --           a
 --           (hcomind0sp r r' topa sys (EDef ext t) conix (fieldix + 1) sp)
 
--- hcomind0 :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Val
--- hcomind0 r r' a sys ext tyix conix sp =
---   VDCon tyix conix (hcomind0sp r r' a sys ext conix 0 sp)
--- {-# inline hcomind0 #-}
+hcomind0 :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Val
+hcomind0 r r' a sys params tyix conix sp =
+  uf
+  -- VDCon tyix conix (hcomind0sp r r' a sys ext conix 0 sp)
+{-# inline hcomind0 #-}
 
 
 -- System where all components are known to be the same constructor
