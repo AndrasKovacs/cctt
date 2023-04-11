@@ -1034,5 +1034,11 @@ decConst (A : U) : dec A → exConst A := λ[
 stableConst (A : U) (sA : stable A) : exConst A :=
   (λ x. sA (dNot A x), λ x y i. sA (propNot (not A) (dNot A x) (dNot A y) i));
 
+stableConstNf (A : U) (sA : stable A) : exConst A :=
+  (λ x. sA (λ f. f x), λ x y {sA (λ f. f x)} {sA (λ f. f y)} i. sA (λ x1. case
+  (x1 x) (a. ((b : N0) → a ={_. N0} b)) [] (x1 y) {x1 x} {x1 y} i));
+
+stableConstOK : stableConst = stableConstNf := refl;
+
 discrete (A B : U) (f : A → B) : U :=
   (a0 a1 : A) → f a0 = f a1 → a0 = a1;

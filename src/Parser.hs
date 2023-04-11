@@ -87,7 +87,7 @@ goSplit = do
         pure (x, xs, body)
   cases <- sepBy case_ (char ';')
   char ']'
-  pure $ Split cases
+  goApp $ Split cases
 
 atom :: Parser Tm
 atom =
@@ -180,7 +180,7 @@ goCoe = do
   r' <- int
   a  <- bindMaybe
   t  <- proj
-  pure $ Coe r r' a t
+  goApp $ Coe r r' a t
 
 goCom :: Parser Tm
 goCom = do
@@ -189,7 +189,7 @@ goCom = do
   a   <- bindMaybe
   sys <- sysHCom
   t   <- proj
-  pure $ Com r r' a sys t
+  goApp $ Com r r' a sys t
 
 goGlue :: Parser Tm
 goGlue = do
@@ -212,17 +212,17 @@ goCase = do
         pure (x, xs, body)
   cases <- sepBy case_ (char ';')
   char ']'
-  pure $ Case t b cases
+  goApp $ Case t b cases
 
 app :: Parser Tm
 app = withPos (
        (do {try (keyword "λ" *> char '['); goSplit})
   <|>  (keyword "coe"     *> goCoe)
   <|>  (keyword "case"    *> goCase)
-  <|>  (keyword "hcom"    *> (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj))
-  <|>  (keyword "unglue"  *> (Unglue <$!> proj))
+  <|>  (keyword "hcom"    *> (goApp =<< (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj)))
+  <|>  (keyword "unglue"  *> (goApp =<< (Unglue <$!> proj)))
   <|>  (keyword "com"     *> goCom)
-  <|>  (keyword "ap"      *> (Ap <$!> proj <*!> proj))
+  <|>  (keyword "ap"      *> (goApp =<< (Ap <$!> proj <*!> proj)))
 
   <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
   <|>  (keyword "glue"    *> goGlue)
