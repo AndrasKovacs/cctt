@@ -4,6 +4,7 @@ module Core where
 import Common
 import CoreTypes
 import Interval
+import qualified LvlMap as LM
 
 -- import Debug.Trace
 
@@ -272,6 +273,10 @@ bindIFromLazy (BindILazy x i a) = BindI x i a; {-# inline bindIFromLazy #-}
 
 bindIToLazy :: BindILazy a -> BindI a
 bindIToLazy (BindILazy x i z) = BindI x i z; {-# inline bindIToLazy #-}
+
+mapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
+mapBindI t f = bindI (t^.name) (\i -> f i (t ∙ i))
+{-# inline mapBindI #-}
 
 -- | Map over a binder in a way which *doesn't* rename the bound variable to a
 --   fresh one.  In this case, the mapping function cannot refer to values in
@@ -734,9 +739,13 @@ coed r r' topA t = case (frc topA) ^. body of
   -- closed inductives
   VTyCon x ENil cs ->
     t
-
-  VTyCon x (rebind topA -> ps) cs ->
-    uf
+  a@(VTyCon x (rebind topA -> ps) cs) -> case frc t of
+    VDCon tyid conid sp ->
+      coeind r r' ps tyid conid sp (snd (cs LM.! conid))
+    t@(VNe _ is) ->
+      VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
+    _ ->
+      impossible
 
   -- Note: I don't need to rebind the "is"! It can be immediately weakened
   -- to the outer context.
@@ -912,8 +921,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   VWrap x (rebind topA -> a) ->
     VPack x $ coed r r' a (unpack x t)
 
-  a ->
-    error $ show (?cof, a)
+  _ ->
+    impossible
 
 
 coe :: NCofArg => DomArg => I -> I -> BindI Val -> Val -> Val
@@ -966,10 +975,8 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       $ ICHComPath r r' a lhs rhs nts base
 
   a@(VNe n is') ->
-    -- case (frc r, frc r') of
-    --   (r, r') ->
-        VNe (NHCom r r' a nts base)
-            (insertI r $ insertI r' $ is <> is')
+      VNe (NHCom r r' a nts base)
+          (insertI r $ insertI r' $ is <> is')
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1017,15 +1024,6 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       $ NICl (a^.name)
       $ ICHComLine r r' a nts base
 
-  -- a@(VTyCon x ps) -> case base of
-  --   VDCon x i sp     -> case ?dom of
-  --                         0 -> hcomind0 r r a ts ps x i sp
-  --                         _ -> hcomind  r r a ts ps x i sp
-  --   base@(VNe n is') -> VNe (NHCom r r' a nts base)
-  --                           (insertI r $ insertI r' $ is <> is')
-  --   v@VHole{}        -> v
-  --   _                -> impossible
-
   -- hcom r r' (x : A) [β i. t i] base =
   --   pack (hcom r r' A [β i. (t i).unpackₓ] (base.unpackₓ))
   VWrap x a ->
@@ -1033,11 +1031,19 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       (mapNeSysHCom' (\i t -> unpack x (t ∙ i)) ts)
       (unpack x base)
 
-  VTyCon tyid ps cs ->
-    error "inductive hcom TODO"
+  VTyCon tyid ps cs -> case frc base of
+    VDCon _ conid sp -> case ?dom of
+      0 -> hcomind0 r r' topA ts ps tyid conid sp (snd (cs LM.! conid))
+      _ -> hcomind  r r' topA ts ps tyid conid sp (snd (cs LM.! conid))
+    base@(VNe n is') ->
+      VNe (NHCom r r' topA nts base) (insertI r $ insertI r' $ is <> is')
+    base@VHole{} ->
+      base
+    _ ->
+      impossible
 
-  a ->
-    error $ "Unknown hcom type: " ++ show a
+  _ ->
+    impossible
 
 
 ----------------------------------------------------------------------------------------------------
@@ -1106,6 +1112,7 @@ ungluen t (!sys, !is) = case frc t of
 
 -- Strict inductive types
 ----------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 goTyParams :: EvalArgs (Env -> Spine -> Env)
 goTyParams env = \case
@@ -1151,64 +1158,48 @@ case_ t b ecs@(EC sub env rc cs) = case frc t of
   _            -> impossible
 {-# inline case_ #-}
 
-----------------------------------------------------------------------------------------------------
+projVDSpine :: Lvl -> VDSpine -> Val
+projVDSpine x sp = case (x, sp) of
+  (0, VDCons t _ ) -> t
+  (x, VDCons _ sp) -> projVDSpine (x - 1) sp
+  _                -> impossible
 
--- projsp :: NCofArg => DomArg => Lvl -> VDSpine -> Val
--- projsp ix sp = case (ix, sp) of
---   (0 , VDInd t _     ) -> t
---   (0 , VDHInd t _ _  ) -> t
---   (0 , VDExt t _ _   ) -> t
---   (ix, VDInd _ sp    ) -> projsp (ix - 1) sp
---   (ix, VDHInd _ _ sp ) -> projsp (ix - 1) sp
---   (ix, VDExt _ _ sp  ) -> projsp (ix - 1) sp
---   _                    -> impossible
+lazyprojfield :: NCofArg => DomArg => Lvl -> Lvl -> Val -> Val
+lazyprojfield conid fieldid v = case frc v of
+  VDCon _ conid' sp | conid == conid' -> projVDSpine fieldid sp
+  _                                   -> impossible
+{-# inline lazyprojfield #-}
 
--- lazyprojfield :: NCofArg => DomArg => Lvl -> Lvl -> Val -> Val
--- lazyprojfield conix fieldix v = case frc v of
---   VDCon x i sp | i == conix -> projsp fieldix sp
---   _                         -> impossible
--- {-# inline lazyprojfield #-}
+lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
+lazyprojsys conid fieldid = \case
+  NSHEmpty      -> NSHEmpty
+  NSHCons t sys -> NSHCons (mapBindCof t \t -> umapBindILazy t (lazyprojfield conid fieldid))
+                           (lazyprojsys conid fieldid sys)
 
--- -- Project all fieldix fields of a constructor conix from a system
--- lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
--- lazyprojsys conix fieldix = \case
---   NSHEmpty      -> NSHEmpty
---   NSHCons t sys -> NSHCons (mapBindCof t \t -> umapBindILazy t (lazyprojfield conix fieldix))
---                            (lazyprojsys conix fieldix sys)
+lazyprojsys' :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom' -> NeSysHCom'
+lazyprojsys' conid fieldid (!sys, !is) = (lazyprojsys conid fieldid sys // is)
+{-# inline lazyprojsys' #-}
 
--- lazyprojsys' :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom' -> NeSysHCom'
--- lazyprojsys' conix fieldix (!sys, !is) = (lazyprojsys conix fieldix sys // is)
--- {-# inline lazyprojsys' #-}
+hcomind0sp :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> VDSpine
+hcomind0sp r r' a sys params conid fieldid sp fieldtypes = case (sp, fieldtypes) of
+  (VDNil, TNil) ->
+    VDNil
+  (VDCons t sp, TCons _ tty fieldtypes) ->
+    VDCons (hcomdn r r' (evalParam params tty) (lazyprojsys' conid fieldid sys) t)
+           (hcomind0sp r r' a sys (EDef params t) conid (fieldid + 1) sp fieldtypes)
+  _ ->
+    impossible
 
--- hcomind0sp :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> VDSpine
--- hcomind0sp r r' topa sys ext conix fieldix sp = case sp of
---   VDNil ->
---     VDNil
---   VDInd t sp ->
---     VDInd (hcomdn r r' topa (lazyprojsys' conix fieldix sys) (frc t))
---           (hcomind0sp r r' topa sys ext conix (fieldix + 1) sp)
---   VDHInd t a sp ->
---     let va = (let ?env = ext; ?sub = idSub (dom ?cof) in eval a) in
---     VDHInd (hcomdn r r' (funf va topa) (lazyprojsys' conix fieldix sys) t)
---            a
---            (hcomind0sp r r' topa sys (EDef ext t) conix (fieldix + 1) sp)
---   VDExt t a sp  ->
---     let ~va = (let ?env = ext; ?sub = idSub (dom ?cof) in eval a) in
---     VDExt (hcomdn r r' va (lazyprojsys' conix fieldix sys) t)
---           a
---           (hcomind0sp r r' topa sys (EDef ext t) conix (fieldix + 1) sp)
-
-hcomind0 :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Val
-hcomind0 r r' a sys params tyix conix sp =
-  uf
-  -- VDCon tyix conix (hcomind0sp r r' a sys ext conix 0 sp)
+hcomind0 :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> Val
+hcomind0 r r' a sys params tyid conid sp fieldtypes =
+  VDCon tyid conid (hcomind0sp r r' a sys params conid 0 sp fieldtypes)
 {-# inline hcomind0 #-}
-
 
 -- System where all components are known to be the same constructor
 data Projected
   = PNil
   | PCons NeCof Name IVar VDSpine Projected
+  deriving Show
 
 type Projected' = (Projected, IVarSet)
 
@@ -1216,6 +1207,7 @@ type Projected' = (Projected, IVarSet)
 data TryToProject
   = TTPProject Projected
   | TTPNe {-# unpack #-} NeSysHCom'
+  deriving Show
 
 projsys :: NCofArg => DomArg => Lvl -> NeSysHCom' -> NeSysHCom -> TryToProject
 projsys conix topSys@(!_,!_) = \case
@@ -1231,7 +1223,7 @@ projsys conix topSys@(!_,!_) = \case
           prj@TTPNe{} ->
             prj
 
-      VNe n is -> TTPNe (fst topSys // is <> snd topSys) -- extend blockers with is'
+      VNe n is -> TTPNe (fst topSys // is <> snd topSys) -- extend blockers
       _        -> impossible
 
 projsys' :: NCofArg => DomArg => Lvl -> NeSysHCom' -> TryToProject
@@ -1239,51 +1231,46 @@ projsys' conix (!sys, !is) = projsys conix (sys, is) sys
 {-# inline projsys' #-}
 
 projfields :: Projected -> Lvl -> NeSysHCom
-projfields prj fieldix = case prj of
-  PNil ->
-    NSHEmpty
-  PCons ncof x i sp prj ->
-    NSHCons (BindCof ncof (BindILazy x i uf)) (projfields prj fieldix)
+projfields prj fieldid = case prj of
+  PNil                  -> NSHEmpty
+  PCons ncof x i sp prj -> NSHCons (BindCof ncof (BindILazy x i (projVDSpine fieldid sp)))
+                                   (projfields prj fieldid)
 
-projfields' :: Projected' -> Lvl ->NeSysHCom'
-projfields' (!prj,!is) fieldix = (projfields prj fieldix // is)
+projfields' :: Projected' -> Lvl -> NeSysHCom'
+projfields' (!prj,!is) fieldid = (projfields prj fieldid // is)
 {-# inline projfields' #-}
 
-hcomindsp :: NCofArg => DomArg => I -> I -> Val -> Projected' -> Env -> Lvl -> Lvl -> VDSpine -> VDSpine
-hcomindsp r r' topa prj@(!_,!_) ext conix fieldix sp = case sp of
-  VDNil ->
+hcomindsp :: NCofArg => DomArg => I -> I -> Val -> Projected' -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> VDSpine
+hcomindsp r r' a prj@(!_,!_) params conid fieldid sp fieldtypes = case (sp, fieldtypes) of
+  (VDNil, TNil) ->
     VDNil
-  VDCons t sp ->
-    uf
-    -- let
+  (VDCons t sp, TCons _ tty fieldtypes) ->
+    VDCons (hcomdn r r' (evalParam params tty) (projfields' prj fieldid) t)
+           (hcomindsp r r' a prj (EDef params t) conid (fieldid + 1) sp fieldtypes)
+  _ ->
+    impossible
 
-
-  -- VDNil ->
-  --   VDNil
-  -- VDInd t sp ->
-  --   VDInd (hcomdn r r' topa (projfields' prj fieldix) (frc t))
-  --         (hcomindsp r r' topa prj ext conix (fieldix + 1) sp)
-  -- VDHInd t a sp ->
-  --   let va = (let ?env = ext; ?sub = idSub (dom ?cof) in eval a) in
-  --   VDHInd (hcomdn r r' (funf va topa) (projfields' prj fieldix) t)
-  --          a
-  --          (hcomindsp r r' topa prj (EDef ext t) conix (fieldix + 1) sp)
-
-  -- VDExt t a sp  ->
-  --   let ~va = (let ?env = ext; ?sub = idSub (dom ?cof) in eval a) in
-  --   VDExt (hcomdn r r' va (projfields' prj fieldix) t)
-  --         a
-  --         (hcomindsp r r' topa prj (EDef ext t) conix (fieldix + 1) sp)
-
-
-hcomind :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Val
-hcomind r r' a sys ext tyix conix sp = case projsys' conix sys of
+hcomind :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> Val
+hcomind r r' a sys params tyid conid sp fieldtypes  = case projsys' conid sys of
   TTPProject prj ->
-    VDCon tyix conix (hcomindsp r r' a (prj // snd sys) ext conix 0 sp)
+    VDCon tyid conid (hcomindsp r r' a (prj // snd sys) params conid 0 sp fieldtypes)
   TTPNe (sys,is) ->
-    VNe (NHCom r r' a sys (VDCon tyix conix sp)) (insertI r $ insertI r' is)
+    VNe (NHCom r r' a sys (VDCon tyid conid sp)) (insertI r $ insertI r' is)
 {-# inline hcomind #-}
 
+coeindsp :: NCofArg => DomArg => I -> I -> BindI Env -> VDSpine -> Tel -> VDSpine
+coeindsp r r' params sp fieldtypes = case (sp, fieldtypes) of
+  (VDNil, TNil) -> VDNil
+  (VDCons t sp, TCons _ tty fieldtypes) ->
+    let tty' = umapBindI params \ps -> evalParam ps tty in
+    VDCons (coed r r' tty' t)
+           (coeindsp r r' (mapBindI params \i ps -> EDef ps (coe r i tty' t)) sp fieldtypes)
+  _ -> impossible
+
+coeind :: NCofArg => DomArg => I -> I -> BindI Env -> Lvl -> Lvl -> VDSpine -> Tel -> Val
+coeind r r' params tyid conid sp fieldtypes =
+  VDCon tyid conid (coeindsp r r' params sp fieldtypes)
+{-# inline coeind #-}
 
 ----------------------------------------------------------------------------------------------------
 
@@ -1358,8 +1345,9 @@ eval = \case
   Ap f x y p        -> ap_ (eval f) (eval x) (eval y) (eval p)
   Com r r' i a t b  -> com' (evalI r) (evalI r') (bindIS i \_ -> eval a) (evalSysHCom' t) (eval b)
 
-
-
+evalParam :: NCofArg => DomArg => Env -> Tm -> Val
+evalParam env t = let ?sub = idSub (dom ?cof); ?recurse = DontRecurse; ?env = env in eval t
+{-# inline evalParam #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Forcing
