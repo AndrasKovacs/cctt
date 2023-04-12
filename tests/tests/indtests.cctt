@@ -21,15 +21,14 @@ five := suc (suc (suc (suc (suc zero))));
 ten := add five five;
 
 mul (n m : ℕ) : ℕ :=
-  case n (_. ℕ) [
-    zero. zero;
-    suc n. add m (mul n m)];
+  case n [zero. zero; suc n. add m (mul n m)];
+
+mul' : ℕ → ℕ → ℕ := λ[
+  zero. λ _. zero;
+  suc n. λ m. add m (mul' n m)];
 
 n100 := mul ten ten;
-
-mul2 (n m : ℕ) : ℕ := case n [zero. zero; suc n. add m (mul2 n m)];
-
-n1k := mul2 ten n100;
+n1k  := mul' ten n100;
 
 --------------------------------------------------------------------------------
 
@@ -40,18 +39,27 @@ map (A B : U) (f : A → B)(as : List A) : List B :=
     nil. nil;
     cons a as. cons (f a) (map A B f as)];
 
+foldr (A B : U)(f : A → B → B)(b : B)(as : List A) : B :=
+  case as [nil. b;
+           cons a as. f a (foldr A B f b as)];
+
+foldr' : (A B : U) → (A → B → B) → B → List A → B :=
+  λ A B f b. λ[nil. b; cons a as. f a (foldr' A B f b as)];
+
 list1 : List ℕ := cons ten (cons ten (cons ten nil));
 list2 := map ℕ ℕ (λ _. zero) list1;
 
 --------------------------------------------------------------------------------
 
+-- No positivity check.
 data Bad := mkBad (Bad → Bad);
 
 data Top := tt;
 
 data Bot :=;
 
-Bot-elim (A : U)(p : Bot) : A := case p (_. A) [];
+-- makes more sense to just write "case p []" inline.
+Bot-elim (A : U)(p : Bot) : A := case p [];
 
 data W (A : U)(B : A → U) := sup (a : A)(f : B a → W A B);
 
@@ -79,6 +87,7 @@ fω2 := fgf ω (suc (suc zero));
 
 --------------------------------------------------------------------------------
 
+-- non-uniform parameters are allowed
 data Vec (A : U) (n : ℕ) :=
     vnil (n = zero)
   | vcons (m : ℕ) (n = suc m) A (Vec A m) ;
@@ -94,12 +103,12 @@ v1 : Vec ℕ (suc (suc zero)) :=
 v2 := vmap ℕ ℕ (suc (suc zero)) (add ten) v1;
 
 
--- Recursive identities
+-- Recursive identities (will be needed in HITs)
 --------------------------------------------------------------------------------
 
 data RecId :=
     Base
-  | Path (Base = Base);
+  | Path (Base = Base); -- later constructors can refer to earlier ones
 
 recid1 := Path refl⁻¹;
 

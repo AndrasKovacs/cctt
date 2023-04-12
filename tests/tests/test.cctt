@@ -1,4 +1,4 @@
 
--- import basics;
+import basics;
 
-nf (i : I) := hcom 0 1 U [i = 0 _. U] U;
+nf (i : I) := hcom 0 1 U [i = 0 _. U] U; -- runs out of interval variables!
