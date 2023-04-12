@@ -1,0 +1,27 @@
+
+import yaccttprelude;
+
+hedbergLemma (A : U)(a : A) (f : (x : A) → a = x → a = x) :
+  (b : A) (p : a = b) → Square A a a a b refl p (f a refl) (f b p) :=
+  J A a
+    (λ b p. Square A a a a b refl p (f a refl) (f b p))
+    refl;
+
+hedbergStable (A : U) (a b : A) (h : (x : A) -> stable (a = x))(p q : a = b) : p = q :=
+  let rem1 (x : A) : exConst (a = x) := stableConst (a = x) (h x);
+  let f (x : A) : a = x → a = x := (rem1 x).1;
+  let fIsConst (x : A) : const (a = x) (f x) := (rem1 x).2;
+  let rem4 : Square A a a b b refl refl (f b p) (f b q) := fIsConst b p q;
+  let r : a = a := f a refl;
+  let rem2 : Square A a a a b refl p r (f b p) := hedbergLemma A a f b p;
+  let rem3 : Square A a a a b refl q r (f b q) := hedbergLemma A a f b q;
+  λ j i. hcom 0 1 [j=0. rem2 i
+                 ; j=1. rem3 i
+		 ; i=0. r
+		 ; i=1. rem4 j] a;
+
+hedbergS (A:U) (h : (a x : A) -> stable (a = x)) : set A :=
+  λ a b. hedbergStable A a b (h a);
+
+hedberg (A : U) (h : discrete A) : set A :=
+  λ a b. hedbergStable A a b (λ b. decStable (Path A a b) (h a b));

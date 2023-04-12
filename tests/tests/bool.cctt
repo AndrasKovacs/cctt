@@ -1,0 +1,80 @@
+
+data Top := tt;
+data Bot :=;
+not (A : U) := A → Bot;
+data bool := false | true;
+
+falseNeqTrue : not (false = true) :=
+  λ p. coe 0 1 (i. case (p i) [false. Top; true. Bot]) tt;
+
+trueNeqFalse : not (true = false) :=
+  λ p. coe 0 1 (i. case (p i) [false. Bot; true. Top]) tt;
+
+-- boolDec
+
+
+-- boolDec : (b1 b2 : bool) -> dec (Path bool b1 b2) = split
+--  false -> rem
+--   where
+--   rem : (b : bool) -> dec (Path bool false b) = split
+--    false -> inl (<i> false)
+--    true -> inr falseNeqTrue
+--  true -> rem
+--   where
+--   rem : (b : bool) -> dec (Path bool true b) = split
+--    false -> inr trueNeqFalse
+--    true -> inl (<i> true)
+
+-- setbool : set bool = hedberg bool boolDec
+
+-- -- Boolean negation
+-- negBool : bool -> bool = split
+--   false -> true
+--   true  -> false
+
+-- -- negBool is involutive:
+-- negBoolK : (b : bool) -> Path bool (negBool (negBool b)) b = split
+--   false -> <i> false
+--   true  -> <i> true
+
+-- injNegBool : (b b' : bool) -> Path bool (negBool b) (negBool b') -> Path bool b b' = split
+--   false -> split@((b' : bool) -> Path bool true (negBool b') -> Path bool false b') with
+--     false -> \(_ : Path bool true true) -> <_> false
+--     true -> \(p : Path bool true false) -> efq (Path bool false true) (trueNeqFalse p)
+--   true -> split@((b' : bool) -> Path bool false (negBool b') -> Path bool true b') with
+--     false -> \(p : Path bool false true) -> efq (Path bool true false) (falseNeqTrue p)
+--     true -> \(_ : Path bool false false) -> <_> true
+
+-- ctr (b : bool) : fiber bool bool negBool b = (negBool b,negBoolK b)
+
+-- gengoal (A : U) (hA : set A) (x y : A) (p : Path A y x) : (z : A) (r : Path A y z) (q : Path A z x) ->
+--   PathP (<i> Path A (r @ i) x) p q =
+--   J A y (\(z : A) (r : Path A y z) -> (q : Path A z x) -> PathP (<i> Path A (r @ i) x) p q)
+--    (hA y x p)
+
+-- contr (b : bool) (x y : fiber bool bool negBool b) : Path (fiber bool bool negBool b) x y =
+--     let x1 : bool = x.1
+--         x2 : Path bool (negBool x1) b = x.2
+--         y1 : bool = y.1
+--         y2 : Path bool (negBool y1) b = y.2
+--         goal1 : Path bool x1 y1 =
+--           injNegBool x1 y1 (<i> hcom 1->0 bool [(i=0) -> x2, (i=1) -> y2] b)
+--         goal2 : PathP (<i> Path bool (negBool (goal1 @ i)) b) x2 y2 = undefined
+--           -- gengoal bool setbool b (negBool x1) x2 (negBool y1) (<i> negBool (goal1 @ i)) y2
+--     in <i> (goal1 @ i,goal2 @ i)
+
+-- negBoolEquivInhProp : equivInhProp bool bool =
+--   (negBool,\(b : bool) -> (ctr b,contr b))
+
+-- negBoolEquiv : equiv bool bool = equivInhPropToEquiv bool bool negBoolEquivInhProp
+
+-- pathNegbool : Path U bool bool = ua bool bool negBoolEquiv
+
+-- test0 : bool = coe 0->1 pathNegbool false
+-- test1 : bool = coe 1->0 pathNegbool true
+
+-- prf0 : PathP (<i> pathNegbool @ i) false true =
+--   <i> coe 0->i pathNegbool false
+
+-- prf1 : PathP (<i> pathNegbool @ i) true false =
+--   <i> coe 1->i pathNegbool false
