@@ -11,10 +11,12 @@ import CoreTypes
 import Interval
 import qualified LvlMap as LM
 
+type Constructors = LM.Map (Name, ConInfo)
+
 data TblEntry
   = TBETopDef Lvl VTy ~Val (DontShow SourcePos)   -- level, type, value
   | TBETyCon Lvl Tel Constructors (DontShow SourcePos)
-  | TBEDCon Lvl Lvl Tel (DontShow SourcePos)
+  | TBEDCon ConInfo (DontShow SourcePos)
   | TBELocal Lvl VTy                   -- level, type
   | TBELocalInt IVar
   | TBETopRec Lvl (Maybe VTy) (DontShow SourcePos)
@@ -149,12 +151,13 @@ finalizeTyCon tyid = do
 addDCon :: Name -> Lvl -> Lvl -> Tel -> DontShow SourcePos -> (TableArg => IO a) -> TableArg => IO a
 addDCon x tyid conid fields pos act = do
   -- extend topcxt
-  modTyConInfo tyid \(ps, cs, canCase) -> (ps, LM.insert conid (x, fields) cs, canCase)
-  modTop (tbl %~ M.insert x (TBEDCon tyid conid fields pos))
+  let ci = CI tyid conid fields
+  modTyConInfo tyid \(ps, cs, canCase) -> (ps, LM.insert conid (x, ci) cs, canCase)
+  modTop (tbl %~ M.insert x (TBEDCon ci pos))
 
   -- but independently, extend local cxt, because this one contains the type params as well,
   -- while the topcxt does not!
-  let ?tbl = M.insert x (TBEDCon tyid conid fields pos) ?tbl
+  let ?tbl = M.insert x (TBEDCon ci pos) ?tbl
   act
 {-# inline addDCon #-}
 
@@ -185,6 +188,7 @@ define x ~a ~v act =
 bindI :: Name -> Elab (IVar -> a) -> Elab a
 bindI x act =
   let fresh = dom ?cof in
+  if  fresh == maxivar then error "RAN OUT OF IVARS IN ELABORATION" else
   let ?cof  = setDom (fresh + 1) ?cof `ext` IVar fresh
       ?tbl  = M.insert x (TBELocalInt fresh) ?tbl in
   let _ = ?cof; _ = ?tbl in

@@ -4,7 +4,6 @@ module CoreTypes where
 
 import Common
 import Interval
-import qualified LvlMap as LM
 
 -- Syntax
 --------------------------------------------------------------------------------
@@ -21,7 +20,11 @@ data Spine
   | SPCons Tm Spine
   deriving Show
 
-type Constructors = LM.Map (Name, Tel)
+data ConInfo = CI {
+    conInfoTypeid     :: Lvl
+  , conInfoConid      :: Lvl
+  , conInfoFieldTypes :: Tel
+  } deriving Show
 
 data Tm
   = TopVar Lvl ~(DontShow Val)
@@ -29,8 +32,8 @@ data Tm
   | LocalVar Ix
   | Let Name Tm Ty Tm
 
-  | TyCon Lvl Spine (DontShow Constructors) -- typid, params, constructors
-  | DCon Lvl Lvl Spine           -- type lvl, con lvl (relative) (TODO: pack)
+  | TyCon Lvl Spine                      -- typid, params
+  | DCon {-# nounpack #-} ConInfo Spine
   | Case Tm Name ~Tm Cases
   | Split Name ~Tm Cases
 
@@ -233,8 +236,8 @@ data Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
-  | VTyCon Lvl Env (DontShow Constructors)
-  | VDCon Lvl Lvl VDSpine          -- type lvl, con index
+  | VTyCon Lvl Env
+  | VDCon {-# nounpack #-} ConInfo VDSpine
 
   | VHole (Maybe Name) (DontShow SourcePos) Sub Env
   deriving Show
@@ -542,3 +545,4 @@ makeFields ''BindCofLazy
 makeFields ''NamedClosure
 makeFields ''NamedIClosure
 makeFields ''NeCof'
+makeFields ''ConInfo

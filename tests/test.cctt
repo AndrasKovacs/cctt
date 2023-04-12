@@ -1,11 +1,4 @@
 
-foo := coe 0 0 (_. U → U) (λ x. x) U;
+-- import basics;
 
-bar := hcom 0 0 (U → U) [] (λ x. x) U;
-
-data Bot :=;
-kek (x : Bot) := case x (_. U → U) [] U;
-
--- data Unit := tt;
--- idunit (x : Unit) : Unit := case x (_. Unit) [tt. tt];
--- test : idunit ={_. Unit → Unit} idunit := refl;
+nf (i : I) := hcom 0 1 U [i = 0 _. U] U;

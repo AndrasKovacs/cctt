@@ -32,7 +32,11 @@ import Pretty
 conv :: Elab (Val -> Val -> IO ())
 conv t u = if Conversion.conv t u
   then pure ()
-  else err $ CantConvert (quote t) (quote u)
+  else do
+    -- debug [show (quote t)]
+    -- debug [replicate 100 ' ']
+    -- debug [show (quote u)]
+    err $ CantConvert (quote t) (quote u)
 
 convICl :: Elab (NamedIClosure -> NamedIClosure -> IO ())
 convICl t u = if Conversion.conv t u
@@ -100,8 +104,8 @@ makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
 data Infer = Infer Tm ~VTy deriving Show
 
 data Split
-  = DConHead Lvl Lvl Tel Tel Constructors [P.Tm]
-  | TyConHead Lvl Tel Constructors [P.Tm]
+  = DConHead ConInfo Tel [P.Tm] -- Tel: typarams
+  | TyConHead Lvl Tel [P.Tm]
   | SplitInfer {-# unpack #-} Infer
   deriving Show
 
@@ -132,11 +136,11 @@ check t topA = frcPos t \case
 
     (P.Split cs, VPi a b) -> do
       (typeid, params) <- case frc a of
-        VTyCon i ps _ -> pure (i, ps)
+        VTyCon i ps   -> pure (i, ps)
         a             -> err $ ExpectedInductiveType (quote a)
       (paramtypes, cons, canCase) <- tyConInfo typeid
       unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
-      cs <- elabCases typeid 0 params b (LM.elems cons) cs
+      cs <- elabCases params b (LM.elems cons) cs
       pure $! Split (b^.name) (quote b) cs
 
     (P.Lam x ann t, VPath a l r) -> do
@@ -202,13 +206,13 @@ check t topA = frcPos t \case
     (P.Case t Nothing cs, b) -> do
       Infer t a <- infer t
       (typeid, params) <- case frc a of
-        VTyCon i ps _ -> pure (i, ps)
-        a             -> err $ ExpectedInductiveType (quote a)
+        VTyCon i ps -> pure (i, ps)
+        a           -> err $ ExpectedInductiveType (quote a)
       let qb = bind "_" a \_ -> quote b
       let bv = NCl "_" $ CConst b
       (paramtypes, cons, canCase) <- tyConInfo typeid
       unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
-      cs <- elabCases typeid 0 params bv (LM.elems cons) cs
+      cs <- elabCases params bv (LM.elems cons) cs
       pure $ Case t "_" qb cs
 
     (P.Hole i p, a) -> setPos p $ withPrettyArgs do
@@ -220,19 +224,19 @@ check t topA = frcPos t \case
       t <- check t a
       pure $! Pack x t
 
-    (t, VTyCon tyid ps _) -> do
+    (t, VTyCon tyid ps) -> do
       split t >>= \case
-        DConHead tyid' conid ps' fs cons sp -> do
+        DConHead ci@(CI tyid' conid fs) ps' sp -> do
           unless (tyid' == tyid) $ withPrettyArgs $
             err $ GenericError $
               "No such constructor for expected type:\n\n  "
-              ++ pretty (quote (VTyCon tyid ps (coerce cons)))
+              ++ pretty (quote (VTyCon tyid ps))
           sp <- checkSp ps sp fs
-          pure $ DCon tyid conid sp
+          pure $ DCon ci sp
 
         TyConHead{} ->
           err $ GenericError $ withPrettyArgs $
-            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps (DontShow mempty))) ++
+            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps)) ++
             "\n\nbut the expression is a type constructor"
 
         SplitInfer (Infer t a) -> do
@@ -251,11 +255,11 @@ goSplit t sp topT = frcPos t \case
     res <- case M.lookup x ?tbl of
       Nothing ->
         err $ NameNotInScope x
-      Just (TBETyCon l ps cs _) ->
-        pure $ TyConHead l ps cs sp
-      Just (TBEDCon tyid conid fs _) -> do
+      Just (TBETyCon l ps _ _) -> do
+        pure $ TyConHead l ps sp
+      Just (TBEDCon ci@(CI tyid conid fs) _) -> do
         (ps, cs, _) <- tyConInfo tyid
-        pure $ DConHead tyid conid ps fs cs sp
+        pure $ DConHead ci ps sp
       Just (TBELocal l a) ->
         SplitInfer <$!> inferSp (LocalVar (lvlToIx ?dom l)) a sp
       Just TBELocalInt{} ->
@@ -279,7 +283,7 @@ goSplit t sp topT = frcPos t \case
         err TopLvlNotInScope
       Just (TPETyCon ps cons _) ->
         case LM.lookup conid cons of
-          Just (_, fs) -> pure $ DConHead tyid conid ps fs cons sp
+          Just (_, ci) -> pure $ DConHead ci ps sp
           Nothing      -> err $ GenericError "No such data constructor"
       Just (TPEDef a v) -> do
         err $ GenericError $ "No type constructor with De Bruijn level " ++ show tyid
@@ -291,8 +295,8 @@ goSplit t sp topT = frcPos t \case
     case LM.lookup x (top^.topInfo) of
       Nothing -> do
         err TopLvlNotInScope
-      Just (TPETyCon ps cons _) -> do
-        pure $ TyConHead x ps cons sp
+      Just (TPETyCon ps _ _) -> do
+        pure $ TyConHead x ps sp
       Just (TPEDef a v) -> do
         SplitInfer <$!> inferSp (TopVar x (coerce v)) a sp
       Just (TPERec Nothing) ->
@@ -341,16 +345,16 @@ infer :: Elab (P.Tm -> IO Infer)
 infer t = split t >>= \case
 
   -- no params + saturated
-  DConHead tyid conid params fields cons sp -> case params of
+  DConHead ci@(CI tyid conid fields) params sp -> case params of
     TNil -> do
       sp <- checkSp ENil sp fields
-      pure $ Infer (DCon tyid conid sp) (VTyCon tyid ENil (coerce cons))
+      pure $ Infer (DCon ci sp) (VTyCon tyid ENil)
     _  -> err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
 
   -- saturated
-  TyConHead tyid ps cons sp -> do
+  TyConHead tyid ps sp -> do
     sp <- checkSp ENil sp ps
-    pure $ Infer (TyCon tyid sp (coerce cons)) VU
+    pure $ Infer (TyCon tyid sp) VU
 
   SplitInfer inf -> do
     pure inf
@@ -568,13 +572,13 @@ inferNonSplit t = frcPos t \case
   P.Case t (Just (x, b)) cs -> do
     Infer t a <- infer t
     (typeid, params) <- case frc a of
-      VTyCon i ps _ -> pure (i, ps)
-      a             -> err $ ExpectedInductiveType (quote a)
+      VTyCon i ps -> pure (i, ps)
+      a           -> err $ ExpectedInductiveType (quote a)
     b <- bind x a \_ -> check b VU
     let bv = makeNCl x b
     (paramtypes, cons, canCase) <- tyConInfo typeid
     unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
-    cs <- elabCases typeid 0 params bv (LM.elems cons) cs
+    cs <- elabCases params bv (LM.elems cons) cs
     pure $! Infer (Case t x b cs) (bv ∙ eval t)
 
   P.Case _ Nothing _ ->
@@ -595,21 +599,19 @@ elabCase typeid conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) o
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
-caseLhsVal :: Lvl -> Lvl -> Lvl -> [Name] -> Val
-caseLhsVal typeid conid dom xs = VDCon typeid conid (go dom xs) where
-  go dom []     = VDNil
-  go dom (_:xs) = VDCons (VNe (NLocalVar dom) mempty) (go (dom + 1) xs)
+caseLhsSp :: Lvl -> [Name] -> VDSpine
+caseLhsSp dom []     = VDNil
+caseLhsSp dom (_:xs) = VDCons (VNe (NLocalVar dom) mempty) (caseLhsSp (dom + 1) xs)
 
 elabCases :: Elab (
-     Lvl -> Lvl -> Env -> NamedClosure
-  -> [(Name, Tel)] -> [(Name, [Name], P.Tm)] -> IO Cases)
-elabCases typeid conid params b contypes cs = case (contypes, cs) of
+     Env -> NamedClosure -> [(Name, ConInfo)] -> [(Name, [Name], P.Tm)] -> IO Cases)
+elabCases params b contypes cs = case (contypes, cs) of
   ([], []) ->
     pure CSNil
-  ((x, fieldtypes):contypes, (x', xs, body):cs) | x == x' -> do
-    let rhstype = b ∙ caseLhsVal typeid conid ?dom xs
+  ((x, ci@(CI conid typeid fieldtypes)):contypes, (x', xs, body):cs) | x == x' -> do
+    let rhstype = b ∙ VDCon ci (caseLhsSp ?dom xs)
     t  <- elabCase typeid conid params fieldtypes rhstype xs body
-    cs <- elabCases typeid (conid + 1) params b contypes cs
+    cs <- elabCases params b contypes cs
     pure $ CSCons x xs t cs
   _ -> do
     err CaseMismatch
@@ -832,7 +834,7 @@ guardTopShadowing :: Elab (Name -> IO ())
 guardTopShadowing x =     case M.lookup x ?tbl of
   Just (TBETopDef _ _ _ pos) -> err $ TopShadowing (coerce pos)
   Just (TBETyCon _ _ _ pos)  -> err $ TopShadowing (coerce pos)
-  Just (TBEDCon _ _ _ pos)   -> err $ TopShadowing (coerce pos)
+  Just (TBEDCon _ pos)       -> err $ TopShadowing (coerce pos)
   Just _                     -> impossible
   _                          -> pure ()
 

@@ -11,6 +11,9 @@ import qualified LvlSet as LS
 
 ----------------------------------------------------------------------------------------------------
 
+maxivar :: IVar
+maxivar = 11
+
 {-|
 Interval expressions are 4 bits (nibbles):
  0-11 : var (level)

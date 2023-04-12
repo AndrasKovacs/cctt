@@ -63,12 +63,12 @@ err e = throwIO $ ErrInCxt e
 withPrettyArgs :: TableArg => DomArg => NCofArg => PrettyArgs a -> a
 withPrettyArgs act =
   let entryToNameKey = \case
-        TBETopDef x _ _ _ -> NKTop x
-        TBELocal x _      -> NKLocal x
-        TBELocalInt x     -> NKLocalI x
-        TBETyCon x _ _ _  -> NKTop x
-        TBEDCon x y _ _   -> NKDCon x y
-        TBETopRec x _ _   -> NKTop x in
+        TBETopDef x _ _ _    -> NKTop x
+        TBELocal x _         -> NKLocal x
+        TBELocalInt x        -> NKLocalI x
+        TBETyCon x _ _ _     -> NKTop x
+        TBEDCon (CI x y _) _ -> NKDCon x y
+        TBETopRec x _ _      -> NKTop x in
   let ?idom   = dom ?cof
       ?names  = M.foldlWithKey'
                   (\acc name e -> M.insert (entryToNameKey e) name acc)

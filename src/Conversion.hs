@@ -6,11 +6,17 @@ import CoreTypes
 import Core
 import Interval
 
+import Debug.Trace
+
 
 -- Note: neutral inputs (NeSys, Ne, NeSysHCom) are assumed to be forced
 --       other things are not!
 -- Also: neutral inputs may have different types!
 ----------------------------------------------------------------------------------------------------
+
+wrop :: Bool -> Bool
+wrop True = True
+wrop False = trace "FOOOOOOOOOOOOOOOOOOOOOOOOOOOO" False
 
 class Conv a where
   conv :: NCofArg => DomArg => a -> a -> Bool
@@ -19,20 +25,20 @@ instance Conv Val where
   conv t t' = case frc t // frc t' of
 
     -- rigid match
-    (VNe n _        , VNe n' _          ) -> conv n n'
-    (VGlueTy a sys  , VGlueTy a' sys'   ) -> conv a a' && conv (fst sys) (fst sys')
-    (VPi a b        , VPi a' b'         ) -> conv a a' && conv b b'
-    (VLam t         , VLam t'           ) -> conv t t'
-    (VPath a t u    , VPath a' t' u'    ) -> conv a a' && conv t t' && conv u u'
-    (VPLam _ _ t    , VPLam _ _ t'      ) -> conv t t'
-    (VSg a b        , VSg a' b'         ) -> b^.name == b'^.name && conv a a' && conv b b'
-    (VWrap x a      , VWrap x' a'       ) -> x == x' && conv a a'
-    (VPair _ t u    , VPair _ t' u'     ) -> conv t t' && conv u u'
-    (VU             , VU                ) -> True
-    (VLine a        , VLine a'          ) -> conv a a'
-    (VLLam t        , VLLam t'          ) -> conv t t'
-    (VTyCon x ts _  , VTyCon x' ts' _   ) -> x == x' && conv ts ts'
-    (VDCon x i sp   , VDCon x' i' sp'   ) -> x == x' && i == i' && conv sp sp'
+    (VNe n _            , VNe n' _             ) -> conv n n'
+    (VGlueTy a sys      , VGlueTy a' sys'      ) -> conv a a' && conv (fst sys) (fst sys')
+    (VPi a b            , VPi a' b'            ) -> conv a a' && conv b b'
+    (VLam t             , VLam t'              ) -> conv t t'
+    (VPath a t u        , VPath a' t' u'       ) -> conv a a' && conv t t' && conv u u'
+    (VPLam _ _ t        , VPLam _ _ t'         ) -> conv t t'
+    (VSg a b            , VSg a' b'            ) -> b^.name == b'^.name && conv a a' && conv b b'
+    (VWrap x a          , VWrap x' a'          ) -> x == x' && conv a a'
+    (VPair _ t u        , VPair _ t' u'        ) -> conv t t' && conv u u'
+    (VU                 , VU                   ) -> True
+    (VLine a            , VLine a'             ) -> conv a a'
+    (VLLam t            , VLLam t'             ) -> conv t t'
+    (VTyCon x ts        , VTyCon x' ts'        ) -> x == x' && conv ts ts'
+    (VDCon (CI _ i _) sp, VDCon (CI _ i' _) sp') -> i == i' && conv sp sp'
 
     -- We keep track of evaluation contexts for holes.
     -- This prevents spurious conversions between holes.

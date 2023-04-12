@@ -4,9 +4,7 @@ module Core where
 import Common
 import CoreTypes
 import Interval
-import qualified LvlMap as LM
-
--- import Debug.Trace
+import Debug.Trace
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -29,6 +27,7 @@ type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
 freshI :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshI act =
   let fresh = dom ?cof in
+  if  fresh == maxivar then error "RAN OUT OF IVARS" else
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   seq ?cof (act fresh)
 {-# inline freshI #-}
@@ -737,11 +736,11 @@ coed r r' topA t = case (frc topA) ^. body of
     t
 
   -- closed inductives
-  VTyCon x ENil cs ->
+  VTyCon x ENil ->
     t
-  a@(VTyCon x (rebind topA -> ps) cs) -> case frc t of
-    VDCon tyid conid sp ->
-      coeind r r' ps tyid conid sp (snd (unDontShow cs LM.! conid))
+  a@(VTyCon x (rebind topA -> ps)) -> case frc t of
+    VDCon ci@(CI _ _ fieldtypes) sp ->
+      VDCon ci (coeindsp r r' ps sp fieldtypes)
     t@(VNe _ is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
     _ ->
@@ -1031,10 +1030,13 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       (mapNeSysHCom' (\i t -> unpack x (t ∙ i)) ts)
       (unpack x base)
 
-  VTyCon tyid ps cs -> case frc base of
-    VDCon _ conid sp -> case ?dom of
-      0 -> hcomind0 r r' topA ts ps tyid conid sp (snd (unDontShow cs LM.! conid))
-      _ -> hcomind  r r' topA ts ps tyid conid sp (snd (unDontShow cs LM.! conid))
+  a@(VTyCon tyid ps) -> case frc base of
+    VDCon ci@(CI _ conid fieldtypes) sp -> case ?dom of
+      0 ->
+        VDCon ci (hcomind0sp r r' a ts ps conid 0 sp fieldtypes)
+      _ -> case projsys' conid ts of
+        TTPProject prj  -> VDCon ci (hcomindsp r r' a (prj // snd ts) ps conid 0 sp fieldtypes)
+        TTPNe (sys, is) -> VNe (NHCom r r' a sys (VDCon ci sp)) (insertI r $ insertI r' is)
     base@(VNe n is') ->
       VNe (NHCom r r' topA nts base) (insertI r $ insertI r' $ is <> is')
     base@VHole{} ->
@@ -1153,9 +1155,9 @@ lookupCase i sp cs = case i // cs of
 
 case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
 case_ t b ecs@(EC sub env rc cs) = case frc t of
-  VDCon _ i sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase i sp cs
-  VNe n i      -> VNe (NCase n b ecs) i
-  _            -> impossible
+  VDCon (CI _ i _) sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase i sp cs
+  VNe n is            -> VNe (NCase n b ecs) is
+  _                   -> impossible
 {-# inline case_ #-}
 
 projVDSpine :: Lvl -> VDSpine -> Val
@@ -1166,8 +1168,8 @@ projVDSpine x sp = case (x, sp) of
 
 lazyprojfield :: NCofArg => DomArg => Lvl -> Lvl -> Val -> Val
 lazyprojfield conid fieldid v = case frc v of
-  VDCon _ conid' sp | conid == conid' -> projVDSpine fieldid sp
-  _                                   -> impossible
+  VDCon (CI _ conid' _) sp | conid == conid' -> projVDSpine fieldid sp
+  _                                          -> impossible
 {-# inline lazyprojfield #-}
 
 lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
@@ -1190,11 +1192,6 @@ hcomind0sp r r' a sys params conid fieldid sp fieldtypes = case (sp, fieldtypes)
   _ ->
     impossible
 
-hcomind0 :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> Val
-hcomind0 r r' a sys params tyid conid sp fieldtypes =
-  VDCon tyid conid (hcomind0sp r r' a sys params conid 0 sp fieldtypes)
-{-# inline hcomind0 #-}
-
 -- System where all components are known to be the same constructor
 data Projected
   = PNil
@@ -1216,7 +1213,7 @@ projsys conix topSys@(!_,!_) = \case
     let ~prj = projsys conix topSys sys; {-# inline prj #-} in
 
     assumeCof (t^.binds) $ case (frc (t^.body))^.body of
-      VDCon _ conix' sp | conix == conix' ->
+      VDCon (CI _ conix' _) sp | conix == conix' ->
         case prj of
           TTPProject prj ->
             TTPProject (PCons (t^.binds) (t^.body.name) (t^.body.binds) sp prj)
@@ -1250,14 +1247,6 @@ hcomindsp r r' a prj@(!_,!_) params conid fieldid sp fieldtypes = case (sp, fiel
   _ ->
     impossible
 
-hcomind :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> Val
-hcomind r r' a sys params tyid conid sp fieldtypes  = case projsys' conid sys of
-  TTPProject prj ->
-    VDCon tyid conid (hcomindsp r r' a (prj // snd sys) params conid 0 sp fieldtypes)
-  TTPNe (sys,is) ->
-    VNe (NHCom r r' a sys (VDCon tyid conid sp)) (insertI r $ insertI r' is)
-{-# inline hcomind #-}
-
 coeindsp :: NCofArg => DomArg => I -> I -> BindI Env -> VDSpine -> Tel -> VDSpine
 coeindsp r r' params sp fieldtypes = case (sp, fieldtypes) of
   (VDNil, TNil) -> VDNil
@@ -1266,11 +1255,6 @@ coeindsp r r' params sp fieldtypes = case (sp, fieldtypes) of
     VDCons (coed r r' tty' t)
            (coeindsp r r' (mapBindI params \i ps -> EDef ps (coe r i tty' t)) sp fieldtypes)
   _ -> impossible
-
-coeind :: NCofArg => DomArg => I -> I -> BindI Env -> Lvl -> Lvl -> VDSpine -> Tel -> Val
-coeind r r' params tyid conid sp fieldtypes =
-  VDCon tyid conid (coeindsp r r' params sp fieldtypes)
-{-# inline coeind #-}
 
 ----------------------------------------------------------------------------------------------------
 
@@ -1291,8 +1275,8 @@ eval = \case
   Let x _ t u       -> define (eval t) (eval u)
 
   -- Inductives
-  TyCon x ts cs     -> VTyCon x (tyParams ts) cs
-  DCon x i sp       -> VDCon x i (spine sp)
+  TyCon x ts        -> VTyCon x (tyParams ts)
+  DCon ci sp        -> VDCon ci (spine sp)
   Case t x b cs     -> case_ (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
   Split x b cs      -> VLam $ NCl x $ CSplit (evalClosure x b) (EC ?sub ?env ?recurse cs)
 
@@ -1425,8 +1409,8 @@ instance Force Val Val where
     VHole x p s env  -> VHole x p (sub s) (sub env)
     VLine t          -> VLine (sub t)
     VLLam t          -> VLLam (sub t)
-    VTyCon x ts cs   -> VTyCon x (sub ts) cs
-    VDCon x i sp     -> VDCon x i (sub sp)
+    VTyCon x ts      -> VTyCon x (sub ts)
+    VDCon ci sp      -> VDCon ci (sub sp)
   {-# noinline frcS #-}
 
 instance Force Ne Val where

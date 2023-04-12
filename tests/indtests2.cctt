@@ -1,0 +1,54 @@
+
+data ℕ := zero | suc ℕ;
+
+nf1 := hcom 0 1 [] zero;
+nf2 := hcom 0 1 [] (suc zero);
+nf3 := coe 0 1 (_. ℕ) (suc zero);
+nf4 := hcom 0 1 [] (suc (suc (suc zero)));
+
+nf5 (i j : I) (x : ℕ) := hcom i j [] (suc (suc (suc x)));
+nf6 (i j k : I) (x : ℕ) := hcom i j [k = 0 _. suc (suc (suc x))] (suc (suc (suc x)));
+nf7 (i j k : I) := hcom i j [k = 0 _. suc (suc (suc zero))] (suc (suc (suc zero)));
+
+t1 (r r' : I)(x : ℕ) : coe r r' (_. ℕ) x = x := refl;
+
+t2 (r r' : I) : hcom r r' [] zero = zero := refl;
+
+t3 : hcom 0 1 [] zero = zero := refl;
+
+t4 (r r' : I) (x : ℕ) : hcom r r' [] (suc x) = suc (hcom r r' [] x) := refl;
+
+t5 (x : ℕ) : hcom 0 1 [] (suc x) = suc (hcom 0 1 [] x) := refl;
+
+t6 (r r' k : I) (x : ℕ) : hcom r r' [k = 0 j. suc x] (suc x) = suc (hcom r r' [k = 0 _. x] x) := refl;
+
+--------------------------------------------------------------------------------
+
+
+data Unit := tt;
+data Fam (x : Unit) := fam;
+
+data Sg (A : U)(B : A → U) := pair (a : A) (b : B a);
+
+t7 (A : I → U)(B : (i : I) → A i → U)(a : A 0)(b : B 0 a) :
+    coe 0 1 (i. Sg (A i) (B i)) (pair a b)
+  = pair (coe 0 1 A a) (coe 0 1 (i. B i (coe 0 i A a)) b) := refl;
+
+nf8 (A : I → U)(B : (i : I) → A i → U)(a : A 0)(b : B 0 a) :=
+  coe 0 1 (i. Sg (A i) (B i)) (pair a b);
+
+t8 (A : I → U)(B : (i : I) → A i → U)(a : A 0)(b : B 0 a) :
+    coe 0 1 (i. Sg (A i) (B i)) (pair a b)
+  = pair (coe 0 1 A a) (coe 0 1 (i. B i (coe 0 i A a)) b) := refl;
+
+nf9 (A : U)(B : A → U) (a : I → A)(b : (i : I) → B (a i))(i : I) :=
+  hcom 0 1 (Sg A B) [i = 0 j. pair (a j) (b j)] (pair (a 0) (b 0));
+
+nf10
+  (A : U)(B : A → U) (a : I → A)(b : (i : I) → B (a i))(i : I)
+  (p : pair (a 0) (b 0) ={_. Sg A B} pair (a 1) (b 1)) :=
+  hcom 0 1 (Sg A B) [i = 0. p] (pair (a 0) (b 0));
+
+nf11 (i : I) := hcom 0 1 (Sg Unit (λ x. Fam x)) [i = 0 j. pair tt fam] (pair tt fam);
+
+--------------------------------------------------------------------------------

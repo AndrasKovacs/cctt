@@ -226,81 +226,81 @@ unProject t x = case t of
 
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
-  TopVar x _        -> topVar x
-  RecursiveCall x   -> topVar x
-  LocalVar x        -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
-  Let x a t u       -> let pa = let_ a; pt = let_ t in fresh x \x ->
-                       letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
-  Pi "_" a b        -> let pa = sigma a in fresh "_" \_ ->
-                       pip (pa <> " → " <> pi b)
-  Pi n a b          -> let pa = pair a in fresh n \n ->
-                       pip (piBind n pa  <> goLinesPis b)
-  App t u           -> appp (app t <> " " <> proj u)
-  Lam x t           -> letp (fresh x \x -> "λ " <> x <> goLams t)
-  Line "_" a        -> freshI "_" \_ -> pip ("I → " <> pi a)
-  Line x a          -> freshI x   \x -> pip (lineBind x <> goLinesPis a)
-  LApp t u          -> appp (app t <> " " <> int u)
-  LLam x t          -> letp (freshI x \x -> "λ " <> x <> goLams t)
-  Sg "_" a b        -> let pa = eq a in fresh "_" \_ ->
-                       sigmap (pa <> " × " <> sigma b)
-  Sg x a b          -> let pa = pair a in fresh x \x ->
-                       sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
-  Pair x t u        -> pairp (let_ t <> ", " <> pair u)
-  Proj1 t x         -> case unProject t x of
-                         Nothing -> projp (proj t <> ".1")
-                         Just t  -> projp (proj t <> "." <> str x)
-  Proj2 t x         -> projp (proj t <> ".2")
-  U                 -> "U"
-  Path "_" a t u    -> ifVerbose
-                        (let pt = trans t; pu = trans u in freshI "_" \_ ->
-                         eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
-                        (eqp (trans t <> " = " <> trans u))
-  Path x a t u      -> let pt = trans t; pu = trans u in freshI x \x ->
-                       eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
-  PApp l r t u      -> ifVerbose
-                         (appp (app t <> " {" <> pair l <> "} {" <> pair r <> "} " <> int u))
-                         (appp (app t <> " " <> int u))
-  PLam l r x t      -> ifVerbose
-                         (let pl = pair l; pr = pair r in
-                          letp (freshI x \x -> "λ {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t))
-                         (letp (freshI x \x -> "λ " <> x <> goLams t))
-  Coe r r' i a t    -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
-                       appp ("coe " <> pr <> " " <> pr' <> coeTy i a <> pt)
-  HCom r r' a t u   -> appp ("hcom " <> int r <> " " <> int r'
-                             <> ifVerbose (" " <> proj a) ""
-                             <> " " <> sysH t <> " " <> proj u)
-  GlueTy a s        -> appp ("Glue " <> proj a <> " " <> sys s)
-  Unglue t _        -> appp ("unglue " <> proj t)
-  Glue a s1 s2      -> ifVerbose
-                         (appp ("glue " <> proj a <> " " <> sys s1 <> " " <> sys s2))
-                         (appp ("glue " <> proj a <> " " <> sys s2))
-  Hole i p          -> case i of
-                         Just x -> "?" <> str x
-                         _      -> runIO $ (getTop <&> (^.errPrinting)) >>= \case
-                           True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
-                           _    -> pure "?"
-  Com r r' i a t u  -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
-                       "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
-                              <> pt <> " " <> pu)
-  WkI x t           -> wkI x (tm t)
-  Refl _            -> "refl"
-  Sym _ _ _ p       -> projp (proj p <> "⁻¹")
-  Trans _ _ _ _ p q -> transp (app p <> " ∙ " <> trans q)
-  Ap f _ _ p        -> appp ("ap " <> proj f <> " " <> proj p)
-  TyCon x SPNil _   -> topVar x
-  TyCon x ts _      -> appp (topVar x <> spine ts)
-  DCon i j SPNil    -> dataCon i j
-  DCon i j sp       -> appp (dataCon i j <> spine sp)
-  Case t x b cs     -> ifVerbose
-                        (let pt = proj t; pcs = cases cs in fresh x \x ->
-                         appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
-                        (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
-  Wrap x a          -> "(" <> str x <> " : " <> pair a <> ")"
-  Pack x t          -> tm t
-  Unpack t x        -> case unProject t x of
-                         Nothing -> projp (proj t <> ".1")
-                         Just t  -> projp (proj t <> "." <> str x)
-  Split x b cs      -> appp ("λ[" <> cases cs <> "]")
+  TopVar x _            -> topVar x
+  RecursiveCall x       -> topVar x
+  LocalVar x            -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
+  Let x a t u           -> let pa = let_ a; pt = let_ t in fresh x \x ->
+                           letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
+  Pi "_" a b            -> let pa = sigma a in fresh "_" \_ ->
+                           pip (pa <> " → " <> pi b)
+  Pi n a b              -> let pa = pair a in fresh n \n ->
+                           pip (piBind n pa  <> goLinesPis b)
+  App t u               -> appp (app t <> " " <> proj u)
+  Lam x t               -> letp (fresh x \x -> "λ " <> x <> goLams t)
+  Line "_" a            -> freshI "_" \_ -> pip ("I → " <> pi a)
+  Line x a              -> freshI x   \x -> pip (lineBind x <> goLinesPis a)
+  LApp t u              -> appp (app t <> " " <> int u)
+  LLam x t              -> letp (freshI x \x -> "λ " <> x <> goLams t)
+  Sg "_" a b            -> let pa = eq a in fresh "_" \_ ->
+                           sigmap (pa <> " × " <> sigma b)
+  Sg x a b              -> let pa = pair a in fresh x \x ->
+                           sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
+  Pair x t u            -> pairp (let_ t <> ", " <> pair u)
+  Proj1 t x             -> case unProject t x of
+                             Nothing -> projp (proj t <> ".1")
+                             Just t  -> projp (proj t <> "." <> str x)
+  Proj2 t x             -> projp (proj t <> ".2")
+  U                     -> "U"
+  Path "_" a t u        -> ifVerbose
+                            (let pt = trans t; pu = trans u in freshI "_" \_ ->
+                             eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
+                            (eqp (trans t <> " = " <> trans u))
+  Path x a t u          -> let pt = trans t; pu = trans u in freshI x \x ->
+                           eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
+  PApp l r t u          -> ifVerbose
+                             (appp (app t <> " {" <> pair l <> "} {" <> pair r <> "} " <> int u))
+                             (appp (app t <> " " <> int u))
+  PLam l r x t          -> ifVerbose
+                             (let pl = pair l; pr = pair r in
+                              letp (freshI x \x -> "λ {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t))
+                             (letp (freshI x \x -> "λ " <> x <> goLams t))
+  Coe r r' i a t        -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
+                           appp ("coe " <> pr <> " " <> pr' <> coeTy i a <> pt)
+  HCom r r' a t u       -> appp ("hcom " <> int r <> " " <> int r'
+                                 <> ifVerbose (" " <> proj a) ""
+                                 <> " " <> sysH t <> " " <> proj u)
+  GlueTy a s            -> appp ("Glue " <> proj a <> " " <> sys s)
+  Unglue t _            -> appp ("unglue " <> proj t)
+  Glue a s1 s2          -> ifVerbose
+                             (appp ("glue " <> proj a <> " " <> sys s1 <> " " <> sys s2))
+                             (appp ("glue " <> proj a <> " " <> sys s2))
+  Hole i p              -> case i of
+                             Just x -> "?" <> str x
+                             _      -> runIO $ (getTop <&> (^.errPrinting)) >>= \case
+                               True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
+                               _    -> pure "?"
+  Com r r' i a t u      -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
+                           "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
+                                  <> pt <> " " <> pu)
+  WkI x t               -> wkI x (tm t)
+  Refl _                -> "refl"
+  Sym _ _ _ p           -> projp (proj p <> "⁻¹")
+  Trans _ _ _ _ p q     -> transp (app p <> " ∙ " <> trans q)
+  Ap f _ _ p            -> appp ("ap " <> proj f <> " " <> proj p)
+  TyCon x SPNil         -> topVar x
+  TyCon x ts            -> appp (topVar x <> spine ts)
+  DCon (CI i j _) SPNil -> dataCon i j
+  DCon (CI i j _) sp    -> appp (dataCon i j <> spine sp)
+  Case t x b cs         -> ifVerbose
+                            (let pt = proj t; pcs = cases cs in fresh x \x ->
+                             appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
+                            (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
+  Wrap x a              -> "(" <> str x <> " : " <> pair a <> ")"
+  Pack x t              -> tm t
+  Unpack t x            -> case unProject t x of
+                             Nothing -> projp (proj t <> ".1")
+                             Just t  -> projp (proj t <> "." <> str x)
+  Split x b cs          -> appp ("λ[" <> cases cs <> "]")
 
 ----------------------------------------------------------------------------------------------------
 
