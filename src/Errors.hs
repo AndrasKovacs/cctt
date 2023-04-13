@@ -204,7 +204,7 @@ showError = \case
 displayErrInCxt :: ErrInCxt -> IO ()
 displayErrInCxt (ErrInCxt e) = withPrettyArgs do
   file <- getTop <&> (^.currentSrc)
-  modTop (errPrinting .~ True)
+  modTop (printingOpts.errPrinting .~ True)
 
   let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
       lnum = show linum

@@ -22,13 +22,43 @@ data TblEntry
   | TBETopRec Lvl (Maybe VTy) (DontShow SourcePos)
   deriving Show
 
-data Box a = Box ~a deriving (Show)
+data Locals
+  = LNil
+  | LBind Locals Name ~VTy ~Ty
+  | LInt Locals Name
+  | LCof Locals NeCof
+  deriving Show
+
+data RevLocals
+  = RLNil
+  | RLBind Name ~VTy ~Ty RevLocals
+  | RLInt Name RevLocals
+  | RLCof NeCof RevLocals
+  deriving Show
+
+data HoleInCxt = HoleInCxt RevLocals Ty
+  deriving Show
+
+revLocals :: Locals -> RevLocals
+revLocals = go RLNil where
+  go acc LNil              = acc
+  go acc (LBind ls x a qa) = go (RLBind x a qa acc) ls
+  go acc (LInt ls r)       = go (RLInt r acc) ls
+  go acc (LCof ls c)       = go (RLCof c acc) ls
+
+lookupLocalType :: Ix -> Locals -> Box VTy
+lookupLocalType x ls = case (x, ls) of
+  (0, LBind _ _ a _ ) -> Box a
+  (x, LBind ls _ _ _) -> lookupLocalType (x - 1) ls
+  (x, LInt ls _     ) -> lookupLocalType x ls
+  (x, LCof ls _     ) -> lookupLocalType x ls
+  _                   -> impossible
 
 type Table      = M.Map Name TblEntry
 type TableArg   = (?tbl        :: Table)
 type PosArg     = (?srcPos     :: SourcePos)
 type TopLvl     = (?topLvl     :: Lvl)
-type LocalTypes = (?localTypes :: [Box VTy])
+type LocalsArg  = (?locals     :: Locals)
 
 -- | Case expressions are not allowed on a TyCon whose constructors are being defined.
 type IsCaseAllowed = Bool
@@ -39,23 +69,31 @@ data TopEntry
   | TPERec (Maybe VTy)
   deriving Show
 
+data PrintingOpts = PrintingOpts {
+    printingOptsPrintNf     :: Maybe Name
+  , printingOptsVerbose     :: Bool
+  , printingOptsErrPrinting :: Bool
+  , printingOptsHoleCxts    :: Bool }
+  deriving Show
+
 data TopState = TopState {
     topStateTopInfo      :: LM.Map TopEntry
   , topStateLvl          :: Lvl
   , topStateTbl          :: Table
   , topStateLoadedFiles  :: S.Set FilePath
   , topStateLoadCycle    :: [FilePath]
-  , topStatePrintNf      :: Maybe Name
   , topStateCurrentPath  :: FilePath
   , topStateCurrentSrc   :: String
-  , topStateVerbose      :: Bool
-  , topStateErrPrinting  :: Bool
-  , topStateParsingTime  :: NominalDiffTime}
+  , topStateParsingTime  :: NominalDiffTime
+  , topStatePrintingOpts :: PrintingOpts
+  }
   deriving Show
+makeFields ''PrintingOpts
 makeFields ''TopState
 
 initialTop :: TopState
-initialTop = TopState mempty 0 mempty mempty mempty Nothing "" "" False False 0
+initialTop =
+  TopState mempty 0 mempty mempty mempty "" "" 0 (PrintingOpts Nothing False False True)
 
 topState :: IORef TopState
 topState = runIO $ newIORef initialTop
@@ -89,7 +127,7 @@ modTyConInfo tyid f = do
             _ -> impossible
 {-# inline modTyConInfo #-}
 
-type Elab a = LocalTypes => NCofArg => DomArg => EnvArg => TableArg => PosArg => a
+type Elab a = LocalsArg => NCofArg => DomArg => EnvArg => TableArg => PosArg => a
 
 resetTop :: IO ()
 resetTop = modTop \_ -> initialTop
@@ -97,12 +135,12 @@ resetTop = modTop \_ -> initialTop
 withTopElab :: Elab (IO a) -> IO a
 withTopElab act = do
   top <- getTop
-  let ?tbl        = top^.tbl
-      ?cof        = idSub 0
-      ?dom        = 0
-      ?env        = ENil
-      ?srcPos     = initialPos (top^.currentPath)
-      ?localTypes = []
+  let ?tbl    = top^.tbl
+      ?cof    = idSub 0
+      ?dom    = 0
+      ?env    = ENil
+      ?srcPos = initialPos (top^.currentPath)
+      ?locals = LNil
   act
 {-# inline withTopElab #-}
 
@@ -162,24 +200,24 @@ addDCon x tyid conid fields pos act = do
 {-# inline addDCon #-}
 
 -- | Bind a fibrant variable.
-bind :: Name -> VTy -> Elab (Val -> a) -> Elab a
-bind x ~a act =
-  let v           = vVar ?dom in
-  let ?dom        = ?dom + 1
-      ?env        = EDef ?env v
-      ?tbl        = M.insert x (TBELocal ?dom a) ?tbl
-      ?localTypes = Box a : ?localTypes in
+bind :: Name -> VTy -> Ty -> Elab (Val -> a) -> Elab a
+bind x ~a ~qa act =
+  let v       = vVar ?dom in
+  let ?dom    = ?dom + 1
+      ?env    = EDef ?env v
+      ?tbl    = M.insert x (TBELocal ?dom a) ?tbl
+      ?locals = LBind ?locals x a qa in
   let _ = ?dom; _ = ?env; _ = ?tbl in
   act v
 {-# inline bind #-}
 
 -- | Define a fibrant variable.
-define :: Name -> VTy -> Val -> Elab a -> Elab a
-define x ~a ~v act =
-  let ?env        = EDef ?env v
-      ?dom        = ?dom + 1
-      ?tbl        = M.insert x (TBELocal ?dom a) ?tbl
-      ?localTypes = Box a : ?localTypes in
+define :: Name -> VTy -> Ty -> Val -> Elab a -> Elab a
+define x ~a ~qa ~v act =
+  let ?env    = EDef ?env v
+      ?dom    = ?dom + 1
+      ?tbl    = M.insert x (TBELocal ?dom a) ?tbl
+      ?locals = LBind ?locals x a qa in
   let _ = ?env; _ = ?tbl; _ = ?dom in
   act
 {-# inline define #-}
@@ -196,7 +234,10 @@ bindI x act =
 {-# inline bindI #-}
 
 bindCof :: NeCof' -> Elab a -> Elab a
-bindCof (NeCof' cof c) act = let ?cof = cof in act; {-# inline bindCof #-}
+bindCof (NeCof' cof c) act =
+  let ?cof    = cof
+      ?locals = LCof ?locals c in
+  act; {-# inline bindCof #-}
 
 -- | Try to pick an informative fresh ivar name.
 pickIVarName :: Elab Name

@@ -11,12 +11,13 @@ import ElabState
 import Pretty
 
 helpMsg = unlines [
-   "usage: cctt <file> [nf <topdef>] [elab] [verbose]"
+   "usage: cctt <file> [nf <topdef>] [elab] [verbose] [no-hole-cxts]"
   ,""
   ,"Checks <file>. Options:"
   ,"  nf <topdef>   prints the normal form of top-level definition <topdef>"
   ,"  elab          prints the elaboration output"
   ,"  verbose       prints path endpoints and hcom types explicitly"
+  ,"  no-hole-cxt   turn off printing local contexts of holes"
   ]
 
 elabPath :: FilePath -> [String] -> IO ()
@@ -25,7 +26,7 @@ elabPath path args = mainWith (pure $ path : args)
 mainInteraction :: IO ()
 mainInteraction = mainWith getArgs
 
-parseArgs :: [String] -> IO (FilePath, Maybe Name, Bool, Bool)
+parseArgs :: [String] -> IO (FilePath, Maybe Name, Bool, Bool, Bool)
 parseArgs args = do
   let exit = putStrLn helpMsg >> exitSuccess
   (path, args) <- case args of
@@ -37,21 +38,22 @@ parseArgs args = do
   (elab, args) <- case args of
     "elab":args -> pure (True, args)
     args        -> pure (False, args)
-  verbose <- case args of
-    "verbose":[] -> pure True
-    []           -> pure False
-    _            -> exit
-  pure (path, printnf, elab, verbose)
+  (verbose, args) <- case args of
+    "verbose":args -> pure (True, args)
+    args           -> pure (False, args)
+  noHoleCxts <- case args of
+    "no-hole-cxts":[] -> pure True
+    []                -> pure False
+    _                 -> exit
+  pure (path, printnf, elab, verbose, noHoleCxts)
 
 
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   resetTop
-  (path, printnf, printelab, verbosity) <- parseArgs =<< getArgs
+  (path, printnf, printelab, verbosity, noHoleCxts) <- parseArgs =<< getArgs
 
-  modTop $
-      (verbose .~ verbosity)
-    . (printNf .~ printnf)
+  modTop (printingOpts %~ ((verbose .~ verbosity) . (printNf .~ printnf)))
 
   (top, totaltime) <- timed (elaborate path)
   parsetime <- getTop <&> (^.parsingTime)

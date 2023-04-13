@@ -4,7 +4,7 @@ module Core where
 import Common
 import CoreTypes
 import Interval
-import Debug.Trace
+-- import Debug.Trace
 
 ----------------------------------------------------------------------------------------------------
 {-

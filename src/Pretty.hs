@@ -19,7 +19,7 @@ import Data.Foldable
 --------------------------------------------------------------------------------
 
 ifVerbose :: a -> a -> a
-ifVerbose t f = runIO $ getTop <&> (^.verbose) >>= \case
+ifVerbose t f = runIO $ getTop <&> (^.printingOpts.verbose) >>= \case
   True  -> pure t
   False -> pure f
 {-# inline ifVerbose #-}
@@ -276,7 +276,7 @@ tm = \case
                              (appp ("glue " <> proj a <> " " <> sys s2))
   Hole i p              -> case i of
                              Just x -> "?" <> str x
-                             _      -> runIO $ (getTop <&> (^.errPrinting)) >>= \case
+                             _      -> runIO $ (getTop <&> (^.printingOpts.errPrinting)) >>= \case
                                True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
                                _    -> pure "?"
   Com r r' i a t u      -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->

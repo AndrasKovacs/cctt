@@ -32,11 +32,7 @@ import Pretty
 conv :: Elab (Val -> Val -> IO ())
 conv t u = if Conversion.conv t u
   then pure ()
-  else do
-    -- debug [show (quote t)]
-    -- debug [replicate 100 ' ']
-    -- debug [show (quote u)]
-    err $ CantConvert (quote t) (quote u)
+  else err $ CantConvert (quote t) (quote u)
 
 convICl :: Elab (NamedIClosure -> NamedIClosure -> IO ())
 convICl t u = if Conversion.conv t u
@@ -123,16 +119,17 @@ check t topA = frcPos t \case
         t <- check t va
         pure (a, va, t)
     let ~vt = eval t
-    u <- define x va vt $ check u topA
+    u <- define x va a vt $ check u topA
     pure $! Let x a t u
 
   t -> case (t, frc topA) of
 
     (P.Lam x ann t, VPi a b) -> do
-      case ann of Nothing -> pure ()
-                  Just a' -> do a' <- check a' VU
-                                conv (eval a') a
-      Lam x <$!> bind x a (\v -> check t (b ∙ v))
+      ~qa <- case ann of Nothing -> pure (quote a)
+                         Just a' -> do a' <- check a' VU
+                                       conv (eval a') a
+                                       pure a'
+      Lam x <$!> bind x a qa (\v -> check t (b ∙ v))
 
     (P.Split cs, VPi a b) -> do
       (typeid, params) <- case frc a of
@@ -208,7 +205,7 @@ check t topA = frcPos t \case
       (typeid, params) <- case frc a of
         VTyCon i ps -> pure (i, ps)
         a           -> err $ ExpectedInductiveType (quote a)
-      let qb = bind "_" a \_ -> quote b
+      let qb = bind "_" a (quote a) \_ -> quote b
       let bv = NCl "_" $ CConst b
       (paramtypes, cons, canCase) <- tyConInfo typeid
       unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
@@ -369,7 +366,7 @@ inferNonSplit t = frcPos t \case
   P.LocalLvl x -> do
     unless (0 <= x && x < ?dom) (err LocalLvlNotInScope)
     let ix = lvlToIx ?dom x
-    let Box a = ?localTypes !! fromIntegral ix
+    let Box a = lookupLocalType ix ?locals
     pure $! Infer (LocalVar ix) a
 
   P.ILvl{} -> err UnexpectedI
@@ -394,7 +391,7 @@ inferNonSplit t = frcPos t \case
         t <- check t va
         pure (a, va, t)
     let ~vt = eval t
-    Infer u b <- define x va vt $ infer u
+    Infer u b <- define x va a vt $ infer u
     pure $! Infer (Let x a t u) b
 
   P.Pi x (P.unPos -> P.I) b -> do
@@ -403,7 +400,7 @@ inferNonSplit t = frcPos t \case
 
   P.Pi x a b -> do
     a <- check a VU
-    b <- bind x (eval a) \_ -> check b VU
+    b <- bind x (eval a) a \_ -> check b VU
     pure $ Infer (Pi x a b) VU
 
   P.PApp l r t u -> do
@@ -430,9 +427,10 @@ inferNonSplit t = frcPos t \case
 
     a -> do
       a <- eval <$!> check a VU
-      (t, b, qb) <- bind x a \_ -> do Infer t b <- infer t
-                                      let qb = quote b
-                                      pure (t, b, qb)
+      (t, b, qb) <- bind x a (quote a) \_ -> do
+        Infer t b <- infer t
+        let qb = quote b
+        pure (t, b, qb)
       pure $! Infer (Lam x t) (VPi a (makeNCl x qb))
 
   -- we infer non-dependent path types to explicit path lambdas.
@@ -448,7 +446,7 @@ inferNonSplit t = frcPos t \case
 
   P.Sg x a b -> do
     a <- check a VU
-    b <- bind x (eval a) \_ -> check b VU
+    b <- bind x (eval a) a \_ -> check b VU
     pure $ Infer (Sg x a b) VU
 
   P.Pair{} ->
@@ -574,7 +572,7 @@ inferNonSplit t = frcPos t \case
     (typeid, params) <- case frc a of
       VTyCon i ps -> pure (i, ps)
       a           -> err $ ExpectedInductiveType (quote a)
-    b <- bind x a \_ -> check b VU
+    b <- bind x a (quote a) \_ -> check b VU
     let bv = makeNCl x b
     (paramtypes, cons, canCase) <- tyConInfo typeid
     unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
@@ -594,7 +592,8 @@ elabCase typeid conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) o
   (TNil, []) ->
     check body rhstype
   (TCons _ a fieldtypes, x:xs) -> do
-    bind x (evalIn tyenv a) \x ->
+    let ~va = evalIn tyenv a
+    bind x va (quote va) \x ->
       elabCase typeid conid (EDef tyenv x) fieldtypes rhstype xs body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
@@ -638,7 +637,7 @@ constantICl a = bindI "i" \(IVar -> i) -> bindI "j" \(IVar -> j) -> conv (a ∙ 
 
 -- | Ensure that a Closure is constant.
 constantCl :: Elab (VTy -> NamedClosure -> IO ())
-constantCl a cl = bind "x" a \x -> bind "y" a \y -> conv (cl ∙ x) (cl ∙ y)
+constantCl a cl = bind "x" a (quote a) \x -> bind "y" a (quote a) \y -> conv (cl ∙ x) (cl ∙ y)
 
 -- | Ensure that a type is a non-dependent function.
 nonDepFun :: Elab (Val -> IO (Val, NamedClosure))
@@ -859,7 +858,7 @@ elabTop = \case
 
       finalizeTopDef l x va tv (coerce pos)
 
-      printnf <- getTop <&> (^.printNf)
+      printnf <- getTop <&> (^.printingOpts.printNf)
       case printnf of
         Just x' | x == x' -> withPrettyArgs do
           putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote tv)
@@ -916,14 +915,14 @@ elabTelescope = \case
   [] -> pure TNil
   (x, a):ps -> do
     a <- check a VU
-    bind x (eval a) \_ -> do
+    bind x (eval a) a \_ -> do
       ps <- elabTelescope ps
       pure $ TCons x a ps
 
 bindTelescope :: Tel -> Elab a -> Elab a
 bindTelescope ps act = case ps of
   TNil         -> act
-  TCons x a ps -> bind x (eval a) \_ -> bindTelescope ps act
+  TCons x a ps -> bind x (eval a) a \_ -> bindTelescope ps act
 {-# inline bindTelescope #-}
 
 ----------------------------------------------------------------------------------------------------

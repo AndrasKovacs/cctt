@@ -135,6 +135,10 @@ newtype DontShow a = DontShow {unDontShow :: a} deriving Eq
 instance Show (DontShow a) where
   showsPrec _ _ x = x
 
+--------------------------------------------------------------------------------
+
+data Box a = Box ~a deriving Show
+
 -- Time measurement
 --------------------------------------------------------------------------------
 
