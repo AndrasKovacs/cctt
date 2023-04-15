@@ -65,12 +65,9 @@ data LoadState = LoadState {
   , loadStateCurrentSrc  :: String
   } deriving Show
 
-data TopEntry' = TEDef' DefInfo | TETyCon' TyConInfo
-  deriving Show
-
 data State = State {
     stateTop          :: M.Map Name TopEntry
-  , stateTop'         :: LM.Map TopEntry'
+  , stateTop'         :: LM.Map TopEntry
   , stateLvl          :: Lvl
   , stateLoadState    :: LoadState
   , stateParsingTime  :: NominalDiffTime
@@ -116,17 +113,6 @@ withTopElab act = do
       ?srcPos = initialPos (st^.loadState.currentPath)
   act
 {-# inline withTopElab #-}
-
-declareNewTyCon :: Name -> Tel -> SourcePos -> IO ()
-declareNewTyCon x ps pos = do
-  st   <- getState
-  cons <- newIORef mempty
-  frz  <- newIORef False
-  let tyinfo = TCI (stateLvl st) ps cons frz x pos
-  putState $ st & top %~ M.insert x (TETyCon tyinfo)
-
-freezeTyCon :: TyConInfo -> IO ()
-freezeTyCon ti = writeIORef (ti^.frozen) True
 
 -- | Bind a fibrant variable.
 bind :: Name -> VTy -> Ty -> Elab (Val -> a) -> Elab a

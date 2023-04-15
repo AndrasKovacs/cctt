@@ -5,7 +5,6 @@ import System.Environment
 import System.Exit
 
 import Common
-import CoreTypes
 import Elaboration
 import ElabState
 import Pretty
@@ -50,18 +49,16 @@ parseArgs args = do
 
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
-  resetTop
+  reset
   (path, printnf, printelab, verbosity, noHoleCxts) <- parseArgs =<< getArgs
 
-  modTop (printingOpts %~ ((verbose .~ verbosity) . (printNf .~ printnf)))
+  modState (printingOpts %~ ((verbose .~ verbosity) . (printNf .~ printnf)))
 
   (top, totaltime) <- timed (elaborate path)
-  parsetime <- getTop <&> (^.parsingTime)
-
+  st <- getState
   putStrLn (path ++ " checked in " ++ show totaltime)
-  putStrLn ("parsing time: " ++ show parsetime)
-  putStrLn ("checked " ++ show (topLen top) ++ " definitions")
+  putStrLn ("parsing time: " ++ show (st^.parsingTime))
+  putStrLn ("checked " ++ show (st^.lvl) ++ " definitions")
 
   when printelab do
-    putStrLn $ pretty top
-  pure ()
+    putStrLn $ pretty0 (st^.top')

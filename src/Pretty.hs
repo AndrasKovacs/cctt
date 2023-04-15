@@ -13,6 +13,7 @@ import Common
 import CoreTypes
 import Interval
 import ElabState hiding (bind, bindI, isNameUsed)
+import qualified LvlMap as LM
 
 --------------------------------------------------------------------------------
 
@@ -322,31 +323,34 @@ dataFields = \case
   TCons x a fs -> let pa = pair a in bind x \x ->
                   "(" <> x <> " : " <> pa <> ")" <> dataFields fs
 
-dataCons :: PrettyArgs ([(Name, Tel)] -> Txt)
+dataCons :: PrettyArgs ([DConInfo] -> Txt)
 dataCons = \case
-  []         -> mempty
-  [(x, fs)]  -> str x <> dataFields fs
-  (x, fs):cs -> str x <> dataFields fs <> "\n  | " <> dataCons cs
+  []     -> mempty
+  [inf]  -> str (inf^.name) <> dataFields (inf^.fieldTypes)
+  inf:cs -> str (inf^.name) <> dataFields (inf^.fieldTypes) <> "\n  | " <> dataCons cs
 
-inductive :: PrettyArgs (Tel -> [(Name, Tel)] -> Txt)
+inductive :: PrettyArgs (Tel -> [DConInfo] -> Txt)
 inductive ps cs = case ps of
   TNil         -> " :=\n    " <> dataCons cs
   TCons x a ps -> let pa = pair a in bind x \x ->
                   " (" <> x <> " : " <> pa <> ")" <> inductive ps cs
 
-top_ :: Top -> Txt
-top_ = \case
-  TEmpty       -> mempty
-  TDef x a t u ->
-    let ?dom    = 0
-        ?idom   = 0
-        ?names  = NNil in
-    "\n" <> str x <> " : " <> pair a <> " :=\n  " <> pair t <> ";\n" <> top_ u
-  TData x ps cons top ->
-    let ?dom    = 0
-        ?idom   = 0
-        ?names  = NNil in
-    "\ndata " <> str x <> inductive ps cons <> ";\n" <> top_ top
+topEntries :: LM.Map TopEntry -> Txt
+topEntries = LM.foldrWithKey'
+  (\l e acc -> case e of
+      TEDef inf -> withPrettyArgs0 $
+         "\n" <> str (inf^.name)
+          <> " : " <> pair (inf^.defTy)
+          <> " :=\n  " <> pair (inf^.def) <> ";\n" <> acc
+      TETyCon inf -> withPrettyArgs0 $ runIO do
+        cons <- readIORef (inf^.constructors)
+        pure $!
+         "\ndata " <> str (inf^.name)
+         <> inductive (inf^.paramTypes) (LM.elems cons) <> ";\n" <> acc
+
+      TEDCon{} -> impossible
+      TERec{}  -> impossible)
+  mempty
 
 ----------------------------------------------------------------------------------------------------
 
@@ -357,9 +361,9 @@ class Pretty c a | a -> c  where
   pretty    :: c => a -> String
   pretty0   :: a -> String
 
-instance Pretty () Top where
-  pretty  t   = runTxt (top_ t)
-  pretty0 t   = runTxt (top_ t)
+instance Pretty () (LM.Map TopEntry) where
+  pretty  t   = runTxt (topEntries t)
+  pretty0 t   = runTxt (topEntries t)
 
 instance Pretty (NamesArg, DomArg, IDomArg) Tm where
   pretty    t = runTxt (pair t)

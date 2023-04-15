@@ -258,7 +258,7 @@ splitIdent x ix ls sp = case ls of
       Just (TETyCon inf)      -> pure $ TyConHead inf sp
       Just (TERec Nothing)    -> err $ GenericError $
                                        "Can't infer type for recursive call. "++
-                                       "Put a type annotation on the top-level definition."
+                                       "Hint: put a type annotation on the recursive definition."
       Just (TERec (Just inf)) -> SplitInfer <$!> inferSp (RecursiveCall inf) (inf^.recTyVal) sp
       Just (TEDCon inf)       -> pure $ DConHead inf sp
 
@@ -282,25 +282,37 @@ goSplit t sp topT = frcPos t \case
     case LM.lookup x (st^.top') of
       Nothing ->
         err $ GenericError $ "No top-level definition with de Bruijn level"
-      Just (TEDef' inf) ->
+      Just (TERec Nothing) ->
+        err $ GenericError $
+            "Can't infer type for recursive call. "++
+            "Hint: put a type annotation on the recursive definition."
+      Just (TERec (Just inf)) ->
+        SplitInfer <$!> inferSp (RecursiveCall inf) (inf^.recTyVal) sp
+      Just (TEDef inf) ->
         SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
-      Just (TETyCon' inf) ->
+      Just (TETyCon inf) ->
         pure $ TyConHead inf sp
+      Just (TEDCon{}) ->
+        impossible
 
   P.TopLvl x (Just y) -> do
     st <- getState
     case LM.lookup x (st^.top') of
       Nothing ->
         err $ GenericError $ "No type constructor with de Bruijn level"
-      Just (TEDef' _) ->
+      Just (TEDef _) ->
         err $ GenericError $ "No type constructor with de Bruijn level"
-      Just (TETyCon' inf) -> do
+      Just TERec{} ->
+        err $ GenericError $ "No type constructor with de Bruijn level"
+      Just (TETyCon inf) -> do
         cons <- readIORef (inf^.constructors)
         case LM.lookup y cons of
           Nothing ->
             err $ GenericError $ "No data constructor with de Bruijn level"
           Just dinf ->
             pure $ DConHead dinf sp
+      Just TEDCon{} ->
+        impossible
 
   t -> do
     Infer t a <- inferNonSplit t
@@ -847,82 +859,103 @@ guardTopShadowing x = do
     Just (TEDCon inf ) -> err $ TopShadowing (inf^.pos)
     Just (TERec _    ) -> impossible
 
-elabTop :: P.Top -> IO Top
+elabTop :: P.Top -> IO ()
 elabTop = \case
 
-  P.TDef pos x ma t top -> withTopElab $ setPos pos do
+  P.TDef pos x ma t ptop -> withTopElab $ setPos pos do
     guardTopShadowing x
 
-    ma <- case ma of
-      Nothing -> pure Nothing
-      Just a  -> do {a <- check a VU; pure (Just (a, eval a))}
+    l <- getState <&> (^.lvl)
 
-    _
+    recInf <- case ma of
+      Nothing ->
+        pure Nothing
+      Just a  -> do
+        a <- check a VU
+        let ~va = eval a
+        pure $ Just $ RI l a va x (coerce pos)
 
-    -- declareTopDef x (snd <$!> ma) (coerce pos) \l -> do
+    let recEntry = TERec recInf
 
-    --   (t, a, va) <- case ma of
-    --     Nothing      -> do {Infer t a <- infer t; pure (t, quote a, a)}
-    --     Just (a, va) -> do {t <- check t va; pure (t, a, va)}
+    modState $
+        (top  %~ M.insert x recEntry)
+      . (top' %~ LM.insert l recEntry)
+      . (lvl  +~ 1)
 
-    --   -- recursive evaluation
-    --   let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse (coerce tv) in Core.eval t)
+    (t, a, va) <- case recInf of
+      Nothing  -> do {Infer t a <- infer t; pure (t, quote a, a)}
+      Just inf -> do {t <- check t (inf^.recTyVal);
+                      pure (t, inf^.recTy, inf^.recTyVal)}
 
-    --   finalizeTopDef l x va tv (coerce pos)
+    -- recursive evaluation
+    let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse (coerce tv)
+               in Core.eval t)
 
-    --   printnf <- getTop <&> (^.printingOpts.printNf)
-    --   case printnf of
-    --     Just x' | x == x' -> withPrettyArgs do
-    --       putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote tv)
-    --       putStrLn ""
-    --     _ -> pure ()
+    let defEntry = TEDef $ DI l t tv a va x (coerce pos)
 
-    --   top <- elabTop top
-    --   pure $ TDef x a t top
+    modState $
+        (top  %~ M.insert x defEntry)
+      . (top' %~ LM.insert l defEntry)
 
-  P.TImport pos modname top -> withTopElab $ setPos pos do
-    st <- getState
-    let dirpath = takeDirectory (st^.loadState.currentPath)
+    printnf <- getState <&> (^.printingOpts.printNf)
+    case printnf of
+      Just x' | x == x' -> withPrettyArgs do
+        putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote tv)
+        putStrLn ""
+      _ -> pure ()
+
+    elabTop ptop
+
+  P.TImport pos modname ptop -> withTopElab $ setPos pos do
+    st <- getState <&> (^.loadState)
+    let dirpath = takeDirectory (st^.currentPath)
         newpath = dirpath </> (modname <.> "cctt")
-    if S.member newpath (st^.loadState.loadedFiles) then do
-      elabTop top
+    if S.member newpath (st^.loadedFiles) then do
+      elabTop ptop
     else if elem newpath (st^.loadCycle) then do
-      err $ ImportCycle (st^.currentPath) (st^.loadState.loadCycle)
+      err $ ImportCycle (st^.currentPath) (st^.loadCycle)
     else do
-      importTop <- elabPath (Just pos) newpath
-      top <- elabTop top
-      pure $! importTop <> top
+      elabPath (Just pos) newpath
+      elabTop ptop
 
-  P.TData pos tyname ps cs top -> withTopElab $ setPos pos do
+  P.TData pos tyname ps cs ptop -> withTopElab $ setPos pos do
     guardTopShadowing tyname
-    ps   <- elabTelescope ps
-    _
-    -- (tyid, cs) <- declareNewTyCon tyname ps (coerce pos) \tyid -> do
-    --   cs <- bindTelescope ps do
-    --     elabConstructors tyid 0 cs
-    --   pure (tyid, cs)
-    -- finalizeTyCon tyid
-    -- tbl  <- getTop <&> (^.tbl)
-    -- top  <- elabTop top
-    -- pure $ TData tyname ps cs top
+
+    l       <- getState <&> (^.lvl)
+    ps      <- elabTelescope ps
+    consRef <- newIORef (mempty @(LM.Map DConInfo))
+    frzRef  <- newIORef False
+
+    let inf   = TCI l ps consRef frzRef tyname (coerce pos)
+    let entry = TETyCon inf
+
+    modState $
+         (top  %~ M.insert tyname entry)
+      .  (top' %~ LM.insert l entry)
+      .  (lvl  +~ 1)
+
+    bindTelescope ps $ elabConstructors inf 0 cs
+    writeIORef frzRef True
+    elabTop ptop
 
   P.TEmpty ->
-    pure TEmpty
+    pure ()
+
 
 ----------------------------------------------------------------------------------------------------
 
-elabConstructors :: Elab (Lvl -> Lvl -> [(DontShow SourcePos, Name, [(Name, P.Ty)])]
-                          -> IO [(Name, Tel)])
-elabConstructors tyid conid = \case
+elabConstructors :: Elab (
+  TyConInfo -> Lvl -> [(DontShow SourcePos, Name, [(Name, P.Ty)])] -> IO ())
+elabConstructors tyinf conid = \case
   [] ->
-    pure []
+    pure ()
   (pos, x, fs):cs -> setPos pos do
     guardTopShadowing x
-    _
-    -- fs <- elabTelescope fs
-    -- cs <- addDCon x tyid conid fs (coerce pos) do
-    --   elabConstructors tyid (conid + 1) cs
-    -- pure ((x, fs):cs)
+    fs <- elabTelescope fs
+    let dinf = DCI conid fs x tyinf (coerce pos)
+    modState (top %~ M.insert x (TEDCon dinf))
+    modifyIORef' (tyinf^.constructors) (LM.insert conid dinf)
+    elabConstructors tyinf (conid + 1) cs
 
 elabTelescope :: Elab ([(Name, P.Ty)] -> IO Tel)
 elabTelescope = \case
@@ -941,11 +974,12 @@ bindTelescope ps act = case ps of
 
 ----------------------------------------------------------------------------------------------------
 
-elabPath :: Maybe (DontShow SourcePos) -> FilePath -> IO Top
+elabPath :: Maybe (DontShow SourcePos) -> FilePath -> IO ()
 elabPath pos path = do
-  oldpath  <- getState <&> (^.currentPath)
-  oldCycle <- getState <&> (^.loadCycle)
-  oldSrc   <- getState <&> (^.currentSrc)
+  loadSt <- getState <&> (^.loadState)
+  let oldpath  = loadSt^.currentPath
+  let oldCycle = loadSt^.loadCycle
+  let oldSrc   = loadSt^.currentSrc
 
   file <- readFile path `catch` \(e :: IOError) -> do
     case pos of
@@ -956,18 +990,18 @@ elabPath pos path = do
         err $ CantOpenFile path
 
   (!top, !tparse) <- timed (parseString path file)
-  modState $ (currentPath .~ path)
-           . (loadCycle   .~ (path : oldCycle))
-           . (parsingTime +~ tparse)
-           . (currentSrc  .~ file)
+  modState $ (loadState.currentPath .~ path)
+           . (loadState.loadCycle   .~ (path : oldCycle))
+           . (parsingTime           +~ tparse)
+           . (loadState.currentSrc  .~ file)
   top <- elabTop top
-  modState $ (currentPath .~ oldpath)
-           . (loadCycle   .~ oldCycle)
-           . (currentSrc  .~ oldSrc)
-           . (loadedFiles %~ S.insert path)
+  modState $ (loadState.currentPath .~ oldpath)
+           . (loadState.loadCycle   .~ oldCycle)
+           . (loadState.currentSrc  .~ oldSrc)
+           . (loadState.loadedFiles %~ S.insert path)
   pure top
 
-elaborate :: FilePath -> IO Top
+elaborate :: FilePath -> IO ()
 elaborate path = elabPath Nothing path `catch` \(e :: ErrInCxt) -> do
   displayErrInCxt e
   exitSuccess

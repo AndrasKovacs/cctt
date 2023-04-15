@@ -28,3 +28,7 @@ adjust f x m = coerce (IM.adjust f (fromIntegral x) (coerce m)); {-# inline adju
 
 elems :: Map a -> [a]
 elems x = IM.elems (coerce x); {-# inline elems #-}
+
+foldrWithKey' :: (Lvl -> a -> b -> b) -> b -> Map a -> b
+foldrWithKey' f b as = IM.foldrWithKey' (\l a b -> f (fromIntegral l) a b) b (unMap as)
+{-# inline foldrWithKey' #-}

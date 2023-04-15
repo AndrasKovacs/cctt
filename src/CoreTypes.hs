@@ -9,7 +9,7 @@ import qualified LvlMap as LM
 -- Syntax
 --------------------------------------------------------------------------------
 
-data RecInfo = FI {
+data RecInfo = RI {
     recInfoRecId    :: Lvl
   , recInfoRecTy    :: ~Ty
   , recInfoRecTyVal :: ~VTy
@@ -18,7 +18,7 @@ data RecInfo = FI {
   }
 
 instance Show RecInfo where
-  show (FI _ _ _ x _) = x
+  show (RI _ _ _ x _) = x
 
 data DefInfo = DI {
     defInfoDefId    :: Lvl
@@ -144,26 +144,6 @@ data Sys = SEmpty | SCons Cof Tm Sys
 
 data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
   deriving Show
-
-data Top
-  = TData Name Tel [(Name, Tel)] Top
-  | TDef Name Ty Tm Top
-  | TEmpty
-  deriving Show
-
-instance Monoid Top where
-  mempty = TEmpty
-
-instance Semigroup Top where
-  TEmpty                  <> top' = top'
-  TDef x a t top          <> top' = TDef x a t (top <> top')
-  TData x params cons top <> top' = TData x params cons (top <> top')
-
-topLen :: Top -> Int
-topLen = go 0 where
-  go acc TEmpty            = acc
-  go acc (TDef _ _ _ top)  = go (acc + 1) top
-  go acc (TData _ _ _ top) = go (acc + 1) top
 
 -- Values
 --------------------------------------------------------------------------------
