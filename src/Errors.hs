@@ -2,7 +2,6 @@
 module Errors where
 
 import Control.Exception
-import qualified Data.Map.Strict as M
 import Data.List
 
 import Common
@@ -49,33 +48,15 @@ data Error
 instance Exception Error where
 
 data ErrInCxt where
-  ErrInCxt :: (TableArg, PosArg, NCofArg, DomArg) => Error -> ErrInCxt
+  ErrInCxt :: (LocalsArg, NCofArg, DomArg, EnvArg, PosArg) => Error -> ErrInCxt
 
 instance Show ErrInCxt where
   show (ErrInCxt e) = show e
 
 instance Exception ErrInCxt
 
-err :: TableArg => PosArg => NCofArg => DomArg => Error -> IO a
+err :: Elab (Error -> IO a)
 err e = throwIO $ ErrInCxt e
-
--- | Convert the symbol table to a printing environment.
-withPrettyArgs :: TableArg => DomArg => NCofArg => PrettyArgs a -> a
-withPrettyArgs act =
-  let entryToNameKey = \case
-        TBETopDef x _ _ _    -> NKTop x
-        TBELocal x _         -> NKLocal x
-        TBELocalInt x        -> NKLocalI x
-        TBETyCon x _ _ _     -> NKTop x
-        TBEDCon (CI x y _) _ -> NKDCon x y
-        TBETopRec x _ _      -> NKTop x in
-  let ?idom   = dom ?cof
-      ?names  = M.foldlWithKey'
-                  (\acc name e -> M.insert (entryToNameKey e) name acc)
-                  mempty ?tbl
-      ?shadow = mempty in
-  act
-{-# inline withPrettyArgs #-}
 
 showError :: PrettyArgs (Error -> String)
 showError = \case
@@ -203,8 +184,8 @@ showError = \case
 
 displayErrInCxt :: ErrInCxt -> IO ()
 displayErrInCxt (ErrInCxt e) = withPrettyArgs do
-  file <- getTop <&> (^.currentSrc)
-  modTop (printingOpts.errPrinting .~ True)
+  file <- getState <&> (^.loadState.currentSrc)
+  modState (printingOpts.errPrinting .~ True)
 
   let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
       lnum = show linum

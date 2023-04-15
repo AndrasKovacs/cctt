@@ -6,17 +6,11 @@ import CoreTypes
 import Core
 import Interval
 
-import Debug.Trace
-
 
 -- Note: neutral inputs (NeSys, Ne, NeSysHCom) are assumed to be forced
 --       other things are not!
 -- Also: neutral inputs may have different types!
 ----------------------------------------------------------------------------------------------------
-
-wrop :: Bool -> Bool
-wrop True = True
-wrop False = trace "FOOOOOOOOOOOOOOOOOOOOOOOOOOOO" False
 
 class Conv a where
   conv :: NCofArg => DomArg => a -> a -> Bool
@@ -25,20 +19,20 @@ instance Conv Val where
   conv t t' = case frc t // frc t' of
 
     -- rigid match
-    (VNe n _            , VNe n' _             ) -> conv n n'
-    (VGlueTy a sys      , VGlueTy a' sys'      ) -> conv a a' && conv (fst sys) (fst sys')
-    (VPi a b            , VPi a' b'            ) -> conv a a' && conv b b'
-    (VLam t             , VLam t'              ) -> conv t t'
-    (VPath a t u        , VPath a' t' u'       ) -> conv a a' && conv t t' && conv u u'
-    (VPLam _ _ t        , VPLam _ _ t'         ) -> conv t t'
-    (VSg a b            , VSg a' b'            ) -> b^.name == b'^.name && conv a a' && conv b b'
-    (VWrap x a          , VWrap x' a'          ) -> x == x' && conv a a'
-    (VPair _ t u        , VPair _ t' u'        ) -> conv t t' && conv u u'
-    (VU                 , VU                   ) -> True
-    (VLine a            , VLine a'             ) -> conv a a'
-    (VLLam t            , VLLam t'             ) -> conv t t'
-    (VTyCon x ts        , VTyCon x' ts'        ) -> x == x' && conv ts ts'
-    (VDCon (CI _ i _) sp, VDCon (CI _ i' _) sp') -> i == i' && conv sp sp'
+    (VNe n _        , VNe n' _          ) -> conv n n'
+    (VGlueTy a sys  , VGlueTy a' sys'   ) -> conv a a' && conv (fst sys) (fst sys')
+    (VPi a b        , VPi a' b'         ) -> conv a a' && conv b b'
+    (VLam t         , VLam t'           ) -> conv t t'
+    (VPath a t u    , VPath a' t' u'    ) -> conv a a' && conv t t' && conv u u'
+    (VPLam _ _ t    , VPLam _ _ t'      ) -> conv t t'
+    (VSg a b        , VSg a' b'         ) -> b^.name == b'^.name && conv a a' && conv b b'
+    (VWrap x a      , VWrap x' a'       ) -> x == x' && conv a a'
+    (VPair _ t u    , VPair _ t' u'     ) -> conv t t' && conv u u'
+    (VU             , VU                ) -> True
+    (VLine a        , VLine a'          ) -> conv a a'
+    (VLLam t        , VLLam t'          ) -> conv t t'
+    (VTyCon inf ts  , VTyCon inf' ts'   ) -> inf^.tyId == inf'^.tyId && conv ts ts'
+    (VDCon inf sp   , VDCon inf' sp'    ) -> inf^.conId == inf'^.conId && conv sp sp'
 
     -- We keep track of evaluation contexts for holes.
     -- This prevents spurious conversions between holes.
@@ -63,13 +57,13 @@ instance Conv Val where
 instance Conv Ne where
 
   conv t t' = case unSubNe t // unSubNe t' of
-    (NLocalVar x   , NLocalVar x'      ) -> x == x'
-    (NDontRecurse x, NDontRecurse x'   ) -> x == x'
-    (NApp t u      , NApp t' u'        ) -> conv t t' && conv u u'
-    (NPApp p t u r , NPApp p' t' u' r' ) -> conv p p' && conv r r'
-    (NProj1 n _    , NProj1 n' _       ) -> conv n n'
-    (NProj2 n _    , NProj2 n' _       ) -> conv n n'
-    (NLApp t i     , NLApp t' i'       ) -> conv t t' && conv i i'
+    (NLocalVar x     , NLocalVar x'      ) -> x == x'
+    (NDontRecurse inf, NDontRecurse inf' ) -> inf^.recId == inf'^.recId
+    (NApp t u        , NApp t' u'        ) -> conv t t' && conv u u'
+    (NPApp p t u r   , NPApp p' t' u' r' ) -> conv p p' && conv r r'
+    (NProj1 n _      , NProj1 n' _       ) -> conv n n'
+    (NProj2 n _      , NProj2 n' _       ) -> conv n n'
+    (NLApp t i       , NLApp t' i'       ) -> conv t t' && conv i i'
 
     (NCoe r1 r2 a t, NCoe r1' r2' a' t') ->
       conv r1 r1' && conv r2 r2' && conv a a' && conv t t'

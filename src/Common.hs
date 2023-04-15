@@ -3,6 +3,7 @@ module Common (
   , module Control.Monad
   , module Data.Bits
   , module Lens.Micro.Platform
+  , module Data.IORef
   , SourcePos(..)
   , sourcePosPretty
   , initialPos
@@ -21,6 +22,7 @@ import GHC.Exts
 import Lens.Micro.Platform
 import System.IO.Unsafe
 import Text.Megaparsec (SourcePos(..), sourcePosPretty, initialPos, Pos, unPos)
+import Data.IORef
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------

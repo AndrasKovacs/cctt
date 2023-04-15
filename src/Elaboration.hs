@@ -100,8 +100,8 @@ makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
 data Infer = Infer Tm ~VTy deriving Show
 
 data Split
-  = DConHead ConInfo Tel [P.Tm] -- Tel: typarams
-  | TyConHead Lvl Tel [P.Tm]
+  = DConHead DConInfo [P.Tm]
+  | TyConHead TyConInfo [P.Tm]
   | SplitInfer {-# unpack #-} Infer
   deriving Show
 
@@ -132,11 +132,12 @@ check t topA = frcPos t \case
       Lam x <$!> bind x a qa (\v -> check t (b ∙ v))
 
     (P.Split cs, VPi a b) -> do
-      (typeid, params) <- case frc a of
-        VTyCon i ps   -> pure (i, ps)
+      (tyinfo, params) <- case frc a of
+        VTyCon inf ps -> pure (inf, ps)
         a             -> err $ ExpectedInductiveType (quote a)
-      (paramtypes, cons, canCase) <- tyConInfo typeid
-      unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
+      frz <- readIORef (tyinfo^.frozen)
+      unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+      cons <- readIORef (tyinfo^.constructors)
       cs <- elabCases params b (LM.elems cons) cs
       pure $! Split (b^.name) (quote b) cs
 
@@ -202,13 +203,14 @@ check t topA = frcPos t \case
     -- inferring non-dependent motive for case
     (P.Case t Nothing cs, b) -> do
       Infer t a <- infer t
-      (typeid, params) <- case frc a of
-        VTyCon i ps -> pure (i, ps)
-        a           -> err $ ExpectedInductiveType (quote a)
+      (typeinfo, params) <- case frc a of
+        VTyCon inf ps -> pure (inf, ps)
+        a             -> err $ ExpectedInductiveType (quote a)
       let qb = bind "_" a (quote a) \_ -> quote b
       let bv = NCl "_" $ CConst b
-      (paramtypes, cons, canCase) <- tyConInfo typeid
-      unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
+      frz <- readIORef $ typeinfo^.frozen
+      unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+      cons <- readIORef $ typeinfo^.constructors
       cs <- elabCases params bv (LM.elems cons) cs
       pure $ Case t "_" qb cs
 
@@ -221,19 +223,19 @@ check t topA = frcPos t \case
       t <- check t a
       pure $! Pack x t
 
-    (t, VTyCon tyid ps) -> do
+    (t, VTyCon tyinf ps) -> do
       split t >>= \case
-        DConHead ci@(CI tyid' conid fs) ps' sp -> do
-          unless (tyid' == tyid) $ withPrettyArgs $
+        DConHead dci sp -> do
+          unless (dci^.tyConInfo.tyId == tyinf^.tyId) $ withPrettyArgs $
             err $ GenericError $
               "No such constructor for expected type:\n\n  "
-              ++ pretty (quote (VTyCon tyid ps))
-          sp <- checkSp ps sp fs
-          pure $ DCon ci sp
+              ++ pretty (quote (VTyCon tyinf ps))
+          sp <- checkSp ps sp (dci^.fieldTypes)
+          pure $ DCon dci sp
 
         TyConHead{} ->
           err $ GenericError $ withPrettyArgs $
-            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyid ps)) ++
+            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyinf ps)) ++
             "\n\nbut the expression is a type constructor"
 
         SplitInfer (Infer t a) -> do
@@ -245,62 +247,60 @@ check t topA = frcPos t \case
       convExInf a topA
       pure t
 
+splitIdent :: Elab (Name -> Ix -> Locals -> [P.Tm] -> IO Split)
+splitIdent x ix ls sp = case ls of
+
+  LNil -> do
+    st <- getState
+    case M.lookup x (st^.top) of
+      Nothing                 -> err $ NameNotInScope x
+      Just (TEDef inf)        -> SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
+      Just (TETyCon inf)      -> pure $ TyConHead inf sp
+      Just (TERec Nothing)    -> err $ GenericError $
+                                       "Can't infer type for recursive call. "++
+                                       "Put a type annotation on the top-level definition."
+      Just (TERec (Just inf)) -> SplitInfer <$!> inferSp (RecursiveCall inf) (inf^.recTyVal) sp
+      Just (TEDCon inf)       -> pure $ DConHead inf sp
+
+  LBind ls x' a qa | x == x' -> SplitInfer <$!> inferSp (LocalVar ix) a sp
+                   | True    -> splitIdent x (ix + 1) ls sp
+  LBindI ls x'     | x == x' -> err UnexpectedI
+                   | True    -> splitIdent x ix ls sp
+  LCof ls _                  -> splitIdent x ix ls sp
+
 goSplit :: Elab (P.Tm -> [P.Tm] -> P.Tm -> IO Split)
 goSplit t sp topT = frcPos t \case
 
   P.Ident x -> do
-    res <- case M.lookup x ?tbl of
-      Nothing ->
-        err $ NameNotInScope x
-      Just (TBETyCon l ps _ _) -> do
-        pure $ TyConHead l ps sp
-      Just (TBEDCon ci@(CI tyid conid fs) _) -> do
-        (ps, cs, _) <- tyConInfo tyid
-        pure $ DConHead ci ps sp
-      Just (TBELocal l a) ->
-        SplitInfer <$!> inferSp (LocalVar (lvlToIx ?dom l)) a sp
-      Just TBELocalInt{} ->
-        err UnexpectedI
-      Just (TBETopDef l a v _)  ->
-        SplitInfer <$!> inferSp (TopVar l (DontShow v)) a sp
-      Just (TBETopRec l (Just a) _) ->
-        SplitInfer <$!> inferSp (RecursiveCall l) a sp
-      Just (TBETopRec l Nothing _) ->
-        err $ GenericError $
-           "Can't infer type for recursive call. Put a type annotation on the top-level definition."
-    pure res
+    splitIdent x 0 ?locals sp
 
-  P.App t u ->
+  P.App t u -> do
     goSplit t (u:sp) topT
 
-  P.TopLvl tyid (Just conid) -> do
-    top <- getTop
-    case LM.lookup tyid (top^.topInfo) of
-      Nothing ->
-        err TopLvlNotInScope
-      Just (TPETyCon ps cons _) ->
-        case LM.lookup conid cons of
-          Just (_, ci) -> pure $ DConHead ci ps sp
-          Nothing      -> err $ GenericError "No such data constructor"
-      Just (TPEDef a v) -> do
-        err $ GenericError $ "No type constructor with De Bruijn level " ++ show tyid
-      Just TPERec{} ->
-        err $ GenericError $ "No type constructor with De Bruijn level " ++ show tyid
-
   P.TopLvl x Nothing -> do
-    top <- getTop
-    case LM.lookup x (top^.topInfo) of
-      Nothing -> do
-        err TopLvlNotInScope
-      Just (TPETyCon ps _ _) -> do
-        pure $ TyConHead x ps sp
-      Just (TPEDef a v) -> do
-        SplitInfer <$!> inferSp (TopVar x (coerce v)) a sp
-      Just (TPERec Nothing) ->
-        err $ GenericError $
-           "Can't infer type for recursive call. Put a type annotation on the top-level definition."
-      Just (TPERec (Just a)) ->
-        SplitInfer <$!> inferSp (RecursiveCall x) a sp
+    st <- getState
+    case LM.lookup x (st^.top') of
+      Nothing ->
+        err $ GenericError $ "No top-level definition with de Bruijn level"
+      Just (TEDef' inf) ->
+        SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
+      Just (TETyCon' inf) ->
+        pure $ TyConHead inf sp
+
+  P.TopLvl x (Just y) -> do
+    st <- getState
+    case LM.lookup x (st^.top') of
+      Nothing ->
+        err $ GenericError $ "No type constructor with de Bruijn level"
+      Just (TEDef' _) ->
+        err $ GenericError $ "No type constructor with de Bruijn level"
+      Just (TETyCon' inf) -> do
+        cons <- readIORef (inf^.constructors)
+        case LM.lookup y cons of
+          Nothing ->
+            err $ GenericError $ "No data constructor with de Bruijn level"
+          Just dinf ->
+            pure $ DConHead dinf sp
 
   t -> do
     Infer t a <- inferNonSplit t
@@ -342,16 +342,17 @@ infer :: Elab (P.Tm -> IO Infer)
 infer t = split t >>= \case
 
   -- no params + saturated
-  DConHead ci@(CI tyid conid fields) params sp -> case params of
+  DConHead inf sp -> case inf^.tyConInfo.paramTypes of
     TNil -> do
-      sp <- checkSp ENil sp fields
-      pure $ Infer (DCon ci sp) (VTyCon tyid ENil)
-    _  -> err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
+      sp <- checkSp ENil sp (inf^.fieldTypes)
+      pure $ Infer (DCon inf sp) (VTyCon (inf^.tyConInfo) ENil)
+    _  ->
+      err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
 
   -- saturated
-  TyConHead tyid ps sp -> do
-    sp <- checkSp ENil sp ps
-    pure $ Infer (TyCon tyid sp) VU
+  TyConHead inf sp -> do
+    sp <- checkSp ENil sp (inf^.paramTypes)
+    pure $ Infer (TyCon inf sp) VU
 
   SplitInfer inf -> do
     pure inf
@@ -569,13 +570,14 @@ inferNonSplit t = frcPos t \case
 
   P.Case t (Just (x, b)) cs -> do
     Infer t a <- infer t
-    (typeid, params) <- case frc a of
+    (tyinfo, params) <- case frc a of
       VTyCon i ps -> pure (i, ps)
       a           -> err $ ExpectedInductiveType (quote a)
     b <- bind x a (quote a) \_ -> check b VU
     let bv = makeNCl x b
-    (paramtypes, cons, canCase) <- tyConInfo typeid
-    unless canCase $ err $ GenericError "Can't case split on the type that's being defined"
+    frz <- readIORef (tyinfo^.frozen)
+    unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+    cons <- readIORef (tyinfo^.constructors)
     cs <- elabCases params bv (LM.elems cons) cs
     pure $! Infer (Case t x b cs) (bv ∙ eval t)
 
@@ -587,14 +589,14 @@ inferNonSplit t = frcPos t \case
 
 ----------------------------------------------------------------------------------------------------
 
-elabCase :: Elab (Lvl -> Lvl -> Env -> Tel -> Val -> [Name] -> P.Tm -> IO Tm)
-elabCase typeid conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) of
+elabCase :: Elab (Lvl -> Env -> Tel -> Val -> [Name] -> P.Tm -> IO Tm)
+elabCase conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) of
   (TNil, []) ->
     check body rhstype
   (TCons _ a fieldtypes, x:xs) -> do
     let ~va = evalIn tyenv a
     bind x va (quote va) \x ->
-      elabCase typeid conid (EDef tyenv x) fieldtypes rhstype xs body
+      elabCase conid (EDef tyenv x) fieldtypes rhstype xs body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
@@ -603,15 +605,15 @@ caseLhsSp dom []     = VDNil
 caseLhsSp dom (_:xs) = VDCons (VNe (NLocalVar dom) mempty) (caseLhsSp (dom + 1) xs)
 
 elabCases :: Elab (
-     Env -> NamedClosure -> [(Name, ConInfo)] -> [(Name, [Name], P.Tm)] -> IO Cases)
+     Env -> NamedClosure -> [DConInfo] -> [(Name, [Name], P.Tm)] -> IO Cases)
 elabCases params b contypes cs = case (contypes, cs) of
   ([], []) ->
     pure CSNil
-  ((x, ci@(CI conid typeid fieldtypes)):contypes, (x', xs, body):cs) | x == x' -> do
-    let rhstype = b ∙ VDCon ci (caseLhsSp ?dom xs)
-    t  <- elabCase typeid conid params fieldtypes rhstype xs body
+  (dci:cons, (x', xs, body):cs) | dci^.name == x' -> do
+    let rhstype = b ∙ VDCon dci (caseLhsSp ?dom xs)
+    t  <- elabCase (dci^.conId) params (dci^.fieldTypes) rhstype xs body
     cs <- elabCases params b contypes cs
-    pure $ CSCons x xs t cs
+    pure $ CSCons (dci^.name) xs t cs
   _ -> do
     err CaseMismatch
 
@@ -685,26 +687,32 @@ elabBindMaybe b r r' = case b of
         tgt = instantiate a r'
     pure (x, a, va, src, tgt)
 
-checkI :: Elab (P.Tm -> IO I)
-checkI = \case
-  P.Pos pos t ->
-    setPos pos $ checkI t
+identI :: Elab (Name -> IVar -> Locals -> IO I)
+identI x idom = \case
+  LNil                      -> err $ GenericError $ "Interval variable not in scope"
+  LBind ls x' _ _ | x == x' -> err ExpectedI
+                  | True    -> identI x idom ls
+  LBindI ls x'    | x == x' -> pure $ IVar (idom - 1)
+                  | True    -> identI x (idom - 1) ls
+  LCof ls _                 -> identI x idom ls
 
-  P.I0 -> pure I0
-  P.I1 -> pure I1
+checkI :: Elab (P.Tm -> IO I)
+checkI t = frcPos t \case
+  P.Pos{} -> impossible
+  P.I0    -> pure I0
+  P.I1    -> pure I1
 
   P.Ident x -> do
-    case M.lookup x ?tbl of
-      Nothing              -> err $ NameNotInScope x
-      Just (TBELocalInt l) -> pure $ IVar l
-      Just _               -> err ExpectedI
+    identI x (dom ?cof) ?locals
 
   P.ILvl x -> do
-    unless (0 <= x && x < dom ?cof) (err LocalLvlNotInScope)
+    unless (0 <= x && x < dom ?cof)
+           (err $ GenericError "Interval level not in scope")
     pure $ IVar x
 
   P.LocalLvl (coerce -> x) -> do
-    unless (0 <= x && x < dom ?cof) (err LocalLvlNotInScope)
+    unless (0 <= x && x < dom ?cof)
+           (err $ GenericError "Interval level not in scope")
     pure $ IVar x
 
   t -> do
@@ -830,12 +838,14 @@ elabGlueTySys a = \case
 ----------------------------------------------------------------------------------------------------
 
 guardTopShadowing :: Elab (Name -> IO ())
-guardTopShadowing x =     case M.lookup x ?tbl of
-  Just (TBETopDef _ _ _ pos) -> err $ TopShadowing (coerce pos)
-  Just (TBETyCon _ _ _ pos)  -> err $ TopShadowing (coerce pos)
-  Just (TBEDCon _ pos)       -> err $ TopShadowing (coerce pos)
-  Just _                     -> impossible
-  _                          -> pure ()
+guardTopShadowing x = do
+  st <- getState
+  case M.lookup x (st^.top) of
+    Nothing -> pure ()
+    Just (TEDef inf  ) -> err $ TopShadowing (inf^.pos)
+    Just (TETyCon inf) -> err $ TopShadowing (inf^.pos)
+    Just (TEDCon inf ) -> err $ TopShadowing (inf^.pos)
+    Just (TERec _    ) -> impossible
 
 elabTop :: P.Top -> IO Top
 elabTop = \case
@@ -847,35 +857,37 @@ elabTop = \case
       Nothing -> pure Nothing
       Just a  -> do {a <- check a VU; pure (Just (a, eval a))}
 
-    declareTopDef x (snd <$!> ma) (coerce pos) \l -> do
+    _
 
-      (t, a, va) <- case ma of
-        Nothing      -> do {Infer t a <- infer t; pure (t, quote a, a)}
-        Just (a, va) -> do {t <- check t va; pure (t, a, va)}
+    -- declareTopDef x (snd <$!> ma) (coerce pos) \l -> do
 
-      -- recursive evaluation
-      let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse (coerce tv) in Core.eval t)
+    --   (t, a, va) <- case ma of
+    --     Nothing      -> do {Infer t a <- infer t; pure (t, quote a, a)}
+    --     Just (a, va) -> do {t <- check t va; pure (t, a, va)}
 
-      finalizeTopDef l x va tv (coerce pos)
+    --   -- recursive evaluation
+    --   let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse (coerce tv) in Core.eval t)
 
-      printnf <- getTop <&> (^.printingOpts.printNf)
-      case printnf of
-        Just x' | x == x' -> withPrettyArgs do
-          putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote tv)
-          putStrLn ""
-        _ -> pure ()
+    --   finalizeTopDef l x va tv (coerce pos)
 
-      top <- elabTop top
-      pure $ TDef x a t top
+    --   printnf <- getTop <&> (^.printingOpts.printNf)
+    --   case printnf of
+    --     Just x' | x == x' -> withPrettyArgs do
+    --       putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote tv)
+    --       putStrLn ""
+    --     _ -> pure ()
+
+    --   top <- elabTop top
+    --   pure $ TDef x a t top
 
   P.TImport pos modname top -> withTopElab $ setPos pos do
-    topst <- getTop
-    let dirpath = takeDirectory (topst^.currentPath)
+    st <- getState
+    let dirpath = takeDirectory (st^.loadState.currentPath)
         newpath = dirpath </> (modname <.> "cctt")
-    if S.member newpath (topst^.loadedFiles) then do
+    if S.member newpath (st^.loadState.loadedFiles) then do
       elabTop top
-    else if elem newpath (topst^.loadCycle) then do
-      err $ ImportCycle (topst^.currentPath) (topst^.loadCycle)
+    else if elem newpath (st^.loadCycle) then do
+      err $ ImportCycle (st^.currentPath) (st^.loadState.loadCycle)
     else do
       importTop <- elabPath (Just pos) newpath
       top <- elabTop top
@@ -884,14 +896,15 @@ elabTop = \case
   P.TData pos tyname ps cs top -> withTopElab $ setPos pos do
     guardTopShadowing tyname
     ps   <- elabTelescope ps
-    (tyid, cs) <- declareNewTyCon tyname ps (coerce pos) \tyid -> do
-      cs <- bindTelescope ps do
-        elabConstructors tyid 0 cs
-      pure (tyid, cs)
-    finalizeTyCon tyid
-    tbl  <- getTop <&> (^.tbl)
-    top  <- elabTop top
-    pure $ TData tyname ps cs top
+    _
+    -- (tyid, cs) <- declareNewTyCon tyname ps (coerce pos) \tyid -> do
+    --   cs <- bindTelescope ps do
+    --     elabConstructors tyid 0 cs
+    --   pure (tyid, cs)
+    -- finalizeTyCon tyid
+    -- tbl  <- getTop <&> (^.tbl)
+    -- top  <- elabTop top
+    -- pure $ TData tyname ps cs top
 
   P.TEmpty ->
     pure TEmpty
@@ -905,10 +918,11 @@ elabConstructors tyid conid = \case
     pure []
   (pos, x, fs):cs -> setPos pos do
     guardTopShadowing x
-    fs <- elabTelescope fs
-    cs <- addDCon x tyid conid fs (coerce pos) do
-      elabConstructors tyid (conid + 1) cs
-    pure ((x, fs):cs)
+    _
+    -- fs <- elabTelescope fs
+    -- cs <- addDCon x tyid conid fs (coerce pos) do
+    --   elabConstructors tyid (conid + 1) cs
+    -- pure ((x, fs):cs)
 
 elabTelescope :: Elab ([(Name, P.Ty)] -> IO Tel)
 elabTelescope = \case
@@ -929,9 +943,10 @@ bindTelescope ps act = case ps of
 
 elabPath :: Maybe (DontShow SourcePos) -> FilePath -> IO Top
 elabPath pos path = do
-  oldpath  <- getTop <&> (^.currentPath)
-  oldCycle <- getTop <&> (^.loadCycle)
-  oldSrc   <- getTop <&> (^.currentSrc)
+  oldpath  <- getState <&> (^.currentPath)
+  oldCycle <- getState <&> (^.loadCycle)
+  oldSrc   <- getState <&> (^.currentSrc)
+
   file <- readFile path `catch` \(e :: IOError) -> do
     case pos of
       Nothing -> do
@@ -941,15 +956,15 @@ elabPath pos path = do
         err $ CantOpenFile path
 
   (!top, !tparse) <- timed (parseString path file)
-  modTop $ (currentPath .~ path)
-         . (loadCycle   .~ (path : oldCycle))
-         . (parsingTime +~ tparse)
-         . (currentSrc  .~ file)
+  modState $ (currentPath .~ path)
+           . (loadCycle   .~ (path : oldCycle))
+           . (parsingTime +~ tparse)
+           . (currentSrc  .~ file)
   top <- elabTop top
-  modTop $ (currentPath .~ oldpath)
-         . (loadCycle   .~ oldCycle)
-         . (currentSrc  .~ oldSrc)
-         . (loadedFiles %~ S.insert path)
+  modState $ (currentPath .~ oldpath)
+           . (loadCycle   .~ oldCycle)
+           . (currentSrc  .~ oldSrc)
+           . (loadedFiles %~ S.insert path)
   pure top
 
 elaborate :: FilePath -> IO Top

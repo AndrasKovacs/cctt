@@ -4,8 +4,58 @@ module CoreTypes where
 
 import Common
 import Interval
+import qualified LvlMap as LM
 
 -- Syntax
+--------------------------------------------------------------------------------
+
+data RecInfo = FI {
+    recInfoRecId    :: Lvl
+  , recInfoRecTy    :: ~Ty
+  , recInfoRecTyVal :: ~VTy
+  , recInfoName     :: Name
+  , recInfoPos      :: {-# nounpack #-} SourcePos
+  }
+
+instance Show RecInfo where
+  show (FI _ _ _ x _) = x
+
+data DefInfo = DI {
+    defInfoDefId    :: Lvl
+  , defInfoDef      :: Tm
+  , defInfoDefVal   :: ~Val
+  , defInfoDefTy    :: ~Ty
+  , defInfoDefTyVal :: ~VTy
+  , defInfoName     :: Name
+  , defInfoPos      :: {-# nounpack #-} SourcePos
+  }
+
+instance Show DefInfo where
+  show (DI _ _ _ _ _ x _) = x
+
+data TyConInfo = TCI {
+    tyConInfoTyId         :: Lvl
+  , tyConInfoParamTypes   :: Tel
+  , tyConInfoConstructors :: IORef (LM.Map DConInfo)
+  , tyConInfoFrozen       :: IORef Bool
+  , tyConInfoName         :: Name
+  , tyConInfoPos          :: SourcePos
+  }
+
+instance Show TyConInfo where
+  show (TCI _ _ _ _ x _) = x
+
+data DConInfo = DCI {
+    dConInfoConId      :: Lvl
+  , dConInfoFieldTypes :: Tel
+  , dConInfoName       :: Name
+  , dConInfoTyConInfo  :: {-# nounpack #-} TyConInfo
+  , dConInfoPos        :: {-# nounpack #-} SourcePos
+  }
+
+instance Show DConInfo where
+  show (DCI _ _ x _ _) = x
+
 --------------------------------------------------------------------------------
 
 type Ty = Tm
@@ -20,20 +70,14 @@ data Spine
   | SPCons Tm Spine
   deriving Show
 
-data ConInfo = CI {
-    conInfoTypeid     :: Lvl
-  , conInfoConid      :: Lvl
-  , conInfoFieldTypes :: Tel
-  } deriving Show
-
 data Tm
-  = TopVar Lvl ~(DontShow Val)
-  | RecursiveCall Lvl
+  = TopVar        {-# nounpack #-} DefInfo
+  | RecursiveCall {-# nounpack #-} RecInfo
   | LocalVar Ix
   | Let Name Tm Ty Tm
 
-  | TyCon Lvl Spine                      -- typid, params
-  | DCon {-# nounpack #-} ConInfo Spine
+  | TyCon {-# nounpack #-} TyConInfo Spine
+  | DCon  {-# nounpack #-} DConInfo  Spine
   | Case Tm Name ~Tm Cases
   | Split Name ~Tm Cases
 
@@ -236,15 +280,15 @@ data Val
   | VU
   | VLine NamedIClosure
   | VLLam NamedIClosure
-  | VTyCon Lvl Env
-  | VDCon {-# nounpack #-} ConInfo VDSpine
+  | VTyCon {-# nounpack #-} TyConInfo Env
+  | VDCon {-# nounpack #-} DConInfo VDSpine
 
   | VHole (Maybe Name) (DontShow SourcePos) Sub Env
   deriving Show
 
 data Ne
   = NLocalVar Lvl
-  | NDontRecurse Lvl
+  | NDontRecurse {-# nounpack #-} RecInfo
   | NSub Ne Sub
   | NApp Ne Val
   | NPApp ~Val ~Val Ne I
@@ -545,4 +589,7 @@ makeFields ''BindCofLazy
 makeFields ''NamedClosure
 makeFields ''NamedIClosure
 makeFields ''NeCof'
-makeFields ''ConInfo
+makeFields ''DefInfo
+makeFields ''DConInfo
+makeFields ''TyConInfo
+makeFields ''RecInfo

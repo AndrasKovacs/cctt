@@ -739,8 +739,8 @@ coed r r' topA t = case (frc topA) ^. body of
   VTyCon x ENil ->
     t
   a@(VTyCon x (rebind topA -> ps)) -> case frc t of
-    VDCon ci@(CI _ _ fieldtypes) sp ->
-      VDCon ci (coeindsp r r' ps sp fieldtypes)
+    VDCon dci sp ->
+      VDCon dci (coeindsp r r' ps sp (dci^.fieldTypes))
     t@(VNe _ is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
     _ ->
@@ -1031,12 +1031,12 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       (unpack x base)
 
   a@(VTyCon tyid ps) -> case frc base of
-    VDCon ci@(CI _ conid fieldtypes) sp -> case ?dom of
+    VDCon dci sp -> case ?dom of
       0 ->
-        VDCon ci (hcomind0sp r r' a ts ps conid 0 sp fieldtypes)
-      _ -> case projsys' conid ts of
-        TTPProject prj  -> VDCon ci (hcomindsp r r' a (prj // snd ts) ps conid 0 sp fieldtypes)
-        TTPNe (sys, is) -> VNe (NHCom r r' a sys (VDCon ci sp)) (insertI r $ insertI r' is)
+        VDCon dci (hcomind0sp r r' a ts ps (dci^.conId) 0 sp (dci^.fieldTypes))
+      _ -> case projsys' (dci^.conId) ts of
+        TTPProject prj  -> VDCon dci (hcomindsp r r' a (prj // snd ts) ps (dci^.conId) 0 sp (dci^.fieldTypes))
+        TTPNe (sys, is) -> VNe (NHCom r r' a sys (VDCon dci sp)) (insertI r $ insertI r' is)
     base@(VNe n is') ->
       VNe (NHCom r r' topA nts base) (insertI r $ insertI r' $ is <> is')
     base@VHole{} ->
@@ -1129,10 +1129,10 @@ spine = \case
   SPNil       -> VDNil
   SPCons t ts -> VDCons (eval t) (spine ts)
 
-recursiveCall :: RecurseArg => Lvl -> Val
-recursiveCall x = case ?recurse of
+recursiveCall :: RecurseArg => RecInfo -> Val
+recursiveCall inf = case ?recurse of
   Recurse v   -> coerce v
-  DontRecurse -> VNe (NDontRecurse x) mempty
+  DontRecurse -> VNe (NDontRecurse inf) mempty
 {-# inline recursiveCall #-}
 
 pushVars :: DomArg => Env -> [Name] -> (Env, Lvl)
@@ -1155,9 +1155,9 @@ lookupCase i sp cs = case i // cs of
 
 case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
 case_ t b ecs@(EC sub env rc cs) = case frc t of
-  VDCon (CI _ i _) sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase i sp cs
-  VNe n is            -> VNe (NCase n b ecs) is
-  _                   -> impossible
+  VDCon dci sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
+  VNe n is     -> VNe (NCase n b ecs) is
+  _            -> impossible
 {-# inline case_ #-}
 
 projVDSpine :: Lvl -> VDSpine -> Val
@@ -1168,8 +1168,8 @@ projVDSpine x sp = case (x, sp) of
 
 lazyprojfield :: NCofArg => DomArg => Lvl -> Lvl -> Val -> Val
 lazyprojfield conid fieldid v = case frc v of
-  VDCon (CI _ conid' _) sp | conid == conid' -> projVDSpine fieldid sp
-  _                                          -> impossible
+  VDCon dci sp | conid == (dci^.conId) -> projVDSpine fieldid sp
+  _                                    -> impossible
 {-# inline lazyprojfield #-}
 
 lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
@@ -1207,13 +1207,13 @@ data TryToProject
   deriving Show
 
 projsys :: NCofArg => DomArg => Lvl -> NeSysHCom' -> NeSysHCom -> TryToProject
-projsys conix topSys@(!_,!_) = \case
+projsys conid topSys@(!_,!_) = \case
   NSHEmpty      -> TTPProject PNil
   NSHCons t sys ->
-    let ~prj = projsys conix topSys sys; {-# inline prj #-} in
+    let ~prj = projsys conid topSys sys; {-# inline prj #-} in
 
     assumeCof (t^.binds) $ case (frc (t^.body))^.body of
-      VDCon (CI _ conix' _) sp | conix == conix' ->
+      VDCon dci sp | conid == dci^.conId ->
         case prj of
           TTPProject prj ->
             TTPProject (PCons (t^.binds) (t^.body.name) (t^.body.binds) sp prj)
@@ -1269,8 +1269,8 @@ evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 
 eval :: EvalArgs (Tm -> Val)
 eval = \case
-  TopVar _ v        -> coerce v
-  RecursiveCall x   -> recursiveCall x
+  TopVar inf        -> inf^.defVal
+  RecursiveCall inf -> recursiveCall inf
   LocalVar x        -> localVar x
   Let x _ t u       -> define (eval t) (eval u)
 

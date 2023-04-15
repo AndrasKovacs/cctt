@@ -1,30 +1,40 @@
 
 module Pretty (
-    type Names
-  , type Shadow
+    type Names(..)
   , type PrettyArgs
-  , type NameKey(..)
+  , localsToNames
+  , withPrettyArgs
   , Pretty(..)) where
 
 import Prelude hiding (pi)
 import Data.String
-import qualified Data.Map.Strict as M
 
 import Common
 import CoreTypes
 import Interval
-import ElabState
-import Data.Foldable
+import ElabState hiding (bind, bindI, isNameUsed)
 
 --------------------------------------------------------------------------------
 
+localsToNames :: Locals -> Names
+localsToNames = \case
+  LNil           -> NNil
+  LBind ls x _ _ -> NBind (localsToNames ls) x
+  LBindI ls x    -> NBindI (localsToNames ls) x
+  LCof ls _      -> localsToNames ls
+
+withPrettyArgs :: Elab (PrettyArgs a -> a)
+withPrettyArgs act =
+  let ?idom  = dom ?cof
+      ?names = localsToNames ?locals in
+  act
+{-# inline withPrettyArgs #-}
+
 ifVerbose :: a -> a -> a
-ifVerbose t f = runIO $ getTop <&> (^.printingOpts.verbose) >>= \case
+ifVerbose t f = runIO $ getState <&> (^.printingOpts.verbose) >>= \case
   True  -> pure t
   False -> pure f
 {-# inline ifVerbose #-}
-
---------------------------------------------------------------------------------
 
 newtype Txt = Txt (String -> String)
 
@@ -46,25 +56,17 @@ instance Show Txt where
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
 
-data NameKey = NKLocal Lvl | NKTop Lvl | NKLocalI IVar | NKDCon Lvl Lvl deriving (Eq, Ord, Show)
+data Names = NNil | NBind Names Name | NBindI Names Name deriving Show
+
+isNameUsed :: Name -> Names -> Bool
+isNameUsed x NNil           = False
+isNameUsed x (NBind ns x')  = x == x' || isNameUsed x ns
+isNameUsed x (NBindI ns x') = x == x' || isNameUsed x ns
 
 type Prec     = (?prec   :: Int)
-type Names    = (?names  :: M.Map NameKey Name)
-type Shadow   = (?shadow :: M.Map Name Int)
+type NamesArg = (?names :: Names)
 
-showVar :: M.Map NameKey Name -> NameKey -> String
-showVar m k =
-  let gokey = case k of
-        NKLocal x  -> '@':show x
-        NKTop x    -> "@@"++show x
-        NKLocalI x -> "@"++show x
-        NKDCon i j -> "@@"++show i++"#"++show j
-  in case M.lookup k m of
-    Nothing      -> "(ERR " ++ show k ++ ")"
-    Just ('_':_) -> gokey
-    Just n       -> n
-
-type PrettyArgs a = Names => Shadow => DomArg => IDomArg => a
+type PrettyArgs a = NamesArg => DomArg => IDomArg => a
 
 par :: Prec => Int -> Txt -> Txt
 par p s | p < ?prec = char '(' <> s <> char ')'
@@ -82,38 +84,18 @@ pairp  s = par 0 s; {-# inline pairp #-}
 
 --------------------------------------------------------------------------------
 
-freshen :: Name -> Int -> Name
-freshen "_" n = "_"
-freshen x   n = case n of 0 -> x; n -> x ++ show n
+bind :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
+bind x act = let ?names = NBind ?names x; ?dom = ?dom + 1 in act (str x)
+{-# inline bind #-}
 
-fresh :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
-fresh x act   =
-  let fresh   = ?dom
-      sh      = maybe 0 id (M.lookup x ?shadow)
-      newname = freshen x sh in
-  let ?dom    = fresh + 1
-      ?shadow = M.insert x (sh + 1) ?shadow
-      ?names  = M.insert (NKLocal fresh) newname ?names in
-  act (str (newname))
-{-# inline fresh #-}
-
-freshI :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
-freshI x act =
-  let fresh   = ?idom
-      sh      = maybe 0 id (M.lookup x ?shadow)
-      newname = freshen x sh in
-  let ?idom   = fresh + 1
-      ?shadow = M.insert x (sh + 1) ?shadow
-      ?names  = M.insert (NKLocalI fresh) newname ?names in
-  act (str (newname))
-{-# inline freshI #-}
+bindI :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
+bindI x act = let ?names = NBindI ?names x; ?idom = ?idom + 1 in act (str x)
+{-# inline bindI #-}
 
 wkI :: Name -> PrettyArgs a -> PrettyArgs a
 wkI x act =
-  let lastI   = ?idom - 1 in
-  let ?idom   = lastI
-      ?names  = M.delete (NKLocalI lastI) ?names
-      ?shadow = M.update (\case 1 -> Nothing; n -> Just (n - 1)) x ?shadow in
+  let ?idom = ?idom - 1
+      ?names = case ?names of NBindI ns _ -> ns; _ -> impossible in
   act
 {-# inline wkI #-}
 
@@ -138,28 +120,28 @@ lineBind n = "(" <> n <> " : I)"; {-# inline lineBind #-}
 goLinesPis :: PrettyArgs (Tm -> Txt)
 goLinesPis = \case
   Pi x a b | x /= "_" ->
-    let pa = pair a in fresh x \x ->
+    let pa = pair a in bind x \x ->
     piBind x pa <> goLinesPis b
   Line x b | x /= "_" ->
-    freshI x \x -> lineBind x <> goLinesPis b
+    bindI x \x -> lineBind x <> goLinesPis b
   t ->
     " → " <> pi t
 
 goLams :: PrettyArgs (Tm -> Txt)
 goLams = \case
-  Lam x t      -> fresh  x \x -> " " <> x <> goLams t
+  Lam x t      -> bind  x \x -> " " <> x <> goLams t
   PLam l r x t -> ifVerbose
                     (let pl = pair l; pr = pair r in
-                     freshI x \x -> " {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t)
-                    (freshI x \x -> " " <> x <> goLams t)
-  LLam x t     -> freshI x \x -> " " <> x <> goLams t
+                     bindI x \x -> " {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t)
+                    (bindI x \x -> " " <> x <> goLams t)
+  LLam x t     -> bindI x \x -> " " <> x <> goLams t
   t            -> ". " <> let_ t
 
 int :: PrettyArgs (I -> Txt)
 int = \case
   I0     -> "0"
   I1     -> "1"
-  IVar x -> str (showVar ?names (NKLocalI x))
+  IVar x -> ivar x
 
 cofEq :: PrettyArgs (CofEq -> Txt)
 cofEq (CofEq i j) = int i <> " = " <> int j
@@ -173,9 +155,9 @@ cof = \case
 goSysH :: PrettyArgs (SysHCom -> Txt)
 goSysH = \case
   SHEmpty              -> mempty
-  SHCons c x t SHEmpty -> let pc = cof c in freshI x \x ->
+  SHCons c x t SHEmpty -> let pc = cof c in bindI x \x ->
                           pc <> " " <> x <> ". " <> pair t
-  SHCons c x t sys     -> let pc = cof c; psys = goSysH sys in freshI x \x ->
+  SHCons c x t sys     -> let pc = cof c; psys = goSysH sys in bindI x \x ->
                           pc <> " " <> x <> ". " <> pair t <> "; " <> psys
 
 sysH :: PrettyArgs (SysHCom -> Txt)
@@ -190,12 +172,6 @@ goSys = \case
 sys :: PrettyArgs (Sys -> Txt)
 sys s = "[" <> goSys s <> "]"
 
-topVar :: PrettyArgs (Lvl -> Txt)
-topVar x = str (?names `showVar` NKTop x)
-
-dataCon :: PrettyArgs (Lvl -> Lvl -> Txt)
-dataCon i j = str (?names `showVar` NKDCon i j)
-
 spine :: PrettyArgs (Spine -> Txt)
 spine = \case
   SPNil         -> mempty
@@ -204,8 +180,8 @@ spine = \case
 caseBody :: PrettyArgs ([Name] -> Tm -> Txt)
 caseBody xs t = case xs of
   []   -> ". " <> proj t
-  [x]  -> fresh x \x -> " " <> x <> ". " <> proj t
-  x:xs -> fresh x \x -> " " <> x <> caseBody xs t
+  [x]  -> bind x \x -> " " <> x <> ". " <> proj t
+  x:xs -> bind x \x -> " " <> x <> caseBody xs t
 
 cases :: PrettyArgs (Cases -> Txt)
 cases = \case
@@ -224,26 +200,62 @@ unProject t x = case t of
              | True    -> unProject t x
   t                    -> Just t
 
+ivar :: PrettyArgs (IVar -> Txt)
+ivar x = let
+  go 0 (NBindI _ x)  = (x, False)
+  go l (NBind ls x)  = case go l ls of
+                         (x', sh) -> x' // (sh || x == x')
+  go l (NBindI ls x) = case go (l - 1) ls of
+                         (x', sh) -> x' // (sh || x == x')
+  go _ _             = impossible
+
+  in case go (lvlToIx (coerce ?idom) (coerce x)) ?names of
+    (x, sh) -> if sh then "@" <> str (show x)
+                     else str x
+
+localVar :: NamesArg => Ix -> Txt
+localVar x = let
+  go 0 (NBind _ x)   = (x, False)
+  go l (NBind ls x)  = case go (l - 1) ls of
+                         (x', sh) -> x' // (sh || x == x')
+  go l (NBindI ls x) = case go l ls of
+                         (x', sh) -> x' // (sh || x == x')
+  go _ _             = impossible
+
+  in case go x ?names of
+    (x, sh) -> if sh then "@" <> str (show x)
+                     else str x
+
+topName :: PrettyArgs ((t -> Name) -> (t -> Lvl) -> t -> Txt)
+topName name id t = if isNameUsed (name t) ?names
+  then "@@" <> str (show (id t))
+  else str (name t)
+
+dcon :: PrettyArgs (DConInfo -> Txt)
+dcon inf = if isNameUsed (inf^.name) ?names
+  then "@@" <> str (show (inf^.tyConInfo.tyId)) <> "#" <> str (show (inf^.conId))
+  else str (inf^.name)
+
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
-  TopVar x _            -> topVar x
-  RecursiveCall x       -> topVar x
-  LocalVar x            -> str (?names `showVar` NKLocal (?dom - coerce x - 1))
-  Let x a t u           -> let pa = let_ a; pt = let_ t in fresh x \x ->
+  TopVar inf            -> topName (^.name) (^.defId) inf
+  RecursiveCall inf     -> topName (^.name) (^.recId) inf
+  LocalVar x            -> localVar x
+  Let x a t u           -> let pa = let_ a; pt = let_ t in bind x \x ->
                            letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
-  Pi "_" a b            -> let pa = sigma a in fresh "_" \_ ->
+  Pi "_" a b            -> let pa = sigma a in bind "_" \_ ->
                            pip (pa <> " → " <> pi b)
-  Pi n a b              -> let pa = pair a in fresh n \n ->
+  Pi n a b              -> let pa = pair a in bind n \n ->
                            pip (piBind n pa  <> goLinesPis b)
   App t u               -> appp (app t <> " " <> proj u)
-  Lam x t               -> letp (fresh x \x -> "λ " <> x <> goLams t)
-  Line "_" a            -> freshI "_" \_ -> pip ("I → " <> pi a)
-  Line x a              -> freshI x   \x -> pip (lineBind x <> goLinesPis a)
+  Lam x t               -> letp (bind x \x -> "λ " <> x <> goLams t)
+  Line "_" a            -> bindI "_" \_ -> pip ("I → " <> pi a)
+  Line x a              -> bindI x   \x -> pip (lineBind x <> goLinesPis a)
   LApp t u              -> appp (app t <> " " <> int u)
-  LLam x t              -> letp (freshI x \x -> "λ " <> x <> goLams t)
-  Sg "_" a b            -> let pa = eq a in fresh "_" \_ ->
+  LLam x t              -> letp (bindI x \x -> "λ " <> x <> goLams t)
+  Sg "_" a b            -> let pa = eq a in bind "_" \_ ->
                            sigmap (pa <> " × " <> sigma b)
-  Sg x a b              -> let pa = pair a in fresh x \x ->
+  Sg x a b              -> let pa = pair a in bind x \x ->
                            sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
   Pair x t u            -> pairp (let_ t <> ", " <> pair u)
   Proj1 t x             -> case unProject t x of
@@ -252,19 +264,19 @@ tm = \case
   Proj2 t x             -> projp (proj t <> ".2")
   U                     -> "U"
   Path "_" a t u        -> ifVerbose
-                            (let pt = trans t; pu = trans u in freshI "_" \_ ->
+                            (let pt = trans t; pu = trans u in bindI "_" \_ ->
                              eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
                             (eqp (trans t <> " = " <> trans u))
-  Path x a t u          -> let pt = trans t; pu = trans u in freshI x \x ->
+  Path x a t u          -> let pt = trans t; pu = trans u in bindI x \x ->
                            eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
   PApp l r t u          -> ifVerbose
                              (appp (app t <> " {" <> pair l <> "} {" <> pair r <> "} " <> int u))
                              (appp (app t <> " " <> int u))
   PLam l r x t          -> ifVerbose
                              (let pl = pair l; pr = pair r in
-                              letp (freshI x \x -> "λ {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t))
-                             (letp (freshI x \x -> "λ " <> x <> goLams t))
-  Coe r r' i a t        -> let pt = proj t; pr = int r; pr' = int r' in freshI i \i ->
+                              letp (bindI x \x -> "λ {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t))
+                             (letp (bindI x \x -> "λ " <> x <> goLams t))
+  Coe r r' i a t        -> let pt = proj t; pr = int r; pr' = int r' in bindI i \i ->
                            appp ("coe " <> pr <> " " <> pr' <> coeTy i a <> pt)
   HCom r r' a t u       -> appp ("hcom " <> int r <> " " <> int r'
                                  <> ifVerbose (" " <> proj a) ""
@@ -276,10 +288,10 @@ tm = \case
                              (appp ("glue " <> proj a <> " " <> sys s2))
   Hole i p              -> case i of
                              Just x -> "?" <> str x
-                             _      -> runIO $ (getTop <&> (^.printingOpts.errPrinting)) >>= \case
+                             _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
                                True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
                                _    -> pure "?"
-  Com r r' i a t u      -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in freshI i \i ->
+  Com r r' i a t u      -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in bindI i \i ->
                            "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
                                   <> pt <> " " <> pu)
   WkI x t               -> wkI x (tm t)
@@ -287,12 +299,12 @@ tm = \case
   Sym _ _ _ p           -> projp (proj p <> "⁻¹")
   Trans _ _ _ _ p q     -> transp (app p <> " ∙ " <> trans q)
   Ap f _ _ p            -> appp ("ap " <> proj f <> " " <> proj p)
-  TyCon x SPNil         -> topVar x
-  TyCon x ts            -> appp (topVar x <> spine ts)
-  DCon (CI i j _) SPNil -> dataCon i j
-  DCon (CI i j _) sp    -> appp (dataCon i j <> spine sp)
+  TyCon inf SPNil       -> topName (^.name) (^.tyId) inf
+  TyCon inf ts          -> appp (topName (^.name) (^.tyId) inf <> spine ts)
+  DCon inf SPNil        -> dcon inf
+  DCon inf sp           -> appp (dcon inf <> spine sp)
   Case t x b cs         -> ifVerbose
-                            (let pt = proj t; pcs = cases cs in fresh x \x ->
+                            (let pt = proj t; pcs = cases cs in bind x \x ->
                              appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
                             (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
   Wrap x a              -> "(" <> str x <> " : " <> pair a <> ")"
@@ -307,7 +319,7 @@ tm = \case
 dataFields :: PrettyArgs (Tel -> Txt)
 dataFields = \case
   TNil         -> mempty
-  TCons x a fs -> let pa = pair a in fresh x \x ->
+  TCons x a fs -> let pa = pair a in bind x \x ->
                   "(" <> x <> " : " <> pa <> ")" <> dataFields fs
 
 dataCons :: PrettyArgs ([(Name, Tel)] -> Txt)
@@ -319,53 +331,44 @@ dataCons = \case
 inductive :: PrettyArgs (Tel -> [(Name, Tel)] -> Txt)
 inductive ps cs = case ps of
   TNil         -> " :=\n    " <> dataCons cs
-  TCons x a ps -> let pa = pair a in fresh x \x ->
+  TCons x a ps -> let pa = pair a in bind x \x ->
                   " (" <> x <> " : " <> pa <> ")" <> inductive ps cs
 
-top_ :: Names => LvlArg => Top -> Txt
+top_ :: Top -> Txt
 top_ = \case
   TEmpty       -> mempty
   TDef x a t u ->
     let ?dom    = 0
         ?idom   = 0
-        ?names  = M.insert (NKTop ?lvl) x ?names
-        ?lvl    = ?lvl + 1
-        ?shadow = mempty in
+        ?names  = NNil in
     "\n" <> str x <> " : " <> pair a <> " :=\n  " <> pair t <> ";\n" <> top_ u
   TData x ps cons top ->
     let ?dom    = 0
         ?idom   = 0
-        ?shadow = mempty
-        ?lvl    = ?lvl + 1
-        ?names  = foldl'
-           (\ns (!conid, !x) -> M.insert (NKDCon ?lvl conid) x ns)
-           (M.insert (NKTop ?lvl) x ?names)
-           (zipWith (\conid (x, _) -> (conid, x)) [0..] cons) in
+        ?names  = NNil in
     "\ndata " <> str x <> inductive ps cons <> ";\n" <> top_ top
 
 ----------------------------------------------------------------------------------------------------
 
-class Pretty c c0 a | a -> c c0 where
+withPrettyArgs0 :: PrettyArgs a -> a
+withPrettyArgs0 act = let ?dom = 0; ?idom = 0; ?names = NNil in act
+
+class Pretty c a | a -> c  where
   pretty    :: c => a -> String
-  pretty0   :: c0 => a -> String
-  prettydbg :: a -> String -- ^ Print all vars as indices.
+  pretty0   :: a -> String
 
-instance Pretty () () Top where
-  pretty  t   = let ?names = mempty; ?lvl = 0 in runTxt (top_ t)
-  pretty0 t   = let ?names = mempty; ?lvl = 0 in runTxt (top_ t)
-  prettydbg t = let ?names = mempty; ?lvl = 0 in runTxt (top_ t)
+instance Pretty () Top where
+  pretty  t   = runTxt (top_ t)
+  pretty0 t   = runTxt (top_ t)
 
-instance Pretty (Names, DomArg, IDomArg) Names Tm where
-  pretty    t = let ?shadow = mempty in runTxt (pair t)
-  pretty0   t = let ?dom = 0; ?idom = 0; ?shadow = mempty in runTxt (pair t)
-  prettydbg t = let ?dom = 0; ?idom = 0; ?shadow = mempty; ?names = mempty in runTxt (pair t)
+instance Pretty (NamesArg, DomArg, IDomArg) Tm where
+  pretty    t = runTxt (pair t)
+  pretty0   t = withPrettyArgs0 $ runTxt (pair t)
 
-instance Pretty (Names, DomArg, IDomArg) Names Cof where
-  pretty  t = let ?shadow = mempty in runTxt (cof t)
-  pretty0 t = let ?dom = 0; ?idom = 0; ?shadow = mempty in runTxt (cof t)
-  prettydbg t = let ?dom = 0; ?idom = 0; ?shadow = mempty; ?names = mempty in runTxt (cof t)
+instance Pretty (NamesArg, DomArg, IDomArg) Cof where
+  pretty    t = runTxt (cof t)
+  pretty0   t = withPrettyArgs0 $ runTxt (cof t)
 
-instance Pretty (Names, DomArg, IDomArg) Names Sys where
-  pretty  t = let ?shadow = mempty in runTxt (sys t)
-  pretty0 t = let ?dom = 0; ?idom = 0; ?shadow = mempty in runTxt (sys t)
-  prettydbg t = let ?dom = 0; ?idom = 0; ?shadow = mempty; ?names = mempty in runTxt (sys t)
+instance Pretty (NamesArg, DomArg, IDomArg) Sys where
+  pretty  t   = runTxt (sys t)
+  pretty0 t   = withPrettyArgs0 $ runTxt (sys t)
