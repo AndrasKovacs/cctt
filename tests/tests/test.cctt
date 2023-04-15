@@ -1,2 +1,10 @@
 
-foo (A A : U) (x : @0) : @0 := ?;
+-- foo (A A : U) (x : @0) : @0 := ?;
+
+data Unit := tt;
+foo : Unit → Unit :=
+  λ [tt. tt];
+
+kek (Unit : U) := @@0;
+
+lel (tt : U) := @@0#0;

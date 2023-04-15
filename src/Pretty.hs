@@ -202,30 +202,32 @@ unProject t x = case t of
   t                    -> Just t
 
 ivar :: PrettyArgs (IVar -> Txt)
-ivar x = let
-  go 0 (NBindI _ x)  = (x, False)
+ivar i = let
+  go 0 (NBindI _ x)  = x // (x == "_")
   go l (NBind ls x)  = case go l ls of
                          (x', sh) -> x' // (sh || x == x')
   go l (NBindI ls x) = case go (l - 1) ls of
                          (x', sh) -> x' // (sh || x == x')
   go _ _             = impossible
 
-  in case go (lvlToIx (coerce ?idom) (coerce x)) ?names of
-    (x, sh) -> if sh then "@" <> str (show x)
-                     else str x
+  in case go (lvlToIx (coerce ?idom) (coerce i)) ?names of
+    (x, True) -> "@" <> str (show i)
+    (x, _   ) -> str x
 
-localVar :: NamesArg => Ix -> Txt
-localVar x = let
-  go 0 (NBind _ x)   = (x, False)
-  go l (NBind ls x)  = case go (l - 1) ls of
+localVar :: NamesArg => DomArg => Ix -> Txt
+localVar i = let
+
+  go :: Ix -> Names -> (Name, Bool)
+  go 0 (NBind _ x)   = x // (x == "_")
+  go i (NBind ls x)  = case go (i - 1) ls of
                          (x', sh) -> x' // (sh || x == x')
-  go l (NBindI ls x) = case go l ls of
+  go i (NBindI ls x) = case go i ls of
                          (x', sh) -> x' // (sh || x == x')
   go _ _             = impossible
 
-  in case go x ?names of
-    (x, sh) -> if sh then "@" <> str (show x)
-                     else str x
+  in case go i ?names of
+    (x, True) -> "@" <> str (show (ixToLvl ?dom i))
+    (x, _   ) -> str x
 
 topName :: PrettyArgs ((t -> Name) -> (t -> Lvl) -> t -> Txt)
 topName name id t = if isNameUsed (name t) ?names

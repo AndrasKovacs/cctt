@@ -618,15 +618,15 @@ caseLhsSp dom (_:xs) = VDCons (VNe (NLocalVar dom) mempty) (caseLhsSp (dom + 1) 
 
 elabCases :: Elab (
      Env -> NamedClosure -> [DConInfo] -> [(Name, [Name], P.Tm)] -> IO Cases)
-elabCases params b contypes cs = case (contypes, cs) of
+elabCases params b cons cs = case (cons, cs) of
   ([], []) ->
     pure CSNil
   (dci:cons, (x', xs, body):cs) | dci^.name == x' -> do
     let rhstype = b ∙ VDCon dci (caseLhsSp ?dom xs)
     t  <- elabCase (dci^.conId) params (dci^.fieldTypes) rhstype xs body
-    cs <- elabCases params b contypes cs
+    cs <- elabCases params b cons  cs
     pure $ CSCons (dci^.name) xs t cs
-  _ -> do
+  _ ->
     err CaseMismatch
 
 ----------------------------------------------------------------------------------------------------

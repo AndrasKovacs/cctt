@@ -126,6 +126,10 @@ lvlToIx :: Lvl -> Lvl -> Ix
 lvlToIx (Lvl envl) (Lvl x) = Ix (envl - x - 1)
 {-# inline lvlToIx #-}
 
+ixToLvl :: Lvl -> Ix -> Lvl
+ixToLvl (Lvl envl) (Ix x) = Lvl (envl - x - 1)
+{-# inline ixToLvl #-}
+
 type LvlArg = (?lvl :: Lvl)
 
 

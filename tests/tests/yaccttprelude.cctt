@@ -66,44 +66,36 @@ symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a
 
 symDepNf (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
 λ {b} {a} i. glue (hcom 0 1 A [i = 0 j. coe 1 0 P (coe j 1 P (p {a}
-{b} j)); i = 1 _. coe 1 0 (_. A) (coe @1 1 (j. A) a); i = 0 i1. coe 1 0 P (coe
-i1 1 P (p {a} {b} i1)); i = 1 i1. coe 1 0 (_. A) (coe i1 1 (j. A) a)] (hcom 1 0
-A [i = 0 j. coe 1 0 P (coe 0 1 P a); i = 1 j. coe 1 0 (_. A) (coe 0 1 (j1. A)
-a)] (hcom 0 1 A [i = 0 j. coe j 1 (j1. A) (coe j 0 P (coe 0 j P a)); i = 1
-j. coe j 1 (j1. A) (coe j 0 (_. A) (coe 0 j (j1. A) a))] (coe 0 1 (j. A) a))))
-
-[i = 0. B
-    , λ x. coe 1 0 P x
-    , λ x. coe 0 1 P x
-    , λ x j. hcom 1 0 B [j = 0 k. x; j = 1 k. coe k 1 P (coe 1 k P x)] x
-    , λ x j. hcom 0 1 A [j = 0 k. coe k 0 P (coe 0 k P x); j = 1 k. x] x
-    , λ x l k. hcom 1 0 A
-        [k = 0 i1. coe i1 0 P (coe 1 i1 P (hcom 1 i1 B [l = 0 k1. x; l = 1 k1. coe k1 1
-	           P (coe 1 k1 P x)] x))
-       ; k = 1 i1. coe i1 0 P (coe 1 i1 P x)
-       ; l = 0 i1. coe i1 0 P (coe 1 i1 P x)
-       ; l = 1 i1. coe i1 0 P (hcom i1 1 (P {A} {B} i1)
-                          [k = 0 k1. coe k1 i1 P (coe i1 k1 P (coe 1 i1 P x))
-			; k = 1 k1. coe 1 i1 P x] (coe 1 i1 P x))]
-        (coe 1 0 P x)
-
-; i = 1. A
-  , λ x. coe 1 0 (_. A) x
-  , λ x. coe 0 1 (_. A) x
-  , λ x j. hcom 1 0 A [j = 0 k. x; j = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x
-  , λ x j. hcom 0 1 A [j = 0 k. coe k 0 (_. A) (coe 0 k (_. A) x); j = 1 k. x] x
-  , λ x l k. hcom 1 0 A [
-      k = 0 i1. coe i1 0 (_. A)
-        (coe 1 i1 (_. A) (hcom 1 i1 A [l = 0 k1. x; l = 1 k1. coe k1 1 (_. A)
-        (coe 1 k1 (_. A) x)] x))
-    ; k = 1 i1. coe i1 0 (_. A) (coe 1 i1 (_. A) x)
-    ; l = 0 i1. coe i1 0 (_. A) (coe 1 i1 (_. A) x)
-    ; l = 1 i1. coe i1 0 (_. A) (hcom i1 1 A [k = 0 k1. coe k1 i1 (_. A) (coe i1 k1 (_. A) (coe 1 i1
-               (_. A) x))
-    ; k = 1 k1. coe 1 i1 (_. A) x] (coe 1 i1 (_. A) x))]
-    (coe 1 0 (_. A) x)]
-[i = 0. b; i = 1. a];
-
+{b} j)); i = 1 _. coe 1 0 (_. A) (coe @1 1 (j. A) a); i = 0 i. coe 1 0 P (coe i
+1 P (p {a} {b} i)); i = 1 i. coe 1 0 (_. A) (coe i 1 (j. A) a)] (hcom 1 0 A [i =
+0 j. coe 1 0 P (coe 0 1 P a); i = 1 j. coe 1 0 (_. A) (coe 0 1 (j. A) a)] (hcom
+0 1 A [i = 0 j. coe j 1 (j. A) (coe j 0 P (coe 0 j P a)); i = 1 j. coe j 1
+(j. A) (coe j 0 (_. A) (coe 0 j (j. A) a))] (coe 0 1 (j. A) a)))) [i = 0. B, λ
+x. coe 1 0 P x, λ x. coe 0 1 P x, λ x {x} {coe 0 1 P (coe 1 0 P x)} j. hcom 1 0
+B [j = 0 k. x; j = 1 k. coe k 1 P (coe 1 k P x)] x, λ x {coe 1 0 P (coe 0 1 P
+x)} {x} j. hcom 0 1 A [j = 0 k. coe k 0 P (coe 0 k P x); j = 1 k. x] x, λ x {λ
+{coe 1 0 P x} {coe 1 0 P x} _. coe 1 0 P x} {λ {coe 1 0 P (coe 0 1 P (coe 1 0 P
+x))} {coe 1 0 P x} k. hcom 0 1 A [k = 0 k. coe k 0 P (coe 0 k P (coe 1 0 P x));
+k = 1 k. coe 1 0 P x] (coe 1 0 P x)} l {coe 1 0 P (hcom 1 0 B [l = 0 k. x; l = 1
+k. coe k 1 P (coe 1 k P x)] x)} {coe 1 0 P x} k. hcom 1 0 A [k = 0 i. coe i 0 P
+(coe 1 i P (hcom 1 i B [l = 0 k. x; l = 1 k. coe k 1 P (coe 1 k P x)] x)); k = 1
+i. coe i 0 P (coe 1 i P x); l = 0 i. coe i 0 P (coe 1 i P x); l = 1 i. coe i 0 P
+(hcom i 1 (P {A} {B} i) [k = 0 k. coe k i P (coe i k P (coe 1 i P x)); k = 1
+k. coe 1 i P x] (coe 1 i P x))] (coe 1 0 P x); i = 1. A, λ x. coe 1 0 (_. A) x,
+λ x. coe 0 1 (_. A) x, λ x {x} {coe 0 1 (_. A) (coe 1 0 (_. A) x)} j. hcom 1 0 A
+[j = 0 k. x; j = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x, λ x {coe 1 0 (_. A)
+(coe 0 1 (_. A) x)} {x} j. hcom 0 1 A [j = 0 k. coe k 0 (_. A) (coe 0 k (_. A)
+x); j = 1 k. x] x, λ x {λ {coe 1 0 (_. A) x} {coe 1 0 (_. A) x} _. coe 1 0
+(_. A) x} {λ {coe 1 0 (_. A) (coe 0 1 (_. A) (coe 1 0 (_. A) x))} {coe 1 0
+(_. A) x} k. hcom 0 1 A [k = 0 k. coe k 0 (_. A) (coe 0 k (_. A) (coe 1 0 (_. A)
+x)); k = 1 k. coe 1 0 (_. A) x] (coe 1 0 (_. A) x)} l {coe 1 0 (_. A) (hcom 1 0
+A [l = 0 k. x; l = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x)} {coe 1 0 (_. A)
+x} k. hcom 1 0 A [k = 0 i. coe i 0 (_. A) (coe 1 i (_. A) (hcom 1 i A [l = 0
+k. x; l = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x)); k = 1 i. coe i 0 (_. A)
+(coe 1 i (_. A) x); l = 0 i. coe i 0 (_. A) (coe 1 i (_. A) x); l = 1 i. coe i 0
+(_. A) (hcom i 1 A [k = 0 k. coe k i (_. A) (coe i k (_. A) (coe 1 i (_. A) x));
+k = 1 k. coe 1 i (_. A) x] (coe 1 i (_. A) x))] (coe 1 0 (_. A) x)] [i = 0. b; i
+= 1. a];
 
 symDepNfOK (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) :
   symDep A B P a b p = symDepNf A B P a b p := refl;
@@ -150,16 +142,16 @@ JEqNf (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
   : J A a C d a (λ _. a) = d :=
 λ {coe 0 1 (i. C (hcom 0 1 A [i = 0 _. a; i = 1 k. a] a) (λ {a} {hcom 0
 1 A [i = 0 _. a; i = 1 k. a] a} j. hcom 0 j A [i = 0 _. a; i = 1 k. a] a)) d}
-{d} k. hcom 0 1 (C a (λ {a} {a} j. a)) [k = 0 i. coe i 1 (i1. C (hcom 0 1 A [i1
-= 0 _. a; i1 = 1 _. a] a) (λ {a} {hcom 0 1 A [i1 = 0 _. a; i1 = 1 _. a] a}
-j. hcom 0 j A [i1 = 0 _. a; i1 = 1 _. a] a)) (coe 0 i (i1. C (hcom 0 1 A [i1 = 0
-_. a; i1 = 1 _. a] a) (λ {a} {hcom 0 1 A [i1 = 0 _. a; i1 = 1 _. a] a} j. hcom 0
-j A [i1 = 0 _. a; i1 = 1 _. a] a)) d); k = 1 _. coe @1 1 (i. C a (λ {a} {a}
-j. a)) d] (coe 0 1 (i. C (hcom 0 1 A [k = 0 x. hcom 0 x A [i = 0 _. a; i = 1
-_. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a] a) (λ {a} {hcom 0 1 A [k = 0
-x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a] a}
-j. hcom 0 j A [k = 0 x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a; i = 0
-_. a; i = 1 _. a] a)) d);
+{d} k. hcom 0 1 (C a (λ {a} {a} j. a)) [k = 0 i. coe i 1 (i. C (hcom 0 1 A [i =
+0 _. a; i = 1 _. a] a) (λ {a} {hcom 0 1 A [i = 0 _. a; i = 1 _. a] a} j. hcom 0
+j A [i = 0 _. a; i = 1 _. a] a)) (coe 0 i (i. C (hcom 0 1 A [i = 0 _. a; i = 1
+_. a] a) (λ {a} {hcom 0 1 A [i = 0 _. a; i = 1 _. a] a} j. hcom 0 j A [i = 0
+_. a; i = 1 _. a] a)) d); k = 1 _. coe @1 1 (i. C a (λ {a} {a} j. a)) d] (coe 0
+1 (i. C (hcom 0 1 A [k = 0 x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a;
+i = 0 _. a; i = 1 _. a] a) (λ {a} {hcom 0 1 A [k = 0 x. hcom 0 x A [i = 0 _. a;
+i = 1 _. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a] a} j. hcom 0 j A [k = 0
+x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a]
+a)) d);
 
 JEqNfOK (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
   : JEq A a C d = JEqNf A a C d :=
@@ -336,475 +328,466 @@ propIsEquiv (A B : U) (f : A → B) : prop (isEquiv A B f) :=
   λ u0 u1 i y. propIsContr (fiber A B f y) (u0 y) (u1 y) i;
 
 propIsEquivNf (A B : U) (f : A → B) : prop (isEquiv A B f) :=
-λ u0 u1 {u0} {u1} i y. ((hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j. ((u0
-y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y}
-_. hcom 1 0 B [@1 = 0 i1. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j. ((u0 y).2
-(u1 y).1 {(u1 y).1} {(u0 y).1} j).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1}
-i).1); @1 = 1 i1. y; i = 0 _. hcom @2 0 B [@1 = 0 i1. coe i1 0 (i2. B) (f (u0
-y).1.1); @1 = 1 i1. coe i1 0 (i2. B) y] (coe @2 0 (i1. B) ((u0 y).1.2 {f (u0
-y).1.1} {y} @1)); i = 1 j. hcom j 0 B [@1 = 0 i1. coe i1 0 (i2. B) (f ((u0 y).2
-(u1 y).1 {(u1 y).1} {(u0 y).1} i1).1); @1 = 1 i1. coe i1 0 (i2. B) y] (coe j 0
-(i1. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j).2 {f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j).1} {y} @1))] (hcom 1 0 B [@1 = 0 i1. coe i1 0 (i2. B)
-(f (hcom 1 i1 A [i = 0 _. (u0 y).1.1; i = 1 j. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @1 = 1 i1. coe
-i1 0 (i2. B) y] (coe 1 0 (i1. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2
-{f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @1)))), λ x {x} {hcom 1 0
-A [i = 0 _. (u0 y).1.1; i = 1 j. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j).1]
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0
-y).1.1; i = 1 j. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j).1] ((u0 y).2 (u0
-y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@1 = 0 i1. f (hcom 1 0 A [i
-= 0 _. (u0 y).1.1; i = 1 j. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @1 = 1 i1. y; i = 0 _. hcom @2 0 B
-[@1 = 0 i1. coe i1 0 (i2. B) (f (u0 y).1.1); @1 = 1 i1. coe i1 0 (i2. B) y] (coe
-@2 0 (i1. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @1)); i = 1 j. hcom j 0 B [@1 = 0
-i1. coe i1 0 (i2. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i1).1); @1 = 1
-i1. coe i1 0 (i2. B) y] (coe j 0 (i1. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0
-y).1} j).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j).1} {y} @1))] (hcom 1 0
-B [@1 = 0 i1. coe i1 0 (i2. B) (f (hcom 1 i1 A [i = 0 _. (u0 y).1.1; i = 1
-j. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j).1] ((u0 y).2 (u0 y).1 {(u0 y).1}
-{(u0 y).1} i).1)); @1 = 1 i1. coe i1 0 (i2. B) y] (coe 1 0 (i1. B) (((u0 y).2
-(u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1}
-i).1} {y} @1)))} i1. (hcom 0 1 A [i1 = 0 k. hcom 1 0 A [k = 0 _. x.1; k = 1
-j. ((u0 y).2 x {x} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1; i1 = 1
-k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 (hcom 1 0 A [i = 0 _. (u0
-y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0
-y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@4 = 0 i2. f (hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @4 = 1 i2. y; i = 0 _. hcom @5 0 B
-[@4 = 0 i2. coe i2 0 (i3. B) (f (u0 y).1.1); @4 = 1 i2. coe i2 0 (i3. B) y] (coe
-@5 0 (i2. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @4)); i = 1 j1. hcom j1 0 B [@4 = 0
-i2. coe i2 0 (i3. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i2).1); @4 = 1
-i2. coe i2 0 (i3. B) y] (coe j1 0 (i2. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0
-y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @4))] (hcom 1
-0 B [@4 = 0 i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)); @4 = 1 i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1} {y} @4)))) {hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1
-y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1,
-λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1
-0 B [@4 = 0 i2. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @4
-= 1 i2. y; i = 0 _. hcom @5 0 B [@4 = 0 i2. coe i2 0 (i3. B) (f (u0 y).1.1); @4
-= 1 i2. coe i2 0 (i3. B) y] (coe @5 0 (i2. B) ((u0 y).1.2 {f (u0 y).1.1} {y}
-@4)); i = 1 j1. hcom j1 0 B [@4 = 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} i2).1); @4 = 1 i2. coe i2 0 (i3. B) y] (coe j1 0 (i2. B)
-(((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1} {y} @4))] (hcom 1 0 B [@4 = 0 i2. coe i2 0 (i3. B) (f (hcom 1
-i2 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @4 = 1 i2. coe i2 0
-(i3. B) y] (coe 1 0 (i2. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @4)))} {(u0 y).1} j).1] ((u0
-y).2 x {x} {(u0 y).1} k).1; i = 0 k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0
-y).2 ((u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0
-y).1.2 {f (u0 y).1.1} {y} @4} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ
-{f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @4} i1} {(u0 y).1} j).1]
-((u0 y).2 x {x} {(u0 y).1} k).1; i = 1 k. hcom 1 0 A [k = 0 _. x.1; k = 1
-j. ((u0 y).2 ((u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y}
-_. (u1 y).1.2 {f (u1 y).1.1} {y} @4} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1
-y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @4} i1} {(u0 y).1}
-j).1] ((u0 y).2 x {x} {(u0 y).1} k).1] x.1, λ {f (hcom 0 1 A [i1 = 0 k. hcom 1 0
-A [k = 0 _. x.1; k = 1 j. ((u0 y).2 x {x} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0
-y).1} k).1; i1 = 1 k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 (hcom 1 0 A
-[i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1]
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0
-y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0
-y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@4 = 0 i2. f (hcom 1 0 A [i
-= 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1]
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @4 = 1 i2. y; i = 0 _. hcom @5 0
-B [@4 = 0 i2. coe i2 0 (i3. B) (f (u0 y).1.1); @4 = 1 i2. coe i2 0 (i3. B) y]
-(coe @5 0 (i2. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @4)); i = 1 j1. hcom j1 0 B [@4
-= 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i2).1); @4
-= 1 i2. coe i2 0 (i3. B) y] (coe j1 0 (i2. B) (((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @4))]
-(hcom 1 0 B [@4 = 0 i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [i = 0 _. (u0 y).1.1; i
-= 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)); @4 = 1 i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1} {y} @4)))) {hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1
-y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1,
-λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1
-0 B [@4 = 0 i2. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @4
-= 1 i2. y; i = 0 _. hcom @5 0 B [@4 = 0 i2. coe i2 0 (i3. B) (f (u0 y).1.1); @4
-= 1 i2. coe i2 0 (i3. B) y] (coe @5 0 (i2. B) ((u0 y).1.2 {f (u0 y).1.1} {y}
-@4)); i = 1 j1. hcom j1 0 B [@4 = 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} i2).1); @4 = 1 i2. coe i2 0 (i3. B) y] (coe j1 0 (i2. B)
-(((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1} {y} @4))] (hcom 1 0 B [@4 = 0 i2. coe i2 0 (i3. B) (f (hcom 1
-i2 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @4 = 1 i2. coe i2 0
-(i3. B) y] (coe 1 0 (i2. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @4)))} {(u0 y).1} j).1] ((u0
-y).2 x {x} {(u0 y).1} k).1; i = 0 k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0
-y).2 ((u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0
-y).1.2 {f (u0 y).1.1} {y} @4} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ
-{f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @4} i1} {(u0 y).1} j).1]
-((u0 y).2 x {x} {(u0 y).1} k).1; i = 1 k. hcom 1 0 A [k = 0 _. x.1; k = 1
-j. ((u0 y).2 ((u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y}
-_. (u1 y).1.2 {f (u1 y).1.1} {y} @4} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1
-y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @4} i1} {(u0 y).1}
-j).1] ((u0 y).2 x {x} {(u0 y).1} k).1] x.1)} {y} _. hcom 0 1 B [@2 = 0 i2. f
-(hcom 0 1 A [i1 = 0 k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 x {x} {(u0
-y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1; i1 = 1 k. hcom 1 0 A [k = 0 _. x.1;
-k = 1 j. ((u0 y).2 (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1
-y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1,
-λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1
-0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6
-= 1 i3. y; i = 0 _. hcom @7 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6
-= 1 i3. coe i3 0 (i4. B) y] (coe @7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y}
-@6)); i = 1 j1. hcom j1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} i3).1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B)
-(((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1} {y} @6))] (hcom 1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1
-i3 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0
-(i4. B) y] (coe 1 0 (i3. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @6)))) {hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1;
-i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1
-{(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6 = 1 i3. y; i = 0 _. hcom @7 0 B
-[@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe
-@7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @6)); i = 1 j1. hcom j1 0 B [@6 = 0
-i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i3).1); @6 = 1
-i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0
-y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @6))] (hcom 1
-0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe 1 0 (i3. B) (((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1} {y} @6)))} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1; i = 0
-k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 ((u0 y).2 (x.1, x.2) {x.1, x.2}
-{(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @6} i1) {(u0
-y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f
-(u0 y).1.1} {y} @6} i1} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1; i = 1
-k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 ((u1 y).2 (x.1, x.2) {x.1, x.2}
-{(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1) {(u1
-y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f
-(u1 y).1.1} {y} @6} i1} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1] x.1);
-@2 = 1 i2. y; i1 = 0 k. hcom k 1 B [@2 = 0 i2. coe i2 1 (i3. B) (f (hcom 1 0 A
-[i2 = 0 _. x.1; i2 = 1 j. ((u0 y).2 x {x} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0
-y).1} i2).1)); @2 = 1 i2. coe i2 1 (i3. B) y] (coe k 1 (i2. B) (hcom 1 0 B [@2 =
-0 i2. f (hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 x {x} {(u0 y).1} j).1]
-((u0 y).2 x {x} {(u0 y).1} k).1); @2 = 1 i2. y; k = 0 _. hcom @4 0 B [@2 = 0
-i2. coe i2 0 (i3. B) (f x.1); @2 = 1 i2. coe i2 0 (i3. B) y] (coe @4 0 (i2. B)
-(x.2 {f x.1} {y} @2)); k = 1 j. hcom j 0 B [@2 = 0 i2. coe i2 0 (i3. B) (f ((u0
-y).2 x {x} {(u0 y).1} i2).1); @2 = 1 i2. coe i2 0 (i3. B) y] (coe j 0 (i2. B)
-(((u0 y).2 x {x} {(u0 y).1} j).2 {f ((u0 y).2 x {x} {(u0 y).1} j).1} {y} @2))]
-(hcom 1 0 B [@2 = 0 i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [k = 0 _. x.1; k = 1
-j. ((u0 y).2 x {x} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1)); @2 = 1
-i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0 y).2 x {x} {(u0 y).1} k).2 {f
-((u0 y).2 x {x} {(u0 y).1} k).1} {y} @2))))); i1 = 1 k. hcom k 1 B [@2 = 0
-i2. coe i2 1 (i3. B) (f (hcom 1 0 A [i2 = 0 _. x.1; i2 = 1 j. ((u0 y).2 (hcom 1
-0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0 i3. f (hcom
-1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6 = 1 i3. y; i = 0
-_. hcom @7 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6 = 1 i3. coe i3 0
-(i4. B) y] (coe @7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @6)); i = 1 j1. hcom
-j1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-i3).1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B) (((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1}
-{y} @6))] (hcom 1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0 _. (u0
-y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0
-y).1 {(u0 y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe 1 0
-(i3. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1
-{(u0 y).1} {(u0 y).1} i).1} {y} @6)))) {hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0
-y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i
-= 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1); @6 = 1 i3. y; i = 0 _. hcom @7 0 B [@6 = 0 i3. coe i3 0
-(i4. B) (f (u0 y).1.1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe @7 0 (i3. B) ((u0
-y).1.2 {f (u0 y).1.1} {y} @6)); i = 1 j1. hcom j1 0 B [@6 = 0 i3. coe i3 0
-(i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i3).1); @6 = 1 i3. coe i3 0
-(i4. B) y] (coe j1 0 (i3. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f
-((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @6))] (hcom 1 0 B [@6 = 0
-i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2
-(u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1}
-i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe 1 0 (i3. B) (((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y}
-@6)))} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} i2).1)); @2 = 1 i2. coe i2 1
-(i3. B) y] (coe k 1 (i2. B) (hcom 1 0 B [@2 = 0 i2. f (hcom 1 0 A [k = 0 _. x.1;
-k = 1 j. ((u0 y).2 (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1
-y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1,
-λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1
-0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6
-= 1 i3. y; i = 0 _. hcom @7 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6
-= 1 i3. coe i3 0 (i4. B) y] (coe @7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y}
-@6)); i = 1 j1. hcom j1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} i3).1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B)
-(((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1} {y} @6))] (hcom 1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1
-i3 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0
-(i4. B) y] (coe 1 0 (i3. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @6)))) {hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1;
-i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1
-{(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6 = 1 i3. y; i = 0 _. hcom @7 0 B
-[@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe
-@7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @6)); i = 1 j1. hcom j1 0 B [@6 = 0
-i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i3).1); @6 = 1
-i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0
-y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @6))] (hcom 1
-0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe 1 0 (i3. B) (((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1} {y} @6)))} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1); @2 = 1
-i2. y; k = 0 _. hcom @4 0 B [@2 = 0 i2. coe i2 0 (i3. B) (f x.1); @2 = 1 i2. coe
-i2 0 (i3. B) y] (coe @4 0 (i2. B) (x.2 {f x.1} {y} @2)); k = 1 j. hcom j 0 B [@2
-= 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0
-y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i
-= 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1); @6 = 1 i3. y; i = 0 _. hcom @7 0 B [@6 = 0 i3. coe i3 0
-(i4. B) (f (u0 y).1.1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe @7 0 (i3. B) ((u0
-y).1.2 {f (u0 y).1.1} {y} @6)); i = 1 j1. hcom j1 0 B [@6 = 0 i3. coe i3 0
-(i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i3).1); @6 = 1 i3. coe i3 0
-(i4. B) y] (coe j1 0 (i3. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f
-((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @6))] (hcom 1 0 B [@6 = 0
-i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2
-(u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1}
-i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe 1 0 (i3. B) (((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y}
-@6)))) {hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0
-A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0
-i3. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6 = 1 i3. y;
-i = 0 _. hcom @7 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6 = 1 i3. coe
-i3 0 (i4. B) y] (coe @7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @6)); i = 1
-j1. hcom j1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} i3).1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B) (((u0 y).2
-(u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1} {y} @6))] (hcom 1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe
-1 0 (i3. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1
-{(u0 y).1} {(u0 y).1} i).1} {y} @6)))} {(u0 y).1} i2).1); @2 = 1 i2. coe i2 0
-(i3. B) y] (coe j 0 (i2. B) (((u0 y).2 (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0
-y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1)} {y} _. hcom 1 0 B [@5 = 0 i2. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i
-= 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1); @5 = 1 i2. y; i = 0 _. hcom @6 0 B [@5 = 0 i2. coe i2 0
-(i3. B) (f (u0 y).1.1); @5 = 1 i2. coe i2 0 (i3. B) y] (coe @6 0 (i2. B) ((u0
-y).1.2 {f (u0 y).1.1} {y} @5)); i = 1 j1. hcom j1 0 B [@5 = 0 i2. coe i2 0
-(i3. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i2).1); @5 = 1 i2. coe i2 0
-(i3. B) y] (coe j1 0 (i2. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f
-((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @5))] (hcom 1 0 B [@5 = 0
-i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2
-(u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1}
-i).1)); @5 = 1 i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y}
-@5)))) {hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0
-A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@5 = 0
-i2. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @5 = 1 i2. y;
-i = 0 _. hcom @6 0 B [@5 = 0 i2. coe i2 0 (i3. B) (f (u0 y).1.1); @5 = 1 i2. coe
-i2 0 (i3. B) y] (coe @6 0 (i2. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @5)); i = 1
-j1. hcom j1 0 B [@5 = 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} i2).1); @5 = 1 i2. coe i2 0 (i3. B) y] (coe j1 0 (i2. B) (((u0 y).2
-(u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1} {y} @5))] (hcom 1 0 B [@5 = 0 i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @5 = 1 i2. coe i2 0 (i3. B) y] (coe
-1 0 (i2. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1
-{(u0 y).1} {(u0 y).1} i).1} {y} @5)))} {(u0 y).1} j).2 {f ((u0 y).2 (hcom 1 0 A
-[i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1]
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0
-y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0
-y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@5 = 0 i2. f (hcom 1 0 A [i
-= 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1]
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @5 = 1 i2. y; i = 0 _. hcom @6 0
-B [@5 = 0 i2. coe i2 0 (i3. B) (f (u0 y).1.1); @5 = 1 i2. coe i2 0 (i3. B) y]
-(coe @6 0 (i2. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @5)); i = 1 j1. hcom j1 0 B [@5
-= 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i2).1); @5
-= 1 i2. coe i2 0 (i3. B) y] (coe j1 0 (i2. B) (((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @5))]
-(hcom 1 0 B [@5 = 0 i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [i = 0 _. (u0 y).1.1; i
-= 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)); @5 = 1 i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1} {y} @5)))) {hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1
-y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1,
-λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1
-0 B [@5 = 0 i2. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @5
-= 1 i2. y; i = 0 _. hcom @6 0 B [@5 = 0 i2. coe i2 0 (i3. B) (f (u0 y).1.1); @5
-= 1 i2. coe i2 0 (i3. B) y] (coe @6 0 (i2. B) ((u0 y).1.2 {f (u0 y).1.1} {y}
-@5)); i = 1 j1. hcom j1 0 B [@5 = 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} i2).1); @5 = 1 i2. coe i2 0 (i3. B) y] (coe j1 0 (i2. B)
-(((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1} {y} @5))] (hcom 1 0 B [@5 = 0 i2. coe i2 0 (i3. B) (f (hcom 1
-i2 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @5 = 1 i2. coe i2 0
-(i3. B) y] (coe 1 0 (i2. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @5)))} {(u0 y).1} j).1} {y}
-@2))] (hcom 1 0 B [@2 = 0 i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [k = 0 _. x.1; k
-= 1 j. ((u0 y).2 (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f
-(hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0
-y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B
-[@6 = 0 i3. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6
-= 1 i3. y; i = 0 _. hcom @7 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6
-= 1 i3. coe i3 0 (i4. B) y] (coe @7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y}
-@6)); i = 1 j1. hcom j1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} i3).1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B)
-(((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1} {y} @6))] (hcom 1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1
-i3 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0
-(i4. B) y] (coe 1 0 (i3. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @6)))) {hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1;
-i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1
-{(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0
-_. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6 = 1 i3. y; i = 0 _. hcom @7 0 B
-[@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe
-@7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @6)); i = 1 j1. hcom j1 0 B [@6 = 0
-i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i3).1); @6 = 1
-i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B) (((u0 y).2 (u1 y).1 {(u1 y).1} {(u0
-y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @6))] (hcom 1
-0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0 _. (u0 y).1.1; i = 1
-j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe 1 0 (i3. B) (((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1} {y} @6)))} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0 y).1} k).1)); @2 =
-1 i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0 y).2 x {x} {(u0 y).1} k).2 {f
-((u0 y).2 x {x} {(u0 y).1} k).1} {y} @2))))); i = 0 k. hcom k 1 B [@2 = 0
-i2. coe i2 1 (i3. B) (f (hcom 1 0 A [i2 = 0 _. x.1; i2 = 1 j. ((u0 y).2 ((u0
-y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f
-(u0 y).1.1} {y} @6} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0
-y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @6} i1} {(u0 y).1} j).1] ((u0 y).2
-x {x} {(u0 y).1} i2).1)); @2 = 1 i2. coe i2 1 (i3. B) y] (coe k 1 (i2. B) (hcom
-1 0 B [@2 = 0 i2. f (hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 ((u0 y).2
-(x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0
-y).1.1} {y} @6} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0
-y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @6} i1} {(u0 y).1} j).1] ((u0 y).2
-x {x} {(u0 y).1} k).1); @2 = 1 i2. y; k = 0 _. hcom @4 0 B [@2 = 0 i2. coe i2 0
-(i3. B) (f x.1); @2 = 1 i2. coe i2 0 (i3. B) y] (coe @4 0 (i2. B) (x.2 {f x.1}
-{y} @2)); k = 1 j. hcom j 0 B [@2 = 0 i2. coe i2 0 (i3. B) (f ((u0 y).2 ((u0
-y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f
-(u0 y).1.1} {y} @6} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0
-y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @6} i1} {(u0 y).1} i2).1); @2 = 1
-i2. coe i2 0 (i3. B) y] (coe j 0 (i2. B) (((u0 y).2 ((u0 y).2 (x.1, x.2) {x.1,
-x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @5} i1)
-{(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2
-{f (u0 y).1.1} {y} @5} i1} {(u0 y).1} j).2 {f ((u0 y).2 ((u0 y).2 (x.1, x.2)
-{x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y}
-@5} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0
-y).1.2 {f (u0 y).1.1} {y} @5} i1} {(u0 y).1} j).1} {y} @2))] (hcom 1 0 B [@2 = 0
-i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 ((u0 y).2
-(x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0
-y).1.1} {y} @6} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0
-y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @6} i1} {(u0 y).1} j).1] ((u0 y).2
-x {x} {(u0 y).1} k).1)); @2 = 1 i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0
-y).2 x {x} {(u0 y).1} k).2 {f ((u0 y).2 x {x} {(u0 y).1} k).1} {y} @2))))); i =
-1 k. hcom k 1 B [@2 = 0 i2. coe i2 1 (i3. B) (f (hcom 1 0 A [i2 = 0 _. x.1; i2 =
-1 j. ((u0 y).2 ((u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y}
-_. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1
-y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1} {(u0 y).1}
-j).1] ((u0 y).2 x {x} {(u0 y).1} i2).1)); @2 = 1 i2. coe i2 1 (i3. B) y] (coe k
-1 (i2. B) (hcom 1 0 B [@2 = 0 i2. f (hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0
-y).2 ((u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1
-y).1.2 {f (u1 y).1.1} {y} @6} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ
-{f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1} {(u0 y).1} j).1]
-((u0 y).2 x {x} {(u0 y).1} k).1); @2 = 1 i2. y; k = 0 _. hcom @4 0 B [@2 = 0
-i2. coe i2 0 (i3. B) (f x.1); @2 = 1 i2. coe i2 0 (i3. B) y] (coe @4 0 (i2. B)
-(x.2 {f x.1} {y} @2)); k = 1 j. hcom j 0 B [@2 = 0 i2. coe i2 0 (i3. B) (f ((u0
-y).2 ((u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1
-y).1.2 {f (u1 y).1.1} {y} @6} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ
-{f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1} {(u0 y).1} i2).1);
-@2 = 1 i2. coe i2 0 (i3. B) y] (coe j 0 (i2. B) (((u0 y).2 ((u1 y).2 (x.1, x.2)
-{x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y}
-@5} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1
-y).1.2 {f (u1 y).1.1} {y} @5} i1} {(u0 y).1} j).2 {f ((u0 y).2 ((u1 y).2 (x.1,
-x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1}
-{y} @5} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y}
-_. (u1 y).1.2 {f (u1 y).1.1} {y} @5} i1} {(u0 y).1} j).1} {y} @2))] (hcom 1 0 B
-[@2 = 0 i2. coe i2 0 (i3. B) (f (hcom 1 i2 A [k = 0 _. x.1; k = 1 j. ((u0 y).2
-((u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2
-{f (u1 y).1.1} {y} @6} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1
-y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1} {(u0 y).1} j).1] ((u0 y).2
-x {x} {(u0 y).1} k).1)); @2 = 1 i2. coe i2 0 (i3. B) y] (coe 1 0 (i2. B) (((u0
-y).2 x {x} {(u0 y).1} k).2 {f ((u0 y).2 x {x} {(u0 y).1} k).1} {y} @2)))))]
-(hcom 0 1 B [@2 = 0 i2. coe i2 1 (i3. B) (f (hcom 0 i2 A [i1 = 0 k. hcom 1 0 A
-[k = 0 _. x.1; k = 1 j. ((u0 y).2 x {x} {(u0 y).1} j).1] ((u0 y).2 x {x} {(u0
-y).1} k).1; i1 = 1 k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0 y).2 (hcom 1 0 A
-[i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1]
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1, λ {f (hcom 1 0 A [i = 0 _. (u0
-y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0
-y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1 0 B [@6 = 0 i3. f (hcom 1 0 A [i
-= 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1]
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6 = 1 i3. y; i = 0 _. hcom @7 0
-B [@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6 = 1 i3. coe i3 0 (i4. B) y]
-(coe @7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y} @6)); i = 1 j1. hcom j1 0 B [@6
-= 0 i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} i3).1); @6
-= 1 i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B) (((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1} {y} @6))]
-(hcom 1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1 i3 A [i = 0 _. (u0 y).1.1; i
-= 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0
-y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0 (i4. B) y] (coe 1 0 (i3. B) (((u0
-y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0
-y).1} i).1} {y} @6)))) {hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1
-y).1 {(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1,
-λ {f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)} {y} _. hcom 1
-0 B [@6 = 0 i3. f (hcom 1 0 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1); @6
-= 1 i3. y; i = 0 _. hcom @7 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (u0 y).1.1); @6
-= 1 i3. coe i3 0 (i4. B) y] (coe @7 0 (i3. B) ((u0 y).1.2 {f (u0 y).1.1} {y}
-@6)); i = 1 j1. hcom j1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f ((u0 y).2 (u1 y).1
-{(u1 y).1} {(u0 y).1} i3).1); @6 = 1 i3. coe i3 0 (i4. B) y] (coe j1 0 (i3. B)
-(((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1} j1).2 {f ((u0 y).2 (u1 y).1 {(u1 y).1}
-{(u0 y).1} j1).1} {y} @6))] (hcom 1 0 B [@6 = 0 i3. coe i3 0 (i4. B) (f (hcom 1
-i3 A [i = 0 _. (u0 y).1.1; i = 1 j1. ((u0 y).2 (u1 y).1 {(u1 y).1} {(u0 y).1}
-j1).1] ((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1)); @6 = 1 i3. coe i3 0
-(i4. B) y] (coe 1 0 (i3. B) (((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).2 {f
-((u0 y).2 (u0 y).1 {(u0 y).1} {(u0 y).1} i).1} {y} @6)))} {(u0 y).1} j).1] ((u0
-y).2 x {x} {(u0 y).1} k).1; i = 0 k. hcom 1 0 A [k = 0 _. x.1; k = 1 j. ((u0
-y).2 ((u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ {f (u0 y).1.1} {y} _. (u0
-y).1.2 {f (u0 y).1.1} {y} @6} i1) {(u0 y).2 (x.1, x.2) {x.1, x.2} {(u0 y).1.1, λ
-{f (u0 y).1.1} {y} _. (u0 y).1.2 {f (u0 y).1.1} {y} @6} i1} {(u0 y).1} j).1]
-((u0 y).2 x {x} {(u0 y).1} k).1; i = 1 k. hcom 1 0 A [k = 0 _. x.1; k = 1
-j. ((u0 y).2 ((u1 y).2 (x.1, x.2) {x.1, x.2} {(u1 y).1.1, λ {f (u1 y).1.1} {y}
-_. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1) {(u1 y).2 (x.1, x.2) {x.1, x.2} {(u1
-y).1.1, λ {f (u1 y).1.1} {y} _. (u1 y).1.2 {f (u1 y).1.1} {y} @6} i1} {(u0 y).1}
-j).1] ((u0 y).2 x {x} {(u0 y).1} k).1] x.1)); @2 = 1 i2. coe i2 1 (i3. B) y]
-(coe 0 1 (i2. B) (x.2 {f x.1} {y} @2)))));
+λ u0 u1 {u0} {u1} i y. ((hcom 1 0 A [i = 0 _. (u0 y).x.x; i = 1 j. ((u0 y).2 (u1
+y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} i).x,
+λ {f (hcom 1 0 A [i = 0 _. (u0 y).x.x; i = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x}
+{(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} i).x)} {y} _. hcom 1 0
+B [@1 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @1
+= 1 i. y; i = 0 _. hcom @2 0 B [@1 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @1 = 1
+i. coe i 0 (i. B) y] (coe @2 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @1)); i = 1
+j. hcom j 0 B [@1 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} i).x); @1 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y}
+@1))] (hcom 1 0 B [@1 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)); @1 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B)
+(((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} i).2 {f ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} i).x} {y} @1)))), λ x {x} {hcom 1 0 A [i = 0 _. (u0 y).x.x; i = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} i).x, λ {f (hcom 1 0 A [i = 0 _. (u0 y).x.x; i = 1 j. ((u0 y).2 (u1
+y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} i).x)}
+{y} _. hcom 1 0 B [@1 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0
+y).x} @0).x); @1 = 1 i. y; i = 0 _. hcom @2 0 B [@1 = 0 i. coe i 0 (i. B) (f (u0
+y).x.x); @1 = 1 i. coe i 0 (i. B) y] (coe @2 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x}
+{y} @1)); i = 1 j. hcom j 0 B [@1 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} i).x); @1 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x} {y} @1))] (hcom 1 0 B [@1 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 =
+0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0
+y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @1 = 1 i. coe i 0 (i. B) y] (coe 1
+0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} i).2 {f ((u0 y).2 (u0 y).x
+{(u0 y).x} {(u0 y).x} i).x} {y} @1)))} i. (hcom 0 1 A [i = 0 k. hcom 1 0 A [k =
+0 _. x.x; k = 1 j. ((u0 y).2 x {x} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x}
+k).x; i = 1 k. hcom 1 0 A [k = 0 _. x.x; k = 1 j. ((u0 y).2 (hcom 1 0 A [@0 = 0
+_. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0
+y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@4 = 0 i. f (hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @4 = 1 i. y; @0 = 0 _. hcom @5
+0 B [@4 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @4 = 1 i. coe i 0 (i. B) y] (coe
+@5 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @4)); @0 = 1 j. hcom j 0 B [@4 = 0
+i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @4 = 1
+i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @4))] (hcom 1 0 B [@4
+= 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)); @4 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0
+y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y}
+@4)))) {hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f
+(hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B
+[@4 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @4
+= 1 i. y; @0 = 0 _. hcom @5 0 B [@4 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @4 = 1
+i. coe i 0 (i. B) y] (coe @5 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @4)); @0 =
+1 j. hcom j 0 B [@4 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} i).x); @4 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y}
+@4))] (hcom 1 0 B [@4 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)); @4 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B)
+(((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x} {y} @4)))} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x;
+@0 = 0 k. hcom 1 0 A [k = 0 _. x.x; k = 1 j. ((u0 y).2 ((u0 y).2 (x.x, x.2)
+{x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y}
+@4} i) {(u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0
+y).x.2 {f (u0 y).x.x} {y} @4} i} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x}
+k).x; @0 = 1 k. hcom 1 0 A [k = 0 _. x.x; k = 1 j. ((u0 y).2 ((u1 y).2 (x.x,
+x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x}
+{y} @4} i) {(u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y}
+_. (u1 y).x.2 {f (u1 y).x.x} {y} @4} i} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0
+y).x} k).x] x.x, λ {f (hcom 0 1 A [i = 0 k. hcom 1 0 A [k = 0 _. x.x; k = 1
+j. ((u0 y).2 x {x} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; i = 1
+k. hcom 1 0 A [k = 0 _. x.x; k = 1 j. ((u0 y).2 (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@4 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x); @4 = 1 i. y; @0 = 0 _. hcom @5 0 B [@4 = 0
+i. coe i 0 (i. B) (f (u0 y).x.x); @4 = 1 i. coe i 0 (i. B) y] (coe @5 0 (i. B)
+((u0 y).x.2 {f (u0 y).x.x} {y} @4)); @0 = 1 j. hcom j 0 B [@4 = 0 i. coe i 0
+(i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @4 = 1 i. coe i 0
+(i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @4))] (hcom 1 0 B [@4 = 0 i. coe i
+0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @4 = 1
+i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y} @4)))) {hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@4 = 0 i. f (hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @4 = 1 i. y; @0 = 0 _. hcom @5
+0 B [@4 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @4 = 1 i. coe i 0 (i. B) y] (coe
+@5 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @4)); @0 = 1 j. hcom j 0 B [@4 = 0
+i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @4 = 1
+i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @4))] (hcom 1 0 B [@4
+= 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)); @4 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0
+y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y}
+@4)))} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @0 = 0 k. hcom 1 0 A [k
+= 0 _. x.x; k = 1 j. ((u0 y).2 ((u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f
+(u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @4} i) {(u0 y).2 (x.x, x.2)
+{x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y}
+@4} i} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @0 = 1 k. hcom 1 0 A [k
+= 0 _. x.x; k = 1 j. ((u0 y).2 ((u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f
+(u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @4} i) {(u1 y).2 (x.x, x.2)
+{x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y}
+@4} i} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x] x.x)} {y} _. hcom 0 1 B
+[@2 = 0 i. f (hcom 0 1 A [@1 = 0 k. hcom 1 0 A [k = 0 _. x.x; k = 1 j. ((u0 y).2
+x {x} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @1 = 1 k. hcom 1 0 A [k
+= 0 _. x.x; k = 1 j. ((u0 y).2 (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0
+y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1
+y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0 i. coe i 0 (i. B)
+(f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe @7 0 (i. B) ((u0 y).x.2 {f (u0
+y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0 i. coe i 0 (i. B) (f ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1 i. coe i 0 (i. B) y] (coe j 0
+(i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6 = 0 i. coe i 0 (i. B) (f (hcom
+1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1 i. coe i 0 (i. B)
+y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2
+(u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y} @6)))) {hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0
+i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe @7 0 (i. B)
+((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0 i. coe i 0
+(i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1 i. coe i 0
+(i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6 = 0 i. coe i
+0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1
+i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y} @6)))} {(u0 y).x}
+j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @0 = 0 k. hcom 1 0 A [k = 0 _. x.x; k = 1
+j. ((u0 y).2 ((u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y}
+_. (u0 y).x.2 {f (u0 y).x.x} {y} @6} @1) {(u0 y).2 (x.x, x.2) {x.x, x.2} {(u0
+y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @6} @1} {(u0 y).x}
+j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @0 = 1 k. hcom 1 0 A [k = 0 _. x.x; k = 1
+j. ((u0 y).2 ((u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y}
+_. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1) {(u1 y).2 (x.x, x.2) {x.x, x.2} {(u1
+y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1} {(u0 y).x}
+j).x] ((u0 y).2 x {x} {(u0 y).x} k).x] x.x); @2 = 1 i. y; i = 0 k. hcom k 1 B
+[@2 = 0 i. coe i 1 (i. B) (f (hcom 1 0 A [i = 0 _. x.x; i = 1 j. ((u0 y).2 x {x}
+{(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} i).x)); @2 = 1 i. coe i 1 (i. B) y]
+(coe k 1 (i. B) (hcom 1 0 B [@2 = 0 i. f (hcom 1 0 A [k = 0 _. x.x; k = 1
+j. ((u0 y).2 x {x} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x); @2 = 1
+i. y; k = 0 _. hcom @4 0 B [@2 = 0 i. coe i 0 (i. B) (f x.x); @2 = 1 i. coe i 0
+(i. B) y] (coe @4 0 (i. B) (x.2 {f x.x} {y} @2)); k = 1 j. hcom j 0 B [@2 = 0
+i. coe i 0 (i. B) (f ((u0 y).2 x {x} {(u0 y).x} i).x); @2 = 1 i. coe i 0 (i. B)
+y] (coe j 0 (i. B) (((u0 y).2 x {x} {(u0 y).x} j).2 {f ((u0 y).2 x {x} {(u0
+y).x} j).x} {y} @2))] (hcom 1 0 B [@2 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [k =
+0 _. x.x; k = 1 j. ((u0 y).2 x {x} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x}
+k).x)); @2 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 x {x} {(u0 y).x}
+k).2 {f ((u0 y).2 x {x} {(u0 y).x} k).x} {y} @2))))); i = 1 k. hcom k 1 B [@2 =
+0 i. coe i 1 (i. B) (f (hcom 1 0 A [i = 0 _. x.x; i = 1 j. ((u0 y).2 (hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7
+0 B [@6 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe
+@7 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0
+i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1
+i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6
+= 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)); @6 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0
+y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y}
+@6)))) {hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f
+(hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B
+[@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @6
+= 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1
+i. coe i 0 (i. B) y] (coe @7 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 =
+1 j. hcom j 0 B [@6 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} i).x); @6 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y}
+@6))] (hcom 1 0 B [@6 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B)
+(((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x} {y} @6)))} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} i).x));
+@2 = 1 i. coe i 1 (i. B) y] (coe k 1 (i. B) (hcom 1 0 B [@2 = 0 i. f (hcom 1 0 A
+[k = 0 _. x.x; k = 1 j. ((u0 y).2 (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0 i. coe i 0 (i. B)
+(f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe @7 0 (i. B) ((u0 y).x.2 {f (u0
+y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0 i. coe i 0 (i. B) (f ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1 i. coe i 0 (i. B) y] (coe j 0
+(i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6 = 0 i. coe i 0 (i. B) (f (hcom
+1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1 i. coe i 0 (i. B)
+y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2
+(u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y} @6)))) {hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0
+i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe @7 0 (i. B)
+((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0 i. coe i 0
+(i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1 i. coe i 0
+(i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6 = 0 i. coe i
+0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1
+i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y} @6)))} {(u0 y).x}
+j).x] ((u0 y).2 x {x} {(u0 y).x} k).x); @2 = 1 i. y; k = 0 _. hcom @4 0 B [@2 =
+0 i. coe i 0 (i. B) (f x.x); @2 = 1 i. coe i 0 (i. B) y] (coe @4 0 (i. B) (x.2
+{f x.x} {y} @2)); k = 1 j. hcom j 0 B [@2 = 0 i. coe i 0 (i. B) (f ((u0 y).2
+(hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0
+= 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0
+y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom
+1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0
+_. hcom @7 0 B [@6 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1 i. coe i 0
+(i. B) y] (coe @7 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 = 1 j. hcom j
+0 B [@6 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x);
+@6 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0
+B [@6 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0
+y).x} @0).x)); @6 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x
+{(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x}
+{y} @6)))) {hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f
+(hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B
+[@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @6
+= 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1
+i. coe i 0 (i. B) y] (coe @7 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 =
+1 j. hcom j 0 B [@6 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} i).x); @6 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y}
+@6))] (hcom 1 0 B [@6 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B)
+(((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x} {y} @6)))} {(u0 y).x} i).x); @2 = 1 i. coe i 0 (i. B) y] (coe
+j 0 (i. B) (((u0 y).2 (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1
+y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x,
+λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x}
+{(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1
+0 B [@5 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @5
+= 1 i. y; @0 = 0 _. hcom @6 0 B [@5 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @5 = 1
+i. coe i 0 (i. B) y] (coe @6 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @5)); @0 =
+1 j. hcom j 0 B [@5 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} i).x); @5 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y}
+@5))] (hcom 1 0 B [@5 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)); @5 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B)
+(((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x} {y} @5)))) {hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0
+y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1
+y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)} {y} _. hcom 1 0 B [@5 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x); @5 = 1 i. y; @0 = 0 _. hcom @6 0 B [@5 = 0 i. coe i 0 (i. B)
+(f (u0 y).x.x); @5 = 1 i. coe i 0 (i. B) y] (coe @6 0 (i. B) ((u0 y).x.2 {f (u0
+y).x.x} {y} @5)); @0 = 1 j. hcom j 0 B [@5 = 0 i. coe i 0 (i. B) (f ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} i).x); @5 = 1 i. coe i 0 (i. B) y] (coe j 0
+(i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x} {y} @5))] (hcom 1 0 B [@5 = 0 i. coe i 0 (i. B) (f (hcom
+1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @5 = 1 i. coe i 0 (i. B)
+y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2
+(u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y} @5)))} {(u0 y).x} j).2 {f ((u0 y).2
+(hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0
+= 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0
+y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@5 = 0 i. f (hcom
+1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @5 = 1 i. y; @0 = 0
+_. hcom @6 0 B [@5 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @5 = 1 i. coe i 0
+(i. B) y] (coe @6 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @5)); @0 = 1 j. hcom j
+0 B [@5 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x);
+@5 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @5))] (hcom 1 0
+B [@5 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0
+y).x} @0).x)); @5 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x
+{(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x}
+{y} @5)))) {hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f
+(hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B
+[@5 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @5
+= 1 i. y; @0 = 0 _. hcom @6 0 B [@5 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @5 = 1
+i. coe i 0 (i. B) y] (coe @6 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @5)); @0 =
+1 j. hcom j 0 B [@5 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} i).x); @5 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y}
+@5))] (hcom 1 0 B [@5 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)); @5 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B)
+(((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x} {y} @5)))} {(u0 y).x} j).x} {y} @2))] (hcom 1 0 B [@2 = 0
+i. coe i 0 (i. B) (f (hcom 1 i A [k = 0 _. x.x; k = 1 j. ((u0 y).2 (hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7
+0 B [@6 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe
+@7 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0
+i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1
+i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6
+= 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)); @6 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0
+y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y}
+@6)))) {hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f
+(hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B
+[@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @6
+= 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1
+i. coe i 0 (i. B) y] (coe @7 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 =
+1 j. hcom j 0 B [@6 = 0 i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0
+y).x} i).x); @6 = 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x
+{(u1 y).x} {(u0 y).x} j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y}
+@6))] (hcom 1 0 B [@6 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B)
+(((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x} {y} @6)))} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x));
+@2 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 x {x} {(u0 y).x} k).2 {f
+((u0 y).2 x {x} {(u0 y).x} k).x} {y} @2))))); @0 = 0 k. hcom k 1 B [@2 = 0
+i. coe i 1 (i. B) (f (hcom 1 0 A [i = 0 _. x.x; i = 1 j. ((u0 y).2 ((u0 y).2
+(x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0
+y).x.x} {y} @6} @1) {(u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0
+y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @6} @1} {(u0 y).x} j).x] ((u0 y).2
+x {x} {(u0 y).x} i).x)); @2 = 1 i. coe i 1 (i. B) y] (coe k 1 (i. B) (hcom 1 0 B
+[@2 = 0 i. f (hcom 1 0 A [k = 0 _. x.x; k = 1 j. ((u0 y).2 ((u0 y).2 (x.x, x.2)
+{x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y}
+@6} @1) {(u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0
+y).x.2 {f (u0 y).x.x} {y} @6} @1} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x}
+k).x); @2 = 1 i. y; k = 0 _. hcom @4 0 B [@2 = 0 i. coe i 0 (i. B) (f x.x); @2 =
+1 i. coe i 0 (i. B) y] (coe @4 0 (i. B) (x.2 {f x.x} {y} @2)); k = 1 j. hcom j 0
+B [@2 = 0 i. coe i 0 (i. B) (f ((u0 y).2 ((u0 y).2 (x.x, x.2) {x.x, x.2} {(u0
+y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @6} @1) {(u0 y).2
+(x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0
+y).x.x} {y} @6} @1} {(u0 y).x} i).x); @2 = 1 i. coe i 0 (i. B) y] (coe j 0
+(i. B) (((u0 y).2 ((u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x}
+{y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @5} i) {(u0 y).2 (x.x, x.2) {x.x, x.2} {(u0
+y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @5} i} {(u0 y).x}
+j).2 {f ((u0 y).2 ((u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x}
+{y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @5} i) {(u0 y).2 (x.x, x.2) {x.x, x.2} {(u0
+y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @5} i} {(u0 y).x}
+j).x} {y} @2))] (hcom 1 0 B [@2 = 0 i. coe i 0 (i. B) (f (hcom 1 i A [k = 0
+_. x.x; k = 1 j. ((u0 y).2 ((u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f (u0
+y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @6} @1) {(u0 y).2 (x.x, x.2) {x.x,
+x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @6} @1}
+{(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x)); @2 = 1 i. coe i 0 (i. B) y]
+(coe 1 0 (i. B) (((u0 y).2 x {x} {(u0 y).x} k).2 {f ((u0 y).2 x {x} {(u0 y).x}
+k).x} {y} @2))))); @0 = 1 k. hcom k 1 B [@2 = 0 i. coe i 1 (i. B) (f (hcom 1 0 A
+[i = 0 _. x.x; i = 1 j. ((u0 y).2 ((u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ
+{f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1) {(u1 y).2 (x.x, x.2)
+{x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y}
+@6} @1} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} i).x)); @2 = 1 i. coe i 1
+(i. B) y] (coe k 1 (i. B) (hcom 1 0 B [@2 = 0 i. f (hcom 1 0 A [k = 0 _. x.x; k
+= 1 j. ((u0 y).2 ((u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x}
+{y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1) {(u1 y).2 (x.x, x.2) {x.x, x.2}
+{(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1} {(u0
+y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x); @2 = 1 i. y; k = 0 _. hcom @4 0 B
+[@2 = 0 i. coe i 0 (i. B) (f x.x); @2 = 1 i. coe i 0 (i. B) y] (coe @4 0 (i. B)
+(x.2 {f x.x} {y} @2)); k = 1 j. hcom j 0 B [@2 = 0 i. coe i 0 (i. B) (f ((u0
+y).2 ((u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1
+y).x.2 {f (u1 y).x.x} {y} @6} @1) {(u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ
+{f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1} {(u0 y).x} i).x); @2
+= 1 i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 ((u1 y).2 (x.x, x.2) {x.x,
+x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @5} i)
+{(u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2
+{f (u1 y).x.x} {y} @5} i} {(u0 y).x} j).2 {f ((u0 y).2 ((u1 y).2 (x.x, x.2)
+{x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y}
+@5} i) {(u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1
+y).x.2 {f (u1 y).x.x} {y} @5} i} {(u0 y).x} j).x} {y} @2))] (hcom 1 0 B [@2 = 0
+i. coe i 0 (i. B) (f (hcom 1 i A [k = 0 _. x.x; k = 1 j. ((u0 y).2 ((u1 y).2
+(x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1
+y).x.x} {y} @6} @1) {(u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ {f (u1
+y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1} {(u0 y).x} j).x] ((u0 y).2
+x {x} {(u0 y).x} k).x)); @2 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2
+x {x} {(u0 y).x} k).2 {f ((u0 y).2 x {x} {(u0 y).x} k).x} {y} @2)))))] (hcom 0 1
+B [@2 = 0 i. coe i 1 (i. B) (f (hcom 0 i A [@1 = 0 k. hcom 1 0 A [k = 0 _. x.x;
+k = 1 j. ((u0 y).2 x {x} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @1 =
+1 k. hcom 1 0 A [k = 0 _. x.x; k = 1 j. ((u0 y).2 (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0 y).x.x; @0 = 1
+j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x}
+{(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7 0 B [@6 = 0
+i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe @7 0 (i. B)
+((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0 i. coe i 0
+(i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1 i. coe i 0
+(i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).2 {f ((u0
+y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6 = 0 i. coe i
+0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1
+y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x)); @6 = 1
+i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y} @6)))) {hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x, λ {f (hcom 1 0 A [@0 = 0 _. (u0
+y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0
+y).x {(u0 y).x} {(u0 y).x} @0).x)} {y} _. hcom 1 0 B [@6 = 0 i. f (hcom 1 0 A
+[@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x]
+((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x); @6 = 1 i. y; @0 = 0 _. hcom @7
+0 B [@6 = 0 i. coe i 0 (i. B) (f (u0 y).x.x); @6 = 1 i. coe i 0 (i. B) y] (coe
+@7 0 (i. B) ((u0 y).x.2 {f (u0 y).x.x} {y} @6)); @0 = 1 j. hcom j 0 B [@6 = 0
+i. coe i 0 (i. B) (f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} i).x); @6 = 1
+i. coe i 0 (i. B) y] (coe j 0 (i. B) (((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x}
+j).2 {f ((u0 y).2 (u1 y).x {(u1 y).x} {(u0 y).x} j).x} {y} @6))] (hcom 1 0 B [@6
+= 0 i. coe i 0 (i. B) (f (hcom 1 i A [@0 = 0 _. (u0 y).x.x; @0 = 1 j. ((u0 y).2
+(u1 y).x {(u1 y).x} {(u0 y).x} j).x] ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x}
+@0).x)); @6 = 1 i. coe i 0 (i. B) y] (coe 1 0 (i. B) (((u0 y).2 (u0 y).x {(u0
+y).x} {(u0 y).x} @0).2 {f ((u0 y).2 (u0 y).x {(u0 y).x} {(u0 y).x} @0).x} {y}
+@6)))} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @0 = 0 k. hcom 1 0 A [k
+= 0 _. x.x; k = 1 j. ((u0 y).2 ((u0 y).2 (x.x, x.2) {x.x, x.2} {(u0 y).x.x, λ {f
+(u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y} @6} @1) {(u0 y).2 (x.x, x.2)
+{x.x, x.2} {(u0 y).x.x, λ {f (u0 y).x.x} {y} _. (u0 y).x.2 {f (u0 y).x.x} {y}
+@6} @1} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x; @0 = 1 k. hcom 1 0 A
+[k = 0 _. x.x; k = 1 j. ((u0 y).2 ((u1 y).2 (x.x, x.2) {x.x, x.2} {(u1 y).x.x, λ
+{f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y} @6} @1) {(u1 y).2 (x.x, x.2)
+{x.x, x.2} {(u1 y).x.x, λ {f (u1 y).x.x} {y} _. (u1 y).x.2 {f (u1 y).x.x} {y}
+@6} @1} {(u0 y).x} j).x] ((u0 y).2 x {x} {(u0 y).x} k).x] x.x)); @2 = 1 i. coe i
+1 (i. B) y] (coe 0 1 (i. B) (x.2 {f x.x} {y} @2)))));
 
 propIsEquivNfOK (A B : U) (f : A → B) : propIsEquiv A B f = propIsEquivNf A B f :=
   refl;
