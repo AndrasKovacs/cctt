@@ -920,6 +920,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   VWrap x (rebind topA -> a) ->
     VPack x $ coed r r' a (unpack x t)
 
+  v@VHole{} -> v
+
   _ ->
     impossible
 
@@ -1044,6 +1046,8 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
     _ ->
       impossible
 
+  v@VHole{} -> v
+
   _ ->
     impossible
 
@@ -1099,7 +1103,8 @@ unglue ~t sys = case sys of
     VNe n is' -> case unSubNe n of
       NGlue base _ _ -> base
       n              -> VNe (NUnglue n sys) (is <> is')
-    _ -> impossible
+    v@VHole{} -> v
+    _         -> impossible
 {-# inline unglue #-}
 
 -- | Unglue with neutral system arg.
@@ -1108,7 +1113,8 @@ ungluen t (!sys, !is) = case frc t of
   VNe n is' -> case unSubNe n of
     NGlue base _ _ -> base
     n              -> VNe (NUnglue n sys) (is <> is')
-  _ -> impossible
+  v@VHole{} -> v
+  _         -> impossible
 {-# inline ungluen #-}
 
 

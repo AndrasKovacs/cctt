@@ -48,6 +48,8 @@ equiv (A B : U) : U :=
 
 iso (A B : U) : U := (f : A → B) × isIso A B f;
 
+idIso (A : U) : iso A A := (λ x. x, λ x. x, λ x _. x, λ x _. x);
+
 idEquiv (A : U) : equiv A A :=
   (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
 
@@ -80,5 +82,7 @@ isoToEquiv (A B : U)(i : iso A B) : equiv A B :=
   , ?rinv
   , ?coh
   ;
+
+isoToPath (A B : U)(i : iso A B) : A = B := ua A B (isoToEquiv A B i);
 
 --------------------------------------------------------------------------------

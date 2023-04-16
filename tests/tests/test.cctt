@@ -1,11 +1,44 @@
 
 import basics;
 
-TopIso : iso Top Top :=
-    λ[tt. tt]
-  , λ[tt. tt]
-  , λ[tt. refl]
-  , λ[tt. refl]
-  ;
+-- bench: ua idEquiv composition normal forms vs Agda
+--        left-nested ua composition, transports
 
-TopEq := ua Top Top (isoToEquiv Top Top TopIso);
+-- Left-nest composition doesn't run out of ivars!
+-- Right-nested does run out of them.
+-- Can we add some explicit WK to get rid of unnecessary fresh vars?
+
+path := isoToPath Top Top (idIso Top);
+
+comp2 := path ∙ path;
+comp3 := (path ∙ path) ∙ path;
+comp4 := comp3 ∙ path;
+
+-- bigpath :=
+--   path ∙ path ∙ path ∙
+--   path ∙ path ∙ path ∙
+--   path ∙ path ∙ path ∙
+--   path ∙ path;
+
+bigpath :=
+  (((((((((path ∙ path) ∙ path) ∙
+  path) ∙ path) ∙ path) ∙
+  path) ∙ path) ∙ path) ∙
+  path) ∙ path;
+
+-- At 12 it runs out of ivars!
+-- Otherwise evaluates instantly.
+
+test := coe 0 1 bigpath tt;
+
+comp (A : U)(x y z : A)(p : x = y)(q : y = z) : x = z :=
+  λ i. hcom 0 1 A [i=0 _. x; i=1 j. q j] (p i);
+
+compU (A B C : U)(p : A = B)(q : B = C) : A = C :=
+  λ i. hcom 0 1 U [i=0 _. A; i=1 j. q j] (p i);
+
+-- Glue (p i) [i=0. A, coe 1 0 (_.A) isEquiv; i=1. C, coe 1 0 (j.q j) isEquiv]
+
+funtest (x : Top) := coe 0 1 comp2 x;
+
+kek (A : U)(x y : A)(p : x = y) := p⁻¹⁻¹⁻¹⁻¹⁻¹⁻¹⁻¹⁻¹⁻¹⁻¹;
