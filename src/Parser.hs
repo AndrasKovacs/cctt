@@ -290,14 +290,14 @@ pi =
           (\_ -> Pi "_" t <$!> pi)
           (pure t))
 
-data LamBind = LBind Name (Maybe Tm) | LPLam Tm Tm Name
+data LamBind = LBind Name LamAnnot | LPLam Tm Tm Name
 
 lamBind :: Parser LamBind
 lamBind =
       do {l <- char '{' *> tm <* char '}'; r <- char '{' *> tm <* char '}';
           x <- bind; pure $ LPLam l r x}
-  <|> do {char '('; x <- bind; char ':'; a <- tm; char ')'; pure (LBind x (Just a))}
-  <|> (LBind <$!> bind <*!> pure Nothing)
+  <|> do {char '('; x <- bind; char ':'; a <- tm; char ')'; pure (LBind x (LAAnn a))}
+  <|> (LBind <$!> bind <*!> pure LANone)
 
 lam :: Parser Tm
 lam = do
@@ -316,12 +316,16 @@ desugarIdentArgs :: [([Name], Ty)] -> Maybe Ty -> Tm -> (Tm, Maybe Ty)
 desugarIdentArgs args mty rhs = case mty of
   -- if there's no return type annotation, we desugar to annotated lambdas
   Nothing -> let
-    tm = foldr' (\(xs, a) t -> foldr' (\x t -> Lam x (Just a) t) t xs) rhs args
+    tm = foldr' (\(xs, a) t -> foldr' (\x t -> Lam x (LAAnn a) t) t xs) rhs args
     in tm // Nothing
 
-  -- if there's a return type, we desugar to a vanilla annotated "let".
+  -- if there's a return type, we annotate the let with a Pi *and* annotate the
+  -- lambdas. This is a simple way to get a term representation of the binder
+  -- type. However, since we do this pre-elaboration, the annotation has to be
+  -- elaborated twice.
+  -- TODO: avoid the extra cost.
   Just a  -> let
-    tm = foldr' (\(xs, _) t -> foldr' (\x t -> Lam x Nothing t) t xs) rhs args
+    tm = foldr' (\(xs, a) t -> foldr' (\x t -> Lam x (LADesugared a) t) t xs) rhs args
     ty = foldr' (\(xs, a) b -> foldr' (\x -> Pi x a) b xs) a args
     in tm // Just ty
 

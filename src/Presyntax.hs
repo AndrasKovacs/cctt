@@ -5,6 +5,12 @@ import Common
 
 type Ty = Tm
 
+data LamAnnot
+  = LANone
+  | LAAnn Ty
+  | LADesugared Ty
+  deriving Show
+
 data Tm
   = Ident Name
   | LocalLvl Lvl                  -- @n
@@ -18,7 +24,7 @@ data Tm
   | Pi Name Ty Ty
   | App Tm Tm
   | PApp Tm Tm Tm Tm        -- explicit endpoints: t {l}{r} u
-  | Lam Name (Maybe Ty) Tm
+  | Lam Name LamAnnot Tm
   | PLam Tm Tm Name Tm      -- explicit endpoints: λ {l}{r} x. t
 
   | Sg Name Ty Ty

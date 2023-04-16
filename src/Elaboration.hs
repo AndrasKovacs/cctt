@@ -125,10 +125,12 @@ check t topA = frcPos t \case
   t -> case (t, frc topA) of
 
     (P.Lam x ann t, VPi a b) -> do
-      ~qa <- case ann of Nothing -> pure (quote a)
-                         Just a' -> do a' <- check a' VU
-                                       conv (eval a') a
-                                       pure a'
+      ~qa <- case ann of
+        P.LANone         -> pure (quote a)
+        P.LAAnn a'       -> do a' <- check a' VU
+                               conv (eval a') a
+                               pure a'
+        P.LADesugared a' -> check a' VU
       Lam x <$!> bind x a qa (\v -> check t (b ∙ v))
 
     (P.Split cs, VPi a b) -> do
@@ -142,9 +144,10 @@ check t topA = frcPos t \case
       pure $! Split (b^.name) (quote b) cs
 
     (P.Lam x ann t, VPath a l r) -> do
-      case ann of Nothing               -> pure ()
-                  Just (P.unPos -> P.I) -> pure ()
-                  Just _                -> err $ GenericError "Expected an interval binder"
+      case ann of P.LANone                 -> pure ()
+                  P.LAAnn (P.unPos -> P.I) -> pure ()
+                  P.LADesugared{}          -> pure ()
+                  _                        -> err $ GenericError "Expected an interval binder"
       t <- bindI x \i -> check t (a ∙ IVar i)
       convEndpoints (instantiate t I0) l
       convEndpoints (instantiate t I1) r
@@ -178,10 +181,11 @@ check t topA = frcPos t \case
       q <- check q (VPath a y z)
       pure $! Trans (quote a) (quote x) (quote y) (quote z) p q
 
-    (P.Lam x ma t, VLine a) -> do
-      case ma of Nothing               -> pure ()
-                 Just (P.unPos -> P.I) -> pure ()
-                 Just _                -> err $ GenericError "Expected an interval binder"
+    (P.Lam x ann t, VLine a) -> do
+      case ann of P.LANone                 -> pure ()
+                  P.LAAnn (P.unPos -> P.I) -> pure ()
+                  P.LADesugared{}          -> pure ()
+                  _                        -> err $ GenericError "Expected an interval binder"
       t <- bindI x \r -> check t (a ∙ IVar r)
       pure $ LLam x t
 
@@ -429,10 +433,13 @@ inferNonSplit t = frcPos t \case
       a ->
         err $! ExpectedPath (quote a)
 
-  P.Lam x Nothing t ->
+  P.Lam x P.LANone t ->
     err CantInferLam
 
-  P.Lam x (Just a) t -> case P.unPos a of
+  P.Lam x P.LADesugared{} t ->
+    impossible
+
+  P.Lam x (P.LAAnn a) t -> case P.unPos a of
     -- line type
     P.I -> bindI x \i -> do
       Infer t a <- infer t
