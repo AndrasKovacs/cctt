@@ -40,19 +40,22 @@ parseArgs args = do
   (verbose, args) <- case args of
     "verbose":args -> pure (True, args)
     args           -> pure (False, args)
-  noHoleCxts <- case args of
-    "no-hole-cxts":[] -> pure True
-    []                -> pure False
+  holeCxts <- case args of
+    "no-hole-cxts":[] -> pure False
+    []                -> pure True
     _                 -> exit
-  pure (path, printnf, elab, verbose, noHoleCxts)
+  pure (path, printnf, elab, verbose, holeCxts)
 
 
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   reset
-  (path, printnf, printelab, verbosity, noHoleCxts) <- parseArgs =<< getArgs
+  (path, printnf, printelab, verbosity, holeCxts) <- parseArgs =<< getArgs
 
-  modState (printingOpts %~ ((verbose .~ verbosity) . (printNf .~ printnf)))
+  modState $ printingOpts %~
+      (verbose .~ verbosity)
+    . (printNf .~ printnf)
+    . (showHoleCxts .~ holeCxts)
 
   (top, totaltime) <- timed (elaborate path)
   st <- getState

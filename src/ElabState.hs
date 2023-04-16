@@ -52,10 +52,10 @@ type LocalsArg  = (?locals  :: Locals)
 type Elab a     = LocalsArg => NCofArg => DomArg => EnvArg => PosArg => a
 
 data PrintingOpts = PrintingOpts {
-    printingOptsPrintNf     :: Maybe Name
-  , printingOptsVerbose     :: Bool
-  , printingOptsErrPrinting :: Bool
-  , printingOptsHoleCxts    :: Bool }
+    printingOptsPrintNf      :: Maybe Name
+  , printingOptsVerbose      :: Bool
+  , printingOptsErrPrinting  :: Bool
+  , printingOptsShowHoleCxts :: Bool }
   deriving Show
 
 data LoadState = LoadState {

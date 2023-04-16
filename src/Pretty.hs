@@ -4,6 +4,9 @@ module Pretty (
   , type PrettyArgs
   , localsToNames
   , withPrettyArgs
+  , withPrettyArgs0
+  , bind
+  , bindI
   , Pretty(..)) where
 
 import Prelude hiding (pi)
@@ -146,6 +149,11 @@ int = \case
 
 cofEq :: PrettyArgs (CofEq -> Txt)
 cofEq (CofEq i j) = int i <> " = " <> int j
+
+necof :: PrettyArgs (NeCof -> Txt)
+necof = \case
+  NCEq i j    -> int i <> " = " <> int j
+  NCAnd c1 c2 -> necof c1 <> ", " <> necof c2
 
 cof :: PrettyArgs (Cof -> Txt)
 cof = \case
@@ -374,6 +382,10 @@ instance Pretty (NamesArg, DomArg, IDomArg) Tm where
 instance Pretty (NamesArg, DomArg, IDomArg) Cof where
   pretty    t = runTxt (cof t)
   pretty0   t = withPrettyArgs0 $ runTxt (cof t)
+
+instance Pretty (NamesArg, DomArg, IDomArg) NeCof where
+  pretty    t = runTxt (necof t)
+  pretty0   t = withPrettyArgs0 $ runTxt (necof t)
 
 instance Pretty (NamesArg, DomArg, IDomArg) Sys where
   pretty  t   = runTxt (sys t)

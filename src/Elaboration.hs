@@ -23,8 +23,8 @@ import qualified Core
 import qualified Presyntax as P
 import qualified LvlMap as LM
 
-import Pretty
-
+import Pretty hiding (bind, bindI)
+import qualified Pretty
 
 -- Wrapped functions
 ----------------------------------------------------------------------------------------------------
@@ -218,10 +218,37 @@ check t topA = frcPos t \case
       cs <- elabCases params bv (LM.elems cons) cs
       pure $ Case t "_" qb cs
 
-    (P.Hole i p, a) -> setPos p $ withPrettyArgs do
+    (P.Hole i p, a) -> do
       putStrLn ("HOLE ?" ++ maybe (sourcePosPretty ?srcPos) id i)
-      putStrLn ("  : " ++ pretty (quote a) ++ "\n")
-      pure (Hole i p)
+      showcxt <- getState <&> (^.printingOpts.showHoleCxts)
+      let qa = quote a
+
+      let showBinder :: PrettyArgs (Name -> String)
+          showBinder "_" = '@':show ?dom
+          showBinder x   = x
+
+      let showIBinder :: PrettyArgs (Name -> String)
+          showIBinder "_" = '@':show ?idom
+          showIBinder x   = x
+
+      let go :: PrettyArgs (RevLocals -> IO Tm)
+          go = \case
+            RLNil -> do
+              when showcxt $ do
+                putStrLn ("────────────────────────────────────────────────────────────")
+              putStrLn (" : " ++ pretty qa ++ "\n")
+              pure (Hole i p)
+            RLBind x _ a ls -> do
+              when showcxt $ putStrLn (showBinder x ++ " : " ++ pretty a)
+              Pretty.bind x \_ -> go ls
+            RLBindI x ls -> do
+              when showcxt $ putStrLn (showIBinder x ++ " : I")
+              Pretty.bindI x \_ -> go ls
+            RLCof c ls -> do
+              when showcxt $ putStrLn (pretty c)
+              go ls
+
+      withPrettyArgs0 $ go (revLocals ?locals)
 
     (t, VWrap x a) -> do
       t <- check t a

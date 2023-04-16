@@ -8,3 +8,11 @@ foo : Unit → Unit :=
 kek (Unit : U) := @@0;
 
 lel (tt : U) := @@0#0;
+
+id (A : U)(x : A) := x;
+
+fun (A B : id U U) (x : A) (y : A) : A := ?;
+
+fun2 (A B : id U U) (x : A) (y : A) : A := ?;
+
+fun4 (A B : id U U) (x : A) (y : A) : A := ?mallac;
