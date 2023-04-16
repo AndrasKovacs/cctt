@@ -934,7 +934,10 @@ elabTop = \case
     printnf <- getState <&> (^.printingOpts.printNf)
     case printnf of
       Just x' | x == x' -> withPrettyArgs do
-        putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 (quote tv)
+        (!tq, !ntime) <- timedPure (quote tv)
+        putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 tq
+        putStrLn ""
+        putStrLn $ "Normalized in " ++ show ntime
         putStrLn ""
       _ -> pure ()
 

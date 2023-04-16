@@ -1,65 +1,56 @@
 
-import hedberg;
+import basics;
 
-data bool := false | true;
+data Bool := false | true;
 
 falseNeqTrue : not (false = true) :=
-  λ p. coe 0 1 (i. case (p i) [false. Unit; true. N0]) tt;
+  λ p. coe 0 1 (i. case (p i) [false. Top; true. Bot]) tt;
 
 trueNeqFalse : not (true = false) :=
-  λ p. coe 0 1 (i. case (p i) [false. N0; true. Unit]) tt;
+  λ p. coe 0 1 (i. case (p i) [false. Bot; true. Top]) tt;
 
-boolDec : (b1 b2 : bool) → dec (b1 = b2) := λ[
-  false. λ[false. inl refl        ; true. inr falseNeqTrue];
-  true.  λ[false. inr trueNeqFalse; true. inl refl        ]
+boolDec : (b1 b2 : Bool) → Dec (b1 = b2) := λ[
+  false. λ[false. left  refl        ; true. right falseNeqTrue];
+  true.  λ[false. right trueNeqFalse; true. left  refl        ]
   ];
 
-setbool : set bool := hedberg bool boolDec;
+negBool : Bool → Bool := λ[false. true; true. false];
 
-negBool : bool → bool := λ[false. true; true. false];
+negIso : iso Bool Bool :=
+    negBool
+  , negBool
+  , λ[false. refl; true. refl]
+  , λ[false. refl; true. refl];
 
-negBoolK : (b : bool) → negBool (negBool b) = b := λ[false. refl; true. refl];
+negEq : Bool = Bool :=
+  ua Bool Bool (isoToEquiv Bool Bool negIso);
 
-injNegBool : (b b' : bool) → negBool b = negBool b' → b = b' := λ[
-  false. λ[false. λ _. refl;
-           true.  λ p. case (trueNeqFalse p) []];
-  true.  λ[false. λ p. case (falseNeqTrue p) [];
-           true.  λ _. refl]];
+comp (A : U)(x y z : A)(p : x = y)(q : y = z) := p ∙ q;
 
+data Nat := zero | suc Nat;
 
+nsym (A : U)(x : A)(p : x = x)(n : Nat) : x = x :=
+  case n [zero. p; suc n. nsym A x p⁻¹ n];
 
+n5 := suc (suc (suc (suc (suc zero))));
 
+add (n m : Nat) : Nat := case n [
+  zero. m;
+  suc n. suc (add n m)];
 
--- ctr (b : bool) : fiber bool bool negBool b = (negBool b,negBoolK b)
+n10 := add n5 n5;
+n15 := add n10 n5;
+n20 := add n10 n10;
 
--- gengoal (A : U) (hA : set A) (x y : A) (p : Path A y x) : (z : A) (r : Path A y z) (q : Path A z x) ->
---   PathP (<i> Path A (r @ i) x) p q =
---   J A y (\(z : A) (r : Path A y z) -> (q : Path A z x) -> PathP (<i> Path A (r @ i) x) p q)
---    (hA y x p)
+ncomp (p : Bool = Bool) (n : Nat) : Bool = Bool := case n [
+  zero. p;
+  suc n. p ∙ ncomp p n];
 
--- contr (b : bool) (x y : fiber bool bool negBool b) : Path (fiber bool bool negBool b) x y =
---     let x1 : bool = x.1
---         x2 : Path bool (negBool x1) b = x.2
---         y1 : bool = y.1
---         y2 : Path bool (negBool y1) b = y.2
---         goal1 : Path bool x1 y1 =
---           injNegBool x1 y1 (<i> hcom 1->0 bool [(i=0) -> x2, (i=1) -> y2] b)
---         goal2 : PathP (<i> Path bool (negBool (goal1 @ i)) b) x2 y2 = undefined
---           -- gengoal bool setbool b (negBool x1) x2 (negBool y1) (<i> negBool (goal1 @ i)) y2
---     in <i> (goal1 @ i,goal2 @ i)
+-- works up to 11, then we run out of ivars
+-- each compositions needs an extra ivar!
+bigpath := negEq ∙ negEq ∙ negEq ∙
+           negEq ∙ negEq ∙ negEq ∙
+	   negEq ∙ negEq ∙ negEq ∙
+	   negEq ∙ negEq;
 
--- negBoolEquivInhProp : equivInhProp bool bool =
---   (negBool,\(b : bool) -> (ctr b,contr b))
-
--- negBoolEquiv : equiv bool bool = equivInhPropToEquiv bool bool negBoolEquivInhProp
-
--- pathNegbool : Path U bool bool = ua bool bool negBoolEquiv
-
--- test0 : bool = coe 0->1 pathNegbool false
--- test1 : bool = coe 1->0 pathNegbool true
-
--- prf0 : PathP (<i> pathNegbool @ i) false true =
---   <i> coe 0->i pathNegbool false
-
--- prf1 : PathP (<i> pathNegbool @ i) true false =
---   <i> coe 1->i pathNegbool false
+test := coe 0 1 bigpath false;

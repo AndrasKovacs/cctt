@@ -1,18 +1,11 @@
 
--- foo (A A : U) (x : @0) : @0 := ?;
+import basics;
 
-data Unit := tt;
-foo : Unit → Unit :=
-  λ [tt. tt];
+TopIso : iso Top Top :=
+    λ[tt. tt]
+  , λ[tt. tt]
+  , λ[tt. refl]
+  , λ[tt. refl]
+  ;
 
-kek (Unit : U) := @@0;
-
-lel (tt : U) := @@0#0;
-
-id (A : U)(x : A) := x;
-
-fun (A B : id U U) (x : A) (y : A) : A := ?;
-
-fun2 (A B : id U U) (x : A) (y : A) : A := ?;
-
-fun4 (A B : id U U) (x : A) (y : A) : A := ?mallac;
+TopEq := ua Top Top (isoToEquiv Top Top TopIso);

@@ -57,7 +57,7 @@ mainWith getArgs = do
     . (printNf .~ printnf)
     . (showHoleCxts .~ holeCxts)
 
-  (top, totaltime) <- timed (elaborate path)
+  (!top, !totaltime) <- timed (elaborate path)
   st <- getState
   putStrLn (path ++ " checked in " ++ show totaltime)
   putStrLn ("parsing time: " ++ show (st^.parsingTime))

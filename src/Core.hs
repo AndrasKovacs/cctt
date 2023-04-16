@@ -27,7 +27,7 @@ type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
 freshI :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshI act =
   let fresh = dom ?cof in
-  if  fresh == maxivar then error "RAN OUT OF IVARS" else
+  if  fresh == maxivar then error "RAN OUT OF IVARS IN EVAL" else
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   seq ?cof (act fresh)
 {-# inline freshI #-}
@@ -1157,6 +1157,7 @@ case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
 case_ t b ecs@(EC sub env rc cs) = case frc t of
   VDCon dci sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
   VNe n is     -> VNe (NCase n b ecs) is
+  v@VHole{}    -> v
   _            -> impossible
 {-# inline case_ #-}
 

@@ -1,4 +1,14 @@
 
+data Top := tt;
+data Bot :=;
+not (A : U) := A → Bot;
+
+data Sum (A B : U) := left A | right B;
+
+Dec (A : U) := Sum A (not A);
+
+--------------------------------------------------------------------------------
+
 isLogEquiv (A B : U)(f : A → B) : U := (B → A);
 
 isSection (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
@@ -33,20 +43,6 @@ coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
 		      x
   );
 
-coeIsEquivNF (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
-(λ x. coe r' r A x, λ x {x} {coe r' r A (coe r r' A x)} j. hcom r r'
-(A r) [j = 0 k. x; j = 1 k. coe k r A (coe r k A x)] x, λ x {coe r r' A (coe r'
-r A x)} {x} j. hcom r' r (A r') [j = 0 k. coe k r' A (coe r' k A x); j = 1 k. x]
-x, λ x {λ {coe r r' A x} {coe r r' A x} _. coe r r' A x} {λ {coe r r' A (coe r'
-r A (coe r r' A x))} {coe r r' A x} j. hcom r' r (A r') [j = 0 k. coe k r' A
-(coe r' k A (coe r r' A x)); j = 1 k. coe r r' A x] (coe r r' A x)} l {coe r r'
-A (hcom r r' (A r) [l = 0 k. x; l = 1 k. coe k r A (coe r k A x)] x)} {coe r r'
-A x} k. hcom r r' (A r') [k = 0 i. coe i r' A (coe r i A (hcom r i (A r) [l = 0
-k. x; l = 1 k. coe k r A (coe r k A x)] x)); k = 1 i. coe i r' A (coe r i A x);
-l = 0 i. coe i r' A (coe r i A x); l = 1 i. coe i r' A (hcom i r (A i) [k = 0
-k. coe k i A (coe i k A (coe r i A x)); k = 1 k. coe r i A x] (coe r i A x))]
-(coe r r' A x));
-
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
 
@@ -63,12 +59,6 @@ J (A : U) (a : A) (C : (x : A) → a = x → U)
   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
-JNf (A : U) (a : A) (C : (x : A) → a = x → U)
-  (d : C a (λ _. a))(x : A) (p : a = x) : C x p :=
-coe 0 1 (i. C (hcom 0 1 A [i = 0 _. a; i = 1 k. p {a} {x} k] a)
-(λ {a} {hcom 0 1 A [i = 0 _. a; i = 1 k. p {a} {x} k] a} j. hcom 0 j A [i = 0
-_. a; i = 1 k. p {a} {x} k] a)) d;
-
 JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
   : J A a C d a (λ _. a) = d :=
 
@@ -83,18 +73,12 @@ JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
                 k=1 _. d]
                d;
 
-JEqNf (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
-  : J A a C d a (λ _. a) = d :=
+isoToEquiv (A B : U)(i : iso A B) : equiv A B :=
+    i.f
+  , i.g
+  , i.linv
+  , ?rinv
+  , ?coh
+  ;
 
-λ {coe 0 1 (i. C (hcom 0 1 A [i = 0 _. a; i = 1 k. a] a) (λ {a} {hcom 0
-1 A [i = 0 _. a; i = 1 k. a] a} j. hcom 0 j A [i = 0 _. a; i = 1 k. a] a)) d}
-{d} k. hcom 0 1 (C a (λ {a} {a} j. a)) [k = 0 i. coe i 1 (i. C (hcom 0 1 A [i =
-0 _. a; i = 1 _. a] a) (λ {a} {hcom 0 1 A [i = 0 _. a; i = 1 _. a] a} j. hcom 0
-j A [i = 0 _. a; i = 1 _. a] a)) (coe 0 i (i. C (hcom 0 1 A [i = 0 _. a; i = 1
-_. a] a) (λ {a} {hcom 0 1 A [i = 0 _. a; i = 1 _. a] a} j. hcom 0 j A [i = 0
-_. a; i = 1 _. a] a)) d); k = 1 _. coe @1 1 (i. C a (λ {a} {a} j. a)) d] (coe 0
-1 (i. C (hcom 0 1 A [k = 0 x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a;
-i = 0 _. a; i = 1 _. a] a) (λ {a} {hcom 0 1 A [k = 0 x. hcom 0 x A [i = 0 _. a;
-i = 1 _. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a] a} j. hcom 0 j A [k = 0
-x. hcom 0 x A [i = 0 _. a; i = 1 _. a] a; k = 1 _. a; i = 0 _. a; i = 1 _. a]
-a)) d);
+--------------------------------------------------------------------------------

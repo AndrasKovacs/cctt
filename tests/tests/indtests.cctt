@@ -29,6 +29,18 @@ mul' : ℕ → ℕ → ℕ := λ[
 
 n100 := mul ten ten;
 n1k  := mul' ten n100;
+n100k := mul n1k n100;
+n10m := mul n100 n100k;
+
+data Bool := true | false;
+
+even : ℕ → Bool := λ[
+  zero. true;
+  suc n. case (even n) [true. false; false. true]];
+
+testn1k   := even n1k;
+testn100k := even n100k;
+testn10m  := even n10m;
 
 --------------------------------------------------------------------------------
 

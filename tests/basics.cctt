@@ -1,4 +1,14 @@
 
+data Top := tt;
+data Bot :=;
+not (A : U) := A → Bot;
+
+data Sum (A B : U) := left A | right B;
+
+Dec (A : U) := Sum A (not A);
+
+--------------------------------------------------------------------------------
+
 isLogEquiv (A B : U)(f : A → B) : U := (B → A);
 
 isSection (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
@@ -62,3 +72,13 @@ JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
                [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
                 k=1 _. d]
                d;
+
+isoToEquiv (A B : U)(i : iso A B) : equiv A B :=
+    i.f
+  , i.g
+  , i.linv
+  , ?rinv
+  , ?coh
+  ;
+
+--------------------------------------------------------------------------------
