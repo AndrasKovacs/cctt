@@ -261,7 +261,7 @@ check t topA = frcPos t \case
             err $ GenericError $
               "No such constructor for expected type:\n\n  "
               ++ pretty (quote (VTyCon tyinf ps))
-          sp <- checkSp ps sp (dci^.fieldTypes)
+          sp <- checkSp (dci^.name) ps sp (dci^.fieldTypes)
           pure $ DCon dci sp
 
         TyConHead{} ->
@@ -368,18 +368,18 @@ inferSp t a sp = case sp of
     a ->
       err $! ExpectedPiPathLine (quote a)
 
-checkSp :: Elab (Env -> [P.Tm] -> Tel -> IO Spine)
-checkSp env sp fs = case (sp, fs) of
+checkSp :: Elab (Name -> Env -> [P.Tm] -> Tel -> IO Spine)
+checkSp conname env sp fs = case (sp, fs) of
   (t:sp, TCons x a fs) -> do
     t  <- check t (evalIn env a)
-    sp <- checkSp (EDef env (eval t)) sp fs
+    sp <- checkSp conname (EDef env (eval t)) sp fs
     pure $ SPCons t sp
   ([], TNil) ->
     pure $ SPNil
   (_:_, TNil) ->
-    err $ GenericError "Constructor applied to too few arguments"
+    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too many arguments"
   ([], TCons{}) ->
-    err $ GenericError "Constructor applied to too many arguments"
+    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too few arguments"
 
 infer :: Elab (P.Tm -> IO Infer)
 infer t = split t >>= \case
@@ -387,14 +387,15 @@ infer t = split t >>= \case
   -- no params + saturated
   DConHead inf sp -> case inf^.tyConInfo.paramTypes of
     TNil -> do
-      sp <- checkSp ENil sp (inf^.fieldTypes)
+      sp <- checkSp (inf^.name) ENil sp (inf^.fieldTypes)
       pure $ Infer (DCon inf sp) (VTyCon (inf^.tyConInfo) ENil)
     _  ->
-      err $ GenericError $ "Can't infer type for a data constructor which has type parameters"
+      err $ GenericError $ "Can't infer type for data constructor " ++ show (inf^.name) ++ " which has "
+                            ++"type parameters"
 
   -- saturated
   TyConHead inf sp -> do
-    sp <- checkSp ENil sp (inf^.paramTypes)
+    sp <- checkSp (inf^.name) ENil sp (inf^.paramTypes)
     pure $ Infer (TyCon inf sp) VU
 
   SplitInfer inf -> do
@@ -735,7 +736,7 @@ elabBindMaybe b r r' = case b of
 
 identI :: Elab (Name -> IVar -> Locals -> IO I)
 identI x idom = \case
-  LNil                      -> err $ GenericError $ "Interval variable not in scope"
+  LNil                      -> err $ GenericError $ "Interval variable not in scope: " ++ show x
   LBind ls x' _ _ | x == x' -> err ExpectedI
                   | True    -> identI x idom ls
   LBindI ls x'    | x == x' -> pure $ IVar (idom - 1)

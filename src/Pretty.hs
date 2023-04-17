@@ -188,8 +188,8 @@ spine = \case
 
 caseBody :: PrettyArgs ([Name] -> Tm -> Txt)
 caseBody xs t = case xs of
-  []   -> ". " <> proj t
-  [x]  -> bind x \x -> " " <> x <> ". " <> proj t
+  []   -> ". " <> pair t
+  [x]  -> bind x \x -> " " <> x <> ". " <> pair t
   x:xs -> bind x \x -> " " <> x <> caseBody xs t
 
 cases :: PrettyArgs (Cases -> Txt)

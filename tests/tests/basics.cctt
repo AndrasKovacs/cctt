@@ -84,5 +84,3 @@ isoToEquiv (A B : U)(i : iso A B) : equiv A B :=
   ;
 
 isoToPath (A B : U)(i : iso A B) : A = B := ua A B (isoToEquiv A B i);
-
---------------------------------------------------------------------------------

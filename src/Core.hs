@@ -92,6 +92,10 @@ bindILazyS :: Name -> (SubArg => NCofArg => I -> a) -> (SubArg => NCofArg => Bin
 bindILazyS x act = freshIS \i -> BindILazy x i (act (IVar i))
 {-# inline bindILazyS #-}
 
+bindIUnLazy :: BindILazy a -> BindI a
+bindIUnLazy (BindILazy x i a) = BindI x i a
+{-# inline bindIUnLazy #-}
+
 ----------------------------------------------------------------------------------------------------
 -- Cof and Sys semantics
 ----------------------------------------------------------------------------------------------------
@@ -987,7 +991,8 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
     -- NOTE: r = r' can be false or neutral
     sys = nscons (ceq r r') (VPair "Ty" base (theIdEquiv base)) $
           mapNeSysFromH
-            (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
+            (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindIUnLazy t) r' r))
+            -- (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
             nts
 
     in VGlueTy base (sys // insertI r (insertI r' is))

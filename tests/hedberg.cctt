@@ -8,13 +8,20 @@ hedbergLemma (A : U)(a : A) (f : (x : A) → a = x → a = x) :
     refl;
 
 hedbergStable (A : U) (a b : A) (h : (x : A) -> stable (a = x))(p q : a = b) : p = q :=
+
   let rem1 (x : A) : exConst (a = x) := stableConst (a = x) (h x);
+
   let f (x : A) : a = x → a = x := (rem1 x).1;
+
   let fIsConst (x : A) : const (a = x) (f x) := (rem1 x).2;
+
   let rem4 : Square A a a b b refl refl (f b p) (f b q) := fIsConst b p q;
+
   let r : a = a := f a refl;
-  let rem2 : Square A a a a b refl p r (f b p) := hedbergLemma A a f b p;
-  let rem3 : Square A a a a b refl q r (f b q) := hedbergLemma A a f b q;
+
+  let rem2 (i j : I) := hedbergLemma A a f b p i j;
+  let rem3 (i j : I) := hedbergLemma A a f b q i j;
+
   λ j i. hcom 0 1 [j=0. rem2 i
                  ; j=1. rem3 i
 		 ; i=0. r

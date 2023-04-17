@@ -1,28 +1,19 @@
 {-# OPTIONS --cubical #-}
 
 open import Cubical.Foundations.Everything
+open import Cubical.Data.Nat
+open import Cubical.Data.Bool
 
-data Bool : Set where
-  true false : Bool
+BoolPathN : ℕ → Bool ≡ Bool
+BoolPathN n = iter n (λ p → p ∙ notEq) notEq
 
-not : Bool → Bool
-not true  = false
-not false = true
+fun : ℕ → Bool → Bool
+fun n x = transport (BoolPathN n) x
 
-notIso : Iso Bool Bool
-Iso.fun      notIso b     = not b
-Iso.inv      notIso b     = not b
-Iso.rightInv notIso true  = refl
-Iso.rightInv notIso false = refl
-Iso.leftInv  notIso true  = refl
-Iso.leftInv  notIso false = refl
+val : ℕ → Bool
+val n = transport (BoolPathN n) true
 
-notPath : Bool ≡ Bool
-notPath = isoToPath notIso
+test : val 1000 ≡ false
+test = refl
 
-bigPath =
-    notPath ∙ notPath ∙ notPath ∙ notPath ∙ notPath ∙ notPath
-  ∙ notPath ∙ notPath ∙ notPath ∙ notPath ∙ notPath ∙ notPath
-
-test : Bool
-test = transport bigPath true
+-- all|internal|modules|definitions|sharing|serialize|constraints|metas|interactive|conversion)

@@ -229,7 +229,7 @@ app = withPos (
   <|>  (goApp =<< proj))
 
 trans :: Parser Tm
-trans = foldr1 Trans <$!> sepBy1 app (char '∙')
+trans = foldl1 Trans <$!> sepBy1 app (char '∙')
 
 eq :: Parser Tm
 eq = do

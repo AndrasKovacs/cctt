@@ -19,8 +19,8 @@ helpMsg = unlines [
   ,"  no-hole-cxt   turn off printing local contexts of holes"
   ]
 
-elabPath :: FilePath -> [String] -> IO ()
-elabPath path args = mainWith (pure $ path : args)
+elabPath :: FilePath -> String -> IO ()
+elabPath path args = mainWith (pure $ path : words args)
 
 mainInteraction :: IO ()
 mainInteraction = mainWith getArgs

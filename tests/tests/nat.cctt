@@ -1,0 +1,58 @@
+
+data ℕ := zero | suc ℕ;
+
+iter (A : U)(f : A → A)(a : A)(n : ℕ) : A := case n [
+  zero. a;
+  suc n. f (iter A f a n)];
+
+add (x y : ℕ) : ℕ := case x [
+  zero . y;
+  suc x. suc (add x y)];
+
+suc' (x : ℕ) := suc x;
+
+add0 : (x : ℕ) → add x zero = x := λ[
+  zero. refl;
+  suc x. λ i. suc (add0 x i)];
+
+addSuc : (x y : ℕ) → add x (suc y) = suc (add x y) := λ[
+  zero.  λ y i. suc y;
+  suc x. λ y i. suc (addSuc x y i)];
+
+addAssoc : (x y z : ℕ) → add x (add y z) = add (add x y) z := λ[
+  zero.  λ y z i. add y z;
+  suc x. λ y z i. suc (addAssoc x y z i)];
+
+addComm : (x y : ℕ) → add x y = add y x := λ[
+  zero.  λ y. (add0 y)⁻¹;
+  suc x. λ y. ap suc' (addComm x y) ∙ (addSuc y x)⁻¹];
+
+mul (x y : ℕ) : ℕ := case x [
+  zero. zero;
+  suc x. add y (mul x y)];
+
+n1    := suc zero;
+n2    := suc n1;
+n3    := suc n2;
+n4    := suc n3;
+n5    := suc n4;
+n6    := suc n5;
+n7    := suc n6;
+n8    := suc n7;
+n9    := suc n8;
+n10   := suc n9;
+n11   := suc n10;
+n12   := suc n11;
+n13   := suc n12;
+n14   := suc n13;
+n15   := suc n14;
+n16   := suc n15;
+n17   := suc n16;
+n18   := suc n17;
+n19   := suc n18;
+n20   := suc n19;
+n100  := mul n10 n10;
+n1k   := mul n10 n100;
+n10k  := mul n10 n1k;
+n100k := mul n10 n10k;
+n1m   := mul n1k n1k;
