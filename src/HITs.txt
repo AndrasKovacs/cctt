@@ -1,0 +1,73 @@
+
+Parameterized HITs
+
+Signature:    (fibrant-only) parameters, list of constructors
+Constructor:  telescope with mixed I-s and fibrant types (under params)
+              + system with component type exactly (Sort params)
+HCom:         trivial, returns FHCom (which is canonical!)
+Coercion:
+  - If empty boundary or boundary only contains vars: do the same as with ordinary inductives
+  - Otherwise: Evan's boundary adjustment
+  - Add a (hasSimpleBoundary :: Bool) tag to HConInfo
+
+------------------------------------------------------------
+
+higher inductive S1 := base | loop (i : I)[i=0. base; i=1.base];
+
+higher inductive SetTrunc (A : U) :=
+    SEmbed A
+  | STrunc (x y : SetTrunc A)(p q : x = y) (i j : I)[i=0. p j; i=1. q j];
+
+(\i j. STrunc x y p q i j) : p = q
+
+HTyCon HTyConInfo TyParams
+HDCon HDConInfo HDSpine
+
+VHTyCon HTyConInfo Env
+VHDCon HDConInfo VHDSpine IVarSet
+
+HTel
+
+------------------------------------------------------------
+
+Case elaboration:
+
+   case t (x. B) [
+     con fs. rhs
+   ]
+
+- lookup arg telescope of fs
+
+- starting from typarams env, push field vars to cxt, create LHS val, check rhs with
+  B (rhsVal)
+
+  (almost the same as with indtypes up to this point)
+
+- lookup syntactic con boundary, evaluate it in paramEnv + idSub
+  during eval, apply (case _ (x. B) prevcases) to  each boundary component, where
+  (prevcases) are the previously checked cases.
+
+- Check compatibility of rhs with the evaluated boundary system
+
+Case evaluation:
+
+- action on constructors exactly the same as in indtypes
+
+- fhcom:
+  case _ (x.B x) cases : (x : A ps) → B x
+
+  base        : A ps
+  whole thing : B (fhcom ...)
+
+  case base B cases        : B base
+  α i ⊢ case (t i) B cases : B (t i)
+
+  Case (fhcom r r' (A ps) [α i. t i] base) (x. B x) cases =
+
+  com r r' (i. B (fhcom r i (A ps) [α i. t i] base)) [α i. case (t i) B cases]
+                                                     (case base B cases) =
+
+  let B* = λ i. B (fhcom r i (A ps) [α j. t j] base);
+  hcom r r' (B* r')
+            [α i. coe i r' B* (case (t i) B cases)]
+	    (coe r r' B* (case base B cases))

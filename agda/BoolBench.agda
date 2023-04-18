@@ -13,7 +13,7 @@ fun n x = transport (BoolPathN n) x
 val : ℕ → Bool
 val n = transport (BoolPathN n) true
 
-test : val 1000 ≡ false
+test : val zero ≡ false
 test = refl
 
 -- all|internal|modules|definitions|sharing|serialize|constraints|metas|interactive|conversion)

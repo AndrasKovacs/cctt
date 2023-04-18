@@ -75,10 +75,10 @@ JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
                 k=1 _. d]
                d;
 
-isoToEquiv (A B : U)(i : iso A B) : equiv A B :=
-    i.f
-  , i.g
-  , i.linv
+isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
+    iso.f
+  , iso.g
+  , iso.linv
   , ?rinv
   , ?coh
   ;
