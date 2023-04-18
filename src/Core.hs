@@ -12,9 +12,7 @@ FORCING
   - moving under cofibrations:
     - We lose off-diagonals
     - We lose system forcing
-
   - semantic system cons-es always take forced cofibrations
-
 -}
 
 type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
@@ -394,12 +392,14 @@ instance Apply Val Val Val NCofArg DomArg where
   {-# inline (∙) #-}
 
 instance Apply (BindI a) I a (SubAction a) NCofArg where
+  (∙) (BindI x i a) j | IVar i == j = a
   (∙) (BindI x i a) j =
     let s = setCod i (idSub (dom ?cof)) `ext` j
     in doSub s a
   {-# inline (∙) #-}
 
 instance Apply (BindILazy a) I a (SubAction a) NCofArg where
+  (∙) (BindILazy x i a) j | IVar i == j = a
   (∙) (BindILazy x i a) j =
     let s = setCod i (idSub (dom ?cof)) `ext` j
     in doSub s a
@@ -432,6 +432,7 @@ capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
   CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = s; ?recurse = rc in eval t
   CSplit b ecs          -> case_ u b ecs
+  CHSplit b ecs         -> hcase u b ecs
 
   CCoePi r r' a b t ->
     let ~x = u in
@@ -1088,12 +1089,6 @@ glueTy ~a sys = case sys of
   VSNe sys  -> VGlueTy a sys
 {-# inline glueTy #-}
 
-glueTyNoinline :: NCofArg => DomArg => Val -> VSys -> Val
-glueTyNoinline ~a sys = case sys of
-  VSTotal b -> proj1 "Ty" b
-  VSNe sys  -> VGlueTy a sys
-{-# noinline glueTyNoinline #-}
-
 glue :: Val -> VSys -> VSys -> Val
 glue ~t eqs sys = case (eqs, sys) of
   (VSTotal{}    , VSTotal v)      -> v
@@ -1127,13 +1122,29 @@ ungluen t (!sys, !is) = case frc t of
 ----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
-goTyParams :: EvalArgs (Env -> Spine -> Env)
-goTyParams env = \case
-  SPNil       -> env
-  SPCons a as -> goTyParams (EDef env (eval a)) as
+evalIndParam :: NCofArg => DomArg => Env -> Tm -> Val
+evalIndParam env t =
+  let ?sub     = emptySub (dom ?cof)
+      ?recurse = DontRecurse
+      ?env     = env
+  in eval t
+{-# inline evalIndParam #-}
 
-tyParams :: EvalArgs (Spine -> Env)
-tyParams = goTyParams ENil
+goParams :: EvalArgs (Env -> Spine -> Env)
+goParams env = \case
+  SPNil       -> env
+  SPCons a as -> goParams (EDef env (eval a)) as
+
+params :: EvalArgs (Spine -> Env)
+params = goParams ENil
+
+goLazyParams :: EvalArgs (Env -> LazySpine -> Env)
+goLazyParams env = \case
+  LSPNil       -> env
+  LSPCons a as -> goLazyParams (EDef env (eval a)) as
+
+lazyParams :: EvalArgs (LazySpine -> Env)
+lazyParams = goLazyParams ENil
 
 spine :: EvalArgs (Spine -> VDSpine)
 spine = \case
@@ -1166,10 +1177,10 @@ lookupCase i sp cs = case i // cs of
 
 case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
 case_ t b ecs@(EC sub env rc cs) = case frc t of
-  VDCon dci sp -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
-  VNe n is     -> VNe (NCase n b ecs) is
-  v@VHole{}    -> v
-  _            -> impossible
+  VDCon dci sp       -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
+  VNe n is           -> VNe (NCase n b ecs) is
+  v@VHole{}          -> v
+  _                  -> impossible
 {-# inline case_ #-}
 
 projVDSpine :: Lvl -> VDSpine -> Val
@@ -1199,7 +1210,7 @@ hcomind0sp r r' a sys params conid fieldid sp fieldtypes = case (sp, fieldtypes)
   (VDNil, TNil) ->
     VDNil
   (VDCons t sp, TCons _ tty fieldtypes) ->
-    VDCons (hcomdn r r' (evalParam params tty) (lazyprojsys' conid fieldid sys) t)
+    VDCons (hcomdn r r' (evalIndParam params tty) (lazyprojsys' conid fieldid sys) t)
            (hcomind0sp r r' a sys (EDef params t) conid (fieldid + 1) sp fieldtypes)
   _ ->
     impossible
@@ -1254,7 +1265,7 @@ hcomindsp r r' a prj@(!_,!_) params conid fieldid sp fieldtypes = case (sp, fiel
   (VDNil, TNil) ->
     VDNil
   (VDCons t sp, TCons _ tty fieldtypes) ->
-    VDCons (hcomdn r r' (evalParam params tty) (projfields' prj fieldid) t)
+    VDCons (hcomdn r r' (evalIndParam params tty) (projfields' prj fieldid) t)
            (hcomindsp r r' a prj (EDef params t) conid (fieldid + 1) sp fieldtypes)
   _ ->
     impossible
@@ -1263,13 +1274,86 @@ coeindsp :: NCofArg => DomArg => I -> I -> BindI Env -> VDSpine -> Tel -> VDSpin
 coeindsp r r' params sp fieldtypes = case (sp, fieldtypes) of
   (VDNil, TNil) -> VDNil
   (VDCons t sp, TCons _ tty fieldtypes) ->
-    let tty' = umapBindI params \ps -> evalParam ps tty in
+    let tty' = umapBindI params \ps -> evalIndParam ps tty in
     VDCons (coed r r' tty' t)
+           -- TODO: opt mapBindI
            (coeindsp r r' (mapBindI params \i ps -> EDef ps (coe r i tty' t)) sp fieldtypes)
   _ -> impossible
 
+
+-- Higher inductive types
+----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 
+-- TODO: unbox
+data VBoundary = VBTotal Val | VBNe IVarSet deriving Show
+
+vbempty :: VBoundary
+vbempty = VBNe mempty
+
+vbcons :: NCofArg => VCof -> (NCofArg => Val) -> VBoundary -> VBoundary
+vbcons cof v ~sys = case cof of
+  VCTrue      -> VBTotal v
+  VCFalse     -> sys
+  VCNe cof is -> case sys of
+    VBTotal v'  -> VBTotal v'
+    VBNe is'    -> VBNe (is <> is')
+{-# inline vbcons #-}
+
+evalBoundary :: EvalArgs (Sys -> VBoundary)
+evalBoundary = \case
+  SEmpty          -> VBNe mempty
+  SCons cof t sys -> vbcons (evalCof cof) (eval t) (evalBoundary sys)
+
+hdcon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Val
+hdcon inf ps fs s = case inf^.boundary of
+  SEmpty -> VHDCon inf ps fs s mempty
+  bnd    -> let ?sub = s; ?env = pushSp ps fs; ?recurse = DontRecurse in
+            case evalBoundary bnd of
+              VBTotal v -> v
+              VBNe is   -> VHDCon inf ps fs s is
+{-# inline hdcon #-}
+
+lookupHCase :: EvalArgs (Lvl -> VDSpine -> Sub -> Cases -> Val)
+lookupHCase i sp s cs = case i // cs of
+  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp; ?sub = uf in eval body
+  (i, CSCons _ _  _    cs) -> lookupHCase (i - 1) sp s cs
+  _                        -> impossible
+
+hcase :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
+hcase t b ecs@(EC sub env rc cs) = case frc t of
+
+  VHDCon i ps fs s _ ->
+    let ?sub = sub; ?env = env; ?recurse = rc in
+    lookupHCase (i^.conId) fs s cs
+
+  VNe n is -> case unSubNe n of
+
+    -- case on hcom
+    hcombase@(NHCom r r' a (frc -> sys) base) ->
+
+      -- case (hcom r r' a [α i. t i] base) B cs =
+      -- let B* = λ i. B (hcom r i a [α i. t i] base);
+      -- hcom r r' (B (hcom r r' a [α i. t i] base))
+      --           [α i. coe i r' B* (case (t i) B cs)]
+      --           (coe r r' B* (case base B cs))
+
+      let bbind = bindI "i" \i -> b ∙ hcom r i a sys base in
+      hcomd r r'
+        (b ∙ VNe hcombase is)
+        (mapVSysHCom
+           (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs))
+           sys)
+        (coed r r' bbind (hcase base b ecs))
+
+    n ->
+      VNe (NHCase n b ecs) is
+
+  v@VHole{} -> v
+  _         -> impossible
+
+
+----------------------------------------------------------------------------------------------------
 
 evalClosure :: EvalArgs (Name -> Tm -> NamedClosure)
 evalClosure x a = NCl x (CEval (EC ?sub ?env ?recurse a))
@@ -1287,10 +1371,14 @@ eval = \case
   Let x _ t u       -> define (eval t) (eval u)
 
   -- Inductives
-  TyCon x ts        -> VTyCon x (tyParams ts)
-  DCon ci sp        -> VDCon ci (spine sp)
+  TyCon i ts        -> VTyCon i (params ts)
+  DCon i sp         -> VDCon i (spine sp)
   Case t x b cs     -> case_ (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
   Split x b cs      -> VLam $ NCl x $ CSplit (evalClosure x b) (EC ?sub ?env ?recurse cs)
+  HSplit x b cs     -> VLam $ NCl x $ CHSplit (evalClosure x b) (EC ?sub ?env ?recurse cs)
+  HTyCon i ts       -> VHTyCon i (params ts)
+  HDCon i ps fs s   -> hdcon i (lazyParams ps) (spine fs) (sub s)
+  HCase t x b cs    -> hcase (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
 
   -- Pi
   Pi x a b          -> VPi (eval a) (evalClosure x b)
@@ -1341,10 +1429,6 @@ eval = \case
   Ap f x y p        -> ap_ (eval f) (eval x) (eval y) (eval p)
   Com r r' i a t b  -> com' (evalI r) (evalI r') (bindIS i \_ -> eval a) (evalSysHCom' t) (eval b)
 
-evalParam :: NCofArg => DomArg => Env -> Tm -> Val
-evalParam env t = let ?sub = idSub (dom ?cof); ?recurse = DontRecurse; ?env = env in eval t
-{-# inline evalParam #-}
-
 ----------------------------------------------------------------------------------------------------
 -- Forcing
 ----------------------------------------------------------------------------------------------------
@@ -1391,14 +1475,24 @@ recFrc :: NCofArg => DomArg => Val -> Val
 recFrc = \case
   VSub v s                             -> let ?sub = s in frcS v
   VNe t is            | isUnblocked is -> frc t
-  VGlueTy a (sys, is) | isUnblocked is -> recFrc (glueTyNoinline a (frc sys))
+  VGlueTy a (sys, is) | isUnblocked is -> frcGlueTy a sys
+  VHDCon i ps fs s is | isUnblocked is -> frcVHDCon i ps fs s is
   v                                    -> v
+
+frcGlueTy :: NCofArg => DomArg => Val -> NeSys -> Val
+frcGlueTy a sys = recFrc (glueTy a (frc sys))
+{-# noinline frcGlueTy #-}
+
+frcVHDCon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> IVarSet -> Val
+frcVHDCon i ps fs s is = recFrc (hdcon i ps fs s)
+{-# noinline frcVHDCon #-}
 
 instance Force Val Val where
   frc = \case
     VSub v s                             -> let ?sub = s in frcS v
     VNe t is            | isUnblocked is -> frc t
-    VGlueTy a (sys, is) | isUnblocked is -> recFrc (glueTyNoinline a (frc sys))
+    VGlueTy a (sys, is) | isUnblocked is -> frcGlueTy a sys
+    VHDCon i ps fs s is | isUnblocked is -> frcVHDCon i ps fs s is
     v                                    -> v
   {-# inline frc #-}
 
@@ -1406,23 +1500,26 @@ instance Force Val Val where
     VSub v s                              -> let ?sub = sub s in frcS v
     VNe t is            | isUnblockedS is -> frcS t
     VGlueTy a (sys, is) | isUnblockedS is -> recFrc (glueTy (sub a) (frcS sys))
+    VHDCon i ps fs s is | isUnblockedS is -> recFrc (hdcon i ps fs s)
 
-    VNe t is         -> VNe (sub t) (sub is)
-    VGlueTy a sys    -> VGlueTy (sub a) (sub sys)
-    VPi a b          -> VPi (sub a) (sub b)
-    VLam t           -> VLam (sub t)
-    VPath a t u      -> VPath (sub a) (sub t) (sub u)
-    VPLam l r t      -> VPLam (sub l) (sub r) (sub t)
-    VSg a b          -> VSg (sub a) (sub b)
-    VPair x t u      -> VPair x (sub t) (sub u)
-    VWrap x t        -> VWrap x (sub t)
-    VPack x t        -> VPack x (sub t)
-    VU               -> VU
-    VHole x p s env  -> VHole x p (sub s) (sub env)
-    VLine t          -> VLine (sub t)
-    VLLam t          -> VLLam (sub t)
-    VTyCon x ts      -> VTyCon x (sub ts)
-    VDCon ci sp      -> VDCon ci (sub sp)
+    VNe t is            -> VNe (sub t) (sub is)
+    VGlueTy a sys       -> VGlueTy (sub a) (sub sys)
+    VPi a b             -> VPi (sub a) (sub b)
+    VLam t              -> VLam (sub t)
+    VPath a t u         -> VPath (sub a) (sub t) (sub u)
+    VPLam l r t         -> VPLam (sub l) (sub r) (sub t)
+    VSg a b             -> VSg (sub a) (sub b)
+    VPair x t u         -> VPair x (sub t) (sub u)
+    VWrap x t           -> VWrap x (sub t)
+    VPack x t           -> VPack x (sub t)
+    VU                  -> VU
+    VHole x p s env     -> VHole x p (sub s) (sub env)
+    VLine t             -> VLine (sub t)
+    VLLam t             -> VLLam (sub t)
+    VTyCon x ts         -> VTyCon x (sub ts)
+    VDCon ci sp         -> VDCon ci (sub sp)
+    VHTyCon i ps        -> VHTyCon i (sub ps)
+    VHDCon i ps fs s is -> VHDCon i (sub ps) (sub fs) (sub s) (sub is)
   {-# noinline frcS #-}
 
 instance Force Ne Val where
@@ -1441,6 +1538,7 @@ instance Force Ne Val where
     NGlue t eqs sys   -> recFrc (glue t (frc eqs) (frc sys))
     NLApp t i         -> recFrc (lapp (frc t) i)
     NCase t b cs      -> recFrc (case_ (frc t) b cs)
+    NHCase t b cs     -> recFrc (hcase (frc t) b cs)
   {-# noinline frc #-}
 
   frcS = \case
@@ -1458,6 +1556,7 @@ instance Force Ne Val where
     NGlue t eqs sys   -> recFrc (glue (sub t) (frcS eqs) (frcS sys))
     NLApp t i         -> recFrc (lapp (frcS t) (frcS i))
     NCase t b cs      -> recFrc (case_ (frcS t) (sub b) (sub cs))
+    NHCase t b cs     -> recFrc (hcase (frcS t) (sub b) (sub cs))
 
 instance Force NeSys VSys where
 
@@ -1559,6 +1658,7 @@ unSubNeS = \case
   NGlue a eqs sys    -> NGlue (sub a) (sub eqs) (sub sys)
   NLApp t i          -> NLApp (sub t) (sub i)
   NCase t b cs       -> NCase (sub t) (sub b) (sub cs)
+  NHCase t b cs      -> NHCase (sub t) (sub b) (sub cs)
 
 ----------------------------------------------------------------------------------------------------
 -- Definitions

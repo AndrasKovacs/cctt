@@ -142,9 +142,9 @@ nibblesToSub ns = Sub (go 0 0 ns) where
   go shift acc (n:ns) = go (shift + 4) (unsafeShiftL n shift .|. acc) ns
 
 subToNibbles :: Sub -> [Word]
-subToNibbles (Sub s) = go s where
-  go 0 = []
-  go n = n .&. 15 : go (unsafeShiftR n 4)
+subToNibbles (Sub s) = go (0 :: Int) s where
+  go 16 _ = []
+  go i  n = n .&. 15 : go (i + 1) (unsafeShiftR n 4)
 
 emptySub# :: Word -> Word
 emptySub# dom = unsafeShiftL dom 60 .|. 62129658859368976
@@ -178,6 +178,12 @@ setDomCod :: IVar -> IVar -> Sub -> Sub
 setDomCod d c (Sub n) = Sub (
   n .&. 72057594037927935 .|. unsafeShiftL (coerce d) 60 .|. unsafeShiftL (coerce c) 56)
 {-# inline setDomCod #-}
+
+onlyElems# :: Sub -> Word
+onlyElems# (Sub s) =
+  let shift = 64 - unsafeShiftL (fromIntegral (cod (Sub s))) 2 in
+  unsafeShiftR (unsafeShiftL s shift) shift
+{-# inline onlyElems# #-}
 
 lookupSub# :: Word -> Sub -> I
 lookupSub# w (Sub s) = I (unsafeShiftR s (unsafeShiftL (w2i w) 2) .&. 15)
@@ -290,3 +296,16 @@ instance SubAction IVarSet where
 instance (SubAction a, SubAction b) => SubAction (a, b) where
   sub (a, b) = let x = sub a; y = sub b in (x, y)
   {-# inline sub #-}
+
+-- | Extend a sub with a sub
+pushSub :: Sub -> Sub -> Sub
+pushSub (Sub s) s' =
+  let oldc     = cod (Sub s)
+      d        = dom (Sub s)
+      newc     = oldc + cod s'
+      oldbits  = unsafeShiftL (fromIntegral oldc) 2
+      selems   = onlyElems# (Sub s)
+      s'elems  = onlyElems# s' in
+  setDomCod d newc $
+  Sub (selems .|. unsafeShiftL s'elems oldbits)
+{-# inline pushSub #-}

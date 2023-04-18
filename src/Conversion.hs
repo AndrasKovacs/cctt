@@ -21,6 +21,7 @@ instance Conv Val where
     -- rigid match
     (VNe n _        , VNe n' _          ) -> conv n n'
     (VGlueTy a sys  , VGlueTy a' sys'   ) -> conv a a' && conv (fst sys) (fst sys')
+    -- (VHDCon inf sp _, VHDCon inf' sp' _ ) -> inf^.conId == inf'^.conId && conv sp sp'
     (VPi a b        , VPi a' b'         ) -> conv a a' && conv b b'
     (VLam t         , VLam t'           ) -> conv t t'
     (VPath a t u    , VPath a' t' u'    ) -> conv a a' && conv t t' && conv u u'
@@ -32,6 +33,7 @@ instance Conv Val where
     (VLine a        , VLine a'          ) -> conv a a'
     (VLLam t        , VLLam t'          ) -> conv t t'
     (VTyCon inf ts  , VTyCon inf' ts'   ) -> inf^.tyId == inf'^.tyId && conv ts ts'
+    (VHTyCon inf ts , VHTyCon inf' ts'  ) -> inf^.tyId == inf'^.tyId && conv ts ts'
     (VDCon inf sp   , VDCon inf' sp'    ) -> inf^.conId == inf'^.conId && conv sp sp'
 
     -- We keep track of evaluation contexts for holes.
@@ -123,6 +125,13 @@ instance Conv VDSpine where
     (VDNil         , VDNil           ) -> True
     (VDCons t sp   , VDCons t' sp'   ) -> conv t t' && conv sp sp'
     _                                  -> impossible
+
+instance Conv VHDSpine where
+  conv sp sp' = case (sp, sp') of
+    (VHDNil         , VHDNil           ) -> True
+    (VHDCons t sp   , VHDCons t' sp'   ) -> conv t t' && conv sp sp'
+    (VHDI r sp      , VHDI r' sp'      ) -> conv r r' && conv sp sp'
+    _                                    -> impossible
 
 instance Conv a => Conv [a] where
   conv as as' = case (as, as') of

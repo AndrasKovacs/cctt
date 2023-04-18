@@ -1,7 +1,7 @@
 
 import basics;
 
-data Bool := false | true;
+inductive Bool := false | true;
 
 falseNeqTrue : not (false = true) :=
   λ p. coe 0 1 (i. case (p i) [false. Top; true. Bot]) tt;
@@ -27,7 +27,7 @@ negEq : Bool = Bool :=
 
 comp (A : U)(x y z : A)(p : x = y)(q : y = z) := p ∙ q;
 
-data Nat := zero | suc Nat;
+inductive Nat := zero | suc Nat;
 
 nsym (A : U)(x : A)(p : x = x)(n : Nat) : x = x :=
   case n [zero. p; suc n. nsym A x p⁻¹ n];

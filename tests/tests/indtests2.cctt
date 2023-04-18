@@ -1,5 +1,5 @@
 
-data ℕ := zero | suc ℕ;
+inductive ℕ := zero | suc ℕ;
 
 nf1 := hcom 0 1 [] zero;
 nf2 := hcom 0 1 [] (suc zero);
@@ -25,10 +25,10 @@ t6 (r r' k : I) (x : ℕ) : hcom r r' [k = 0 j. suc x] (suc x) = suc (hcom r r' 
 --------------------------------------------------------------------------------
 
 
-data Unit := tt;
-data Fam (x : Unit) := fam;
+inductive Unit := tt;
+inductive Fam (x : Unit) := fam;
 
-data Sg (A : U)(B : A → U) := pair (a : A) (b : B a);
+inductive Sg (A : U)(B : A → U) := pair (a : A) (b : B a);
 
 t7 (A : I → U)(B : (i : I) → A i → U)(a : A 0)(b : B 0 a) :
     coe 0 1 (i. Sg (A i) (B i)) (pair a b)

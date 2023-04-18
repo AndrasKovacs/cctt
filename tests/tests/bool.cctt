@@ -1,6 +1,6 @@
 import basics;
 
-data Bool := false | true;
+inductive Bool := false | true;
 
 falseNeqTrue : not (false = true) :=
   λ p. coe 0 1 (i. case (p i) [false. Top; true. Bot]) tt;

@@ -1,9 +1,9 @@
 
-data Top := tt;
-data Bot :=;
+inductive Top := tt;
+inductive Bot :=;
 not (A : U) := A → Bot;
 
-data Sum (A B : U) := left A | right B;
+inductive Sum (A B : U) := left A | right B;
 
 Dec (A : U) := Sum A (not A);
 

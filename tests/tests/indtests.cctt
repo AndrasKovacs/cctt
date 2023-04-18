@@ -2,10 +2,10 @@
 
 --------------------------------------------------------------------------------
 
-data Foo := R | G | B;
+inductive Foo := R | G | B;
 foo : Foo := G;
 
-data ℕ := zero | suc ℕ;
+inductive ℕ := zero | suc ℕ;
 
 czero (n : ℕ) : ℕ :=
   case n (_. ℕ) [
@@ -32,7 +32,7 @@ n1k  := mul' ten n100;
 n100k := mul n1k n100;
 n10m := mul n100 n100k;
 
-data Bool := true | false;
+inductive Bool := true | false;
 
 even : ℕ → Bool := λ[
   zero. true;
@@ -44,7 +44,7 @@ testn10m  := even n10m;
 
 --------------------------------------------------------------------------------
 
-data List (A : U) := nil | cons A (List A);
+inductive List (A : U) := nil | cons A (List A);
 
 map (A B : U) (f : A → B)(as : List A) : List B :=
   case as (_. List B) [
@@ -64,18 +64,18 @@ list2 := map ℕ ℕ (λ _. zero) list1;
 --------------------------------------------------------------------------------
 
 -- No positivity check.
-data Bad := mkBad (Bad → Bad);
+inductive Bad := mkBad (Bad → Bad);
 
-data Top := tt;
+inductive Top := tt;
 
-data Bot :=;
+inductive Bot :=;
 
 -- makes more sense to just write "case p []" inline.
 Bot-elim (A : U)(p : Bot) : A := case p [];
 
-data W (A : U)(B : A → U) := sup (a : A)(f : B a → W A B);
+inductive W (A : U)(B : A → U) := sup (a : A)(f : B a → W A B);
 
-data O := ozero | osuc O | olim (ℕ → O);
+inductive O := ozero | osuc O | olim (ℕ → O);
 
 fromℕ : ℕ → O := λ[
   zero. ozero;
@@ -100,7 +100,7 @@ fω2 := fgf ω (suc (suc zero));
 --------------------------------------------------------------------------------
 
 -- non-uniform parameters are allowed
-data Vec (A : U) (n : ℕ) :=
+inductive Vec (A : U) (n : ℕ) :=
     vnil (n = zero)
   | vcons (m : ℕ) (n = suc m) A (Vec A m) ;
 
@@ -118,7 +118,7 @@ v2 := vmap ℕ ℕ (suc (suc zero)) (add ten) v1;
 -- Recursive identities (will be needed in HITs)
 --------------------------------------------------------------------------------
 
-data RecId :=
+inductive RecId :=
     Base
   | Path (Base = Base); -- later constructors can refer to earlier ones
 
@@ -128,7 +128,7 @@ recid1 := Path refl⁻¹;
 
 not (A : U) := A → Bot;
 
-data Sum (A B : U) := Left A | Right B;
+inductive Sum (A B : U) := Left A | Right B;
 Dec (A : U) := Sum A (not A);
 
 the (A : U)(x : A) := x;

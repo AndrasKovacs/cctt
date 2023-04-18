@@ -41,7 +41,7 @@ prod       = char '*' <|> char '×'
 branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
 branch p t f = (t =<< p) <|> f
 
--- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "data", "elim", "glue",
+-- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "inductive", "higher", "elim", "glue",
 --             "hcom", "import", "let", "refl", "unglue", "λ"]
 
 isKeyword :: String -> Bool
@@ -57,6 +57,7 @@ isKeyword = \case
   'e':'l':'i':'m':[]         -> True
   'g':'l':'u':'e':[]         -> True
   'h':'c':'o':'m':[]         -> True
+  'h':'i':'g':'h':'e':'r':[] -> True
   'i':'m':'p':'o':'r':'t':[] -> True
   'l':'e':'t':[]             -> True
   'r':'e':'f':'l':[]         -> True
@@ -364,7 +365,7 @@ telescope = do
 
 top :: Parser Top
 top =
-  branch ((//) <$!> getSourcePos <*> (keyword "data" *> ident))
+  branch ((//) <$!> getSourcePos <*> (keyword "inductive" *> ident))
 
     (\(pos, x) -> do
         params <- telescope

@@ -942,18 +942,18 @@ isoToEquivNfOK (A B : U) (i : iso A B) : isoToEquiv A B i = isoToEquivNf A B i :
 
 --------------------------------------------------------------------------------
 
-data N0 :=;
+inductive N0 :=;
 
 efq (A : U) : N0 → A := λ[];
 not (A : U) : U := A → N0;
 
-data Unit := tt;
+inductive Unit := tt;
 
 propUnit : prop Unit := λ[tt. λ[tt. refl]];
 
 setUnit : set Unit := propSet Unit propUnit;
 
-data or (A B : U) := inl (a : A) | inr (b : B);
+inductive or (A B : U) := inl (a : A) | inr (b : B);
 
 propOr (A B : U) (hA : prop A) (hB : prop B) (h : A → not B) : prop (or A B) := λ[
   inl a'. λ[inl b'. λ i. inl (hA a' b' i);

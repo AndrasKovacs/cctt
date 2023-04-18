@@ -53,6 +53,8 @@ instance Quote Val Tm where
     VLLam t          -> LLam (t^.name) (quote t)
     VTyCon x ts      -> TyCon x (quote ts)
     VDCon ci sp      -> DCon ci (quote sp)
+    VHTyCon i ts     -> HTyCon i (quote ts)
+    -- VHDCon i ts _    -> HDCon i (quote ts)
 
 --------------------------------------------------------------------------------
 
@@ -78,6 +80,12 @@ instance Quote VDSpine Spine where
   quote = \case
     VDNil       -> SPNil
     VDCons t sp -> SPCons (quote t) (quote sp)
+
+instance Quote VHDSpine HSpine where
+  quote = \case
+    VHDNil       -> HSPNil
+    VHDCons t sp -> HSPCons (quote t) (quote sp)
+    VHDI r sp    -> HSPI (quote r) (quote sp)
 
 instance Quote a b => Quote (BindCofLazy a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}

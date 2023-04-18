@@ -247,6 +247,14 @@ dcon inf = if isNameUsed (inf^.name) ?names
   then "@@" <> str (show (inf^.tyConInfo.tyId)) <> "#" <> str (show (inf^.conId))
   else str (inf^.name)
 
+hdcon :: PrettyArgs (HDConInfo -> Txt)
+hdcon inf = if isNameUsed (inf^.name) ?names
+  then "@@" <> str (show (inf^.tyConInfo.tyId)) <> "#" <> str (show (inf^.conId))
+  else str (inf^.name)
+
+goSub :: PrettyArgs (Sub -> Txt)
+goSub = foldrSub (\_ i acc -> " " <> int i <> acc) mempty
+
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
   TopVar inf            -> topName (^.name) (^.defId) inf
@@ -324,6 +332,12 @@ tm = \case
                              Nothing -> projp (proj t <> ".1")
                              Just t  -> projp (proj t <> "." <> str x)
   Split x b cs          -> appp ("λ[" <> cases cs <> "]")
+  HTyCon inf SPNil      -> topName (^.name) (^.tyId) inf
+  HTyCon inf ts         -> appp (topName (^.name) (^.tyId) inf <> spine ts)
+  HDCon inf _ fs s      -> case fs of
+                             SPNil | cod s == 0 -> hdcon inf
+                             _ -> appp (hdcon inf <> spine fs <> goSub s)
+
 
 ----------------------------------------------------------------------------------------------------
 
@@ -355,7 +369,7 @@ topEntries = LM.foldrWithKey'
       TETyCon inf -> withPrettyArgs0 $ runIO do
         cons <- readIORef (inf^.constructors)
         pure $!
-         "\ndata " <> str (inf^.name)
+         "\ninductive " <> str (inf^.name)
          <> inductive (inf^.paramTypes) (LM.elems cons) <> ";\n" <> acc
 
       TEDCon{} -> impossible

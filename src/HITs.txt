@@ -6,9 +6,39 @@ Constructor:  telescope with mixed I-s and fibrant types (under params)
               + system with component type exactly (Sort params)
 HCom:         trivial, returns FHCom (which is canonical!)
 Coercion:
-  - If empty boundary or boundary only contains vars: do the same as with ordinary inductives
-  - Otherwise: Evan's boundary adjustment
-  - Add a (hasSimpleBoundary :: Bool) tag to HConInfo
+  - A boundary is coherent iff it contains no elimination (app, papp, lapp, proj, case)
+  - Coherent coercion is the same as indtype coercion
+  - Incoherent coercion:
+    - coerce fields as usual, accummulate the line env + isub
+    - evaluate boundary in the line env. This coeFill-s all
+      field vars, from "r" to "i". The coe from "i" to "r'" each component
+      on the outside.
+
+      con fs : A ps [α. t]
+
+      coe r r' (i. A (ps i)) (con fs) =
+      hcom r r' (A (ps r')) [⟦α⟧ i. coe i r' (j. A (ps j)) ⟦t⟧] (con (coe fs))
+
+QUESTION:
+  - recompute boundary from syntax on every forcing, or store the boundary?
+  - kinda bad either way
+    1. recompute. Then we have to store Tm typarams, which will be normalized
+       due to bidirectional checking. TODO: allow explicit param notation.
+    2. store. Then we have to store the normalized boundary, again due to
+       bidirectional checking. In coercion we get the typaram filler from the coe type arg,
+       so we don't have to store typarams in HDCon.
+
+    In any case, coercion *must* recompute the boundary, because we need a
+    filler for the boundary adjustment.
+
+    WAIT A MINUTE
+    BOUNDARY FORCING ONLY REQUIRES COMPUTING THE COFS!
+    THAT MAKES FALSE POSITIVE FORCING HELLA CHEAP
+
+    Let's go with option 1.
+    We'd like to evaluate boundary components lazily.
+    We don't need the NeSys part of the VSys result. TODO: specialize evalSys to not return NeSys.
+    let's call it evalBoundary.
 
 ------------------------------------------------------------
 
@@ -20,13 +50,20 @@ higher inductive SetTrunc (A : U) :=
 
 (\i j. STrunc x y p q i j) : p = q
 
-HTyCon HTyConInfo TyParams
-HDCon HDConInfo HDSpine
 
-VHTyCon HTyConInfo Env
-VHDCon HDConInfo VHDSpine IVarSet
+Tm
+- HTyCon HTyConInfo TyParams
+- HDCon HDConInfo HDSpine
 
-HTel
+Val
+- VHTyCon HTyConInfo Env
+- VHDCon HDConInfo VHDSpine IVarSet    (similar to GlueTy, neutral but not in Ne!
+
+- Case and Split are reused.
+- FHCom is not distinguished from ordinary Tm/Ne HCom
+  - We can always just look at the base type
+
+Don't forget action of coe on fhcom!
 
 ------------------------------------------------------------
 
@@ -71,3 +108,9 @@ Case evaluation:
   hcom r r' (B* r')
             [α i. coe i r' B* (case (t i) B cases)]
 	    (coe r r' B* (case base B cases))
+
+HDCon evaluation:
+  - eval fields, push field values to paramenv + sub
+  - eval boundary in paramenv + sub
+     - total: return val
+     - neutral: return neutral

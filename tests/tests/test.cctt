@@ -2,7 +2,7 @@
 import basics;
 import nat;
 
-data Bool := true | false;
+inductive Bool := true | false;
 
 iter (A : U)(f : A → A)(n : ℕ) (x : A) : A := case n [
   zero. x;

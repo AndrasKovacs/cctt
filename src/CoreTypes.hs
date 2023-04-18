@@ -39,7 +39,7 @@ data TyConInfo = TCI {
   , tyConInfoConstructors :: IORef (LM.Map DConInfo)
   , tyConInfoFrozen       :: IORef Bool
   , tyConInfoName         :: Name
-  , tyConInfoPos          :: SourcePos
+  , tyConInfoPos          :: {-# nounpack #-} SourcePos
   }
 
 instance Show TyConInfo where
@@ -56,6 +56,30 @@ data DConInfo = DCI {
 instance Show DConInfo where
   show (DCI _ _ x _ _) = x
 
+data HDConInfo = HDCI {
+    hDConInfoConId      :: Lvl
+  , hDConInfoFieldTypes :: HTel
+  , hDConInfoBoundary   :: Sys
+  , hDConInfoName       :: Name
+  , hDConInfoTyConInfo  :: {-# nounpack #-} HTyConInfo
+  , hDConInfoPos        :: {-# nounpack #-} SourcePos
+  }
+
+instance Show HDConInfo where
+  show (HDCI _ _ _ x _ _) = x
+
+data HTyConInfo = HTCI {
+    hTyConInfoTyId         :: Lvl
+  , hTyConInfoParamTypes   :: Tel
+  , hTyConInfoConstructors :: IORef (LM.Map HDConInfo)
+  , hTyConInfoFrozen       :: IORef Bool
+  , hTyConInfoName         :: Name
+  , hTyConInfoPos          :: {-# nounpack #-} SourcePos
+  }
+
+instance Show HTyConInfo where
+  show (HTCI _ _ _ _ x _) = x
+
 --------------------------------------------------------------------------------
 
 type Ty = Tm
@@ -65,9 +89,20 @@ data Tel
   | TCons Name Ty Tel
   deriving Show
 
+data HTel
+  = HTNil
+  | HTCons Name Ty HTel
+  | HTConsI Name HTel
+  deriving Show
+
 data Spine
   = SPNil
   | SPCons Tm Spine
+  deriving Show
+
+data LazySpine
+  = LSPNil
+  | LSPCons ~Tm LazySpine
   deriving Show
 
 data Tm
@@ -78,8 +113,15 @@ data Tm
 
   | TyCon {-# nounpack #-} TyConInfo Spine
   | DCon  {-# nounpack #-} DConInfo  Spine
-  | Case Tm Name ~Tm Cases
-  | Split Name ~Tm Cases
+
+  | HTyCon {-# nounpack #-} HTyConInfo Spine
+  -- LazySpine is for params which are usually quoted from syntax.
+  | HDCon {-# nounpack #-} HDConInfo LazySpine Spine Sub
+  | HCase Tm Name ~Ty Cases
+  | HSplit Name ~Ty Cases
+
+  | Case Tm Name ~Ty Cases
+  | Split Name ~Ty Cases
 
   | Pi Name Ty Ty
   | App Tm Tm
@@ -247,6 +289,7 @@ data Val
   -- them in coe/hcom.
   | VNe Ne IVarSet
   | VGlueTy VTy NeSys'
+  | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IVarSet
 
   -- canonicals
   | VPi VTy NamedClosure
@@ -261,8 +304,10 @@ data Val
   | VLine NamedIClosure
   | VLLam NamedIClosure
   | VTyCon {-# nounpack #-} TyConInfo Env
+  | VHTyCon {-# nounpack #-} HTyConInfo Env
   | VDCon {-# nounpack #-} DConInfo VDSpine
 
+  -- misc
   | VHole (Maybe Name) (DontShow SourcePos) Sub Env
   deriving Show
 
@@ -281,6 +326,7 @@ data Ne
   | NUnglue Ne NeSys
   | NGlue Val ~NeSys NeSys
   | NCase Ne NamedClosure (EvalClosure Cases)
+  | NHCase Ne NamedClosure (EvalClosure Cases)
   deriving Show
 
 data VDSpine
@@ -314,6 +360,7 @@ data Closure
 
   -- ^ Body of lambdaCase
   | CSplit NamedClosure (EvalClosure Cases)
+  | CHSplit NamedClosure (EvalClosure Cases) -- HIT version
 
   -- ^ Body of function coercions.
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
@@ -495,8 +542,9 @@ instance SubAction (EvalClosure a) where
 
 instance SubAction Closure where
   sub cl = case cl of
-    CEval ecl    -> CEval (sub ecl)
-    CSplit b ecl -> CSplit (sub b) (sub ecl)
+    CEval     ecl -> CEval (sub ecl)
+    CSplit  b ecl -> CSplit (sub b) (sub ecl)
+    CHSplit b ecl -> CSplit (sub b) (sub ecl)
 
     -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.
@@ -573,3 +621,5 @@ makeFields ''DefInfo
 makeFields ''DConInfo
 makeFields ''TyConInfo
 makeFields ''RecInfo
+makeFields ''HTyConInfo
+makeFields ''HDConInfo
