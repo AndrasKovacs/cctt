@@ -58,15 +58,16 @@ instance Show DConInfo where
 
 data HDConInfo = HDCI {
     hDConInfoConId      :: Lvl
-  , hDConInfoFieldTypes :: HTel
+  , hDConInfoFieldTypes :: Tel
   , hDConInfoBoundary   :: Sys
   , hDConInfoName       :: Name
+  , hDConInfoIsCoherent :: Bool
   , hDConInfoTyConInfo  :: {-# nounpack #-} HTyConInfo
   , hDConInfoPos        :: {-# nounpack #-} SourcePos
   }
 
 instance Show HDConInfo where
-  show (HDCI _ _ _ x _ _) = x
+  show (HDCI _ _ _ x _ _ _) = x
 
 data HTyConInfo = HTCI {
     hTyConInfoTyId         :: Lvl
@@ -87,12 +88,6 @@ type Ty = Tm
 data Tel
   = TNil
   | TCons Name Ty Tel
-  deriving Show
-
-data HTel
-  = HTNil
-  | HTCons Name Ty HTel
-  | HTConsI Name HTel
   deriving Show
 
 data Spine

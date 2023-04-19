@@ -178,7 +178,7 @@ vshempty = VSHNe (NSHEmpty, mempty)
 
 vshcons :: NCofArg => VCof -> Name -> (NCofArg => I -> Val) -> VSysHCom -> VSysHCom
 vshcons cof i v ~sys = case cof of
-  VCTrue       -> VSHTotal (bindILazy i v)
+  VCTrue      -> VSHTotal (bindILazy i v)
   VCFalse     -> sys
   VCNe cof is -> case sys of
     VSHTotal v'      -> VSHTotal v'
@@ -284,20 +284,20 @@ mapBindI t f = bindI (t^.name) (\i -> f i (t ∙ i))
 --   external scope, it can only depend on the value under the binder. This can
 --   be useful when we only do projections under a binder. The case switch in
 --   `coed` on the type argument is similar.
-umapBindILazy :: NCofArg => BindILazy a -> (NCofArg => a -> b) -> BindILazy b
+umapBindILazy :: NCofArg => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
 umapBindILazy (BindILazy x i a) f =
   let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
-  seq ?cof (BindILazy x i (f a))
+  seq ?cof (BindILazy x i (f (IVar i) a))
 {-# inline umapBindILazy #-}
 
-umapBindI :: NCofArg => BindI a -> (NCofArg => a -> b) -> BindI b
+umapBindI :: NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
 umapBindI (BindI x i a) f =
   let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
-  seq ?cof (BindI x i (f a))
+  seq ?cof (BindI x i (f (IVar i) a))
 {-# inline umapBindI #-}
 
 proj1BindIFromLazy :: NCofArg => DomArg => Name -> BindILazy Val -> BindI Val
-proj1BindIFromLazy x t = umapBindI (bindIToLazy t) (proj1 x)
+proj1BindIFromLazy x t = umapBindI (bindIToLazy t) (\_ -> proj1 x)
 {-# inline proj1BindIFromLazy #-}
 
 mapNeSys :: NCofArg => (NCofArg => Val -> Val) -> NeSys -> NeSys
@@ -743,11 +743,14 @@ coed r r' topA t = case (frc topA) ^. body of
   -- closed inductives
   VTyCon x ENil ->
     t
+
   a@(VTyCon x (rebind topA -> ps)) -> case frc t of
     VDCon dci sp ->
       VDCon dci (coeindsp r r' ps sp (dci^.fieldTypes))
     t@(VNe _ is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
+    v@VHole{} ->
+      v
     _ ->
       impossible
 
@@ -925,6 +928,40 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   VWrap x (rebind topA -> a) ->
     VPack x $ coed r r' a (unpack x t)
 
+  VHTyCon _ ENil ->
+    t
+
+  a@(VHTyCon ti (rebind topA -> ps)) -> case frc t of
+    VHDCon di _ fs s is
+      | di^.isCoherent ->
+        VHDCon di (ps ∙ r') (coeindsp r r' ps fs (di^.fieldTypes)) s is
+      | otherwise ->
+        case coehindsp r r' (rebind topA a) ps fs (di^.fieldTypes) s (di^.boundary) of
+          (!sp, !sys) ->
+            let psr' = ps ∙ r' in
+            hcomd r r' (VHTyCon ti psr') sys (VHDCon di psr' sp s is)
+
+    t@(VNe n is) -> case unSubNe n of
+
+      -- coe r r' a (fhcom i j (a r) [α k. t k] b) =
+      -- fhcom i j (a r') [α k. coe r r' a (t k)] (coe r r' a b)
+
+      n@(NHCom i j _ (frc -> sys) b) ->
+        hcomd r r'
+          (VHTyCon ti (ps ∙ r'))
+          (mapVSysHCom (\k t -> coed r r' (rebind topA a) (t ∙ k)) sys)
+          (coed r r' (rebind topA a) b)
+
+      n ->
+        VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
+
+    v@VHole{} ->
+      v
+
+    _ ->
+      impossible
+
+
   v@VHole{} -> v
 
   _ ->
@@ -1038,7 +1075,7 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       (mapNeSysHCom' (\i t -> unpack x (t ∙ i)) ts)
       (unpack x base)
 
-  a@(VTyCon tyid ps) -> case frc base of
+  a@(VTyCon _ ps) -> case frc base of
     VDCon dci sp -> case ?dom of
       0 ->
         VDCon dci (hcomind0sp r r' a ts ps (dci^.conId) 0 sp (dci^.fieldTypes))
@@ -1051,6 +1088,10 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       base
     _ ->
       impossible
+
+  -- "fhcom", hcom on HITs is blocked
+  a@(VHTyCon tyinf ps) ->
+    VNe (NHCom r r' a nts base) (insertI r $ insertI r' is)
 
   v@VHole{} -> v
 
@@ -1198,7 +1239,7 @@ lazyprojfield conid fieldid v = case frc v of
 lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
 lazyprojsys conid fieldid = \case
   NSHEmpty      -> NSHEmpty
-  NSHCons t sys -> NSHCons (mapBindCof t \t -> umapBindILazy t (lazyprojfield conid fieldid))
+  NSHCons t sys -> NSHCons (mapBindCof t \t -> umapBindILazy t (\_ -> lazyprojfield conid fieldid))
                            (lazyprojsys conid fieldid sys)
 
 lazyprojsys' :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom' -> NeSysHCom'
@@ -1274,9 +1315,8 @@ coeindsp :: NCofArg => DomArg => I -> I -> BindI Env -> VDSpine -> Tel -> VDSpin
 coeindsp r r' params sp fieldtypes = case (sp, fieldtypes) of
   (VDNil, TNil) -> VDNil
   (VDCons t sp, TCons _ tty fieldtypes) ->
-    let tty' = umapBindI params \ps -> evalIndParam ps tty in
+    let tty' = umapBindI params \_ ps -> evalIndParam ps tty in
     VDCons (coed r r' tty' t)
-           -- TODO: opt mapBindI
            (coeindsp r r' (mapBindI params \i ps -> EDef ps (coe r i tty' t)) sp fieldtypes)
   _ -> impossible
 
@@ -1316,7 +1356,8 @@ hdcon inf ps fs s = case inf^.boundary of
 
 lookupHCase :: EvalArgs (Lvl -> VDSpine -> Sub -> Cases -> Val)
 lookupHCase i sp s cs = case i // cs of
-  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp; ?sub = uf in eval body
+  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp; ?sub = pushSub ?sub s in
+                              eval body
   (i, CSCons _ _  _    cs) -> lookupHCase (i - 1) sp s cs
   _                        -> impossible
 
@@ -1352,6 +1393,45 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
   v@VHole{} -> v
   _         -> impossible
 
+
+-- NOTE: the input cofs must be independent from the input binder
+-- TODO OPT: fuse vSysToH and evalCoeBoundary
+neSysToH :: BindI NeSys -> NeSysHCom
+neSysToH (BindI x i sys) = case sys of
+  NSEmpty      -> NSHEmpty
+  NSCons t sys -> NSHCons (BindCof (t^.binds) (BindILazy x i (t^.body)))
+                          (neSysToH (BindI x i sys))
+
+vSysToH :: BindI VSys -> VSysHCom
+vSysToH (BindI x i sys) = case sys of
+  VSTotal v      -> VSHTotal (BindILazy x i v)
+  VSNe (sys, is) -> VSHNe (neSysToH (BindI x i sys) // is)
+{-# inline vSysToH #-}
+
+-- evaluate boundary to a VSys under an extra binder
+evalCoeBoundary :: EvalArgs (I -> I ->  BindI VTy -> Sys -> VSys)
+evalCoeBoundary r' i a = \case
+  SEmpty          -> vsempty
+  SCons cof t bnd -> vscons (evalCof cof) (coe i r' a (eval t))
+                            (evalCoeBoundary r' i a bnd)
+
+-- TODO: we know already that the boundary is neutral, because of the VHDCon forcing!
+-- The adjusted HCOM result is known to be fully neutral!
+-- TODO optimize: build the neutral system result directly, then build the Ne result.
+coehindsp :: NCofArg => DomArg =>
+   I -> I -> BindI VTy -> BindI Env -> VDSpine -> Tel -> Sub -> Sys -> (VDSpine, VSysHCom)
+coehindsp r r' topA params sp fieldtypes s boundary = case (sp, fieldtypes) of
+  (VDNil, TNil) ->
+    let vsys = vSysToH (mapBindI params \i ps -> let ?env = ps; ?sub = s; ?recurse = DontRecurse
+                                                 in evalCoeBoundary r' i topA boundary) in
+    (VDNil // vsys)
+
+  (VDCons t sp, TCons _ tty fieldtypes) ->
+    let tty' = umapBindI params \_ ps -> evalIndParam ps tty in
+    case coehindsp r r' topA (mapBindI params \i ps -> EDef ps (coe r i tty' t)) sp fieldtypes s boundary of
+      (!sp, !sys) -> VDCons (coed r r' tty' t) sp // sys
+  _ ->
+    impossible
 
 ----------------------------------------------------------------------------------------------------
 
