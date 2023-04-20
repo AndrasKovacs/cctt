@@ -279,14 +279,16 @@ type VTy = Val
 data Val
   = VSub Val Sub
 
-  -- Neutrals. These are annotated with sets of blocking ivars. Glue types are
-  -- also neutral, but they're handled separately, because we have to match on
-  -- them in coe/hcom.
+  -- Neutrals. Not stable under substitution, no computation can ever match on them.
   | VNe Ne IVarSet
-  | VGlueTy VTy NeSys'
-  | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IVarSet
 
-  -- canonicals
+  -- Semineutrals. No stable under substitution but computation can match on them.
+  -- since
+  | VGlueTy VTy NeSys' -- coe can act on it
+  | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IVarSet -- case can act on it
+  | VHCom I I VTy NeSysHCom' Val IVarSet  -- coe and case can act on it
+
+  -- Canonicals. Stable under substitution.
   | VPi VTy NamedClosure
   | VLam NamedClosure
   | VPath NamedIClosure Val Val
@@ -317,7 +319,6 @@ data Ne
   | NProj2 Ne Name
   | NUnpack Ne Name
   | NCoe I I (BindI Val) Val
-  | NHCom I I VTy NeSysHCom Val
   | NUnglue Ne NeSys
   | NGlue Val ~NeSys NeSys
   | NCase Ne NamedClosure (EvalClosure Cases)

@@ -13,6 +13,10 @@ FORCING
     - We lose off-diagonals
     - We lose system forcing
   - semantic system cons-es always take forced cofibrations
+
+OPT:
+  - always store IVarSet together with NeSys/HCom, that
+    way we don't have to re-force stored NeSys-es in several places
 -}
 
 type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
@@ -77,6 +81,10 @@ bindCofLazy (NeCof' cof c) act = let ?cof = cof in BindCofLazy c act
 bindI :: Name -> (NCofArg => I -> a) -> (NCofArg => BindI a)
 bindI x act = freshI \i -> BindI x i (act (IVar i))
 {-# inline bindI #-}
+
+bindIVar :: Name -> (NCofArg => IVar -> a) -> (NCofArg => BindI a)
+bindIVar x act = freshI \i -> BindI x i (act i)
+{-# inline bindIVar #-}
 
 bindILazy :: Name -> (NCofArg => I -> a) -> (NCofArg => BindILazy a)
 bindILazy x act = freshI \i -> BindILazy x i (act (IVar i))
@@ -278,6 +286,10 @@ bindIToLazy (BindILazy x i z) = BindI x i z; {-# inline bindIToLazy #-}
 mapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
 mapBindI t f = bindI (t^.name) (\i -> f i (t ∙ i))
 {-# inline mapBindI #-}
+
+mapBindIVar :: SubAction a => NCofArg => BindI a -> (NCofArg => IVar -> a -> b) -> BindI b
+mapBindIVar t f = bindIVar (t^.name) (\i -> f i (t ∙ IVar i))
+{-# inline mapBindIVar #-}
 
 -- | Map over a binder in a way which *doesn't* rename the bound variable to a
 --   fresh one.  In this case, the mapping function cannot refer to values in
@@ -835,10 +847,10 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     mkComponent :: NCofArg => Val -> (Val, BindILazy Val)
     mkComponent tfr' = let
 
-      ~equiv1  = tfr'
-      ~equiv2  = proj2 "Ty"   equiv1
-      ~equiv3  = proj2 "f"    equiv2
-      ~equiv4  = proj2 "g"    equiv3
+      equiv1   = tfr'
+      equiv2   = proj2 "Ty"   equiv1
+      equiv3   = proj2 "f"    equiv2
+      equiv4   = proj2 "g"    equiv3
       ~equiv5  = proj2 "linv" equiv4
 
       ~tr'     = proj1 "Ty"   equiv1
@@ -932,28 +944,31 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     t
 
   a@(VHTyCon ti (rebind topA -> ps)) -> case frc t of
-    VHDCon di _ fs s is
-      | di^.isCoherent ->
-        VHDCon di (ps ∙ r') (coeindsp r r' ps fs (di^.fieldTypes)) s is
-      | otherwise ->
+
+    VHDCon di _ fs s is ->
+      let psr' = ps ∙ r' in
+      if di^.isCoherent then
+        VHDCon di psr' (coeindsp r r' ps fs (di^.fieldTypes)) s is
+      else
         case coehindsp r r' (rebind topA a) ps fs (di^.fieldTypes) s (di^.boundary) of
           (!sp, !sys) ->
-            let psr' = ps ∙ r' in
-            hcomd r r' (VHTyCon ti psr') sys (VHDCon di psr' sp s is)
+            VHCom r r' (VHTyCon ti psr')
+              (sys, is)
+              (VHDCon di psr' sp s is)
+              (insertI r $ insertI r' is)
 
-    t@(VNe n is) -> case unSubNe n of
+    -- coe r r' a (fhcom i j (a r) [α k. t k] b) =
+    -- fhcom i j (a r') [α k. coe r r' a (t k)] (coe r r' a b)
+    VHCom i j _ sys b is ->
+      let abind = rebind topA a in
+      VHCom i j
+        (VHTyCon ti (ps ∙ r'))
+        (mapNeSysHCom' (\k t -> coed r r' abind (t ∙ k)) sys)
+        (coed r r' abind b)
+        is
 
-      -- coe r r' a (fhcom i j (a r) [α k. t k] b) =
-      -- fhcom i j (a r') [α k. coe r r' a (t k)] (coe r r' a b)
-
-      n@(NHCom i j _ (frc -> sys) b) ->
-        hcomd r r'
-          (VHTyCon ti (ps ∙ r'))
-          (mapVSysHCom (\k t -> coed r r' (rebind topA a) (t ∙ k)) sys)
-          (coed r r' (rebind topA a) b)
-
-      n ->
-        VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
+    VNe n is ->
+      VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
 
     v@VHole{} ->
       v
@@ -988,7 +1003,7 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
         (proj1 (b^.name) base))
 
       (hcomdn r r'
-        (b ∙ hcomn r r' a
+        (b ∙ hcomdn r r' a
              (mapNeSysHCom' (\i t -> proj1 (b^.name) (t ∙ i)) ts)
              (proj1 (b^.name) base))
 
@@ -1018,8 +1033,7 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       $ ICHComPath r r' a lhs rhs nts base
 
   a@(VNe n is') ->
-      VNe (NHCom r r' a nts base)
-          (insertI r $ insertI r' $ is <> is')
+    VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1080,10 +1094,16 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       0 ->
         VDCon dci (hcomind0sp r r' a ts ps (dci^.conId) 0 sp (dci^.fieldTypes))
       _ -> case projsys' (dci^.conId) ts of
-        TTPProject prj  -> VDCon dci (hcomindsp r r' a (prj // snd ts) ps (dci^.conId) 0 sp (dci^.fieldTypes))
-        TTPNe (sys, is) -> VNe (NHCom r r' a sys (VDCon dci sp)) (insertI r $ insertI r' is)
+        TTPProject prj  ->
+          VDCon dci (hcomindsp r r' a (prj // snd ts) ps (dci^.conId) 0 sp (dci^.fieldTypes))
+        TTPNe (sys, is) -> -- NOTE: this is is extended with the blocking neutral component's ivars
+          VHCom r r' a (sys, is) (VDCon dci sp) (insertI r $ insertI r' is)
+
     base@(VNe n is') ->
-      VNe (NHCom r r' topA nts base) (insertI r $ insertI r' $ is <> is')
+      uf
+
+
+      -- VNe (NHCom r r' topA nts base) (insertI r $ insertI r' $ is <> is')
     base@VHole{} ->
       base
     _ ->
@@ -1091,7 +1111,8 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
 
   -- "fhcom", hcom on HITs is blocked
   a@(VHTyCon tyinf ps) ->
-    VNe (NHCom r r' a nts base) (insertI r $ insertI r' is)
+    uf
+    -- VNe (NHCom r r' a nts base) (insertI r $ insertI r' is)
 
   v@VHole{} -> v
 
@@ -1284,7 +1305,10 @@ projsys conid topSys@(!_,!_) = \case
           prj@TTPNe{} ->
             prj
 
-      VNe n is -> TTPNe (fst topSys // is <> snd topSys) -- extend blockers
+      -- NOTE: extend blockers with neutral's ivars BUT DELETE BOUND VAR.
+      VNe n is -> TTPNe (fst topSys // deleteIS (t^.body.binds) is <> snd topSys)
+
+      VHole{}  -> error "TODO: hole in system projection"
       _        -> impossible
 
 projsys' :: NCofArg => DomArg => Lvl -> NeSysHCom' -> TryToProject
@@ -1368,63 +1392,50 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
     let ?sub = sub; ?env = env; ?recurse = rc in
     lookupHCase (i^.conId) fs s cs
 
-  VNe n is -> case unSubNe n of
+  VNe n is -> uf
+    -- case unSubNe n of
 
-    -- case on hcom
-    hcombase@(NHCom r r' a (frc -> sys) base) ->
+    -- -- case on hcom
+    -- hcombase@(NHCom r r' a (frc -> sys) base) ->
 
-      -- case (hcom r r' a [α i. t i] base) B cs =
-      -- let B* = λ i. B (hcom r i a [α i. t i] base);
-      -- hcom r r' (B (hcom r r' a [α i. t i] base))
-      --           [α i. coe i r' B* (case (t i) B cs)]
-      --           (coe r r' B* (case base B cs))
+    --   -- case (hcom r r' a [α i. t i] base) B cs =
+    --   -- let B* = λ i. B (hcom r i a [α i. t i] base);
+    --   -- hcom r r' (B (hcom r r' a [α i. t i] base))
+    --   --           [α i. coe i r' B* (case (t i) B cs)]
+    --   --           (coe r r' B* (case base B cs))
 
-      let bbind = bindI "i" \i -> b ∙ hcom r i a sys base in
-      hcomd r r'
-        (b ∙ VNe hcombase is)
-        (mapVSysHCom
-           (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs))
-           sys)
-        (coed r r' bbind (hcase base b ecs))
+    --   let bbind = bindI "i" \i -> b ∙ hcom r i a sys base in
+    --   hcomd r r'
+    --     (b ∙ VNe hcombase is)
+    --     (mapVSysHCom
+    --        (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs))
+    --        sys)
+    --     (coed r r' bbind (hcase base b ecs))
 
-    n ->
-      VNe (NHCase n b ecs) is
+    -- n ->
+    --   VNe (NHCase n b ecs) is
 
   v@VHole{} -> v
   _         -> impossible
 
 
--- NOTE: the input cofs must be independent from the input binder
--- TODO OPT: fuse vSysToH and evalCoeBoundary
-neSysToH :: BindI NeSys -> NeSysHCom
-neSysToH (BindI x i sys) = case sys of
-  NSEmpty      -> NSHEmpty
-  NSCons t sys -> NSHCons (BindCof (t^.binds) (BindILazy x i (t^.body)))
-                          (neSysToH (BindI x i sys))
-
-vSysToH :: BindI VSys -> VSysHCom
-vSysToH (BindI x i sys) = case sys of
-  VSTotal v      -> VSHTotal (BindILazy x i v)
-  VSNe (sys, is) -> VSHNe (neSysToH (BindI x i sys) // is)
-{-# inline vSysToH #-}
-
--- evaluate boundary to a VSys under an extra binder
-evalCoeBoundary :: EvalArgs (I -> I ->  BindI VTy -> Sys -> VSys)
+evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
-  SEmpty          -> vsempty
-  SCons cof t bnd -> vscons (evalCof cof) (coe i r' a (eval t))
-                            (evalCoeBoundary r' i a bnd)
+  SEmpty ->
+    NSHEmpty
+  SCons cof t bnd -> case evalCof cof of
+    VCTrue     -> impossible
+    VCFalse    -> evalCoeBoundary r' i a bnd
+    VCNe cof _ -> NSHCons (bindCof cof (BindILazy (a^.name) i (coe (IVar i) r' a (eval t))))
+                          (evalCoeBoundary r' i a bnd)
 
--- TODO: we know already that the boundary is neutral, because of the VHDCon forcing!
--- The adjusted HCOM result is known to be fully neutral!
--- TODO optimize: build the neutral system result directly, then build the Ne result.
 coehindsp :: NCofArg => DomArg =>
-   I -> I -> BindI VTy -> BindI Env -> VDSpine -> Tel -> Sub -> Sys -> (VDSpine, VSysHCom)
+   I -> I -> BindI VTy -> BindI Env -> VDSpine -> Tel -> Sub -> Sys -> (VDSpine, NeSysHCom)
 coehindsp r r' topA params sp fieldtypes s boundary = case (sp, fieldtypes) of
   (VDNil, TNil) ->
-    let vsys = vSysToH (mapBindI params \i ps -> let ?env = ps; ?sub = s; ?recurse = DontRecurse
-                                                 in evalCoeBoundary r' i topA boundary) in
-    (VDNil // vsys)
+    let nesys = (mapBindIVar params \i ps -> let ?env = ps; ?sub = s; ?recurse = DontRecurse
+                                             in evalCoeBoundary r' i topA boundary)^.body in
+    (VDNil // nesys)
 
   (VDCons t sp, TCons _ tty fieldtypes) ->
     let tty' = umapBindI params \_ ps -> evalIndParam ps tty in
@@ -1553,53 +1564,62 @@ instance Force NeCof VCof where
 
 recFrc :: NCofArg => DomArg => Val -> Val
 recFrc = \case
-  VSub v s                             -> let ?sub = s in frcS v
-  VNe t is            | isUnblocked is -> frc t
-  VGlueTy a (sys, is) | isUnblocked is -> frcGlueTy a sys
-  VHDCon i ps fs s is | isUnblocked is -> frcVHDCon i ps fs s is
-  v                                    -> v
+  VSub v s                               -> let ?sub = s in frcS v
+  VNe t is              | isUnblocked is -> frc t
+  VGlueTy a (sys, is)   | isUnblocked is -> recFrc (glueTy a (frc sys))
+  VHDCon i ps fs s is   | isUnblocked is -> recFrc (hdcon i ps fs s)
+  VHCom r r' a sys t is | isUnblocked is -> recFrc (hcom r r' a (frc sys) t)
+  v                                      -> v
 
 frcGlueTy :: NCofArg => DomArg => Val -> NeSys -> Val
 frcGlueTy a sys = recFrc (glueTy a (frc sys))
 {-# noinline frcGlueTy #-}
 
-frcVHDCon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> IVarSet -> Val
-frcVHDCon i ps fs s is = recFrc (hdcon i ps fs s)
+frcVHDCon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Val
+frcVHDCon i ps fs s = recFrc (hdcon i ps fs s)
 {-# noinline frcVHDCon #-}
+
+frcVHCom :: NCofArg => DomArg => I -> I -> VTy -> NeSysHCom' -> Val -> Val
+frcVHCom r r' a sys t = recFrc (hcom r r' a (frc sys) t)
+{-# noinline frcVHCom #-}
 
 instance Force Val Val where
   frc = \case
-    VSub v s                             -> let ?sub = s in frcS v
-    VNe t is            | isUnblocked is -> frc t
-    VGlueTy a (sys, is) | isUnblocked is -> frcGlueTy a sys
-    VHDCon i ps fs s is | isUnblocked is -> frcVHDCon i ps fs s is
-    v                                    -> v
+    VSub v s                               -> let ?sub = s in frcS v
+    VNe t is              | isUnblocked is -> frc t
+    VGlueTy a (sys, is)   | isUnblocked is -> frcGlueTy a sys
+    VHDCon i ps fs s is   | isUnblocked is -> frcVHDCon i ps fs s
+    VHCom r r' a sys t is | isUnblocked is -> frcVHCom r r' a sys t
+    v                                      -> v
   {-# inline frc #-}
 
   frcS = \case
-    VSub v s                              -> let ?sub = sub s in frcS v
-    VNe t is            | isUnblockedS is -> frcS t
-    VGlueTy a (sys, is) | isUnblockedS is -> recFrc (glueTy (sub a) (frcS sys))
-    VHDCon i ps fs s is | isUnblockedS is -> recFrc (hdcon i ps fs s)
+    VSub v s                                -> let ?sub = sub s in frcS v
+    VNe t is              | isUnblockedS is -> frcS t
+    VGlueTy a (sys, is)   | isUnblockedS is -> recFrc (glueTy (sub a) (frcS sys))
+    VHDCon i ps fs s is   | isUnblockedS is -> recFrc (hdcon i (sub ps) (sub fs) (sub s))
+    VHCom r r' a sys t is | isUnblockedS is -> recFrc (hcom (sub r) (sub r') (sub a) (frcS sys) (sub t))
 
-    VNe t is            -> VNe (sub t) (sub is)
-    VGlueTy a sys       -> VGlueTy (sub a) (sub sys)
-    VPi a b             -> VPi (sub a) (sub b)
-    VLam t              -> VLam (sub t)
-    VPath a t u         -> VPath (sub a) (sub t) (sub u)
-    VPLam l r t         -> VPLam (sub l) (sub r) (sub t)
-    VSg a b             -> VSg (sub a) (sub b)
-    VPair x t u         -> VPair x (sub t) (sub u)
-    VWrap x t           -> VWrap x (sub t)
-    VPack x t           -> VPack x (sub t)
-    VU                  -> VU
-    VHole x p s env     -> VHole x p (sub s) (sub env)
-    VLine t             -> VLine (sub t)
-    VLLam t             -> VLLam (sub t)
-    VTyCon x ts         -> VTyCon x (sub ts)
-    VDCon ci sp         -> VDCon ci (sub sp)
-    VHTyCon i ps        -> VHTyCon i (sub ps)
-    VHDCon i ps fs s is -> VHDCon i (sub ps) (sub fs) (sub s) (sub is)
+
+    VNe t is              -> VNe (sub t) (sub is)
+    VGlueTy a sys         -> VGlueTy (sub a) (sub sys)
+    VPi a b               -> VPi (sub a) (sub b)
+    VLam t                -> VLam (sub t)
+    VPath a t u           -> VPath (sub a) (sub t) (sub u)
+    VPLam l r t           -> VPLam (sub l) (sub r) (sub t)
+    VSg a b               -> VSg (sub a) (sub b)
+    VPair x t u           -> VPair x (sub t) (sub u)
+    VWrap x t             -> VWrap x (sub t)
+    VPack x t             -> VPack x (sub t)
+    VU                    -> VU
+    VHole x p s env       -> VHole x p (sub s) (sub env)
+    VLine t               -> VLine (sub t)
+    VLLam t               -> VLLam (sub t)
+    VTyCon x ts           -> VTyCon x (sub ts)
+    VDCon ci sp           -> VDCon ci (sub sp)
+    VHTyCon i ps          -> VHTyCon i (sub ps)
+    VHDCon i ps fs s is   -> VHDCon i (sub ps) (sub fs) (sub s) (sub is)
+    VHCom r r' a sys t is -> VHCom (sub r) (sub r') (sub a) (sub sys) (sub t) (sub is)
   {-# noinline frcS #-}
 
 instance Force Ne Val where
@@ -1613,7 +1633,6 @@ instance Force Ne Val where
     NProj2 t x        -> recFrc (proj2 x (frc t))
     NUnpack t x       -> recFrc (unpack x (frc t))
     NCoe r r' a t     -> recFrc (coe r r' (frc a) (frc t))
-    NHCom r r' a ts t -> recFrc (hcom r r' (frc a) (frc ts) t)
     NUnglue t sys     -> recFrc (unglue (frc t) (frc sys))
     NGlue t eqs sys   -> recFrc (glue t (frc eqs) (frc sys))
     NLApp t i         -> recFrc (lapp (frc t) i)
@@ -1631,7 +1650,6 @@ instance Force Ne Val where
     NProj2 t x        -> recFrc (proj2 x (frcS t))
     NUnpack t x       -> recFrc (unpack x (frcS t))
     NCoe r r' a t     -> recFrc (coe (frcS r) (frcS r') (frcS a) (frcS t))
-    NHCom r r' a ts t -> recFrc (hcom (frcS r) (frcS r') (frcS a) (frcS ts) (frcS t))
     NUnglue t sys     -> recFrc (unglue (frcS t) (frcS sys))
     NGlue t eqs sys   -> recFrc (glue (sub t) (frcS eqs) (frcS sys))
     NLApp t i         -> recFrc (lapp (frcS t) (frcS i))
@@ -1733,7 +1751,6 @@ unSubNeS = \case
   NProj2 t x         -> NProj2 (sub t) x
   NUnpack t x        -> NUnpack (sub t) x
   NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
-  NHCom r r' a sys t -> NHCom (sub r) (sub r') (sub a) (sub sys) (sub t)
   NUnglue a sys      -> NUnglue (sub a) (sub sys)
   NGlue a eqs sys    -> NGlue (sub a) (sub eqs) (sub sys)
   NLApp t i          -> NLApp (sub t) (sub i)
