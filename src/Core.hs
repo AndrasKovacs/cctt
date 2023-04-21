@@ -17,6 +17,9 @@ FORCING
 OPT:
   - always store IVarSet together with NeSys/HCom, that
     way we don't have to re-force stored NeSys-es in several places
+
+TODO:
+  - propagate VHole from strict system projection
 -}
 
 type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
@@ -766,10 +769,9 @@ coed r r' topA t = case (frc topA) ^. body of
     _ ->
       impossible
 
-  -- Note: I don't need to rebind the "is"! It can be immediately weakened
-  -- to the outer context.
-  n@(VNe _ is) ->
-    VNe (NCoe r r' (rebind topA n) t) (insertI r $ insertI r' is)
+  -- NOTE: deleting the bound var from is
+  a@(VNe _ is) ->
+    VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' (deleteIS (topA^.binds) is))
 
 
 {-
@@ -830,7 +832,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
     gr           = t
     ~_Ar'        = a ∙ r'
-    ~topSysr     = topSys ∙ r :: NeSys
+    ~topSysr     = topSys ∙ r  :: NeSys
     ~topSysr'    = topSys ∙ r' :: NeSys
     forallTopSys = forallNeSys topSys
     topSysr'f    = frc topSysr'
@@ -945,7 +947,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
   a@(VHTyCon ti (rebind topA -> ps)) -> case frc t of
 
-    VHDCon di _ fs s is ->
+    t@(VHDCon di _ fs s is) ->
       let psr' = ps ∙ r' in
       if di^.isCoherent then
         VHDCon di psr' (coeindsp r r' ps fs (di^.fieldTypes)) s is
@@ -959,7 +961,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
     -- coe r r' a (fhcom i j (a r) [α k. t k] b) =
     -- fhcom i j (a r') [α k. coe r r' a (t k)] (coe r r' a b)
-    VHCom i j _ sys b is ->
+    t@(VHCom i j _ sys b is) ->
       let abind = rebind topA a in
       VHCom i j
         (VHTyCon ti (ps ∙ r'))
@@ -967,11 +969,11 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
         (coed r r' abind b)
         is
 
-    VNe n is ->
+    t@(VNe n is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
 
-    v@VHole{} ->
-      v
+    t@VHole{} ->
+      t
 
     _ ->
       impossible
@@ -1090,29 +1092,24 @@ hcomdn r r' topA ts@(!nts, !is) base = case frc topA of
       (unpack x base)
 
   a@(VTyCon _ ps) -> case frc base of
-    VDCon dci sp -> case ?dom of
+    base@(VDCon dci sp) -> case ?dom of
       0 ->
         VDCon dci (hcomind0sp r r' a ts ps (dci^.conId) 0 sp (dci^.fieldTypes))
       _ -> case projsys' (dci^.conId) ts of
         TTPProject prj  ->
           VDCon dci (hcomindsp r r' a (prj // snd ts) ps (dci^.conId) 0 sp (dci^.fieldTypes))
         TTPNe (sys, is) -> -- NOTE: this is is extended with the blocking neutral component's ivars
-          VHCom r r' a (sys, is) (VDCon dci sp) (insertI r $ insertI r' is)
+          VHCom r r' a (sys, is) base (insertI r $ insertI r' is)
 
     base@(VNe n is') ->
-      uf
+      VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
-
-      -- VNe (NHCom r r' topA nts base) (insertI r $ insertI r' $ is <> is')
-    base@VHole{} ->
-      base
-    _ ->
-      impossible
+    base@VHole{} -> base
+    _            -> impossible
 
   -- "fhcom", hcom on HITs is blocked
   a@(VHTyCon tyinf ps) ->
-    uf
-    -- VNe (NHCom r r' a nts base) (insertI r $ insertI r' is)
+    VHCom r r' a ts base (insertI r $ insertI r' is)
 
   v@VHole{} -> v
 
@@ -1392,32 +1389,21 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
     let ?sub = sub; ?env = env; ?recurse = rc in
     lookupHCase (i^.conId) fs s cs
 
-  VNe n is -> uf
-    -- case unSubNe n of
+  t@(VHCom r r' a sys base is) ->
 
-    -- -- case on hcom
-    -- hcombase@(NHCom r r' a (frc -> sys) base) ->
+     -- case (hcom r r' a [α i. t i] base) B cs =
+     -- let B* = λ i. B (hcom r i a [α i. t i] base);
+     -- hcom r r' (B (hcom r r' a [α i. t i] base))
+     --           [α i. coe i r' B* (case (t i) B cs)]
+     --           (coe r r' B* (case base B cs))
+    let bbind = bindI "i" \i -> b ∙ hcom r i a (frc sys) base in
+    hcomdn r r' (b ∙ t)
+      (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs)) sys)
+      (coed r r' bbind (hcase base b ecs))
 
-    --   -- case (hcom r r' a [α i. t i] base) B cs =
-    --   -- let B* = λ i. B (hcom r i a [α i. t i] base);
-    --   -- hcom r r' (B (hcom r r' a [α i. t i] base))
-    --   --           [α i. coe i r' B* (case (t i) B cs)]
-    --   --           (coe r r' B* (case base B cs))
-
-    --   let bbind = bindI "i" \i -> b ∙ hcom r i a sys base in
-    --   hcomd r r'
-    --     (b ∙ VNe hcombase is)
-    --     (mapVSysHCom
-    --        (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs))
-    --        sys)
-    --     (coed r r' bbind (hcase base b ecs))
-
-    -- n ->
-    --   VNe (NHCase n b ecs) is
-
+  VNe n is  -> VNe (NHCase n b ecs) is
   v@VHole{} -> v
   _         -> impossible
-
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case

@@ -365,36 +365,47 @@ telescope = do
 
 top :: Parser Top
 top =
-  branch ((//) <$!> getSourcePos <*> (keyword "inductive" *> ident))
-
+  branch ((//) <$!> getSourcePos <*> (keyword "higher" *> keyword "inductive" *> ident))
     (\(pos, x) -> do
         params <- telescope
         symbol ":="
-        constructors <- sepBy ((,,) <$!> (coerce <$> getSourcePos) <*!> ident <*!> telescope)
-                              (char '|')
+        constructors <-
+          sepBy ((,,,) <$!> (DontShow <$> getSourcePos) <*!> ident <*!> telescope <*!> optional sys)
+                (char '|')
         char ';'
         u <- top
-        pure $! TData (coerce pos) x params constructors u
+        pure $! THData (coerce pos) x params constructors u
     )
+    (branch ((//) <$!> getSourcePos <*> (keyword "inductive" *> ident))
 
-    (branch ((//) <$!> getSourcePos <*!> ident)
       (\(pos, x) -> do
-        args <- many piBinder
-        ma   <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
-        symbol ":="
-        t <- tm
-        (t, ma) <- pure $! desugarIdentArgs args ma t
-        char ';'
-        u <- top
-        pure $! TDef (coerce pos) x ma t u)
+          params <- telescope
+          symbol ":="
+          constructors <- sepBy ((,,) <$!> (DontShow <$> getSourcePos) <*!> ident <*!> telescope)
+                                (char '|')
+          char ';'
+          u <- top
+          pure $! TData (coerce pos) x params constructors u
+      )
 
-      (branch ((//) <$!> getSourcePos <*!> (keyword "import" *> ident))
-        (\(pos, file) -> do
-            char ';'
-            u <- top
-            pure $ TImport (coerce pos) file u)
+      (branch ((//) <$!> getSourcePos <*!> ident)
+        (\(pos, x) -> do
+          args <- many piBinder
+          ma   <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
+          symbol ":="
+          t <- tm
+          (t, ma) <- pure $! desugarIdentArgs args ma t
+          char ';'
+          u <- top
+          pure $! TDef (coerce pos) x ma t u)
 
-        (pure TEmpty)))
+        (branch ((//) <$!> getSourcePos <*!> (keyword "import" *> ident))
+          (\(pos, file) -> do
+              char ';'
+              u <- top
+              pure $ TImport (coerce pos) file u)
+
+          (pure TEmpty))))
 
 src :: Parser Top
 src = ws *> top <* eof

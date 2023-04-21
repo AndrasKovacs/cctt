@@ -27,12 +27,12 @@ instance Quote Ne Tm where
     NProj2 t x        -> Proj2 (quote t) x
     NUnpack t x       -> Unpack (quote t) x
     NCoe r r' a t     -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
-    NHCom r r' a ts t -> HCom (quote r) (quote r') (quote a) (quote ts) (quote t)
     NUnglue t sys     -> Unglue (quote t) (quote sys)
     NGlue t s1 s2     -> Glue (quote t) (quote s1) (quote s2)
     NLApp t i         -> LApp (quote t) (quote i)
     NDontRecurse x    -> RecursiveCall x
     NCase t b cs      -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
+    NHCase t b cs     -> HCase (quote t) (b^.name) (quote b) (quoteCases cs)
 
 instance Quote Val Tm where
   quote t = case frc t of
@@ -54,6 +54,7 @@ instance Quote Val Tm where
     VTyCon x ts      -> TyCon x (quote ts)
     VDCon ci sp      -> DCon ci (quote sp)
     VHTyCon i ts     -> HTyCon i (quote ts)
+    VHDCon i ps fs s _ -> HDCon i (quoteParams ps) (quote fs) s
     -- VHDCon i ts _    -> HDCon i (quote ts)
 
 --------------------------------------------------------------------------------
@@ -74,18 +75,18 @@ quoteCases (EC sub env _ cs) =
   let ?sub = sub; ?env = env; ?recurse = DontRecurse in quoteCases' cs
 {-# inline quoteCases #-}
 
+quoteParams :: NCofArg => DomArg => Env -> LazySpine
+quoteParams = go LSPNil where
+  go acc = \case
+    ENil       -> acc
+    EDef env v -> go (LSPCons (quote v) acc) env
+
 --------------------------------------------------------------------------------
 
 instance Quote VDSpine Spine where
   quote = \case
     VDNil       -> SPNil
     VDCons t sp -> SPCons (quote t) (quote sp)
-
-instance Quote VHDSpine HSpine where
-  quote = \case
-    VHDNil       -> HSPNil
-    VHDCons t sp -> HSPCons (quote t) (quote sp)
-    VHDI r sp    -> HSPI (quote r) (quote sp)
 
 instance Quote a b => Quote (BindCofLazy a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
