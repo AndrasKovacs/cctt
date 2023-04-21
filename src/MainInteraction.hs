@@ -1,12 +1,17 @@
 
 module MainInteraction where
 
+import qualified Data.Map.Strict as M
 import System.Environment
 import System.Exit
+
 import Common
-import Elaboration
+import CoreTypes
 import ElabState
+import Elaboration
+import Interval
 import Pretty
+import Quotation
 
 helpMsg = unlines [
    "usage: cctt <file> [nf <topdef>] [elab] [verbose] [no-hole-cxts]"
@@ -56,11 +61,27 @@ mainWith getArgs = do
     . (printNf .~ printnf)
     . (showHoleCxts .~ holeCxts)
 
-  (!top, !totaltime) <- timed (elaborate path)
+  (_, !totaltime) <- timed (elaborate path)
   st <- getState
   putStrLn (path ++ " checked in " ++ show totaltime)
   putStrLn ("parsing time: " ++ show (st^.parsingTime))
   putStrLn ("checked " ++ show (st^.lvl) ++ " definitions")
+
+  case printnf of
+    Just x -> do
+      (!nf, !nftime) <- case M.lookup x (st^.top) of
+        Just (TEDef i) -> do
+          let ?env = ENil; ?cof = idSub 0; ?dom = 0
+          timedPure (quote (i^.defVal))
+        _ -> do
+          putStrLn $ "No top-level definition with name: " ++ show x
+          exitSuccess
+      putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 nf
+      putStrLn ""
+      putStrLn $ "Normalized in " ++ show nftime
+      putStrLn ""
+    Nothing ->
+      pure ()
 
   when printelab do
     putStrLn $ pretty0 (st^.top')

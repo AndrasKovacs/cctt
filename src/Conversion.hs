@@ -37,6 +37,7 @@ instance Conv Val where
 
     (VHDCon i _ fs s _, VHDCon i' _ fs' s' _) ->
       i^.conId == i'^.conId && conv fs fs' && conv s s'
+
     (VHCom r1 r2 a t b _, VHCom r1' r2' a' t' b' _) ->
       conv r1 r1' && conv r2 r2'  && conv a a' && conv t t' && conv b b'
 
@@ -49,10 +50,10 @@ instance Conv Val where
     (t              , VLam t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
     (VPair x t u    , t'                ) -> conv t (proj1 x t') && conv u (proj2 x t')
     (t              , VPair x t' u'     ) -> conv (proj1 x t) t' && conv (proj2 x t) u'
-    (VPLam l r t    , t'                ) -> freshI \(IVar -> i) -> conv (t ∙ i) (papp l r t' i)
-    (t              , VPLam l r t'      ) -> freshI \(IVar -> i) -> conv (papp l r t i) (t' ∙ i)
-    (VLLam t        , t'                ) -> freshI \(IVar -> i) -> conv (t ∙ i) (lapp t' i)
-    (t              , VLLam t'          ) -> freshI \(IVar -> i) -> conv (lapp t i) (t' ∙ i)
+    (VPLam l r t    , t'                ) -> freshI \i -> conv (t ∙ i) (papp l r t' i)
+    (t              , VPLam l r t'      ) -> freshI \i -> conv (papp l r t i) (t' ∙ i)
+    (VLLam t        , t'                ) -> freshI \i -> conv (t ∙ i) (lapp t' i)
+    (t              , VLLam t'          ) -> freshI \i -> conv (lapp t i) (t' ∙ i)
     (VPack x t      , t'                ) -> conv t (unpack x t')
     (t              , VPack x t'        ) -> conv (unpack x t) t'
 
@@ -139,10 +140,10 @@ instance Conv a => Conv [a] where
   {-# inline conv #-}
 
 instance Conv (BindI Val) where
-  conv t t' = freshI \(IVar -> i) -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
+  conv t t' = freshI \i -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
 
 instance Conv (BindILazy Val) where
-  conv t t' = freshI \(IVar -> i) -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
+  conv t t' = freshI \i -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
 
 instance Conv a => Conv (BindCofLazy a) where
   conv t t' = conv (t^.binds) (t'^.binds)
@@ -176,7 +177,7 @@ instance Conv NamedClosure where
   conv t t' = fresh \x -> conv (t ∙ x) (t' ∙ x); {-# inline conv #-}
 
 instance Conv NamedIClosure where
-  conv t t' = freshI \(IVar -> i) -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
+  conv t t' = freshI \i -> conv (t ∙ i) (t' ∙ i); {-# inline conv #-}
 
 instance Conv NeCof' where
   conv (NeCof' _ c) (NeCof' _ c') = conv c c'

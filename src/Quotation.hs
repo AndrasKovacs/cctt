@@ -111,10 +111,10 @@ instance Quote NeCof Cof where
       NCAnd c1 c2 -> go c1 (go c2 acc)
 
 instance (SubAction a, Quote a b) => Quote (BindI a) b where
-  quote t = freshI \i -> quote (t ∙ IVar i); {-# inline quote #-}
+  quote t = freshI \i -> quote (t ∙ i); {-# inline quote #-}
 
 instance (SubAction a, Quote a b) => Quote (BindILazy a) b where
-  quote t = freshI \i -> quote (t ∙ IVar i); {-# inline quote #-}
+  quote t = freshI \i -> quote (t ∙ i); {-# inline quote #-}
 
 instance Quote NeSys Sys where
   quote = \case
@@ -130,7 +130,7 @@ instance Quote NamedClosure Tm where
   quote t = fresh \x -> quote (t ∙ x); {-# inline quote #-}
 
 instance Quote NamedIClosure Tm where
-  quote t = freshI \(IVar -> i) -> quote (t ∙ i); {-# inline quote #-}
+  quote t = freshI \i -> quote (t ∙ i); {-# inline quote #-}
 
 instance Quote Env Spine where
   quote = go SPNil where

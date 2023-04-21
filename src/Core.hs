@@ -29,22 +29,26 @@ type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
 ----------------------------------------------------------------------------------------------------
 
 -- | Get a fresh ivar when not working under a Sub.
-freshI :: (NCofArg => IVar -> a) -> (NCofArg => a)
-freshI act =
+freshIVar :: (NCofArg => IVar -> a) -> (NCofArg => a)
+freshIVar act =
   let fresh = dom ?cof in
   if  fresh == maxivar then error "RAN OUT OF IVARS IN EVAL" else
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   seq ?cof (act fresh)
+{-# inline freshIVar #-}
+
+freshI :: (NCofArg => I -> a) -> (NCofArg => a)
+freshI act = freshIVar \i -> act (IVar i)
 {-# inline freshI #-}
 
 -- | Get a fresh ivar, when working under a Sub.
-freshIS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
-freshIS act =
+freshIVarS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
+freshIVarS act =
   let fresh = dom ?cof in
   let ?sub  = setDom (fresh+1) ?sub `ext` IVar fresh in
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   seq ?sub (seq ?cof (act fresh))
-{-# inline freshIS #-}
+{-# inline freshIVarS #-}
 
 -- | Define the next fresh ivar to an expression.
 defineI :: I -> (SubArg => a) -> (SubArg => a)
@@ -82,23 +86,23 @@ bindCofLazy (NeCof' cof c) act = let ?cof = cof in BindCofLazy c act
 {-# inline bindCofLazy #-}
 
 bindI :: Name -> (NCofArg => I -> a) -> (NCofArg => BindI a)
-bindI x act = freshI \i -> BindI x i (act (IVar i))
+bindI x act = freshIVar \i -> BindI x i (act (IVar i))
 {-# inline bindI #-}
 
 bindIVar :: Name -> (NCofArg => IVar -> a) -> (NCofArg => BindI a)
-bindIVar x act = freshI \i -> BindI x i (act i)
+bindIVar x act = freshIVar \i -> BindI x i (act i)
 {-# inline bindIVar #-}
 
 bindILazy :: Name -> (NCofArg => I -> a) -> (NCofArg => BindILazy a)
-bindILazy x act = freshI \i -> BindILazy x i (act (IVar i))
+bindILazy x act = freshIVar \i -> BindILazy x i (act (IVar i))
 {-# inline bindILazy #-}
 
 bindIS :: Name -> (SubArg => NCofArg => I -> a) -> (SubArg => NCofArg => BindI a)
-bindIS x act = freshIS \i -> BindI x i (act (IVar i))
+bindIS x act = freshIVarS \i -> BindI x i (act (IVar i))
 {-# inline bindIS #-}
 
 bindILazyS :: Name -> (SubArg => NCofArg => I -> a) -> (SubArg => NCofArg => BindILazy a)
-bindILazyS x act = freshIS \i -> BindILazy x i (act (IVar i))
+bindILazyS x act = freshIVarS \i -> BindILazy x i (act (IVar i))
 {-# inline bindILazyS #-}
 
 bindIUnLazy :: BindILazy a -> BindI a
@@ -1558,6 +1562,7 @@ recFrc = \case
   VHCom r r' a sys t is  | isUnblocked is -> recFrc (hcom r r' a (frc sys) t)
   v                                       -> v
 
+-- We noinline these helpers to minimize the size of inlined Val forcing.
 frcGlueTy :: NCofArg => DomArg => Val -> NeSys -> Val
 frcGlueTy a sys = recFrc (glueTy a (frc sys))
 {-# noinline frcGlueTy #-}

@@ -932,16 +932,6 @@ elabTop = \case
         (top  %~ M.insert x defEntry)
       . (top' %~ LM.insert l defEntry)
 
-    printnf <- getState <&> (^.printingOpts.printNf)
-    case printnf of
-      Just x' | x == x' -> withPrettyArgs do
-        (!tq, !ntime) <- timedPure (quote tv)
-        putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 tq
-        putStrLn ""
-        putStrLn $ "Normalized in " ++ show ntime
-        putStrLn ""
-      _ -> pure ()
-
     elabTop ptop
 
   P.TImport pos modname ptop -> withTopElab $ setPos pos do
