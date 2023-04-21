@@ -3,7 +3,6 @@ module MainInteraction where
 
 import System.Environment
 import System.Exit
-
 import Common
 import Elaboration
 import ElabState

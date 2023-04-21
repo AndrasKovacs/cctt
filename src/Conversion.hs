@@ -20,7 +20,7 @@ instance Conv Val where
 
     -- rigid match
     (VNe n _        , VNe n' _          ) -> conv n n'
-    (VGlueTy a sys  , VGlueTy a' sys'   ) -> conv a a' && conv (fst sys) (fst sys')
+    (VGlueTy a sys  , VGlueTy a' sys'   ) -> conv a a' && conv sys sys'
     (VPi a b        , VPi a' b'         ) -> conv a a' && conv b b'
     (VLam t         , VLam t'           ) -> conv t t'
     (VPath a t u    , VPath a' t' u'    ) -> conv a a' && conv t t' && conv u u'
@@ -60,9 +60,8 @@ instance Conv Val where
     (_              , VSub{}            ) -> impossible
     _                                     -> False
 
-
-instance Conv NeSysHCom' where
-  conv sys sys' = conv (fst sys) (fst sys')
+instance Conv a => Conv (WithIS a) where
+  conv (WIS a _) (WIS a' _) = conv a a'
   {-# inline conv #-}
 
 instance Conv Ne where

@@ -36,26 +36,26 @@ instance Quote Ne Tm where
 
 instance Quote Val Tm where
   quote t = case frc t of
-    VSub{}           -> impossible
-    VNe n _          -> quote n
-    VGlueTy a sys    -> GlueTy (quote a) (quote (fst sys))
-    VPi a b          -> Pi (b^.name) (quote a) (quote b)
-    VLam t           -> Lam (t^.name) (quote t)
-    VPath a lhs rhs  -> Path (a^.name) (quote a) (quote lhs) (quote rhs)
-    VPLam lhs rhs t  -> PLam (quote lhs) (quote rhs) (t^.name) (quote t)
-    VSg a b          -> Sg (b^.name) (quote a) (quote b)
-    VPair x t u      -> Pair x (quote t) (quote u)
-    VWrap x a        -> Wrap x (quote a)
-    VPack x t        -> Pack x (quote t)
-    VU               -> U
-    VHole i p _ _    -> Hole i p                   -- we forget the context when quoting a hole!
-    VLine t          -> Line (t^.name) (quote t)
-    VLLam t          -> LLam (t^.name) (quote t)
-    VTyCon x ts      -> TyCon x (quote ts)
-    VDCon ci sp      -> DCon ci (quote sp)
-    VHTyCon i ts     -> HTyCon i (quote ts)
-    VHDCon i ps fs s _ -> HDCon i (quoteParams ps) (quote fs) s
-    -- VHDCon i ts _    -> HDCon i (quote ts)
+    VSub{}               -> impossible
+    VNe n _              -> quote n
+    VGlueTy a sys        -> GlueTy (quote a) (quote sys)
+    VPi a b              -> Pi (b^.name) (quote a) (quote b)
+    VLam t               -> Lam (t^.name) (quote t)
+    VPath a lhs rhs      -> Path (a^.name) (quote a) (quote lhs) (quote rhs)
+    VPLam lhs rhs t      -> PLam (quote lhs) (quote rhs) (t^.name) (quote t)
+    VSg a b              -> Sg (b^.name) (quote a) (quote b)
+    VPair x t u          -> Pair x (quote t) (quote u)
+    VWrap x a            -> Wrap x (quote a)
+    VPack x t            -> Pack x (quote t)
+    VU                   -> U
+    VHole i p _ _        -> Hole i p                   -- we forget the context when quoting a hole!
+    VLine t              -> Line (t^.name) (quote t)
+    VLLam t              -> LLam (t^.name) (quote t)
+    VTyCon x ts          -> TyCon x (quote ts)
+    VDCon ci sp          -> DCon ci (quote sp)
+    VHTyCon i ts         -> HTyCon i (quote ts)
+    VHDCon i ps fs s _   -> HDCon i (quoteParams ps) (quote fs) s
+    VHCom r r' a sys t _ -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
 
 --------------------------------------------------------------------------------
 
@@ -100,8 +100,8 @@ instance Quote a b => Quote [a] [b] where
 instance Quote a b => Quote (BindCof a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
 
-instance Quote NeCof' Cof where
-  quote (NeCof' _ c) = quote c
+instance Quote a b => Quote (WithIS a) b where
+  quote (WIS a _) = quote a
   {-# inline quote #-}
 
 instance Quote NeCof Cof where

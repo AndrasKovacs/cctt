@@ -196,12 +196,12 @@ check t topA = frcPos t \case
 
     (P.GlueTm base eqs ts, VGlueTy a equivs) -> do
       ~eqs <- case eqs of
-        Nothing -> pure (quote (fst equivs))
+        Nothing -> pure (quote equivs)
         Just eqs -> do
           eqs <- elabGlueTySys a eqs
           pure eqs
       base <- check base a
-      ts   <- elabGlueTmSys base ts a (fst equivs)
+      ts   <- elabGlueTmSys base ts a (equivs^.body)
       pure $ Glue base eqs ts
 
     -- inferring non-dependent motive for case
@@ -562,7 +562,7 @@ inferNonSplit t = frcPos t \case
     case evalSys eqs of
       VSTotal _ -> impossible
       VSNe veqs -> do
-        sys <- elabGlueTmSys base sys a (fst veqs)
+        sys <- elabGlueTmSys base sys a (veqs^.body)
         pure $! Infer (Glue base eqs sys) (VGlueTy a veqs)
 
   P.GlueTm _ Nothing _ -> do
@@ -571,7 +571,7 @@ inferNonSplit t = frcPos t \case
   P.Unglue t -> do
     Infer t a <- infer t
     case frc a of
-      VGlueTy a sys -> pure $! Infer (Unglue t (quote (fst sys))) a
+      VGlueTy a sys -> pure $! Infer (Unglue t (quote sys)) a
       a             -> err $! ExpectedGlueTy (quote a)
 
   P.Com r r' a sys t -> do
@@ -975,6 +975,9 @@ elabTop = \case
     bindTelescope ps $ elabConstructors inf 0 cs
     writeIORef frzRef True
     elabTop ptop
+
+  P.THData{} ->
+    error "TODO: higher inductive declarations"
 
   P.TEmpty ->
     pure ()

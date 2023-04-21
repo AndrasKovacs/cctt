@@ -337,7 +337,11 @@ tm = \case
   HDCon inf _ fs s      -> case fs of
                              SPNil | cod s == 0 -> hdcon inf
                              _ -> appp (hdcon inf <> spine fs <> goSub s)
-
+  HCase t x b cs        -> ifVerbose
+                            (let pt = proj t; pcs = cases cs in bind x \x ->
+                             appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
+                            (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
+  HSplit x b cs         -> appp ("λ[" <> cases cs <> "]")
 
 ----------------------------------------------------------------------------------------------------
 

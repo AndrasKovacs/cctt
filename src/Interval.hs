@@ -293,10 +293,6 @@ instance SubAction IVarSet where
     mempty is
   {-# noinline sub #-}
 
-instance (SubAction a, SubAction b) => SubAction (a, b) where
-  sub (a, b) = let x = sub a; y = sub b in (x, y)
-  {-# inline sub #-}
-
 -- | Extend a sub with a sub
 pushSub :: Sub -> Sub -> Sub
 pushSub (Sub s) s' =

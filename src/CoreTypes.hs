@@ -9,6 +9,9 @@ import qualified LvlMap as LM
 -- Syntax
 --------------------------------------------------------------------------------
 
+data WithIS a = WIS {withISBody :: a, withISIvars :: IVarSet}
+  deriving (Show)
+
 data RecInfo = RI {
     recInfoRecId    :: Lvl
   , recInfoRecTy    :: ~Ty
@@ -253,14 +256,14 @@ data NeSys
   | NSCons (BindCofLazy Val) NeSys
   deriving Show
 
-type NeSys' = (NeSys, IVarSet)
+type NeSys' = WithIS NeSys
 
 data NeSysHCom
   = NSHEmpty
   | NSHCons (BindCof (BindILazy Val)) NeSysHCom
   deriving Show
 
-type NeSysHCom' = (NeSysHCom, IVarSet)
+type NeSysHCom' = WithIS NeSysHCom
 
 -- TODO: unbox
 data VSys
@@ -604,6 +607,10 @@ instance SubAction VDSpine where
     VDNil       -> VDNil
     VDCons v vs -> VDCons (sub v) (sub vs)
 
+instance SubAction a => SubAction (WithIS a) where
+  sub (WIS a is) = WIS (sub a) (sub is)
+  {-# inline sub #-}
+
 --------------------------------------------------------------------------------
 
 makeFields ''BindI
@@ -619,3 +626,4 @@ makeFields ''TyConInfo
 makeFields ''RecInfo
 makeFields ''HTyConInfo
 makeFields ''HDConInfo
+makeFields ''WithIS
