@@ -172,6 +172,11 @@ data Cases
   | CSCons Name [Name] Tm Cases
   deriving Show
 
+snocCases :: Cases -> Name -> [Name] -> Tm -> Cases
+snocCases cs x xs t = case cs of
+  CSNil                -> CSCons x xs t CSNil
+  CSCons x' xs' t' cs  -> CSCons x' xs' t' (snocCases cs x xs t)
+
 -- | Atomic equation.
 data CofEq = CofEq I I
   deriving Show

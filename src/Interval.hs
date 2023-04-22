@@ -210,6 +210,10 @@ ext (Sub s) i =
                     .|. unsafeShiftL (coerce i) (w2i bl)))
 {-# inline ext #-}
 
+liftSub :: Sub -> Sub
+liftSub s = mapDom (+1) (ext s (IVar (dom s)))
+{-# inline liftSub #-}
+
 subToList :: Sub -> [I]
 subToList = foldrSub (\_ i is -> i:is) []
 

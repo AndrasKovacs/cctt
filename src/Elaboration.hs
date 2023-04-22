@@ -9,7 +9,7 @@ import System.FilePath
 import System.Exit
 
 import Common hiding (debug)
-import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalSys)
+import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalSys, evalBoundary)
 import CoreTypes
 import Interval
 import Quotation
@@ -136,15 +136,21 @@ check t topA = frcPos t \case
         P.LADesugared a' -> check a' VU
       Lam x <$!> bind x a qa (\v -> check t (b ∙ v))
 
-    (P.Split cs, VPi a b) -> do
-      (tyinfo, params) <- case frc a of
-        VTyCon inf ps -> pure (inf, ps)
-        a             -> err $ ExpectedInductiveType (quote a)
-      frz <- readIORef (tyinfo^.frozen)
-      unless frz $ err $ GenericError "Can't case split on the type that's being defined"
-      cons <- readIORef (tyinfo^.constructors)
-      cs <- elabCases params b (LM.elems cons) cs
-      pure $! Split (b^.name) (quote b) cs
+    (P.Split cs, VPi a b) -> case frc a of
+      VTyCon tyinfo params -> do
+        frz <- readIORef (tyinfo^.frozen)
+        unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+        cons <- readIORef (tyinfo^.constructors)
+        cs <- elabCases params b (LM.elems cons) cs
+        pure $! Split (b^.name) (quote b) cs
+      VHTyCon inf params -> do
+        frz <- readIORef (inf^.frozen)
+        unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+        cons <- readIORef (inf^.constructors)
+        cs <- elabHCases params b (LM.elems cons) cs CSNil
+        pure $! HSplit (b^.name) (quote b) cs
+      _ ->
+        err $ ExpectedInductiveType (quote a)
 
     (P.Lam x ann t, VPath a l r) -> do
       case ann of P.LANone                 -> pure ()
@@ -210,16 +216,25 @@ check t topA = frcPos t \case
     -- inferring non-dependent motive for case
     (P.Case t Nothing cs, b) -> do
       Infer t a <- infer t
-      (typeinfo, params) <- case frc a of
-        VTyCon inf ps -> pure (inf, ps)
-        a             -> err $ ExpectedInductiveType (quote a)
-      let qb = bind "_" a (quote a) \_ -> quote b
-      let bv = NCl "_" $ CConst b
-      frz <- readIORef $ typeinfo^.frozen
-      unless frz $ err $ GenericError "Can't case split on the type that's being defined"
-      cons <- readIORef $ typeinfo^.constructors
-      cs <- elabCases params bv (LM.elems cons) cs
-      pure $ Case t "_" qb cs
+      case frc a of
+        VTyCon typeinfo params -> do
+          let qb = bind "_" a (quote a) \_ -> quote b
+          let bv = NCl "_" $ CConst b
+          frz <- readIORef $ typeinfo^.frozen
+          unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+          cons <- readIORef $ typeinfo^.constructors
+          cs <- elabCases params bv (LM.elems cons) cs
+          pure $ Case t "_" qb cs
+        VHTyCon inf params -> do
+          let qb = bind "_" a (quote a) \_ -> quote b
+          let bv = NCl "_" $ CConst b
+          frz <- readIORef (inf^.frozen)
+          unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+          cons <- LM.elems <$!> readIORef (inf^.constructors)
+          cs <- elabHCases params bv cons cs CSNil
+          pure $ HCase t "_" qb cs
+        _ ->
+          err $ ExpectedInductiveType (quote a)
 
     (P.Hole i p, a) -> do
       putStrLn ("HOLE ?" ++ maybe (sourcePosPretty ?srcPos) id i)
@@ -272,7 +287,9 @@ check t topA = frcPos t \case
             err $ GenericError $
               "No such constructor for expected type:\n\n  "
               ++ pretty (quote (VTyCon tyinf ps))
-          (!sp, !is) <- uf -- checkSp (dci^.name) ps sp (dci^.fieldTypes)
+
+          (!sp, !is) <- checkHSp (dci^.name) ps sp (dci^.fieldTypes) (dci^.ifields)
+
           pure $ HDCon dci (quoteParams ps) sp is
 
         TyConHead{} ->
@@ -288,8 +305,6 @@ check t topA = frcPos t \case
         SplitInfer (Infer t a) -> do
           convExInf a topA
           pure t
-
-
 
     (t, topA) -> do
       Infer t a <- infer t
@@ -687,16 +702,25 @@ inferNonSplit t = frcPos t \case
 
   P.Case t (Just (x, b)) cs -> do
     Infer t a <- infer t
-    (tyinfo, params) <- case frc a of
-      VTyCon i ps -> pure (i, ps)
-      a           -> err $ ExpectedInductiveType (quote a)
-    b <- bind x a (quote a) \_ -> check b VU
-    let bv = makeNCl x b
-    frz <- readIORef (tyinfo^.frozen)
-    unless frz $ err $ GenericError "Can't case split on the type that's being defined"
-    cons <- readIORef (tyinfo^.constructors)
-    cs <- elabCases params bv (LM.elems cons) cs
-    pure $! Infer (Case t x b cs) (bv ∙ eval t)
+    case frc a of
+      VTyCon tyinfo params -> do
+        b <- bind x a (quote a) \_ -> check b VU
+        let bv = makeNCl x b
+        frz <- readIORef (tyinfo^.frozen)
+        unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+        cons <- LM.elems <$!> readIORef (tyinfo^.constructors)
+        cs <- elabCases params bv cons cs
+        pure $! Infer (Case t x b cs) (bv ∙ eval t)
+      VHTyCon inf params -> do
+        b <- bind x a (quote a) \_ -> check b VU
+        let bv = makeNCl x b
+        frz <- readIORef (inf^.frozen)
+        unless frz $ err $ GenericError "Can't case split on the type that's being defined"
+        cons <- LM.elems <$!> readIORef (inf^.constructors)
+        cs <- elabHCases params bv cons cs CSNil
+        pure $! Infer (HCase t x b cs) (bv ∙ eval t)
+      a ->
+        err $ ExpectedInductiveType (quote a)
 
   P.Case _ Nothing _ ->
     err $ GenericError "Can't infer type for case expression"
@@ -706,31 +730,93 @@ inferNonSplit t = frcPos t \case
 
 ----------------------------------------------------------------------------------------------------
 
-elabCase :: Elab (Lvl -> Env -> Tel -> Val -> [Name] -> P.Tm -> IO Tm)
-elabCase conid tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) of
+elabCase :: Elab (Env -> Tel -> Val -> [Name] -> P.Tm -> IO Tm)
+elabCase tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) of
   (TNil, []) ->
     check body rhstype
   (TCons _ a fieldtypes, x:xs) -> do
     let ~va = evalIn tyenv a
     bind x va (quote va) \x ->
-      elabCase conid (EDef tyenv x) fieldtypes rhstype xs body
+      elabCase (EDef tyenv x) fieldtypes rhstype xs body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
-caseLhsSp :: Lvl -> [Name] -> VDSpine
-caseLhsSp dom []     = VDNil
-caseLhsSp dom (_:xs) = VDCons (VNe (NLocalVar dom) mempty) (caseLhsSp (dom + 1) xs)
+caseLhsSp :: Lvl -> Tel -> VDSpine
+caseLhsSp dom = \case
+  TNil          -> VDNil
+  TCons _ _ tel -> VDCons (vVar dom) (caseLhsSp (dom + 1) tel)
 
-elabCases :: Elab (
-     Env -> NamedClosure -> [DConInfo] -> [(Name, [Name], P.Tm)] -> IO Cases)
+elabCases :: Elab (Env -> NamedClosure -> [DConInfo] -> [(Name, [Name], P.Tm)] -> IO Cases)
 elabCases params b cons cs = case (cons, cs) of
   ([], []) ->
     pure CSNil
   (dci:cons, (x', xs, body):cs) | dci^.name == x' -> do
-    let rhstype = b ∙ VDCon dci (caseLhsSp ?dom xs)
-    t  <- elabCase (dci^.conId) params (dci^.fieldTypes) rhstype xs body
+    let rhstype = b ∙ VDCon dci (caseLhsSp ?dom (dci^.fieldTypes))
+    t  <- elabCase params (dci^.fieldTypes) rhstype xs body
     cs <- elabCases params b cons  cs
     pure $ CSCons (dci^.name) xs t cs
+  _ ->
+    err CaseMismatch
+
+----------------------------------------------------------------------------------------------------
+
+caseLhsIFields :: [Name] -> Sub -> Sub
+caseLhsIFields xs acc = case xs of
+  []   -> acc
+  _:xs -> caseLhsIFields xs (liftSub acc)
+
+evalBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure Cases -> VSys)
+evalBoundary bnd casety casecl = case bnd of
+  SEmpty          -> vsempty
+  SCons cof t bnd -> vscons (evalCof cof) (hcase (eval t) casety casecl)
+                            (evalBoundary bnd casety casecl)
+
+elabHCase' :: Elab (Env -> Sub -> [Name] -> Val -> [Name] -> NamedClosure
+           -> EvalClosure Cases -> Sys -> P.Tm -> IO Tm)
+elabHCase' params sub ifields rhstype xs ~casety ~casecl bnd body = case (ifields, xs) of
+  ([], []) -> do
+    t <- check body rhstype
+    let vbnd = (let ?env = params; ?sub = sub; ?recurse = DontRecurse
+                in evalBoundary bnd casety casecl)
+    case vbnd of
+      VSTotal v -> do
+        conv (eval t) v
+      VSNe (WIS sys _) -> do
+        neSysCompat t sys
+    pure t
+
+  (_:ifields, x:xs) -> do
+    bindI x \_ ->
+      elabHCase' params (liftSub sub) ifields rhstype xs casety casecl bnd body
+  _ ->
+    err $ GenericError "Wrong number of constructor fields"
+
+elabHCase :: Elab (Env -> Tel -> [Name] -> Val -> [Name] -> NamedClosure
+          -> EvalClosure Cases -> Sys -> P.Tm -> IO Tm)
+elabHCase params fieldtypes ifields rhstype xs ~casety ~casecl bnd body = case (fieldtypes, xs) of
+  (TNil, []) -> do
+    elabHCase' params (emptySub (dom ?cof)) ifields rhstype xs casety casecl bnd body
+  (TCons _ a fieldtypes, x:xs) -> do
+    let ~va = evalIn params a
+    bind x va (quote va) \x ->
+      elabHCase (EDef params x) fieldtypes ifields rhstype xs casety casecl bnd body
+  _ -> do
+    err $ GenericError "Wrong number of constructor fields"
+
+elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [(Name, [Name], P.Tm)] -> Cases -> IO Cases)
+elabHCases params b cons cs prevCases = case (cons, cs) of
+  ([], []) ->
+    pure prevCases
+  (dci:cons, (x', xs, body):cs) | dci^.name == x' -> do
+    let lhsTm = HDCon dci (quoteParams params)
+                          (quote (caseLhsSp ?dom (dci^.fieldTypes)))
+                          (caseLhsIFields (dci^.ifields) (emptySub (dom ?cof)))
+    let rhstype = b ∙ eval lhsTm
+    let casecl  = EC (idSub (dom ?cof)) ?env DontRecurse prevCases
+    t <- elabHCase params (dci^.fieldTypes)
+                          (dci^.ifields)
+                          rhstype xs b casecl (dci^.boundary) body
+    elabHCases params b cons cs (snocCases prevCases x' xs t)
   _ ->
     err CaseMismatch
 
@@ -913,6 +999,12 @@ sysCompat t = \case
       VCFalse     -> pure ()
       VCNe cof' _ -> bindCof cof' $ conv (eval t) (eval t')
     sysCompat t sys
+
+neSysCompat :: Elab (Tm -> NeSys -> IO ())
+neSysCompat t = \case
+  NSEmpty       -> pure ()
+  NSCons t' sys -> do (assumeCof (t'^.binds) (conv (eval t) (t'^.body)))
+                      neSysCompat t sys
 
 elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
 elabGlueTmSys base ts a equivs = case (ts, equivs) of
