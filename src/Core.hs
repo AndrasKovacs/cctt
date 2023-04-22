@@ -836,9 +836,9 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   VGlueTy (rebind topA -> a) (WIS (rebind topA -> topSys) (rebind topA -> is)) -> let
 
     gr           = t
-    ~_Ar'        = a ∙ r'
+    _Ar'         = a ∙ r'
     ~topSysr     = topSys ∙ r  :: NeSys
-    ~topSysr'    = topSys ∙ r' :: NeSys
+    topSysr'     = topSys ∙ r' :: NeSys
     forallTopSys = forallNeSys topSys
     topSysr'f    = frc topSysr'
 
@@ -860,9 +860,9 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       equiv4   = proj2 "g"    equiv3
       ~equiv5  = proj2 "linv" equiv4
 
-      ~tr'     = proj1 "Ty"   equiv1
-      ~fr'     = proj1 "f"    equiv2
-      ~fr'inv  = proj1 "g"    equiv3
+      tr'      = proj1 "Ty"   equiv1
+      fr'      = proj1 "f"    equiv2
+      fr'inv   = proj1 "g"    equiv3
       ~r'linv  = proj1 "linv" equiv4
       ~r'rinv  = proj1 "rinv" equiv5
       ~r'coh   = unpack "coh" (proj2 "rinv"  equiv5)
@@ -1553,44 +1553,21 @@ instance Force NeCof VCof where
         VCNe cof' is' -> VCNe (NeCof' (cof'^.extended) (NCAnd (cof^.extra) (cof'^.extra)))
                               (is <> is')
 
-recFrc :: NCofArg => DomArg => Val -> Val
-recFrc = \case
-  VSub v s                                -> let ?sub = s in frcS v
-  VNe t is               | isUnblocked is -> frc t
-  VGlueTy a (WIS sys is) | isUnblocked is -> recFrc (glueTy a (frc sys))
-  VHDCon i ps fs s is    | isUnblocked is -> recFrc (hdcon i ps fs s)
-  VHCom r r' a sys t is  | isUnblocked is -> recFrc (hcom r r' a (frc sys) t)
-  v                                       -> v
-
--- We noinline these helpers to minimize the size of inlined Val forcing.
-frcGlueTy :: NCofArg => DomArg => Val -> NeSys -> Val
-frcGlueTy a sys = recFrc (glueTy a (frc sys))
-{-# noinline frcGlueTy #-}
-
-frcVHDCon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Val
-frcVHDCon i ps fs s = recFrc (hdcon i ps fs s)
-{-# noinline frcVHDCon #-}
-
-frcVHCom :: NCofArg => DomArg => I -> I -> VTy -> NeSysHCom' -> Val -> Val
-frcVHCom r r' a sys t = recFrc (hcom r r' a (frc sys) t)
-{-# noinline frcVHCom #-}
-
 instance Force Val Val where
   frc = \case
     VSub v s                                -> let ?sub = s in frcS v
     VNe t is               | isUnblocked is -> frc t
-    VGlueTy a (WIS sys is) | isUnblocked is -> frcGlueTy a sys
-    VHDCon i ps fs s is    | isUnblocked is -> frcVHDCon i ps fs s
-    VHCom r r' a sys t is  | isUnblocked is -> frcVHCom r r' a sys t
+    VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
+    VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
+    VHCom r r' a sys t is  | isUnblocked is -> frc (hcom r r' a (frc sys) t)
     v                                       -> v
-  {-# inline frc #-}
 
   frcS = \case
     VSub v s                                 -> let ?sub = sub s in frcS v
     VNe t is               | isUnblockedS is -> frcS t
-    VGlueTy a (WIS sys is) | isUnblockedS is -> recFrc (glueTy (sub a) (frcS sys))
-    VHDCon i ps fs s is    | isUnblockedS is -> recFrc (hdcon i (sub ps) (sub fs) (sub s))
-    VHCom r r' a sys t is  | isUnblockedS is -> recFrc (hcom (sub r) (sub r') (sub a) (frcS sys) (sub t))
+    VGlueTy a (WIS sys is) | isUnblockedS is -> frc (glueTy (sub a) (frcS sys))
+    VHDCon i ps fs s is    | isUnblockedS is -> frc (hdcon i (sub ps) (sub fs) (sub s))
+    VHCom r r' a sys t is  | isUnblockedS is -> frc (hcom (sub r) (sub r') (sub a) (frcS sys) (sub t))
 
 
     VNe t is              -> VNe (sub t) (sub is)
@@ -1619,34 +1596,34 @@ instance Force Ne Val where
     t@NLocalVar{}     -> VNe t mempty
     t@NDontRecurse{}  -> VNe t mempty
     NSub n s          -> let ?sub = s in frcS n
-    NApp t u          -> recFrc (frc t ∙ u)
-    NPApp l r t i     -> recFrc (papp l r (frc t) i)
-    NProj1 t x        -> recFrc (proj1 x (frc t))
-    NProj2 t x        -> recFrc (proj2 x (frc t))
-    NUnpack t x       -> recFrc (unpack x (frc t))
-    NCoe r r' a t     -> recFrc (coe r r' (frc a) (frc t))
-    NUnglue t sys     -> recFrc (unglue (frc t) (frc sys))
-    NGlue t eqs sys   -> recFrc (glue t (frc eqs) (frc sys))
-    NLApp t i         -> recFrc (lapp (frc t) i)
-    NCase t b cs      -> recFrc (case_ (frc t) b cs)
-    NHCase t b cs     -> recFrc (hcase (frc t) b cs)
+    NApp t u          -> frc (frc t ∙ u)
+    NPApp l r t i     -> frc (papp l r (frc t) i)
+    NProj1 t x        -> frc (proj1 x (frc t))
+    NProj2 t x        -> frc (proj2 x (frc t))
+    NUnpack t x       -> frc (unpack x (frc t))
+    NCoe r r' a t     -> frc (coe r r' (frc a) (frc t))
+    NUnglue t sys     -> frc (unglue (frc t) (frc sys))
+    NGlue t eqs sys   -> frc (glue t (frc eqs) (frc sys))
+    NLApp t i         -> frc (lapp (frc t) i)
+    NCase t b cs      -> frc (case_ (frc t) b cs)
+    NHCase t b cs     -> frc (hcase (frc t) b cs)
   {-# noinline frc #-}
 
   frcS = \case
     t@NLocalVar{}     -> VNe t mempty
     t@NDontRecurse{}  -> VNe t mempty
     NSub n s          -> let ?sub = sub s in frcS n
-    NApp t u          -> recFrc (frcS t ∙ sub u)
-    NPApp l r t i     -> recFrc (papp (sub l) (sub r) (frcS t) (frcS i))
-    NProj1 t x        -> recFrc (proj1 x (frcS t))
-    NProj2 t x        -> recFrc (proj2 x (frcS t))
-    NUnpack t x       -> recFrc (unpack x (frcS t))
-    NCoe r r' a t     -> recFrc (coe (frcS r) (frcS r') (frcS a) (frcS t))
-    NUnglue t sys     -> recFrc (unglue (frcS t) (frcS sys))
-    NGlue t eqs sys   -> recFrc (glue (sub t) (frcS eqs) (frcS sys))
-    NLApp t i         -> recFrc (lapp (frcS t) (frcS i))
-    NCase t b cs      -> recFrc (case_ (frcS t) (sub b) (sub cs))
-    NHCase t b cs     -> recFrc (hcase (frcS t) (sub b) (sub cs))
+    NApp t u          -> frc (frcS t ∙ sub u)
+    NPApp l r t i     -> frc (papp (sub l) (sub r) (frcS t) (frcS i))
+    NProj1 t x        -> frc (proj1 x (frcS t))
+    NProj2 t x        -> frc (proj2 x (frcS t))
+    NUnpack t x       -> frc (unpack x (frcS t))
+    NCoe r r' a t     -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
+    NUnglue t sys     -> frc (unglue (frcS t) (frcS sys))
+    NGlue t eqs sys   -> frc (glue (sub t) (frcS eqs) (frcS sys))
+    NLApp t i         -> frc (lapp (frcS t) (frcS i))
+    NCase t b cs      -> frc (case_ (frcS t) (sub b) (sub cs))
+    NHCase t b cs     -> frc (hcase (frcS t) (sub b) (sub cs))
 
 instance Force NeSys VSys where
 

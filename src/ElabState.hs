@@ -16,6 +16,8 @@ data TopEntry
   | TERec (Maybe RecInfo)
   | TETyCon TyConInfo
   | TEDCon DConInfo
+  | TEHTyCon HTyConInfo
+  | TEHDCon HDConInfo
   deriving Show
 
 data Locals

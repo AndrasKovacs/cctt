@@ -99,9 +99,12 @@ makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
 
 data Infer = Infer Tm ~VTy deriving Show
 
+-- TODO OPT: unbox
 data Split
   = DConHead DConInfo [P.Tm]
   | TyConHead TyConInfo [P.Tm]
+  | HTyConHead HTyConInfo [P.Tm]
+  | HDConHead HDConInfo [P.Tm]
   | SplitInfer {-# unpack #-} Infer
   deriving Show
 
@@ -198,7 +201,7 @@ check t topA = frcPos t \case
       ~eqs <- case eqs of
         Nothing -> pure (quote equivs)
         Just eqs -> do
-          eqs <- elabGlueTySys a eqs
+          eqs <- elabSys (equivInto a) eqs
           pure eqs
       base <- check base a
       ts   <- elabGlueTmSys base ts a (equivs^.body)
@@ -264,7 +267,20 @@ check t topA = frcPos t \case
           sp <- checkSp (dci^.name) ps sp (dci^.fieldTypes)
           pure $ DCon dci sp
 
+        HDConHead dci sp -> do
+          unless (dci^.tyConInfo.tyId == tyinf^.tyId) $ withPrettyArgs $
+            err $ GenericError $
+              "No such constructor for expected type:\n\n  "
+              ++ pretty (quote (VTyCon tyinf ps))
+          (!sp, !is) <- uf -- checkSp (dci^.name) ps sp (dci^.fieldTypes)
+          pure $ HDCon dci (quoteParams ps) sp is
+
         TyConHead{} ->
+          err $ GenericError $ withPrettyArgs $
+            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyinf ps)) ++
+            "\n\nbut the expression is a type constructor"
+
+        HTyConHead{} ->
           err $ GenericError $ withPrettyArgs $
             "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyinf ps)) ++
             "\n\nbut the expression is a type constructor"
@@ -272,6 +288,8 @@ check t topA = frcPos t \case
         SplitInfer (Infer t a) -> do
           convExInf a topA
           pure t
+
+
 
     (t, topA) -> do
       Infer t a <- infer t
@@ -292,6 +310,8 @@ splitIdent x ix ls sp = case ls of
                                        "Hint: put a type annotation on the recursive definition."
       Just (TERec (Just inf)) -> SplitInfer <$!> inferSp (RecursiveCall inf) (inf^.recTyVal) sp
       Just (TEDCon inf)       -> pure $ DConHead inf sp
+      Just (TEHDCon inf)      -> pure $ HDConHead inf sp
+      Just (TEHTyCon inf)     -> pure $ HTyConHead inf sp
 
   LBind ls x' a qa | x == x' -> SplitInfer <$!> inferSp (LocalVar ix) a sp
                    | True    -> splitIdent x (ix + 1) ls sp
@@ -323,7 +343,11 @@ goSplit t sp topT = frcPos t \case
         SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
       Just (TETyCon inf) ->
         pure $ TyConHead inf sp
+      Just (TEHTyCon inf) ->
+        pure $ HTyConHead inf sp
       Just (TEDCon{}) ->
+        impossible
+      Just (TEHDCon{}) ->
         impossible
 
   P.TopLvl x (Just y) -> do
@@ -342,7 +366,16 @@ goSplit t sp topT = frcPos t \case
             err $ GenericError $ "No data constructor with de Bruijn level"
           Just dinf ->
             pure $ DConHead dinf sp
+      Just (TEHTyCon inf) -> do
+        cons <- readIORef (inf^.constructors)
+        case LM.lookup y cons of
+          Nothing ->
+            err $ GenericError $ "No data constructor with de Bruijn level"
+          Just dinf ->
+            pure $ HDConHead dinf sp
       Just TEDCon{} ->
+        impossible
+      Just TEHDCon{} ->
         impossible
 
   t -> do
@@ -381,6 +414,29 @@ checkSp conname env sp fs = case (sp, fs) of
   ([], TCons{}) ->
     err $ GenericError $ "Constructor " ++ show conname ++ " applied to too few arguments"
 
+checkHSubSp :: Elab (Name -> [P.Tm] -> [Name] -> Sub -> IO Sub)
+checkHSubSp conname ts is acc = case (ts, is) of
+  ([], []) -> pure acc
+  (t:ts, _:is) -> do
+    i <- checkI t
+    checkHSubSp conname ts is (acc `ext` i)
+  (_:_, []) ->
+    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too many arguments"
+  ([], _:_) ->
+    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too few arguments"
+
+checkHSp :: Elab (Name -> Env -> [P.Tm] -> Tel -> [Name] -> IO (Spine, Sub))
+checkHSp conname env sp fs is = case (sp, fs) of
+  (t:sp, TCons x a fs) -> do
+    t  <- check t (evalIn env a)
+    (sp, is) <- checkHSp conname (EDef env (eval t)) sp fs is
+    pure (SPCons t sp, is)
+  (ts, TNil) -> do
+    sub <- checkHSubSp conname ts is (emptySub (dom ?cof))
+    pure (SPNil, sub)
+  ([], TCons{}) ->
+    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too few arguments"
+
 infer :: Elab (P.Tm -> IO Infer)
 infer t = split t >>= \case
 
@@ -393,10 +449,24 @@ infer t = split t >>= \case
       err $ GenericError $ "Can't infer type for data constructor " ++ show (inf^.name) ++ " which has "
                             ++"type parameters"
 
+  -- no params + saturated
+  HDConHead inf sp -> case inf^.tyConInfo.paramTypes of
+    TNil -> do
+      (!sp, !sub) <- checkHSp (inf^.name) ENil sp (inf^.fieldTypes) (inf^.ifields)
+      pure $ Infer (HDCon inf LSPNil sp sub) (VHTyCon (inf^.tyConInfo) ENil)
+    _  ->
+      err $ GenericError $ "Can't infer type for data constructor " ++ show (inf^.name) ++ " which has "
+                            ++"type parameters"
+
   -- saturated
   TyConHead inf sp -> do
     sp <- checkSp (inf^.name) ENil sp (inf^.paramTypes)
     pure $ Infer (TyCon inf sp) VU
+
+  -- saturated
+  HTyConHead inf sp -> do
+    sp <- checkSp (inf^.name) ENil sp (inf^.paramTypes)
+    pure $ Infer (HTyCon inf sp) VU
 
   SplitInfer inf -> do
     pure inf
@@ -553,12 +623,12 @@ inferNonSplit t = frcPos t \case
 
   P.GlueTy a sys -> do
     a   <- check a VU
-    sys <- elabGlueTySys (eval a) sys
+    sys <- elabSys (equivInto (eval a)) sys
     pure $! Infer (GlueTy a sys) VU
 
   P.GlueTm base (Just eqs) sys -> do
     Infer base a <- infer base
-    eqs <- elabGlueTySys a eqs
+    eqs <- elabSys (equivInto a) eqs
     case evalSys eqs of
       VSTotal _ -> impossible
       VSNe veqs -> do
@@ -865,8 +935,8 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
   (ts, equivs) ->
     err $! GlueTmSystemMismatch (quote equivs)
 
-elabGlueTySys :: Elab (VTy -> P.Sys -> IO Sys)
-elabGlueTySys a = \case
+elabSys :: Elab (VTy -> P.Sys -> IO Sys)
+elabSys componentTy = \case
   P.SEmpty ->
     pure SEmpty
   P.SCons cof t sys -> do
@@ -876,9 +946,9 @@ elabGlueTySys a = \case
       VCTrue  -> err NonNeutralCofInSystem
       VCFalse -> err NonNeutralCofInSystem
       VCNe ncof _ -> do
-        sys <- elabGlueTySys a sys
+        sys <- elabSys componentTy sys
         bindCof ncof do
-          t <- check t (equivInto a)
+          t <- check t componentTy
           sysCompat t sys
           pure $ SCons cof t sys
 
@@ -888,11 +958,13 @@ guardTopShadowing :: Elab (Name -> IO ())
 guardTopShadowing x = do
   st <- getState
   case M.lookup x (st^.top) of
-    Nothing -> pure ()
-    Just (TEDef inf  ) -> err $ TopShadowing (inf^.pos)
-    Just (TETyCon inf) -> err $ TopShadowing (inf^.pos)
-    Just (TEDCon inf ) -> err $ TopShadowing (inf^.pos)
-    Just (TERec _    ) -> impossible
+    Nothing             -> pure ()
+    Just (TEDef inf  )  -> err $ TopShadowing (inf^.pos)
+    Just (TETyCon inf)  -> err $ TopShadowing (inf^.pos)
+    Just (TEDCon inf )  -> err $ TopShadowing (inf^.pos)
+    Just (TEHTyCon inf) -> err $ TopShadowing (inf^.pos)
+    Just (TEHDCon inf)  -> err $ TopShadowing (inf^.pos)
+    Just (TERec _     ) -> impossible
 
 elabTop :: P.Top -> IO ()
 elabTop = \case
@@ -966,17 +1038,125 @@ elabTop = \case
     writeIORef frzRef True
     elabTop ptop
 
-  P.THData{} ->
-    error "TODO: higher inductive declarations"
+  P.THData pos tyname ps cs ptop -> withTopElab $ setPos pos do
+    guardTopShadowing tyname
+
+    l       <- getState <&> (^.lvl)
+    ps      <- elabTelescope ps
+    consRef <- newIORef (mempty @(LM.Map HDConInfo))
+    frzRef  <- newIORef False
+
+    let inf   = HTCI l ps consRef frzRef tyname (coerce pos)
+    let entry = TEHTyCon inf
+
+    modState $
+         (top  %~ M.insert tyname entry)
+      .  (top' %~ LM.insert l entry)
+      .  (lvl  +~ 1)
+
+    let tyConVal = VHTyCon inf (go ps 0 ENil) where
+          go :: Tel -> Lvl -> Env -> Env
+          go tel l acc = case tel of
+            TNil          -> acc
+            TCons _ _ tel -> go tel (l + 1) (EDef acc (vVar l))
+
+    bindTelescope ps $ elabHConstructors inf tyConVal 0 cs
+    writeIORef frzRef True
+    elabTop ptop
 
   P.TEmpty ->
     pure ()
 
-
 ----------------------------------------------------------------------------------------------------
 
-elabConstructors :: Elab (
-  TyConInfo -> Lvl -> [(DontShow SourcePos, Name, [(Name, P.Ty)])] -> IO ())
+class IsCoherent a where
+  isCoh :: a -> Bool
+
+instance IsCoherent Tm where
+  isCoh = \case
+    TopVar{}         -> impossible
+    RecursiveCall{}  -> impossible
+    LocalVar{}       -> True
+    Let{}            -> impossible
+    TyCon{}          -> True
+    DCon _ sp        -> isCoh sp
+    HTyCon{}         -> True
+    HDCon _ _ sp _   -> isCoh sp
+    HCase{}          -> False
+    HSplit{}         -> impossible
+    Case{}           -> False
+    Split{}          -> impossible
+    Pi{}             -> True
+    App{}            -> False
+    Lam _ t          -> isCoh t
+    Sg{}             -> True
+    Pair _ t u       -> isCoh t && isCoh u
+    Proj1{}          -> False
+    Proj2{}          -> False
+    Wrap{}           -> True
+    Pack _ t         -> isCoh t
+    Unpack{}         -> False
+    U                -> True
+    Path{}           -> True
+    PApp{}           -> False
+    PLam _ _ _ t     -> isCoh t
+    Line{}           -> True
+    LApp{}           -> False
+    LLam _ t         -> isCoh t
+    Coe{}            -> False
+    HCom _ _ a sys t -> case a of HTyCon{} -> isCoh sys && isCoh t
+                                  _        -> False
+    GlueTy{}         -> True
+    Glue t sys _     -> isCoh t && isCoh sys
+    Unglue{}         -> False
+    Hole{}           -> False
+    Com{}            -> impossible
+    WkI{}            -> impossible
+    Refl{}           -> impossible
+    Sym{}            -> impossible
+    Trans{}          -> impossible
+    Ap{}             -> impossible
+
+instance IsCoherent Sys where
+  isCoh = \case
+    SEmpty          -> True
+    SCons cof t sys -> isCoh t && isCoh sys
+
+instance IsCoherent SysHCom where
+  isCoh = \case
+    SHEmpty            -> True
+    SHCons cof x t sys -> isCoh t && isCoh sys
+
+instance IsCoherent Spine where
+  isCoh = \case
+    SPNil       -> True
+    SPCons t sp -> isCoh t && isCoh sp
+
+elabHConstructors :: Elab (HTyConInfo -> Val -> Lvl -> [P.HConstructor] -> IO ())
+elabHConstructors tyinf tyConVal conid = \case
+  [] ->
+    pure ()
+  (pos, x, fs, bnd):cs -> setPos pos do
+    guardTopShadowing x
+    (fs, is) <- elabHTelescope fs
+    (!bnd, !coh) <- bindTelescope fs $ bindIVars is do
+      case bnd of
+        Nothing  ->
+          pure (SEmpty, True)
+        Just sys -> do
+          sys <- elabSys tyConVal sys
+          case evalSys sys of
+            VSTotal _         -> impossible
+            VSNe (WIS nsys _) -> do
+              let coh = isCoh (quote nsys)
+              pure (sys, coh)
+
+    let dinf = HDCI conid fs coh is bnd x tyinf (coerce pos)
+    modState (top %~ M.insert x (TEHDCon dinf))
+    modifyIORef' (tyinf^.constructors) (LM.insert conid dinf)
+    elabHConstructors tyinf tyConVal (conid + 1) cs
+
+elabConstructors :: Elab (TyConInfo -> Lvl -> [P.Constructor] -> IO ())
 elabConstructors tyinf conid = \case
   [] ->
     pure ()
@@ -987,6 +1167,27 @@ elabConstructors tyinf conid = \case
     modState (top %~ M.insert x (TEDCon dinf))
     modifyIORef' (tyinf^.constructors) (LM.insert conid dinf)
     elabConstructors tyinf (conid + 1) cs
+
+elabHConIVars :: Elab ([(Name, P.Ty)] -> IO [Name])
+elabHConIVars = \case
+  []        -> pure []
+  (x, a):ps -> frcPos a \case
+    P.I -> (x:) <$!> elabHConIVars ps
+    _   -> err $ GenericError "Expected an interval binder"
+
+elabHTelescope :: Elab ([(Name, P.Ty)] -> IO (Tel, [Name]))
+elabHTelescope = \case
+  [] ->
+    pure (TNil, [])
+  (x, a):ps -> frcPos a \case
+    P.I -> do
+      is <- elabHConIVars ps
+      pure (TNil, x:is)
+    a -> do
+      a <- check a VU
+      bind x (eval a) a \_ -> do
+        (ps, is) <- elabHTelescope ps
+        pure (TCons x a ps, is)
 
 elabTelescope :: Elab ([(Name, P.Ty)] -> IO Tel)
 elabTelescope = \case
@@ -1002,6 +1203,12 @@ bindTelescope ps act = case ps of
   TNil         -> act
   TCons x a ps -> bind x (eval a) a \_ -> bindTelescope ps act
 {-# inline bindTelescope #-}
+
+bindIVars :: [Name] -> Elab a -> Elab a
+bindIVars is act = case is of
+  []   -> act
+  x:is -> bindI x \_ -> bindIVars is act
+{-# inline bindIVars #-}
 
 ----------------------------------------------------------------------------------------------------
 

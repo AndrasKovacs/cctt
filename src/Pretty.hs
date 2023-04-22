@@ -257,91 +257,91 @@ goSub = foldrSub (\_ i acc -> " " <> int i <> acc) mempty
 
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
-  TopVar inf            -> topName (^.name) (^.defId) inf
-  RecursiveCall inf     -> topName (^.name) (^.recId) inf
-  LocalVar x            -> localVar x
-  Let x a t u           -> let pa = let_ a; pt = let_ t in bind x \x ->
-                           letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
-  Pi "_" a b            -> let pa = sigma a in bind "_" \_ ->
-                           pip (pa <> " → " <> pi b)
-  Pi n a b              -> let pa = pair a in bind n \n ->
-                           pip (piBind n pa  <> goLinesPis b)
-  App t u               -> appp (app t <> " " <> proj u)
-  Lam x t               -> letp (bind x \x -> "λ " <> x <> goLams t)
-  Line "_" a            -> bindI "_" \_ -> pip ("I → " <> pi a)
-  Line x a              -> bindI x   \x -> pip (lineBind x <> goLinesPis a)
-  LApp t u              -> appp (app t <> " " <> int u)
-  LLam x t              -> letp (bindI x \x -> "λ " <> x <> goLams t)
-  Sg "_" a b            -> let pa = eq a in bind "_" \_ ->
-                           sigmap (pa <> " × " <> sigma b)
-  Sg x a b              -> let pa = pair a in bind x \x ->
-                           sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
-  Pair x t u            -> pairp (let_ t <> ", " <> pair u)
-  Proj1 t x             -> case unProject t x of
-                             Nothing -> projp (proj t <> ".1")
-                             Just t  -> projp (proj t <> "." <> str x)
-  Proj2 t x             -> projp (proj t <> ".2")
-  U                     -> "U"
-  Path "_" a t u        -> ifVerbose
-                            (let pt = trans t; pu = trans u in bindI "_" \_ ->
-                             eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
-                            (eqp (trans t <> " = " <> trans u))
-  Path x a t u          -> let pt = trans t; pu = trans u in bindI x \x ->
-                           eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
-  PApp l r t u          -> ifVerbose
-                             (appp (app t <> " {" <> pair l <> "} {" <> pair r <> "} " <> int u))
-                             (appp (app t <> " " <> int u))
-  PLam l r x t          -> ifVerbose
-                             (let pl = pair l; pr = pair r in
-                              letp (bindI x \x -> "λ {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t))
-                             (letp (bindI x \x -> "λ " <> x <> goLams t))
-  Coe r r' i a t        -> let pt = proj t; pr = int r; pr' = int r' in bindI i \i ->
-                           appp ("coe " <> pr <> " " <> pr' <> coeTy i a <> pt)
-  HCom r r' a t u       -> appp ("hcom " <> int r <> " " <> int r'
-                                 <> ifVerbose (" " <> proj a) ""
-                                 <> " " <> sysH t <> " " <> proj u)
-  GlueTy a s            -> appp ("Glue " <> proj a <> " " <> sys s)
-  Unglue t _            -> appp ("unglue " <> proj t)
-  Glue a s1 s2          -> ifVerbose
-                             (appp ("glue " <> proj a <> " " <> sys s1 <> " " <> sys s2))
-                             (appp ("glue " <> proj a <> " " <> sys s2))
-  Hole i p              -> case i of
-                             Just x -> "?" <> str x
-                             _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
-                               True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
-                               _    -> pure "?"
-  Com r r' i a t u      -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in bindI i \i ->
-                           "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
-                                  <> pt <> " " <> pu)
-  WkI x t               -> wkI x (tm t)
-  Refl _                -> "refl"
-  Sym _ _ _ p           -> projp (proj p <> "⁻¹")
-  Trans _ _ _ _ p q     -> transp (app p <> " ∙ " <> trans q)
-  Ap f _ _ p            -> appp ("ap " <> proj f <> " " <> proj p)
-  TyCon inf SPNil       -> topName (^.name) (^.tyId) inf
-  TyCon inf ts          -> appp (topName (^.name) (^.tyId) inf <> spine ts)
-  DCon inf SPNil        -> dcon inf
-  DCon inf sp           -> appp (dcon inf <> spine sp)
-  Case t x b cs         -> ifVerbose
-                            (let pt = proj t; pcs = cases cs in bind x \x ->
-                             appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
-                            (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
-  Wrap x a              -> "(" <> str x <> " : " <> pair a <> ")"
-  Pack x t              -> tm t
-  Unpack t x            -> case unProject t x of
-                             Nothing -> projp (proj t <> ".1")
-                             Just t  -> projp (proj t <> "." <> str x)
-  Split x b cs          -> appp ("λ[" <> cases cs <> "]")
-  HTyCon inf SPNil      -> topName (^.name) (^.tyId) inf
-  HTyCon inf ts         -> appp (topName (^.name) (^.tyId) inf <> spine ts)
-  HDCon inf _ fs s      -> case fs of
-                             SPNil | cod s == 0 -> hdcon inf
-                             _ -> appp (hdcon inf <> spine fs <> goSub s)
-  HCase t x b cs        -> ifVerbose
-                            (let pt = proj t; pcs = cases cs in bind x \x ->
-                             appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
-                            (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
-  HSplit x b cs         -> appp ("λ[" <> cases cs <> "]")
+  TopVar inf         -> topName (^.name) (^.defId) inf
+  RecursiveCall inf  -> topName (^.name) (^.recId) inf
+  LocalVar x         -> localVar x
+  Let x a t u        -> let pa = let_ a; pt = let_ t in bind x \x ->
+                        letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
+  Pi "_" a b         -> let pa = sigma a in bind "_" \_ ->
+                        pip (pa <> " → " <> pi b)
+  Pi n a b           -> let pa = pair a in bind n \n ->
+                        pip (piBind n pa  <> goLinesPis b)
+  App t u            -> appp (app t <> " " <> proj u)
+  Lam x t            -> letp (bind x \x -> "λ " <> x <> goLams t)
+  Line "_" a         -> bindI "_" \_ -> pip ("I → " <> pi a)
+  Line x a           -> bindI x   \x -> pip (lineBind x <> goLinesPis a)
+  LApp t u           -> appp (app t <> " " <> int u)
+  LLam x t           -> letp (bindI x \x -> "λ " <> x <> goLams t)
+  Sg "_" a b         -> let pa = eq a in bind "_" \_ ->
+                        sigmap (pa <> " × " <> sigma b)
+  Sg x a b           -> let pa = pair a in bind x \x ->
+                        sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
+  Pair x t u         -> pairp (let_ t <> ", " <> pair u)
+  Proj1 t x          -> case unProject t x of
+                          Nothing -> projp (proj t <> ".1")
+                          Just t  -> projp (proj t <> "." <> str x)
+  Proj2 t x          -> projp (proj t <> ".2")
+  U                  -> "U"
+  Path "_" a t u     -> ifVerbose
+                         (let pt = trans t; pu = trans u in bindI "_" \_ ->
+                          eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
+                         (eqp (trans t <> " = " <> trans u))
+  Path x a t u       -> let pt = trans t; pu = trans u in bindI x \x ->
+                        eqp (pt <> " ={" <> x <> ". " <> pair a <> "} " <> pu)
+  PApp l r t u       -> ifVerbose
+                          (appp (app t <> " {" <> pair l <> "} {" <> pair r <> "} " <> int u))
+                          (appp (app t <> " " <> int u))
+  PLam l r x t       -> ifVerbose
+                          (let pl = pair l; pr = pair r in
+                           letp (bindI x \x -> "λ {" <> pl <> "} {" <> pr <> "} " <> x <> goLams t))
+                          (letp (bindI x \x -> "λ " <> x <> goLams t))
+  Coe r r' i a t     -> let pt = proj t; pr = int r; pr' = int r' in bindI i \i ->
+                        appp ("coe " <> pr <> " " <> pr' <> coeTy i a <> pt)
+  HCom r r' a t u    -> appp ("hcom " <> int r <> " " <> int r'
+                              <> ifVerbose (" " <> proj a) ""
+                              <> " " <> sysH t <> " " <> proj u)
+  GlueTy a s         -> appp ("Glue " <> proj a <> " " <> sys s)
+  Unglue t _         -> appp ("unglue " <> proj t)
+  Glue a s1 s2       -> ifVerbose
+                          (appp ("glue " <> proj a <> " " <> sys s1 <> " " <> sys s2))
+                          (appp ("glue " <> proj a <> " " <> sys s2))
+  Hole i p           -> case i of
+                          Just x -> "?" <> str x
+                          _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
+                            True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
+                            _    -> pure "?"
+  Com r r' i a t u   -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in bindI i \i ->
+                        "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
+                               <> pt <> " " <> pu)
+  WkI x t            -> wkI x (tm t)
+  Refl _             -> "refl"
+  Sym _ _ _ p        -> projp (proj p <> "⁻¹")
+  Trans _ _ _ _ p q  -> transp (app p <> " ∙ " <> trans q)
+  Ap f _ _ p         -> appp ("ap " <> proj f <> " " <> proj p)
+  TyCon inf SPNil    -> topName (^.name) (^.tyId) inf
+  TyCon inf ts       -> appp (topName (^.name) (^.tyId) inf <> spine ts)
+  DCon inf SPNil     -> dcon inf
+  DCon inf sp        -> appp (dcon inf <> spine sp)
+  Case t x b cs      -> ifVerbose
+                         (let pt = proj t; pcs = cases cs in bind x \x ->
+                          appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
+                         (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
+  Wrap x a           -> "(" <> str x <> " : " <> pair a <> ")"
+  Pack x t           -> tm t
+  Unpack t x         -> case unProject t x of
+                          Nothing -> projp (proj t <> ".1")
+                          Just t  -> projp (proj t <> "." <> str x)
+  Split x b cs       -> appp ("λ[" <> cases cs <> "]")
+  HTyCon inf SPNil   -> topName (^.name) (^.tyId) inf
+  HTyCon inf ts      -> appp (topName (^.name) (^.tyId) inf <> spine ts)
+  HDCon inf _ fs s   -> case fs of
+                          SPNil | cod s == 0 -> hdcon inf
+                          _ -> appp (hdcon inf <> spine fs <> goSub s)
+  HCase t x b cs     -> ifVerbose
+                         (let pt = proj t; pcs = cases cs in bind x \x ->
+                          appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
+                         (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
+  HSplit x b cs      -> appp ("λ[" <> cases cs <> "]")
 
 ----------------------------------------------------------------------------------------------------
 
@@ -357,11 +357,44 @@ dataCons = \case
   [inf]  -> str (inf^.name) <> dataFields (inf^.fieldTypes)
   inf:cs -> str (inf^.name) <> dataFields (inf^.fieldTypes) <> "\n  | " <> dataCons cs
 
+hdataIFields :: PrettyArgs (HDConInfo -> [Name] -> Txt)
+hdataIFields inf = \case
+  []   -> ": I)" <> boundary_ (inf^.boundary)
+  i:is -> bindI i \_ -> str i <> " " <> hdataIFields inf is
+
+boundary_ :: PrettyArgs (Sys -> Txt)
+boundary_ = \case
+  SEmpty -> ";"
+  bnd    -> sys bnd
+
+hdataFields :: PrettyArgs (HDConInfo -> Tel -> Txt)
+hdataFields inf = \case
+  TNil         -> case inf^.ifields of
+                    []  -> boundary_ (inf^.boundary)
+                    is  -> "(" <> hdataIFields inf is
+  TCons x a fs -> let pa = pair a in bind x \x ->
+                  "(" <> x <> " : " <> pa <> ")" <> hdataFields inf fs
+
+hdataCon :: PrettyArgs (HDConInfo -> Txt)
+hdataCon inf = str (inf^.name) <> hdataFields inf (inf^.fieldTypes)
+
+hdataCons :: PrettyArgs ([HDConInfo] -> Txt)
+hdataCons = \case
+  []     -> mempty
+  [inf]  -> hdataCon inf
+  inf:cs -> hdataCon inf <> "\n  | " <> hdataCons cs
+
 inductive :: PrettyArgs (Tel -> [DConInfo] -> Txt)
 inductive ps cs = case ps of
   TNil         -> " :=\n    " <> dataCons cs
   TCons x a ps -> let pa = pair a in bind x \x ->
                   " (" <> x <> " : " <> pa <> ")" <> inductive ps cs
+
+hinductive :: PrettyArgs (Tel -> [HDConInfo] -> Txt)
+hinductive ps cs = case ps of
+  TNil         -> " :=\n    " <> hdataCons cs
+  TCons x a ps -> let pa = pair a in bind x \x ->
+                  " (" <> x <> " : " <> pa <> ")" <> hinductive ps cs
 
 topEntries :: LM.Map TopEntry -> Txt
 topEntries = LM.foldrWithKey'
@@ -376,8 +409,15 @@ topEntries = LM.foldrWithKey'
          "\ninductive " <> str (inf^.name)
          <> inductive (inf^.paramTypes) (LM.elems cons) <> ";\n" <> acc
 
-      TEDCon{} -> impossible
-      TERec{}  -> impossible)
+      TEHTyCon inf -> withPrettyArgs0 $ runIO do
+        cons <- readIORef (inf^.constructors)
+        pure $!
+         "\nhigher inductive " <> str (inf^.name)
+         <> hinductive (inf^.paramTypes) (LM.elems cons) <> ";\n" <> acc
+
+      TEHDCon{} -> impossible
+      TEDCon{}  -> impossible
+      TERec{}   -> impossible)
   mempty
 
 ----------------------------------------------------------------------------------------------------

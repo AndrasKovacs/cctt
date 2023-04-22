@@ -62,15 +62,16 @@ instance Show DConInfo where
 data HDConInfo = HDCI {
     hDConInfoConId      :: Lvl
   , hDConInfoFieldTypes :: Tel
+  , hDConInfoIsCoherent :: Bool
+  , hDConInfoIfields    :: [Name]
   , hDConInfoBoundary   :: Sys
   , hDConInfoName       :: Name
-  , hDConInfoIsCoherent :: Bool
   , hDConInfoTyConInfo  :: {-# nounpack #-} HTyConInfo
   , hDConInfoPos        :: {-# nounpack #-} SourcePos
   }
 
 instance Show HDConInfo where
-  show (HDCI _ _ _ x _ _ _) = x
+  show (HDCI _ _ _ _ _ x _ _) = x
 
 data HTyConInfo = HTCI {
     hTyConInfoTyId         :: Lvl

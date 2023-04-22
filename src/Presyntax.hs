@@ -72,10 +72,13 @@ data BindMaybe = Bind Name Tm | DontBind Tm
 data SysHCom = SHEmpty | SHCons Cof BindMaybe SysHCom
   deriving Show
 
+type Constructor = (DontShow SourcePos, Name, [(Name, Ty)])
+type HConstructor = (DontShow SourcePos, Name, [(Name, Ty)], Maybe Sys)
+
 data Top
-  = TDef (DontShow SourcePos) Name (Maybe Ty) Tm Top
-  | TData (DontShow SourcePos) Name [(Name, Ty)] [(DontShow SourcePos, Name, [(Name, Ty)])] Top
-  | THData (DontShow SourcePos) Name [(Name, Ty)] [(DontShow SourcePos, Name, [(Name, Ty)], Maybe Sys)] Top
+  = TDef    (DontShow SourcePos) Name (Maybe Ty) Tm Top
+  | TData   (DontShow SourcePos) Name [(Name, Ty)] [Constructor] Top
+  | THData  (DontShow SourcePos) Name [(Name, Ty)] [HConstructor] Top
   | TImport (DontShow SourcePos) Name Top
   | TEmpty
   deriving Show
