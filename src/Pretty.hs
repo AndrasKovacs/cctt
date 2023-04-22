@@ -43,7 +43,7 @@ ifVerbose t f = runIO $ getState <&> (^.printingOpts.verbose) >>= \case
 newtype Txt = Txt (String -> String)
 
 runTxt :: Txt -> String
-runTxt (Txt f) = f ""
+runTxt (Txt f) = f mempty
 
 instance Semigroup Txt where
   Txt x <> Txt y = Txt (x . y); {-# inline (<>) #-}
@@ -55,7 +55,7 @@ instance IsString Txt where
   fromString s = Txt (s++); {-# inline fromString #-}
 
 instance Show Txt where
-  show (Txt s) = s ""
+  show (Txt s) = s mempty
 
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
@@ -192,6 +192,18 @@ caseBody xs t = case xs of
   [x]  -> bind x \x -> " " <> x <> ". " <> pair t
   x:xs -> bind x \x -> " " <> x <> caseBody xs t
 
+hcaseBody' :: PrettyArgs ([Name] -> Tm -> Txt)
+hcaseBody' xs t = case xs of
+  []   -> ". " <> pair t
+  [x]  -> bindI x \x -> " " <> x <> ". " <> pair t
+  x:xs -> bindI x \x -> " " <> x <> hcaseBody' xs t
+
+hcaseBody :: PrettyArgs ([Name] -> [Name] -> Tm -> Txt)
+hcaseBody xs is t = case xs of
+  []   -> hcaseBody' is t
+  [x]  -> bind x \x -> " " <> x <> ". " <> pair t
+  x:xs -> bind x \x -> " " <> x <> hcaseBody xs is t
+
 cases :: PrettyArgs (Cases -> Txt)
 cases = \case
   CSNil               -> mempty
@@ -199,7 +211,10 @@ cases = \case
   CSCons x xs t cs    -> str x <> caseBody xs t <> "; " <> cases cs
 
 hcases :: PrettyArgs (HCases -> Txt)
-hcases = uf
+hcases = \case
+  HCSNil                   -> mempty
+  HCSCons x xs is t HCSNil -> str x <> hcaseBody xs is t
+  HCSCons x xs is t cs     -> str x <> hcaseBody xs is t <> "; " <> hcases cs
 
 coeTy :: PrettyArgs (Txt -> Tm -> Txt)
 coeTy i (PApp _ _ t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
@@ -301,7 +316,7 @@ tm = \case
   Coe r r' i a t     -> let pt = proj t; pr = int r; pr' = int r' in bindI i \i ->
                         appp ("coe " <> pr <> " " <> pr' <> coeTy i a <> pt)
   HCom r r' a t u    -> appp ("hcom " <> int r <> " " <> int r'
-                              <> ifVerbose (" " <> proj a) ""
+                              <> ifVerbose (" " <> proj a) mempty
                               <> " " <> sysH t <> " " <> proj u)
   GlueTy a s         -> appp ("Glue " <> proj a <> " " <> sys s)
   Unglue t _         -> appp ("unglue " <> proj t)
@@ -341,10 +356,10 @@ tm = \case
                           SPNil | cod s == 0 -> hdcon inf
                           _ -> appp (hdcon inf <> spine fs <> goSub s)
   HCase t x b cs     -> ifVerbose
-                         (let pt = proj t; pcs = cases cs in bind x \x ->
+                         (let pt = proj t; pcs = hcases cs in bind x \x ->
                           appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
                          (appp ("case " <> proj t <> " [" <> hcases cs <> "]"))
-  HSplit x b cs      -> appp ("λ[" <> cases cs <> "]")
+  HSplit x b cs      -> appp ("λ[" <> hcases cs <> "]")
 
 ----------------------------------------------------------------------------------------------------
 

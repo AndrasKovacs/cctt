@@ -147,7 +147,7 @@ check t topA = frcPos t \case
         frz <- readIORef (inf^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- readIORef (inf^.constructors)
-        cs <- elabHCases params b (LM.elems cons) cs CSNil
+        cs <- elabHCases params b (LM.elems cons) cs HCSNil
         pure $! HSplit (b^.name) (quote b) cs
       _ ->
         err $ ExpectedInductiveType (quote a)
@@ -231,7 +231,7 @@ check t topA = frcPos t \case
           frz <- readIORef (inf^.frozen)
           unless frz $ err $ GenericError "Can't case split on the type that's being defined"
           cons <- LM.elems <$!> readIORef (inf^.constructors)
-          cs <- elabHCases params bv cons cs CSNil
+          cs <- elabHCases params bv cons cs HCSNil
           pure $ HCase t "_" qb cs
         _ ->
           err $ ExpectedInductiveType (quote a)
@@ -717,7 +717,7 @@ inferNonSplit t = frcPos t \case
         frz <- readIORef (inf^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- LM.elems <$!> readIORef (inf^.constructors)
-        cs <- elabHCases params bv cons cs CSNil
+        cs <- elabHCases params bv cons cs HCSNil
         pure $! Infer (HCase t x b cs) (bv ∙ eval t)
       a ->
         err $ ExpectedInductiveType (quote a)
@@ -765,14 +765,14 @@ caseLhsIFields xs acc = case xs of
   []   -> acc
   _:xs -> caseLhsIFields xs (liftSub acc)
 
-evalBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure Cases -> VSys)
+evalBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure HCases -> VSys)
 evalBoundary bnd casety casecl = case bnd of
   SEmpty          -> vsempty
   SCons cof t bnd -> vscons (evalCof cof) (hcase (eval t) casety casecl)
                             (evalBoundary bnd casety casecl)
 
 elabHCase' :: Elab (Env -> Sub -> [Name] -> Val -> [Name] -> NamedClosure
-           -> EvalClosure Cases -> Sys -> P.Tm -> IO Tm)
+           -> EvalClosure HCases -> Sys -> P.Tm -> IO Tm)
 elabHCase' params sub ifields rhstype xs ~casety ~casecl bnd body = case (ifields, xs) of
   ([], []) -> do
     t <- check body rhstype
@@ -792,18 +792,20 @@ elabHCase' params sub ifields rhstype xs ~casety ~casecl bnd body = case (ifield
     err $ GenericError "Wrong number of constructor fields"
 
 elabHCase :: Elab (Env -> Tel -> [Name] -> Val -> [Name] -> NamedClosure
-          -> EvalClosure Cases -> Sys -> P.Tm -> IO Tm)
+          -> EvalClosure HCases -> Sys -> P.Tm -> IO ([Name], [Name], Tm))
 elabHCase params fieldtypes ifields rhstype xs ~casety ~casecl bnd body = case (fieldtypes, xs) of
   (TNil, xs) -> do
-    elabHCase' params (emptySub (dom ?cof)) ifields rhstype xs casety casecl bnd body
+    t <- elabHCase' params (emptySub (dom ?cof)) ifields rhstype xs casety casecl bnd body
+    pure ([], xs, t)
   (TCons _ a fieldtypes, x:xs) -> do
     let ~va = evalIn params a
-    bind x va (quote va) \x ->
-      elabHCase (EDef params x) fieldtypes ifields rhstype xs casety casecl bnd body
+    bind x va (quote va) \var -> do
+      (xs, is, t) <- elabHCase (EDef params var) fieldtypes ifields rhstype xs casety casecl bnd body
+      pure (x:xs, is, t)
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
-elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> Cases -> IO Cases)
+elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> HCases -> IO HCases)
 elabHCases params b cons cs prevCases = case (cons, cs) of
   ([], []) ->
     pure prevCases
@@ -813,10 +815,10 @@ elabHCases params b cons cs prevCases = case (cons, cs) of
                           (caseLhsIFields (dci^.ifields) (emptySub (dom ?cof)))
     let rhstype = b ∙ eval lhsTm
     let casecl  = EC (idSub (dom ?cof)) ?env DontRecurse prevCases
-    t <- elabHCase params (dci^.fieldTypes)
-                          (dci^.ifields)
-                          rhstype xs b casecl (dci^.boundary) body
-    elabHCases params b cons cs (snocCases prevCases x' xs t)
+    (xs, is, t) <- elabHCase params (dci^.fieldTypes)
+                            (dci^.ifields)
+                            rhstype xs b casecl (dci^.boundary) body
+    elabHCases params b cons cs (snocHCases prevCases x' xs is t)
   _ ->
     err CaseMismatch
 

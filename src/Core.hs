@@ -20,6 +20,9 @@ OPT:
 
 TODO:
   - propagate VHole from strict system projection
+
+TODO FIX:
+  - handle neutral VHCom cases whenever it's possible in a pattern match!
 -}
 
 type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
@@ -1109,8 +1112,12 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
     base@(VNe n is') ->
       VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
+    base@(VHCom _ _ _ _ _ is') ->
+      VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
+
     base@VHole{} -> base
     _            -> impossible
+
 
   -- "fhcom", hcom on HITs is blocked
   a@(VHTyCon tyinf ps) ->
@@ -1380,14 +1387,14 @@ hdcon inf ps fs s = case inf^.boundary of
               VBNe is   -> VHDCon inf ps fs s is
 {-# inline hdcon #-}
 
-lookupHCase :: EvalArgs (Lvl -> VDSpine -> Sub -> Cases -> Val)
+lookupHCase :: EvalArgs (Lvl -> VDSpine -> Sub -> HCases -> Val)
 lookupHCase i sp s cs = case i // cs of
-  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp; ?sub = pushSub ?sub s in
-                              eval body
-  (i, CSCons _ _  _    cs) -> lookupHCase (i - 1) sp s cs
-  _                        -> impossible
+  (0, HCSCons _ _ _ body cs) -> let ?env = pushSp ?env sp; ?sub = pushSub ?sub s in
+                                eval body
+  (i, HCSCons _ _ _ _    cs) -> lookupHCase (i - 1) sp s cs
+  _                          -> impossible
 
-hcase :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
+hcase :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure HCases -> Val)
 hcase t b ecs@(EC sub env rc cs) = case frc t of
 
   VHDCon i ps fs s _ ->

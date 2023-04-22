@@ -116,8 +116,8 @@ data Tm
   | HTyCon {-# nounpack #-} HTyConInfo Spine
   -- LazySpine is for params which are usually quoted from syntax.
   | HDCon {-# nounpack #-} HDConInfo LazySpine Spine Sub
-  | HCase Tm Name ~Ty Cases
-  | HSplit Name ~Ty Cases
+  | HCase Tm Name ~Ty HCases
+  | HSplit Name ~Ty HCases
 
   | Case Tm Name ~Ty Cases
   | Split Name ~Ty Cases
@@ -172,10 +172,15 @@ data Cases
   | CSCons Name [Name] Tm Cases
   deriving Show
 
-snocCases :: Cases -> Name -> [Name] -> Tm -> Cases
-snocCases cs x xs t = case cs of
-  CSNil                -> CSCons x xs t CSNil
-  CSCons x' xs' t' cs  -> CSCons x' xs' t' (snocCases cs x xs t)
+data HCases
+  = HCSNil
+  | HCSCons Name [Name] [Name] Tm HCases
+  deriving Show
+
+snocHCases :: HCases -> Name -> [Name] -> [Name] -> Tm -> HCases
+snocHCases cs x xs is t = case cs of
+  HCSNil                   -> HCSCons x xs is t HCSNil
+  HCSCons x' xs' is' t' cs -> HCSCons x' xs' is' t' (snocHCases cs x xs is t)
 
 -- | Atomic equation.
 data CofEq = CofEq I I
@@ -331,7 +336,7 @@ data Ne
   | NUnglue Ne NeSys
   | NGlue Val ~NeSys NeSys
   | NCase Ne NamedClosure (EvalClosure Cases)
-  | NHCase Ne NamedClosure (EvalClosure Cases)
+  | NHCase Ne NamedClosure (EvalClosure HCases)
   deriving Show
 
 data VDSpine
@@ -365,7 +370,7 @@ data Closure
 
   -- ^ Body of lambdaCase
   | CSplit NamedClosure (EvalClosure Cases)
-  | CHSplit NamedClosure (EvalClosure Cases) -- HIT version
+  | CHSplit NamedClosure (EvalClosure HCases) -- HIT version
 
   -- ^ Body of function coercions.
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
@@ -549,7 +554,7 @@ instance SubAction Closure where
   sub cl = case cl of
     CEval     ecl -> CEval (sub ecl)
     CSplit  b ecl -> CSplit (sub b) (sub ecl)
-    CHSplit b ecl -> CSplit (sub b) (sub ecl)
+    CHSplit b ecl -> CHSplit (sub b) (sub ecl)
 
     -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.
