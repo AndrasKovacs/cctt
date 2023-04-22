@@ -36,8 +36,8 @@ data Tm
   | Wrap Name Ty
   | Hole (Maybe Name) (DontShow SourcePos)
 
-  | Case Tm (Maybe (Name, Ty)) [(Name, [Name], Tm)]
-  | Split [(Name, [Name], Tm)]
+  | Case Tm (Maybe (Name, Ty)) [CaseItem]
+  | Split [CaseItem]
 
   | U
   | Path Tm Tm                                -- x = y
@@ -74,6 +74,7 @@ data SysHCom = SHEmpty | SHCons Cof BindMaybe SysHCom
 
 type Constructor = (DontShow SourcePos, Name, [(Name, Ty)])
 type HConstructor = (DontShow SourcePos, Name, [(Name, Ty)], Maybe Sys)
+type CaseItem = (DontShow SourcePos, Name, [Name], Tm)
 
 data Top
   = TDef    (DontShow SourcePos) Name (Maybe Ty) Tm Top

@@ -67,6 +67,11 @@ mainWith getArgs = do
   putStrLn ("parsing time: " ++ show (st^.parsingTime))
   putStrLn ("checked " ++ show (st^.lvl) ++ " definitions")
 
+  when printelab do
+    putStrLn ("\n------------------------------------------------------------")
+    putStrLn ("------------------------------------------------------------")
+    putStrLn $ pretty0 (st^.top')
+
   case printnf of
     Just x -> do
       (!nf, !nftime) <- case M.lookup x (st^.top) of
@@ -76,12 +81,11 @@ mainWith getArgs = do
         _ -> do
           putStrLn $ "No top-level definition with name: " ++ show x
           exitSuccess
-      putStrLn $ "\nNormal form of " ++ x ++ ":\n\n" ++ pretty0 nf
+      putStrLn ("------------------------------------------------------------")
+      putStrLn ("------------------------------------------------------------")
+      putStrLn ""
+      putStrLn $ "Normal form of " ++ x ++ ":\n\n" ++ pretty0 nf
       putStrLn ""
       putStrLn $ "Normalized in " ++ show nftime
-      putStrLn ""
     Nothing ->
       pure ()
-
-  when printelab do
-    putStrLn $ pretty0 (st^.top')

@@ -1,6 +1,21 @@
 
-higher inductive S1 :=
+import bool;
+
+higher inductive S¹ :=
      base
    | loop (i : I) [i=0. base; i=1. base];
 
-base' : S1 := base;
+test1 := base;
+
+test2 (i : I) : S¹ := loop i;
+
+test3 : loop 0 = base := refl;
+test4 : loop 1 = base := refl;
+
+f (x : S¹)(A : U)(p : A = A) : U := case x [
+  base. A;
+  loop i. p i];
+
+-- f (x : S¹) : U := case x [
+--   base.   Bool;
+--   loop i. negPath i];

@@ -746,11 +746,11 @@ caseLhsSp dom = \case
   TNil          -> VDNil
   TCons _ _ tel -> VDCons (vVar dom) (caseLhsSp (dom + 1) tel)
 
-elabCases :: Elab (Env -> NamedClosure -> [DConInfo] -> [(Name, [Name], P.Tm)] -> IO Cases)
+elabCases :: Elab (Env -> NamedClosure -> [DConInfo] -> [P.CaseItem] -> IO Cases)
 elabCases params b cons cs = case (cons, cs) of
   ([], []) ->
     pure CSNil
-  (dci:cons, (x', xs, body):cs) | dci^.name == x' -> do
+  (dci:cons, (pos, x', xs, body):cs) | dci^.name == x' -> setPos pos do
     let rhstype = b ∙ VDCon dci (caseLhsSp ?dom (dci^.fieldTypes))
     t  <- elabCase params (dci^.fieldTypes) rhstype xs body
     cs <- elabCases params b cons  cs
@@ -788,13 +788,13 @@ elabHCase' params sub ifields rhstype xs ~casety ~casecl bnd body = case (ifield
   (_:ifields, x:xs) -> do
     bindI x \_ ->
       elabHCase' params (liftSub sub) ifields rhstype xs casety casecl bnd body
-  _ ->
+  _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
 elabHCase :: Elab (Env -> Tel -> [Name] -> Val -> [Name] -> NamedClosure
           -> EvalClosure Cases -> Sys -> P.Tm -> IO Tm)
 elabHCase params fieldtypes ifields rhstype xs ~casety ~casecl bnd body = case (fieldtypes, xs) of
-  (TNil, []) -> do
+  (TNil, xs) -> do
     elabHCase' params (emptySub (dom ?cof)) ifields rhstype xs casety casecl bnd body
   (TCons _ a fieldtypes, x:xs) -> do
     let ~va = evalIn params a
@@ -803,11 +803,11 @@ elabHCase params fieldtypes ifields rhstype xs ~casety ~casecl bnd body = case (
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
-elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [(Name, [Name], P.Tm)] -> Cases -> IO Cases)
+elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> Cases -> IO Cases)
 elabHCases params b cons cs prevCases = case (cons, cs) of
   ([], []) ->
     pure prevCases
-  (dci:cons, (x', xs, body):cs) | dci^.name == x' -> do
+  (dci:cons, (pos, x', xs, body):cs) | dci^.name == x' -> setPos pos do
     let lhsTm = HDCon dci (quoteParams params)
                           (quote (caseLhsSp ?dom (dci^.fieldTypes)))
                           (caseLhsIFields (dci^.ifields) (emptySub (dom ?cof)))

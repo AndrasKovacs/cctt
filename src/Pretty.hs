@@ -198,6 +198,9 @@ cases = \case
   CSCons x xs t CSNil -> str x <> caseBody xs t
   CSCons x xs t cs    -> str x <> caseBody xs t <> "; " <> cases cs
 
+hcases :: PrettyArgs (HCases -> Txt)
+hcases = uf
+
 coeTy :: PrettyArgs (Txt -> Tm -> Txt)
 coeTy i (PApp _ _ t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
 coeTy i (LApp t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
@@ -340,7 +343,7 @@ tm = \case
   HCase t x b cs     -> ifVerbose
                          (let pt = proj t; pcs = cases cs in bind x \x ->
                           appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
-                         (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
+                         (appp ("case " <> proj t <> " [" <> hcases cs <> "]"))
   HSplit x b cs      -> appp ("λ[" <> cases cs <> "]")
 
 ----------------------------------------------------------------------------------------------------

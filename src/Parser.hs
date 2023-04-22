@@ -82,10 +82,11 @@ keyword kw = try do
 goSplit :: Parser Tm
 goSplit = do
   let case_ = do
+        pos <- getSourcePos
         x:xs <- some bind
         char '.'
         body <- tm
-        pure (x, xs, body)
+        pure (coerce pos, x, xs, body)
   cases <- sepBy case_ (char ';')
   char ']'
   goApp $ Split cases
@@ -207,10 +208,11 @@ goCase = do
   b <- optional ((//) <$!> (char '(' *> bind) <*!> (char '.' *> tm <* char ')'))
   char '['
   let case_ = do
+        pos <- getSourcePos
         x:xs <- some bind
         char '.'
         body <- tm
-        pure (x, xs, body)
+        pure (coerce pos, x, xs, body)
   cases <- sepBy case_ (char ';')
   char ']'
   goApp $ Case t b cases
