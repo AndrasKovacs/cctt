@@ -182,6 +182,15 @@ check t topA = frcPos t \case
       p <- check p (VPath a x y)
       pure $! Sym (quote a) (quote x) (quote y) p
 
+    (P.Ap f p, VPath b fx fy) -> do
+      constantICl b
+      Infer p pty <- infer p
+      (a, x, y) <- nonDepPath pty
+      f <- check f (fun (a ∙ I0) (b ∙ I0))
+      conv fx (eval f ∙ x)
+      conv fy (eval f ∙ y)
+      pure $! Ap f (quote x) (quote y) p
+
     (P.Trans p q, VPath a x z) -> do
       Infer p axy <- infer p
       (a', x', y) <- nonDepPath axy

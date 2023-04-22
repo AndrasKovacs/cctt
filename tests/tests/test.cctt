@@ -24,6 +24,6 @@ F : S¹ → U := λ[
   loop i. negPath i];
 
 loopNeqRefl (p : loop' = refl) : Bot :=
-  let lem1 : ap F loop' = refl := λ i j. F (p i j);
-  let lem2 : false = true := ap (λ (p : Bool = Bool). coe 0 1 p true) lem1;
+  let lem1 : ap F loop' = refl := ap (λ q. ap F q) p;
+  let lem2 : false = true := ap (λ p. coe 0 1 p true) lem1;
   falseNeqTrue lem2;
