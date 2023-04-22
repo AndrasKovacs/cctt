@@ -291,15 +291,10 @@ check t topA = frcPos t \case
           sp <- checkSp (dci^.name) ps sp (dci^.fieldTypes)
           pure $ DCon dci sp
 
-        HDConHead dci sp -> do
-          unless (dci^.tyConInfo.tyId == tyinf^.tyId) $ withPrettyArgs $
-            err $ GenericError $
-              "No such constructor for expected type:\n\n  "
-              ++ pretty (quote (VTyCon tyinf ps))
-
-          (!sp, !is) <- checkHSp (dci^.name) ps sp (dci^.fieldTypes) (dci^.ifields)
-
-          pure $ HDCon dci (quoteParams ps) sp is
+        HDConHead{} ->
+          err $ GenericError $ withPrettyArgs $
+            "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyinf ps)) ++
+            "\n\nbut the expression is a higher type constructor"
 
         TyConHead{} ->
           err $ GenericError $ withPrettyArgs $
@@ -309,6 +304,35 @@ check t topA = frcPos t \case
         HTyConHead{} ->
           err $ GenericError $ withPrettyArgs $
             "Expected inductive type:\n\n  " ++ pretty (quote (VTyCon tyinf ps)) ++
+            "\n\nbut the expression is a type constructor"
+
+        SplitInfer (Infer t a) -> do
+          convExInf a topA
+          pure t
+
+    (t, VHTyCon tyinf ps) -> do
+      split t >>= \case
+        HDConHead dci sp -> do
+          unless (dci^.tyConInfo.tyId == tyinf^.tyId) $ withPrettyArgs $
+            err $ GenericError $
+              "No such constructor for expected type:\n\n  "
+              ++ pretty (quote (VHTyCon tyinf ps))
+          (!sp, !is) <- checkHSp (dci^.name) ps sp (dci^.fieldTypes) (dci^.ifields)
+          pure $ HDCon dci (quoteParams ps) sp is
+
+        DConHead{} ->
+          err $ GenericError $ withPrettyArgs $
+            "Expected inductive type:\n\n  " ++ pretty (quote (VHTyCon tyinf ps)) ++
+            "\n\nbut the expression is a strict inductive type constructor"
+
+        TyConHead{} ->
+          err $ GenericError $ withPrettyArgs $
+            "Expected inductive type:\n\n  " ++ pretty (quote (VHTyCon tyinf ps)) ++
+            "\n\nbut the expression is a type constructor"
+
+        HTyConHead{} ->
+          err $ GenericError $ withPrettyArgs $
+            "Expected inductive type:\n\n  " ++ pretty (quote (VHTyCon tyinf ps)) ++
             "\n\nbut the expression is a type constructor"
 
         SplitInfer (Infer t a) -> do

@@ -27,3 +27,23 @@ loopNeqRefl (p : loop' = refl) : Bot :=
   let lem1 : ap F loop' = refl := ap (λ q. ap F q) p;
   let lem2 : false = true := ap (λ p. coe 0 1 p true) lem1;
   falseNeqTrue lem2;
+
+higher inductive List (A : U) :=
+    nil
+  | cons A (List A);
+
+test5 (A : I → U)(i j : I)(xs : List (A i)) :
+  coe i j (k. List (A k)) nil = nil :=
+  refl;
+
+test6 (A : I → U)(i j : I)(x : A i)(xs : List (A i)) :
+  coe i j (k. List (A k)) (cons x xs) = cons (coe i j A x) (coe i j (k. List (A k)) xs) :=
+  refl;
+
+higher inductive Pushout (A B C : U)(f : A → B)(g : A → C) :=
+    inl B
+  | inr C
+  | quot (a : A)(i : I) [i=0. inl (f a); i=1. inr (g a)];
+
+test7 (A B C : U)(f : A → B)(g : A → C) (a : A)(i : I) : Pushout A B C f g
+  := quot a i;
