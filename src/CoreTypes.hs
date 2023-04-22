@@ -335,8 +335,8 @@ data Ne
   | NCoe I I (BindI Val) Val
   | NUnglue Ne NeSys
   | NGlue Val ~NeSys NeSys
-  | NCase Ne NamedClosure (EvalClosure Cases)
-  | NHCase Ne NamedClosure (EvalClosure HCases)
+  | NCase Val NamedClosure (EvalClosure Cases)
+  | NHCase Val NamedClosure (EvalClosure HCases)
   deriving Show
 
 data VDSpine

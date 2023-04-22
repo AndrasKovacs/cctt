@@ -772,6 +772,8 @@ coed r r' topA t = case (frc topA) ^. body of
       VDCon dci (coeindsp r r' ps sp (dci^.fieldTypes))
     t@(VNe _ is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
+    t@(VHCom _ _ _ _ _ is) ->
+      VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
     v@VHole{} ->
       v
     _ ->
@@ -1248,10 +1250,11 @@ lookupCase i sp cs = case i // cs of
 
 case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
 case_ t b ecs@(EC sub env rc cs) = case frc t of
-  VDCon dci sp       -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
-  VNe n is           -> VNe (NCase n b ecs) is
-  v@VHole{}          -> v
-  _                  -> impossible
+  VDCon dci sp           -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
+  n@(VNe _ is)           -> VNe (NCase n b ecs) is
+  n@(VHCom _ _ _ _ _ is) -> VNe (NCase n b ecs) is
+  v@VHole{}              -> v
+  _                      -> impossible
 {-# inline case_ #-}
 
 projVDSpine :: Lvl -> VDSpine -> Val
@@ -1413,9 +1416,9 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
       (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs)) sys)
       (coed r r' bbind (hcase base b ecs))
 
-  VNe n is  -> VNe (NHCase n b ecs) is
-  v@VHole{} -> v
-  _         -> impossible
+  n@(VNe _ is) -> VNe (NHCase n b ecs) is
+  v@VHole{}    -> v
+  _            -> impossible
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
