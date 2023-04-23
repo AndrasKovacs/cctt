@@ -96,8 +96,8 @@ bindI :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
 bindI x act = let ?names = NBindI ?names x; ?idom = ?idom + 1 in act (str x)
 {-# inline bindI #-}
 
-wkI :: Name -> PrettyArgs a -> PrettyArgs a
-wkI x act =
+wkI :: PrettyArgs a -> PrettyArgs a
+wkI act =
   let ?idom = ?idom - 1
       ?names = case ?names of NBindI ns _ -> ns; _ -> impossible in
   act
@@ -331,7 +331,7 @@ tm = \case
   Com r r' i a t u   -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in bindI i \i ->
                         "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
                                <> pt <> " " <> pu)
-  WkI x t            -> wkI x (tm t)
+  WkI t              -> wkI (tm t)
   Refl _             -> "refl"
   Sym _ _ _ p        -> projp (proj p <> "⁻¹")
   Trans _ _ _ _ p q  -> transp (app p <> " ∙ " <> trans q)

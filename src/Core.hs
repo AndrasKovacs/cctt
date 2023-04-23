@@ -964,7 +964,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       else
         case coehindsp r r' (rebind topA a) ps fs (di^.fieldTypes) s (di^.boundary) of
           (!sp, !sys) ->
-            VHCom r r' (VHTyCon ti psr')
+            VHCom r' r (VHTyCon ti psr')
               (WIS sys is)
               (VHDCon di psr' sp s is)
               (insertI r $ insertI r' is)
@@ -1511,7 +1511,7 @@ eval = \case
   LLam x t          -> VLLam (evalIClosure x t)
 
   -- Misc
-  WkI _ t           -> wkIS (eval t)
+  WkI t             -> wkIS (eval t)
   Hole x p          -> VHole x p ?sub ?env
 
   -- Builtins

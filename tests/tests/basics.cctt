@@ -7,6 +7,38 @@ inductive Sum (A B : U) := left A | right B;
 
 Dec (A : U) := Sum A (not A);
 
+Square (A : U) (a0 a1 b0 b1 : A)
+               (u : a0 = a1) (v : b0 = b1)
+               (r0 : a0 = b0) (r1 : a1 = b1) : U
+ := r0 ={i. u i = v i} r1;
+
+prop (A : U) : U := (a b : A) → a = b;
+
+set (A : U) : U := (a b : A) → prop (a = b);
+
+discrete (A : U) : U := (a b : A) → Dec (a = b);
+
+stable (A:U) : U := not (not A) → A;
+
+decStable (A : U) : Dec A → stable A := λ[
+ left a. λ _. a;
+ right b. λ h. case (h b) []];
+
+const (A : U) (f : A → A) : U := (x y : A) → f x = f y;
+
+exConst (A : U) : U := (f:A → A) * const A f;
+
+propBot : prop Bot := λ[];
+
+propNot (A : U) : prop (not A) := λ f g i x. propBot (f x) (g x) i;
+
+dNot (A : U) (a : A) : not (not A) := λ f. f a;
+
+stableConst (A : U) (sA : stable A) : exConst A :=
+  (λ x. sA (dNot A x), λ x y i. sA (propNot (not A) (dNot A x) (dNot A y) i));
+
+
+
 --------------------------------------------------------------------------------
 
 isLogEquiv (A B : U)(f : A → B) : U := (B → A);
@@ -84,3 +116,51 @@ isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
   ;
 
 isoToPath (A B : U)(i : iso A B) : A = B := ua A B (isoToEquiv A B i);
+
+--------------------------------------------------------------------------------
+
+hedbergLemma (A : U)(a : A) (f : (x : A) → a = x → a = x) :
+  (b : A) (p : a = b) → Square A a a a b refl p (f a refl) (f b p) :=
+  J A a
+    (λ b p. Square A a a a b refl p (f a refl) (f b p))
+    refl;
+
+hedbergStable (A : U) (a b : A) (h : (x : A) -> stable (a = x))(p q : a = b) : p = q :=
+
+  let rem1 (x : A) : exConst (a = x) := stableConst (a = x) (h x);
+
+  let f (x : A) : a = x → a = x := (rem1 x).1;
+
+  let fIsConst (x : A) : const (a = x) (f x) := (rem1 x).2;
+
+  let rem4 : Square A a a b b refl refl (f b p) (f b q) := fIsConst b p q;
+
+  let r : a = a := f a refl;
+
+  let rem2 (i j : I) := hedbergLemma A a f b p i j;
+  let rem3 (i j : I) := hedbergLemma A a f b q i j;
+
+  λ j i. hcom 0 1 [j=0. rem2 i
+                 ; j=1. rem3 i
+		 ; i=0. r
+		 ; i=1. rem4 j] a;
+
+hedbergS (A:U) (h : (a x : A) -> stable (a = x)) : set A :=
+  λ a b. hedbergStable A a b (h a);
+
+hedberg (A : U) (h : discrete A) : set A :=
+  λ a b. hedbergStable A a b (λ b. decStable (a = b) (h a b));
+
+
+--------------------------------------------------------------------------------
+
+setIsoToEquiv (A B : U)(sb : set B)(iso : iso A B) : equiv A B :=
+  (iso.f
+  ,iso.g
+  ,iso.linv
+  ,iso.rinv
+  ,λ a. ?
+  );
+
+setIsoToPath (A B : U)(sb : set B)(i : iso A B) : A = B :=
+  ua A B (setIsoToEquiv A B sb i);

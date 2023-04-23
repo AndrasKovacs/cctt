@@ -158,7 +158,7 @@ data Tm
 
   | Com I I Name Tm SysHCom Tm
 
-  | WkI Name Tm
+  | WkI Tm
 
   -- builtins
   | Refl ~Tm

@@ -905,7 +905,7 @@ elabBindMaybe b r r' = case b of
             tgt = papp lhs rhs va r'
         let iname = pickIVarName
         bindI iname \i -> do
-          a <- pure $ PApp (quote lhs) (quote rhs) (WkI iname a) (IVar i)
+          a <- pure $ PApp (quote lhs) (quote rhs) (WkI a) (IVar i)
           pure (iname, a, eval a, src, tgt)
       VLine aty -> do
         isConstantU aty
@@ -914,7 +914,7 @@ elabBindMaybe b r r' = case b of
             tgt = lapp va r'
         let iname = pickIVarName
         bindI iname \i -> do
-          a <- pure $ LApp (WkI iname a) (IVar i)
+          a <- pure $ LApp (WkI a) (IVar i)
           pure (iname, a, eval a, src, tgt)
       a -> do
         err $! ExpectedPathLine (quote a)
@@ -1009,13 +1009,13 @@ elabSysHCom a r base = \case
                   let iname = pickIVarName
                   bindI iname \i -> do
                     conv (pty ∙ IVar i) a
-                    t <- pure $ PApp (quote lhs) (quote rhs) (WkI iname t) (IVar i)
+                    t <- pure $ PApp (quote lhs) (quote rhs) (WkI t) (IVar i)
                     pure (iname, t)
                 VLine pty -> do
                   let iname = pickIVarName
                   bindI iname \i -> do
                     conv (pty ∙ IVar i) a
-                    t <- pure $ LApp (WkI iname t) (IVar i)
+                    t <- pure $ LApp (WkI t) (IVar i)
                     pure (iname, t)
                 a -> do
                   err $! ExpectedPathLine (quote a)

@@ -1,0 +1,95 @@
+
+import yaccttprelude;
+import hedberg;
+
+inductive nat := zero | suc nat;
+
+pred : nat → nat := λ[
+  zero. zero;
+  suc n. n];
+
+inductive Z := pos nat | neg nat;
+
+zeroZ := pos zero;
+
+predZ : Z → Z := λ[
+  pos u. case u [zero. neg zero; suc n. pos n];
+  neg v. neg (suc v)];
+
+sucZ : Z → Z := λ[
+  pos u. pos (suc u);
+  neg v. case v [zero. pos zero; suc n. neg n]];
+
+predsucZ : (x : Z) → predZ (sucZ x) = x := λ[
+  pos u. refl;
+  neg v. case v (v. predZ (sucZ (neg v)) = neg v) [
+    zero. refl;
+    suc n. refl
+    ]
+  ];
+
+sucpredZ : (x : Z) → sucZ (predZ x) = x := λ[
+  pos u. case u (u. sucZ (predZ (pos u)) = pos u) [
+    zero.  refl;
+    suc n. refl
+    ];
+  neg v. refl
+  ];
+
+caseNat (A : U) (x y : A) : nat → A := λ[
+  zero.  x;
+  suc _. y];
+
+caseDNat (P : nat → U) (z : P zero) (s : (n : nat) → P (suc n)) : (n : nat) → P n := λ[
+  zero. z;
+  suc n. s n];
+
+znots (n : nat) : not (zero = suc n) :=
+  λ h. subst nat (caseNat U nat N0) zero (suc n) h zero;
+
+discreteNat : discrete nat := λ[
+  zero.  λ[zero.  inl refl;
+           suc m. inr (λ p. case (znots m p) [])];
+  suc n. λ[zero.  inr (λ p. case (znots n p⁻¹) []);
+           suc m. case (discreteNat n m) [
+	     inl p. inl (ap (λ x. suc x) p);
+	     inr p. inr (λ q. case (p (ap pred q)) [])
+	   ]]
+  ];
+
+posNotneg (a b : nat) : not (pos a = neg b) :=
+  λ h. subst Z (λ[pos _. Unit; neg _. N0]) (pos a) (neg b) h tt;
+
+injPos (a b : nat) (h : pos a = pos b) : a = b :=
+  subst Z (λ[pos c. a = c; neg _. N0]) (pos a) (pos b) h refl;
+
+injNeg (a b : nat) (h : neg a = neg b) : a = b :=
+  subst Z (λ[pos _. N0; neg c. a = c]) (neg a) (neg b) h refl;
+
+discreteZ : discrete Z := λ[
+  pos a. λ[
+    pos a'. case (discreteNat a a') [
+      inl p. inl (ap (λ x. pos x) p);
+      inr p. inr (λ q. p (injPos a a' q))
+      ];
+    neg b. inr (λ p. case (posNotneg a b p) [])
+    ];
+  neg b. λ[
+    pos a. inr (λ p. case (posNotneg a b p⁻¹) []);
+    neg b'. case (discreteNat b b') [
+      inl p. inl (ap (λ x. neg x) p);
+      inr p. inr (λ q. p (injNeg b b' q))
+      ]
+    ]
+];
+
+ZSet : set Z := hedberg Z discreteZ;
+
+
+
+-- ctr (y : Z) : fiber Z Z sucZ y := (predZ y, sucpredZ y);
+
+-- gengoal (A : U)(hA : set A) (x y : A) (p : y = x) :
+--   (z : A)(r : y = z)(q : z = x) → p ={i. r i = x} q :=
+--   J A y (λ z r. (q : z = x) → p ={i. r i = x} q)
+--         (hA y x p);
