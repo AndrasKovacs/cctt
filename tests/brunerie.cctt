@@ -1,19 +1,10 @@
 
 {-
 Cubical/Experiments/Z-Cohomology benchmarks
-
-
-
 -}
 
 
 --------------------------------------------------------------------------------
-
-isLogEquiv (A B : U)(f : A → B) : U := (B → A);
-
-isSection (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
-
-isRetraction (A B : U)(f : A → B) : U := (g : B → A) × (rinv : (x : B) → f (g x) = x);
 
 isIso (A B : U)(f : A → B) : U :=
     (g    : B → A)
@@ -53,7 +44,6 @@ idEquiv (A : U) : equiv A A :=
 
 ua (A B : U)(f : equiv A B) : A = B :=
   λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
-
 
 --------------------------------------------------------------------------------
 

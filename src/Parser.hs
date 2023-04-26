@@ -69,7 +69,9 @@ isKeyword = \case
 ident :: Parser Name
 ident = try do
   o <- getOffset
-  x <- takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'' || c == '-')
+  c <- satisfy isAlphaNum
+  x <- takeWhileP Nothing (\c -> isAlphaNum c || c == '\'' || c == '-')
+  x <- pure (c:x)
   if isKeyword x
     then do {setOffset o; fail $ "unexpected keyword: " ++ x}
     else x <$ ws

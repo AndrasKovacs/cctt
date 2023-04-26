@@ -125,6 +125,13 @@ check t topA = frcPos t \case
     u <- define x va a vt $ check u topA
     pure $! Let x a t u
 
+  P.HCom r r' Nothing sys t -> do
+    r  <- checkI r
+    r' <- checkI r'
+    t  <- check t topA
+    sys <- elabSysHCom topA r t sys
+    pure $! HCom r r' (quote topA) sys t
+
   t -> case (t, frc topA) of
 
     (P.Lam x ann t, VPi a b) -> do

@@ -92,6 +92,7 @@ instance Conv Ne where
     (NCase t b cs     , NCase t' b' cs'      ) -> conv t t' && conv b b' && convCases cs cs'
     (NHCase t b cs    , NHCase t' b' cs'     ) -> conv t t' && conv b b' && convHCases cs cs'
     (NGlue b sys fib  , NGlue b' sys' fib'   ) -> conv b b' && conv sys sys' && conv fib fib'
+    (NUnpack n _      , NUnpack n' _         ) -> conv n n'
 
     -- Glue eta
     -- A bit ugly that we put "mempty"-s there, and potentially dodgy, but the only
