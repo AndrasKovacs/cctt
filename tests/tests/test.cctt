@@ -137,3 +137,36 @@ test13NF (A : I → U)(f : A 0 → CohTest2 (A 0))(x : A 0)(i : I) : CohTest2 (A
                     (f (coe j 0 A (coe 0 j A x))))]
 
   (ct2-quot (λ x. coe 0 1 (j. CohTest2 (A j)) (f (coe 1 0 A x))) (coe 0 1 A x) i);
+
+
+-- U-Quotient
+--------------------------------------------------------------------------------
+
+higher inductive Quot (A : U)(R : A → A → U) :=
+    q-emb A
+  | q-quot (x y : A) (R x y) (i : I) [i=0. q-emb x; i=1. q-emb y];
+
+test14 (A : I → U)(R : (i : I) → A i → A i → U)
+       (x y : A 0)(r : R 0 x y)(i : I) : Quot (A 1) (R 1) :=
+  coe 0 1 (i. Quot (A i) (R i)) (q-quot x y r i);
+-- OK (coherent)
+
+-- TODO: more precise coherence checking!!
+-- For example: applications to vars with closed inductive type are OK
+-- How to do it more generally?
+
+--------------------------------------------------------------------------------
+
+higher inductive Coeq (A B : U) (f g : A → B) :=
+    coeq-emb B
+  | coeq-quot (a : A)(i : I)[i=0. coeq-emb (f a); i=1. coeq-emb (g a)];
+
+test15 (A B : I → U)(f g : (i : I) → A i → B i)(a : A 0)(i : I) : Coeq (A 1) (B 1) (f 1) (g 1) :=
+  coe 0 1 (i. Coeq (A i) (B i) (f i) (g i)) (coeq-quot a i);
+
+test15NF (A B : I → U)(f g : (i : I) → A i → B i)(a : A 0)(i : I) : Coeq (A 1) (B 1) (f 1) (g 1) :=
+hcom 1 0 (Coeq (A 1) (B 1) (f 1) (g 1)) [i = 0 i. coeq-emb (coe i 1 B (f i (coe
+0 i A a))); i = 1 i. coeq-emb (coe i 1 B (g i (coe 0 i A a)))] (coeq-quot (coe 0
+1 A a) i);
+
+test15NFOK : test15 = test15NF := refl;

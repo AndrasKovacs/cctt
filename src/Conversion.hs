@@ -41,9 +41,12 @@ instance Conv Val where
     (VHCom r1 r2 a t b _, VHCom r1' r2' a' t' b' _) ->
       conv r1 r1' && conv r2 r2'  && conv a a' && conv t t' && conv b b'
 
-    -- We keep track of evaluation contexts for holes.
-    -- This prevents spurious conversions between holes.
-    (VHole _ p s e  , VHole _ p' s' e'  ) -> p == p' && conv s s' && conv e e'
+    (VHole{}, _) -> True
+    (_, VHole{}) -> True
+
+    -- -- We keep track of evaluation contexts for holes.
+    -- -- This prevents spurious conversions between holes.
+    -- (VHole _ p s e  , VHole _ p' s' e'  ) -> p == p' && conv s s' && conv e e'
 
     -- eta
     (VLam t         , t'                ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
@@ -87,6 +90,7 @@ instance Conv Ne where
 
 
     (NCase t b cs     , NCase t' b' cs'      ) -> conv t t' && conv b b' && convCases cs cs'
+    (NHCase t b cs    , NHCase t' b' cs'     ) -> conv t t' && conv b b' && convHCases cs cs'
     (NGlue b sys fib  , NGlue b' sys' fib'   ) -> conv b b' && conv sys sys' && conv fib fib'
 
     -- Glue eta
@@ -119,6 +123,30 @@ convCases :: NCofArg => DomArg => EvalClosure Cases -> EvalClosure Cases -> Bool
 convCases (EC sub env _ cs) (EC sub' env' _ cs') =
   let ?recurse = DontRecurse
   in convCases' sub env cs sub' env' cs'
+
+convHCases' :: NCofArg => DomArg => RecurseArg => Sub -> Env -> HCases -> Sub -> Env -> HCases -> Bool
+convHCases' sub env cs sub' env' cs' = case (cs, cs') of
+  (HCSNil               , HCSNil               ) -> True
+  (HCSCons x xs is t cs , HCSCons _ _ _  t' cs') ->
+    (case pushVars env xs of
+      (!env, !dom) -> case pushVars env' xs of
+        (!env', !_) -> case pushIVars sub is of
+          (!sub, !cof) -> case pushIVars sub' is of
+            (!sub', _) ->
+              let ?dom = dom in
+              let ?cof = cof in
+              let v  = (let ?env = env ; ?sub = sub  in eval t ) in
+              let v' = (let ?env = env'; ?sub = sub' in eval t') in
+              conv v v')
+    &&
+    convHCases' sub env cs sub' env' cs'
+  _ ->
+    impossible
+
+convHCases :: NCofArg => DomArg => EvalClosure HCases -> EvalClosure HCases -> Bool
+convHCases (EC sub env _ cs) (EC sub' env' _ cs') =
+  let ?recurse = DontRecurse
+  in convHCases' sub env cs sub' env' cs'
 
 instance Conv NeCof where
   conv c c' = case (c, c') of

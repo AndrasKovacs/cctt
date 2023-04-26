@@ -1232,10 +1232,13 @@ recursiveCall inf = case ?recurse of
 
 pushVars :: DomArg => Env -> [Name] -> (Env, Lvl)
 pushVars env = \case
-  []   -> (env, ?dom)
-  _:ns -> let v = VNe (NLocalVar ?dom) mempty in
-          let ?dom = ?dom + 1 in
-          pushVars (EDef env v) ns
+  []   -> (env // ?dom)
+  _:ns -> fresh \v -> pushVars (EDef env v) ns
+
+pushIVars :: NCofArg => Sub -> [Name] -> (Sub, NCof)
+pushIVars s = \case
+  []   -> (s // ?cof)
+  _:is -> freshI \v -> pushIVars (s `ext` v) is
 
 pushSp :: Env -> VDSpine -> Env
 pushSp env = \case
