@@ -4,7 +4,6 @@ module Core where
 import Common
 import CoreTypes
 import Interval
--- import Debug.Trace
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -52,6 +51,13 @@ freshIVarS act =
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   seq ?sub (seq ?cof (act fresh))
 {-# inline freshIVarS #-}
+
+-- | Push multiple fresh ivars.
+freshIVarsS :: [Name] -> (SubArg => NCofArg => a) -> (SubArg => NCofArg => a)
+freshIVarsS is act = case is of
+  []   -> act
+  _:is -> freshIVarS \_ -> freshIVarsS is act
+{-# inline freshIVarsS #-}
 
 -- | Define the next fresh ivar to an expression.
 defineI :: I -> (SubArg => a) -> (SubArg => a)
@@ -1176,8 +1182,8 @@ unglue ~t sys = case sys of
     VNe n is' -> case unSubNe n of
       NGlue base _ _ -> base
       n              -> VNe (NUnglue n sys) (is <> is')
-    v@VHole{} -> v
-    _         -> impossible
+    v@VHole{} -> v          -- TODO: VHCOM missing!!!
+    v         -> impossible -- error $ show v
 {-# inline unglue #-}
 
 -- | Unglue with neutral system arg.
@@ -1234,6 +1240,11 @@ pushVars :: DomArg => Env -> [Name] -> (Env, Lvl)
 pushVars env = \case
   []   -> (env // ?dom)
   _:ns -> fresh \v -> pushVars (EDef env v) ns
+
+-- -- TODO: refactor "push" functions like this below, try to only
+-- --       use the generic "fresh" functions.
+-- pushIVars :: NCofArg => Sub -> [Name] -> (Sub, NCof)
+-- pushIVars s is = let ?sub = s in freshIVarsS is (?sub // ?cof)
 
 pushIVars :: NCofArg => Sub -> [Name] -> (Sub, NCof)
 pushIVars s = \case

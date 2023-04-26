@@ -297,7 +297,7 @@ instance SubAction IVarSet where
     mempty is
   {-# noinline sub #-}
 
--- | Extend a sub with a sub
+-- | Extend a sub with a sub. TODO: check for IVar overflow!!!
 pushSub :: Sub -> Sub -> Sub
 pushSub (Sub s) s' =
   let oldc     = cod (Sub s)

@@ -252,8 +252,12 @@ check t topA = frcPos t \case
         _ ->
           err $ ExpectedInductiveType (quote a)
 
+    (P.Hole (Just "_") p, a) -> do
+      putStrLn ("HOLE ?" ++ sourcePosPretty (coerce p))
+      pure (Hole Nothing p)
+
     (P.Hole i p, a) -> do
-      putStrLn ("HOLE ?" ++ maybe (sourcePosPretty ?srcPos) id i)
+      putStrLn ("HOLE ?" ++ maybe (sourcePosPretty (coerce p)) id i)
       showcxt <- getState <&> (^.printingOpts.showHoleCxts)
       let qa = quote a
 

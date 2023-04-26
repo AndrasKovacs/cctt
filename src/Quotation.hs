@@ -75,12 +75,6 @@ quoteCases (EC sub env _ cs) =
   let ?sub = sub; ?env = env; ?recurse = DontRecurse in quoteCases' cs
 {-# inline quoteCases #-}
 
-quoteUnderIVars :: [Name] -> (NCofArg => a) -> (NCofArg => a)
-quoteUnderIVars is act = case is of
-  []   -> act
-  _:is -> freshI \_ -> quoteUnderIVars is act
-{-# inline quoteUnderIVars #-}
-
 quoteHCases' :: EvalArgs (HCases -> HCases)
 quoteHCases' = \case
   HCSNil                  -> HCSNil
@@ -88,7 +82,7 @@ quoteHCases' = \case
     HCSCons x xs is
       (let (!env, !dom) = pushVars ?env xs in
        let ?env = env; ?dom = dom in
-       quoteUnderIVars is (quote (eval body)))
+       freshIVarsS is (quote (eval body)))
       (quoteHCases' cs)
 
 -- We don't do recursive unfolding under Case binders

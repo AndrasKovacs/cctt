@@ -1,10 +1,51 @@
+higher inductive S1 :=
+    base1
+  | loop1 (i : I) [i=0. base1; i=1. base1];
 
--- (BUG: with field proj doesn't check Omega)
-ptType : U := (A : U) * (pt : A);
-Omega (A : ptType) : ptType := (A.pt = A.pt, refl);
+connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+  let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
+  let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
+  hcom 0 1 [
+    i=0. pface j;
+    i=1. qface j;
+    j=0. pface i;
+    j=1. qface i
+    ]
+    (p 1);
 
-foo (A : ptType) (h : A.1 -> U) := U;
+-- foo (i j : I) := connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j;
 
-inductive Bool := true | false;
+-- loop1' (i : I) : S1 := loop1 i;
 
-mallacc (i : I) : Bool → Bool := hcom 0 1 [i=0 _. λ x. x] (λ x. x);
+rotLoop : (a : S1) → a = a := λ[
+  base1.   λ i. loop1 i;
+  loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
+  ];
+
+-- λ a. case a [
+--     base1. λ i. loop1 i
+--   ; loop1 i. λ j. hcom 0 1 [j = 0 k. hcom 1 0 [k = 0 _. base1; k = 1 l. base1] (loop1 k)
+--                           ; j = 1 k. hcom 0 1 [k = 0 _. base1; k = 1 l. base1] (loop1 k)
+--                           ; j = 0 k. hcom 1 0 [k = 0 _. base1; k = 1 l. base1] (loop1 k)
+--                           ; j = 1 k. hcom 0 1 [k = 0 _. base1; k = 1 l. base1] (loop1 k)]
+--                        (loop1 (ERR 2))]
+
+-- higher inductive S1 :=
+--     base1
+--   | loop1 (i : I) [i=0. base1; i=1. base1];
+
+-- connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+--   let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
+--   let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
+--   hcom 0 1 [
+--     i=0. pface j;
+--     i=1. qface j;
+--     j=0. pface i;
+--     j=1. qface i
+--     ]
+--     (p 1);
+
+-- rotLoop : (a : S1) → a = a := λ[
+--   base1.   λ i. loop1 i;
+--   loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
+--   ];

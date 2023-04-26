@@ -12,6 +12,10 @@ module Common (
   , oneShot
   , inline
   , noinline
+  , trace
+  , traceM
+  , traceShow
+  , traceShowM
   , coerce) where
 
 import Control.Monad
@@ -23,6 +27,7 @@ import Lens.Micro.Platform
 import System.IO.Unsafe
 import Text.Megaparsec (SourcePos(..), sourcePosPretty, initialPos, Pos, unPos)
 import Data.IORef
+import Debug.Trace (trace, traceM, traceShow, traceShowM)
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------

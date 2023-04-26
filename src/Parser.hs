@@ -103,7 +103,7 @@ atom =
                <|> (Refl  <$  keyword "refl")
                <|> (TopLvl   <$!> (C.string "@@" *> decimal) <*!> try (optional (char '#' *> decimal)))
                <|> (LocalLvl <$!> (C.char '@'    *> decimal))
-               <|> (do {p <- getSourcePos; char '?'; id <- optional ident; pure (Hole id (coerce p))})
+               <|> (do {p <- getSourcePos; char '?'; id <- optional bind; pure (Hole id (coerce p))})
                <|> (Ident <$!> ident))
 
 goProj :: Tm -> Parser Tm

@@ -236,9 +236,16 @@ ivar i = let
                          (x', sh) -> x' // (sh || x == x')
   go _ _             = impossible
 
-  in case go (lvlToIx (coerce ?idom) (coerce i)) ?names of
-    (x, True) -> "@" <> str (show i)
-    (x, _   ) -> str x
+  in if i < ?idom then
+    case go (lvlToIx (coerce ?idom) (coerce i)) ?names of
+      (x, True) -> "@" <> str (show i)
+      (x, _   ) -> str x
+  else
+    "(ERR " <> str (show i) <> ")"
+
+  -- in case go (lvlToIx (coerce ?idom) (coerce i)) ?names of
+  --   (x, True) -> "@" <> str (show i)
+  --   (x, _   ) -> str x
 
 localVar :: NamesArg => DomArg => Ix -> Txt
 localVar i = let

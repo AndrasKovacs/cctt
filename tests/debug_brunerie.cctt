@@ -1,4 +1,7 @@
 
+-- Debugging version of brunerie with checked nfs
+
+
 {-
 Cubical/Experiments/Z-Cohomology benchmarks
 -}
@@ -89,6 +92,15 @@ s3-join-k01 (i j m : I) : join S1 S1 :=
     m=1 i. push (loop1 j) base1 i]
   (s3-join-cnx base1 1 m);
 
+s3-join-k01NF (i j m : I) : join S1 S1 :=
+hcom 1 i (join S1 S1) [j = 0 i. hcom 0 i (join S1 S1) [m = 0 _. inl
+base1; m = 1 i. push base1 base1 i] (inl base1); j = 1 i. hcom 0 i (join S1 S1)
+[m = 0 _. inl base1; m = 1 i. push base1 base1 i] (inl base1); m = 0 _. inl
+base1; m = 1 i. push (loop1 j) base1 i] (hcom 0 1 (join S1 S1) [m = 0 _. inl
+base1; m = 1 i. push base1 base1 i] (inl base1));
+
+s3-join-k01NFOK : s3-join-k01NF = s3-join-k01 := refl;
+
 goalcube (i j k m : I) : join S1 S1 :=
   hcom 1 m (join S1 S1) [
     i=1. s3-join-cnx (loop1 k) i;
@@ -99,6 +111,29 @@ goalcube (i j k m : I) : join S1 S1 :=
     k=1. s3-join-k01 i j
     ]
     (push (loop1 j) (loop1 k) i);
+
+goalcubeNF (i j k m : I) : join S1 S1 :=
+hcom 1 m (join S1 S1) [i = 1 l. hcom 0 1 (join S1 S1) [l = 0 _. inl
+base1; l = 1 i. push base1 (loop1 k) i] (inl base1); j = 0 l. hcom 0 i (join S1
+S1) [l = 0 _. inl base1; l = 1 i. push base1 (loop1 k) i] (inl base1); j = 1
+l. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 (loop1 k) i]
+(inl base1); i = 0 l. hcom 1 0 (join S1 S1) [j = 0 i. hcom 0 i (join S1 S1) [l =
+0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1); j = 1 i. hcom 0 i
+(join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1); l =
+0 _. inl base1; l = 1 i. push (loop1 j) base1 i] (hcom 0 1 (join S1 S1) [l = 0
+_. inl base1; l = 1 i. push base1 base1 i] (inl base1)); k = 0 l. hcom 1 i (join
+S1 S1) [j = 0 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1
+base1 i] (inl base1); j = 1 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1
+i. push base1 base1 i] (inl base1); l = 0 _. inl base1; l = 1 i. push (loop1 j)
+base1 i] (hcom 0 1 (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1
+i] (inl base1)); k = 1 l. hcom 1 i (join S1 S1) [j = 0 i. hcom 0 i (join S1 S1)
+[l = 0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1); j = 1 i. hcom 0 i
+(join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1); l =
+0 _. inl base1; l = 1 i. push (loop1 j) base1 i] (hcom 0 1 (join S1 S1) [l = 0
+_. inl base1; l = 1 i. push base1 base1 i] (inl base1))] (push (loop1 j) (loop1
+k) i);
+
+goalcubeNFOK : goalcubeNF = goalcube := refl;
 
 e : S3 → join S1 S1 := λ[
   base3. inl base1;
@@ -276,11 +311,67 @@ f3 : (Omega3 S3pt).1 → (Omega3 (joinpt S1pt S1)).1 :=
 
 test0To3 : (Omega3 (joinpt S1pt S1)).1 := f3 test0To2;
 
+test0To3NF : (Omega3 (joinpt S1pt S1)).1 :=
+λ {λ {λ {inl base1} {inl base1} _. inl base1} {λ {inl base1} {inl base1} _. inl
+base1} _ {inl base1} {inl base1} _. inl base1} {λ {λ {inl base1} {inl base1}
+_. inl base1} {λ {inl base1} {inl base1} _. inl base1} _ {inl base1} {inl base1}
+_. inl base1} i {λ {inl base1} {inl base1} _. inl base1} {λ {inl base1} {inl
+base1} _. inl base1} j {inl base1} {inl base1} k. hcom 1 0 (join S1 S1) [i = 1
+l. hcom 0 1 (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 (loop1 k) i]
+(inl base1); j = 0 l. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1 i. push
+base1 (loop1 k) i] (inl base1); j = 1 l. hcom 0 i (join S1 S1) [l = 0 _. inl
+base1; l = 1 i. push base1 (loop1 k) i] (inl base1); i = 0 l. hcom 1 0 (join S1
+S1) [j = 0 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1
+base1 i] (inl base1); j = 1 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1
+i. push base1 base1 i] (inl base1); l = 0 _. inl base1; l = 1 i. push (loop1 j)
+base1 i] (hcom 0 1 (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1
+i] (inl base1)); k = 0 l. hcom 1 i (join S1 S1) [j = 0 i. hcom 0 i (join S1 S1)
+[l = 0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1); j = 1 i. hcom 0 i
+(join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1); l =
+0 _. inl base1; l = 1 i. push (loop1 j) base1 i] (hcom 0 1 (join S1 S1) [l = 0
+_. inl base1; l = 1 i. push base1 base1 i] (inl base1)); k = 1 l. hcom 1 i (join
+S1 S1) [j = 0 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1
+base1 i] (inl base1); j = 1 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1
+i. push base1 base1 i] (inl base1); l = 0 _. inl base1; l = 1 i. push (loop1 j)
+base1 i] (hcom 0 1 (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1
+i] (inl base1))] (push (loop1 j) (loop1 k) i);
+
+test0To3NFOK : test0To3NF = test0To3 := refl;
+
 f4 : (Omega3 (joinpt S1pt S1)).1 → (Omega3 S2pt).1 :=
   mapOmegaRefl3 (joinpt S1pt S1) S2 alpha;
 
+-- FAIL: DOESN'T RECHECK!
+-- f4NF : (Omega3 (joinpt S1pt S1)).1 → (Omega3 S2pt).1 :=
+-- λ {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2} {base2}
+-- _. base2} {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2}
+-- {base2} _. base2} i {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} j
+-- {base2} {base2} k. hcom 1 0 S2 [i = 1 l. hcom 0 1 S2 [l = 0 _. base2; l = 1
+-- i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2; j = 0
+-- l. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
+-- j. base2] (loop2 k i)] base2; j = 1 l. hcom 0 i S2 [l = 0 _. base2; l = 1
+-- i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2; i = 0
+-- l. hcom 1 0 S2 [j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i =
+-- 0 _. base2; i = 1 j. base2] base2] base2; j = 1 i. hcom 0 i S2 [l = 0 _. base2;
+-- l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2; l = 0
+-- _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
+-- (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
+-- j. base2] base2] base2); k = 0 l. hcom 1 i S2 [j = 0 i. hcom 0 i S2 [l = 0
+-- _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2; j
+-- = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
+-- j. base2] base2] base2; l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i
+-- = 1 j. loop2 @1 j] base2] (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i
+-- = 0 _. base2; i = 1 j. base2] base2] base2); k = 1 l. hcom 1 i S2 [j = 0 i. hcom
+-- 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2]
+-- base2] base2; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0
+-- _. base2; i = 1 j. base2] base2] base2; l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i
+-- = 0 _. base2; i = 1 j. loop2 @1 j] base2] (hcom 0 1 S2 [l = 0 _. base2; l = 1
+-- i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)] (hcom 0 1 S2 [i =
+-- 0 _. base2; i = 1 j. loop2 @1 j] (loop2 k i));
+
 test0To4 : (Omega3 S2pt).1 := f4 test0To3;
 
+-- FAIL: impossible in nf (VHCom case missing!)
 f5 : (Omega3 S2pt).1 → (Omega3 (joinpt S1pt S1)).1 := h;
 
 test0To5 : (Omega3 (joinpt S1pt S1)).1 := f5 test0To4;
