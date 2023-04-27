@@ -70,7 +70,7 @@ ident :: Parser Name
 ident = try do
   o <- getOffset
   c <- satisfy isAlphaNum
-  x <- takeWhileP Nothing (\c -> isAlphaNum c || c == '\'' || c == '-')
+  x <- takeWhileP Nothing (\c -> isAlphaNum c || c == '\'' || c == '-' || c == '\\')
   x <- pure (c:x)
   if isKeyword x
     then do {setOffset o; fail $ "unexpected keyword: " ++ x}
@@ -79,7 +79,7 @@ ident = try do
 keyword :: String -> Parser ()
 keyword kw = try do
   C.string kw
-  (takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'') *> empty) <|> ws
+  (takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'' || c == '-' || c == '\\') *> empty) <|> ws
 
 goSplit :: Parser Tm
 goSplit = do

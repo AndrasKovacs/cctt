@@ -812,7 +812,7 @@ caseLhsIFields xs acc = case xs of
 evalBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure HCases -> VSys)
 evalBoundary bnd casety casecl = case bnd of
   SEmpty          -> vsempty
-  SCons cof t bnd -> vscons (evalCof cof) (hcase (eval t) casety casecl)
+  SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety casecl)
                             (evalBoundary bnd casety casecl)
 
 elabHCase' :: Elab (Env -> Sub -> [Name] -> Val -> [Name] -> NamedClosure

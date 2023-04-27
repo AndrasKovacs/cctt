@@ -32,9 +32,9 @@ coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
   , λ x l k. com r r' A
                       [k=0 i. f' i (linv' i x l)
                       ;k=1 i. f' i x
-		      ;l=0 i. f' i x
-		      ;l=1 i. rinv' i (f' i x) k]
-		      x
+                      ;l=0 i. f' i x
+                      ;l=1 i. rinv' i (f' i x) k]
+                      x
   );
 
 equiv (A B : U) : U :=
@@ -140,15 +140,56 @@ e : S3 → join S1 S1 := λ[
   loop3 i j k. goalcube i j k 0
 ];
 
+eNF : S3 → join S1 S1 :=
+λ _. case @0 (_. join S1 S1) [base3. inl base1; loop3 i j k. hcom 1 0 (join S1
+S1) [i = 1 l. hcom 0 1 (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1
+(loop1 k) i] (inl base1); j = 0 l. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l
+= 1 i. push base1 (loop1 k) i] (inl base1); j = 1 l. hcom 0 i (join S1 S1) [l =
+0 _. inl base1; l = 1 i. push base1 (loop1 k) i] (inl base1); i = 0 l. hcom 1 0
+(join S1 S1) [j = 0 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1 i. push
+base1 base1 i] (inl base1); j = 1 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1;
+l = 1 i. push base1 base1 i] (inl base1); l = 0 _. inl base1; l = 1 i. push
+(loop1 j) base1 i] (hcom 0 1 (join S1 S1) [l = 0 _. inl base1; l = 1 i. push
+base1 base1 i] (inl base1)); k = 0 l. hcom 1 i (join S1 S1) [j = 0 i. hcom 0 i
+(join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1); j =
+1 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1 i]
+(inl base1); l = 0 _. inl base1; l = 1 i. push (loop1 j) base1 i] (hcom 0 1
+(join S1 S1) [l = 0 _. inl base1; l = 1 i. push base1 base1 i] (inl base1)); k =
+1 l. hcom 1 i (join S1 S1) [j = 0 i. hcom 0 i (join S1 S1) [l = 0 _. inl base1;
+l = 1 i. push base1 base1 i] (inl base1); j = 1 i. hcom 0 i (join S1 S1) [l = 0
+_. inl base1; l = 1 i. push base1 base1 i] (inl base1); l = 0 _. inl base1; l =
+1 i. push (loop1 j) base1 i] (hcom 0 1 (join S1 S1) [l = 0 _. inl base1; l = 1
+i. push base1 base1 i] (inl base1))] (push (loop1 j) (loop1 k) i)];
+
+eNFOK : e = eNF := refl;
+
 eInvAux2 : S1 → refl ={_. base3 = base3} refl := λ[
-  base1. λ _ _. base3;
+  base1.   λ _ _. base3;
   loop1 i. λ j k. loop3 i j k
 ];
+
+eInvAux2NF : S1 → refl ={_. base3 = base3} refl :=
+λ _. case @0 (_. (λ {base3} {base3} _. base3) ={_. base3 ={_. S3} base3} (λ
+{base3} {base3} _. base3)) [base1. λ {λ {base3} {base3} _. base3} {λ {base3}
+{base3} _. base3} _ {base3} {base3} _. base3; loop1 i. λ {λ {base3} {base3}
+_. base3} {λ {base3} {base3} _. base3} j {base3} {base3} k. loop3 i j k];
+
+eInvAux2NFOK : eInvAux2NF = eInvAux2 := refl;
 
 eInvAux (x : S1) : S1 → base3 = base3 := λ[
   base1. λ _. base3;
   loop1 i. eInvAux2 x i
 ];
+
+eInvAuxNF :  (x : S1) → S1 → base3 = base3 :=
+λ x _. case @1 (_. base3 ={_. S3} base3) [base1. λ {base3} {base3} _. base3;
+loop1 i. case x (_. ((λ {base3} {base3} _. base3) ={_. base3 ={_. S3} base3} (λ
+{base3} {base3} _. base3))) [base1. λ {λ {base3} {base3} _. base3} {λ {base3}
+{base3} _. base3} _ {base3} {base3} _. base3; loop1 i. λ {λ {base3} {base3}
+_. base3} {λ {base3} {base3} _. base3} j {base3} {base3} k. loop3 i j k] {λ
+{base3} {base3} _. base3} {λ {base3} {base3} _. base3} i];
+
+eInvAuxNFOK : eInvAuxNF = eInvAux := refl;
 
 eInv : join S1 S1 → S3 := λ[
   inl x. base3;

@@ -296,11 +296,11 @@ data Val
   -- Neutrals. Not stable under substitution, no computation can ever match on them.
   | VNe Ne IVarSet
 
-  -- Semineutrals. No stable under substitution but computation can match on them.
-  -- since
-  | VGlueTy VTy NeSys' -- coe can act on it
+  -- Semineutrals. Not stable under substitution but computation can match on them.
+  | VGlueTy VTy NeSys'                                        -- coe can act on it
   | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IVarSet -- case can act on it
-  | VHCom I I VTy NeSysHCom' Val IVarSet  -- coe and case can act on it
+  | VHCom I I VTy NeSysHCom' Val IVarSet                      -- coe and case can act on it
+  | VGlue Val ~NeSys' NeSys IVarSet                            -- unglue can act on it
 
   -- Canonicals. Stable under substitution.
   | VPi VTy NamedClosure
@@ -334,7 +334,6 @@ data Ne
   | NUnpack Ne Name
   | NCoe I I (BindI Val) Val
   | NUnglue Ne NeSys
-  | NGlue Val ~NeSys NeSys
   | NCase Val NamedClosure (EvalClosure Cases)
   | NHCase Val NamedClosure (EvalClosure HCases)
   deriving Show

@@ -1,51 +1,22 @@
+
 higher inductive S1 :=
     base1
   | loop1 (i : I) [i=0. base1; i=1. base1];
 
-connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
-  let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
-  let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
-  hcom 0 1 [
-    i=0. pface j;
-    i=1. qface j;
-    j=0. pface i;
-    j=1. qface i
-    ]
-    (p 1);
+higher inductive S3 :=
+  base3
+| loop3 (i j k : I) [ i=0. base3
+                     ;i=1. base3
+                     ;j=0. base3
+                     ;j=1. base3
+                     ;k=0. base3
+                     ;k=1. base3];
 
--- foo (i j : I) := connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j;
-
--- loop1' (i : I) : S1 := loop1 i;
-
-rotLoop : (a : S1) → a = a := λ[
-  base1.   λ i. loop1 i;
-  loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
-  ];
-
--- λ a. case a [
---     base1. λ i. loop1 i
---   ; loop1 i. λ j. hcom 0 1 [j = 0 k. hcom 1 0 [k = 0 _. base1; k = 1 l. base1] (loop1 k)
---                           ; j = 1 k. hcom 0 1 [k = 0 _. base1; k = 1 l. base1] (loop1 k)
---                           ; j = 0 k. hcom 1 0 [k = 0 _. base1; k = 1 l. base1] (loop1 k)
---                           ; j = 1 k. hcom 0 1 [k = 0 _. base1; k = 1 l. base1] (loop1 k)]
---                        (loop1 (ERR 2))]
-
--- higher inductive S1 :=
---     base1
---   | loop1 (i : I) [i=0. base1; i=1. base1];
-
--- connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
---   let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
---   let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
---   hcom 0 1 [
---     i=0. pface j;
---     i=1. qface j;
---     j=0. pface i;
---     j=1. qface i
---     ]
---     (p 1);
-
--- rotLoop : (a : S1) → a = a := λ[
---   base1.   λ i. loop1 i;
---   loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
---   ];
+-- FAILS recheck!
+eInvAuxNF : S1 → S1 → base3 = base3 :=
+λ x y. case y (_. base3 = base3)
+  [base1. λ _. base3;
+   loop1 i. case x (_. refl ={_. base3 = base3} refl)
+               [base1. λ _ _. base3
+	       ;loop1 kek. λ j k. loop3 kek j k]
+               i];

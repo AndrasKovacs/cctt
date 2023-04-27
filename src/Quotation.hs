@@ -28,7 +28,6 @@ instance Quote Ne Tm where
     NUnpack t x       -> Unpack (quote t) x
     NCoe r r' a t     -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
     NUnglue t sys     -> Unglue (quote t) (quote sys)
-    NGlue t s1 s2     -> Glue (quote t) (quote s1) (quote s2)
     NLApp t i         -> LApp (quote t) (quote i)
     NDontRecurse x    -> RecursiveCall x
     NCase t b cs      -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
@@ -39,6 +38,7 @@ instance Quote Val Tm where
     VSub{}               -> impossible
     VNe n _              -> quote n
     VGlueTy a sys        -> GlueTy (quote a) (quote sys)
+    VGlue t eqs sys _    -> Glue (quote t) (quote eqs) (quote sys)
     VPi a b              -> Pi (b^.name) (quote a) (quote b)
     VLam t               -> Lam (t^.name) (quote t)
     VPath a lhs rhs      -> Path (a^.name) (quote a) (quote lhs) (quote rhs)

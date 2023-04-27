@@ -13,15 +13,10 @@ FORCING
     - We lose system forcing
   - semantic system cons-es always take forced cofibrations
 
-OPT:
-  - always store IVarSet together with NeSys/HCom, that
-    way we don't have to re-force stored NeSys-es in several places
 
 TODO:
   - propagate VHole from strict system projection
 
-TODO FIX:
-  - handle neutral VHCom cases whenever it's possible in a pattern match!
 -}
 
 type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
@@ -787,7 +782,8 @@ coed r r' topA t = case (frc topA) ^. body of
 
   -- NOTE: deleting the bound var from is
   a@(VNe _ is) ->
-    VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' (deleteIS (topA^.binds) is))
+    VNe (NCoe r r' (rebind topA a) t)
+        (insertI r $ insertI r' (deleteIS (topA^.binds) is))
 
 
 {-
@@ -1092,8 +1088,8 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
                                       ∙ hcom r i (proj1 "Ty" tf) (frc betasys) gr) alphasys))
             (ungluen gr alphasys)
 
-    in VNe (NGlue hcombase (alphasys^.body) (fib^.body))
-           (insertI r $ insertI r' ((alphasys^.ivars) <> (betasys^.ivars)))
+    in VGlue hcombase alphasys (fib^.body)
+             (insertI r $ insertI r' ((alphasys^.ivars) <> (betasys^.ivars)))
 
   VLine a ->
         VLLam
@@ -1114,7 +1110,7 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
       _ -> case projsys' (dci^.conId) ts of
         TTPProject prj  ->
           VDCon dci (hcomindsp r r' a (WIS prj (ts^.ivars)) ps (dci^.conId) 0 sp (dci^.fieldTypes))
-        TTPNe (WIS sys is) -> -- NOTE: this is is extended with the blocking neutral component's ivars
+        TTPNe (WIS sys is) -> -- NOTE: this "is" is extended with the blocking neutral component's ivars
           VHCom r r' a (WIS sys is) base (insertI r $ insertI r' is)
 
     base@(VNe n is') ->
@@ -1151,8 +1147,8 @@ hcom r r' ~a ~t ~b
 -- | HCom with neutral system input.
 hcomn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val
 hcomn r r' ~a ~sys ~b
-  | r == r' = b
-  | True    = hcomdn r r' a sys b
+  | frc r == frc r' = b
+  | True            = hcomdn r r' a sys b
 {-# inline hcomn #-}
 
 -- | Off-diagonal HCom.
@@ -1170,30 +1166,24 @@ glueTy ~a sys = case sys of
 
 glue :: Val -> VSys -> VSys -> Val
 glue ~t eqs sys = case (eqs, sys) of
-  (VSTotal{}       , VSTotal v)         -> v
-  (VSNe (WIS eqs _), VSNe (WIS sys is)) -> VNe (NGlue t eqs sys) is
-  _                                     -> impossible
+  (VSTotal{}, VSTotal v)         -> v
+  (VSNe eqs , VSNe (WIS sys is)) -> VGlue t eqs sys is
+  _                              -> impossible
 {-# inline glue #-}
 
 unglue :: NCofArg => DomArg => Val -> VSys -> Val
 unglue ~t sys = case sys of
-  VSTotal teqv      -> proj1 "f" (proj2 "Ty" teqv) ∙ t
-  VSNe (WIS sys is) -> case frc t of
-    VNe n is' -> case unSubNe n of
-      NGlue base _ _ -> base
-      n              -> VNe (NUnglue n sys) (is <> is')
-    v@VHole{} -> v          -- TODO: VHCOM missing!!!
-    v         -> impossible -- error $ show v
+  VSTotal teqv -> proj1 "f" (proj2 "Ty" teqv) ∙ t
+  VSNe sys     -> ungluen t sys
 {-# inline unglue #-}
 
 -- | Unglue with neutral system arg.
 ungluen :: NCofArg => DomArg => Val -> NeSys' -> Val
 ungluen t (WIS sys is) = case frc t of
-  VNe n is' -> case unSubNe n of
-    NGlue base _ _ -> base
-    n              -> VNe (NUnglue n sys) (is <> is')
-  v@VHole{} -> v
-  _         -> impossible
+  VGlue base _ _ _        -> base
+  VNe n is'               -> VNe (NUnglue n sys) (is <> is')
+  v@VHole{}               -> v
+  _                       -> impossible
 {-# inline ungluen #-}
 
 
@@ -1584,6 +1574,7 @@ instance Force Val Val where
     VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
     VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
     VHCom r r' a sys t is  | isUnblocked is -> frc (hcom r r' a (frc sys) t)
+    VGlue t eqs sys is     | isUnblocked is -> frc (glue t (frc eqs) (frc sys))
     v                                       -> v
 
   frcS = \case
@@ -1592,10 +1583,12 @@ instance Force Val Val where
     VGlueTy a (WIS sys is) | isUnblockedS is -> frc (glueTy (sub a) (frcS sys))
     VHDCon i ps fs s is    | isUnblockedS is -> frc (hdcon i (sub ps) (sub fs) (sub s))
     VHCom r r' a sys t is  | isUnblockedS is -> frc (hcom (sub r) (sub r') (sub a) (frcS sys) (sub t))
+    VGlue t eqs sys is     | isUnblockedS is -> frc (glue (sub t) (frcS eqs) (frcS sys))
 
 
     VNe t is              -> VNe (sub t) (sub is)
     VGlueTy a sys         -> VGlueTy (sub a) (sub sys)
+    VGlue t eqs sys is    -> VGlue (sub t) (sub eqs) (sub sys) (sub is)
     VPi a b               -> VPi (sub a) (sub b)
     VLam t                -> VLam (sub t)
     VPath a t u           -> VPath (sub a) (sub t) (sub u)
@@ -1627,7 +1620,6 @@ instance Force Ne Val where
     NUnpack t x       -> frc (unpack x (frc t))
     NCoe r r' a t     -> frc (coe r r' (frc a) (frc t))
     NUnglue t sys     -> frc (unglue (frc t) (frc sys))
-    NGlue t eqs sys   -> frc (glue t (frc eqs) (frc sys))
     NLApp t i         -> frc (lapp (frc t) i)
     NCase t b cs      -> frc (case_ (frc t) b cs)
     NHCase t b cs     -> frc (hcase (frc t) b cs)
@@ -1644,7 +1636,6 @@ instance Force Ne Val where
     NUnpack t x       -> frc (unpack x (frcS t))
     NCoe r r' a t     -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
     NUnglue t sys     -> frc (unglue (frcS t) (frcS sys))
-    NGlue t eqs sys   -> frc (glue (sub t) (frcS eqs) (frcS sys))
     NLApp t i         -> frc (lapp (frcS t) (frcS i))
     NCase t b cs      -> frc (case_ (frcS t) (sub b) (sub cs))
     NHCase t b cs     -> frc (hcase (frcS t) (sub b) (sub cs))
@@ -1745,7 +1736,6 @@ unSubNeS = \case
   NUnpack t x        -> NUnpack (sub t) x
   NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
   NUnglue a sys      -> NUnglue (sub a) (sub sys)
-  NGlue a eqs sys    -> NGlue (sub a) (sub eqs) (sub sys)
   NLApp t i          -> NLApp (sub t) (sub i)
   NCase t b cs       -> NCase (sub t) (sub b) (sub cs)
   NHCase t b cs      -> NHCase (sub t) (sub b) (sub cs)

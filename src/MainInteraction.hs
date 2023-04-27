@@ -63,8 +63,8 @@ mainWith getArgs = do
 
   (_, !totaltime) <- timed (elaborate path)
   st <- getState
-  putStrLn (path ++ " checked in " ++ show totaltime)
   putStrLn ("parsing time: " ++ show (st^.parsingTime))
+  putStrLn ("elaboration time: " ++ show (totaltime - st^.parsingTime))
   putStrLn ("checked " ++ show (st^.lvl) ++ " definitions")
 
   when printelab do

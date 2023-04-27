@@ -19,21 +19,22 @@ instance Conv Val where
   conv t t' = case frc t // frc t' of
 
     -- rigid match
-    (VNe n _        , VNe n' _          ) -> conv n n'
-    (VGlueTy a sys  , VGlueTy a' sys'   ) -> conv a a' && conv sys sys'
-    (VPi a b        , VPi a' b'         ) -> conv a a' && conv b b'
-    (VLam t         , VLam t'           ) -> conv t t'
-    (VPath a t u    , VPath a' t' u'    ) -> conv a a' && conv t t' && conv u u'
-    (VPLam _ _ t    , VPLam _ _ t'      ) -> conv t t'
-    (VSg a b        , VSg a' b'         ) -> b^.name == b'^.name && conv a a' && conv b b'
-    (VWrap x a      , VWrap x' a'       ) -> x == x' && conv a a'
-    (VPair _ t u    , VPair _ t' u'     ) -> conv t t' && conv u u'
-    (VU             , VU                ) -> True
-    (VLine a        , VLine a'          ) -> conv a a'
-    (VLLam t        , VLLam t'          ) -> conv t t'
-    (VTyCon inf ts  , VTyCon inf' ts'   ) -> inf^.tyId == inf'^.tyId && conv ts ts'
-    (VHTyCon inf ts , VHTyCon inf' ts'  ) -> inf^.tyId == inf'^.tyId && conv ts ts'
-    (VDCon inf sp   , VDCon inf' sp'    ) -> inf^.conId == inf'^.conId && conv sp sp'
+    (VNe n _          , VNe n' _            ) -> conv n n'
+    (VGlueTy a sys    , VGlueTy a' sys'     ) -> conv a a' && conv sys sys'
+    (VPi a b          , VPi a' b'           ) -> conv a a' && conv b b'
+    (VLam t           , VLam t'             ) -> conv t t'
+    (VPath a t u      , VPath a' t' u'      ) -> conv a a' && conv t t' && conv u u'
+    (VPLam _ _ t      , VPLam _ _ t'        ) -> conv t t'
+    (VSg a b          , VSg a' b'           ) -> b^.name == b'^.name && conv a a' && conv b b'
+    (VWrap x a        , VWrap x' a'         ) -> x == x' && conv a a'
+    (VPair _ t u      , VPair _ t' u'       ) -> conv t t' && conv u u'
+    (VU               , VU                  ) -> True
+    (VLine a          , VLine a'            ) -> conv a a'
+    (VLLam t          , VLLam t'            ) -> conv t t'
+    (VTyCon inf ts    , VTyCon inf' ts'     ) -> inf^.tyId == inf'^.tyId && conv ts ts'
+    (VHTyCon inf ts   , VHTyCon inf' ts'    ) -> inf^.tyId == inf'^.tyId && conv ts ts'
+    (VDCon inf sp     , VDCon inf' sp'      ) -> inf^.conId == inf'^.conId && conv sp sp'
+    (VGlue t eqs sys _, VGlue t' eqs' sys' _) -> conv t t' && conv eqs eqs' && conv sys sys'
 
     (VHDCon i _ fs s _, VHDCon i' _ fs' s' _) ->
       i^.conId == i'^.conId && conv fs fs' && conv s s'
@@ -48,21 +49,29 @@ instance Conv Val where
     -- -- This prevents spurious conversions between holes.
     -- (VHole _ p s e  , VHole _ p' s' e'  ) -> p == p' && conv s s' && conv e e'
 
-    -- eta
-    (VLam t         , t'                ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
-    (t              , VLam t'           ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
-    (VPair x t u    , t'                ) -> conv t (proj1 x t') && conv u (proj2 x t')
-    (t              , VPair x t' u'     ) -> conv (proj1 x t) t' && conv (proj2 x t) u'
-    (VPLam l r t    , t'                ) -> freshI \i -> conv (t ∙ i) (papp l r t' i)
-    (t              , VPLam l r t'      ) -> freshI \i -> conv (papp l r t i) (t' ∙ i)
-    (VLLam t        , t'                ) -> freshI \i -> conv (t ∙ i) (lapp t' i)
-    (t              , VLLam t'          ) -> freshI \i -> conv (lapp t i) (t' ∙ i)
-    (VPack x t      , t'                ) -> conv t (unpack x t')
-    (t              , VPack x t'        ) -> conv (unpack x t) t'
+    -- -- Glue eta
+    -- -- A bit ugly that we put "mempty"-s there, and potentially dodgy, but the only
+    -- -- way conversion checking can succeed here is when the VNe-s are immediately consumed.
+    -- (NGlue b sys fib  , t'                   ) -> conv b (VNe (NUnglue t' sys) mempty)
+    -- (t                , NGlue b' sys' fib'   ) -> conv (VNe (NUnglue t sys') mempty) b'
 
-    (VSub{}         , _                 ) -> impossible
-    (_              , VSub{}            ) -> impossible
-    _                                     -> False
+    -- eta
+    (VLam t           , t'                  ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
+    (t                , VLam t'             ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
+    (VPair x t u      , t'                  ) -> conv t (proj1 x t') && conv u (proj2 x t')
+    (t                , VPair x t' u'       ) -> conv (proj1 x t) t' && conv (proj2 x t) u'
+    (VPLam l r t      , t'                  ) -> freshI \i -> conv (t ∙ i) (papp l r t' i)
+    (t                , VPLam l r t'        ) -> freshI \i -> conv (papp l r t i) (t' ∙ i)
+    (VLLam t          , t'                  ) -> freshI \i -> conv (t ∙ i) (lapp t' i)
+    (t                , VLLam t'            ) -> freshI \i -> conv (lapp t i) (t' ∙ i)
+    (VPack x t        , t'                  ) -> conv t (unpack x t')
+    (t                , VPack x t'          ) -> conv (unpack x t) t'
+    (VGlue b sys fib _, t'                  ) -> conv b (ungluen t' sys)
+    (t                , VGlue b' sys' fib' _) -> conv (ungluen t sys') b'
+
+    (VSub{}, _     ) -> impossible
+    (_     , VSub{}) -> impossible
+    _                -> False
 
 instance Conv a => Conv (WithIS a) where
   conv (WIS a _) (WIS a' _) = conv a a'
@@ -91,14 +100,7 @@ instance Conv Ne where
 
     (NCase t b cs     , NCase t' b' cs'      ) -> conv t t' && conv b b' && convCases cs cs'
     (NHCase t b cs    , NHCase t' b' cs'     ) -> conv t t' && conv b b' && convHCases cs cs'
-    (NGlue b sys fib  , NGlue b' sys' fib'   ) -> conv b b' && conv sys sys' && conv fib fib'
     (NUnpack n _      , NUnpack n' _         ) -> conv n n'
-
-    -- Glue eta
-    -- A bit ugly that we put "mempty"-s there, and potentially dodgy, but the only
-    -- way conversion checking can succeed here is when the VNe-s are immediately consumed.
-    (NGlue b sys fib  , t'                   ) -> conv b (VNe (NUnglue t' sys) mempty)
-    (t                , NGlue b' sys' fib'   ) -> conv (VNe (NUnglue t sys') mempty) b'
 
     (NSub{} , _      ) -> impossible
     (t      , NSub{} ) -> impossible
