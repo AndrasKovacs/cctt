@@ -445,9 +445,10 @@ fiber and use `coh` to connect a `refl` fiber to it. There are more details
 scattered in the notes in this repo. I will tidy them up later at some point,
 and write out all rules of the CTT in a document.
 
-Comparing half-adjoint equivalences to contractible fibers:
+Comparing half-adjoint equivalences to contractible fibers in the Cartesian setting:
 
-- `idIsEquiv` becomes trivial
-- `isoToEquiv` becomes significantly smaller. This doesn't appear in computation rules but is common in user code.
-- `coe Glue` becomes a bit smaller
-- `coeIsEquiv` stays roughly the same size
+- `idIsEquiv` becomes smaller (trivial, in fact)
+- `coeIsEquiv` becomes significantly smaller
+- `isoToEquiv` becomes somewhat larger
+- `coe Glue` becomes slightly smaller
+
