@@ -174,6 +174,10 @@ setDom :: IVar -> Sub -> Sub
 setDom i (Sub n) = Sub (n .&. 1152921504606846975 .|. unsafeShiftL (coerce i) 60)
 {-# inline setDom #-}
 
+set01#  :: Word -> Word
+set01# w = w .|. 61924494876344320
+{-# inline set01# #-}
+
 setDomCod :: IVar -> IVar -> Sub -> Sub
 setDomCod d c (Sub n) = Sub (
   n .&. 72057594037927935 .|. unsafeShiftL (coerce d) 60 .|. unsafeShiftL (coerce c) 56)
@@ -306,6 +310,8 @@ pushSub (Sub s) s' =
       oldbits  = unsafeShiftL (fromIntegral oldc) 2
       selems   = onlyElems# (Sub s)
       s'elems  = onlyElems# s' in
-  setDomCod d newc $
-  Sub (selems .|. unsafeShiftL s'elems oldbits)
+  if newc > (maxivar + 1)
+    then error "RAN OUT OF IVARS IN EVAL"
+    else setDomCod d newc $
+         Sub (set01# (selems .|. unsafeShiftL s'elems oldbits))
 {-# inline pushSub #-}

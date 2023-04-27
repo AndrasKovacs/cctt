@@ -1,3 +1,24 @@
+isIso (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x);
+
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+iso (A B : U) : U := (f : A → B) × isIso A B f;
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+
+----------------------------------------------------------------------------------------------------
 
 higher inductive join (A B : U) :=
   inl A
@@ -5,54 +26,91 @@ higher inductive join (A B : U) :=
 | push (a : A) (b : B) (i : I) [ i = 0. inl a
                                ; i = 1. inr b ];
 
-test : (A : U) → join A A → join A A := λ A. λ[
-  inl x. inl x;
-  inr x. inr x;
-  push x y i. push x y i];
+higher inductive S1 :=
+    base1
+  | loop1 (i : I) [i=0. base1; i=1. base1];
+
+higher inductive S2 :=
+  base2
+| loop2 (i j : I) [i=0. base2
+                  ;i=1. base2
+                  ;j=0. base2
+                  ;j=1. base2];
+
+higher inductive S3 :=
+  base3
+| loop3 (i j k : I) [ i=0. base3
+                     ;i=1. base3
+                     ;j=0. base3
+                     ;j=1. base3
+                     ;k=0. base3
+                     ;k=1. base3];
+
+rotLoop : (a : S1) → a = a :=
+λ a. case a (a. a ={_. S1} a) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1];
+
+unrotLoop (a : S1) : a = a := (rotLoop a)⁻¹;
+
+higher inductive PostTotalHopf :=
+    b (x : S1)
+  | l (x : S1) (i j : I)
+                     [ i=0. b x
+                     ; i=1. b x
+                     ; j=0. b (unrotLoop x i)
+                     ; j=1. b x ];
+
+the (A : U)(x : A) := x;
+
+f5NF :
+  (λ _ _. base2) ={_. (λ _. base2) ={_. base2 ={_. S2} base2} (λ _. base2)} (λ _ _. base2)
+→ (λ _ _. inl base1) ={_. (λ _. inl base1) ={_. inl base1 ={_. join S1 S1} inl base1} (λ _. inl base1)}
+  (λ _ _. inl base1) :=
+
+λ p i j k. case
+
+(case (p i j k)
+  (x. (case x (_. U) [
+      base2. S1;
+      loop2 i j. Glue S1 [
+        i = 0. S1, idEquiv S1;
+        i = 1. S1, idEquiv S1;
+        j = 0. S1, ?_;
+        j = 1. S1, idEquiv S1]]) → PostTotalHopf)
+
+  [base2.     λ y. b y
+  ;loop2 i j. λ y. hcom 0 1 PostTotalHopf
+                            [i = 0 _. b y;
+			     i = 1 _. b y;
+			     j = 0 k. b ?_;
+			     j = 1 _. b y
+			     ]
+			     (l (unglue y) i j)]
+  ?_)
+
+(_. join S1 S1)
+[b x. inl x; l x i j. ?_];
 
 
 
--- higher inductive S1 :=
---     base1
---   | loop1 (i : I) [i=0. base1; i=1. base1];
-
--- higher inductive S3 :=
---   base3
--- | loop3 (i j k : I) [ i=0. base3
---                      ;i=1. base3
---                      ;j=0. base3
---                      ;j=1. base3
---                      ;k=0. base3
---                      ;k=1. base3];
-
--- inductive Unit := tt;
-
-
-
--- test' : S3 → S3 := λ[
---   base3. base3;
---   loop3 i j k. loop3 i j k
--- ];
-
--- test1 : S1 → S1 → base3 = base3 :=
--- λ x y. case y (_. base3 = base3)
---   [base1. λ _. base3;
---    loop1 i. case x (_. refl ={_. base3 = base3} refl)
---                [base1. λ _ _. base3
--- 	       ;loop1 i. λ j k. loop3 i j k]
---                i];
-
--- -- ERR variables in NF
--- test2 : join S1 S1 → S3 := λ[
---   inl x. base3;
---   inr y. base3;
---   push x y i. test1 x y i
--- ];
-
--- λ _. case @0 [
---   inl x. base3;
---   inr y. base3;
---   push x y. case y [
---        base1. λ _. base3;
---        loop1 i. case x [base1. λ _ _. base3; loop1 kek. λ j k. loop3 j k (ERR 4)]
---                        (ERR 1)] (ERR 0)]
+-- f5NF :
+--   (λ _ _. base2) ={_. (λ _. base2) ={_. base2 ={_. S2} base2} (λ _. base2)} (λ _ _. base2)
+-- → (λ _ _. inl base1) ={_. (λ _. inl base1) ={_. inl base1 ={_. join S1 S1} inl base1} (λ _. inl base1)}
+--   (λ _ _. inl base1) :=
+-- λ p i j k. case
+-- (case (p i j k)
+--   (x. S1 → PostTotalHopf)
+--   [base2.     λ y. b y
+--   ;loop2 i j. λ y. hcom 0 1 PostTotalHopf
+--                             [i = 0 _. b y;
+-- 			     i = 1 _. b y;
+-- 			     j = 0 k. b ?_;
+-- 			     j = 1 _. b y
+-- 			     ]
+-- 			     (l y i j)]
+--   ?_)
+-- (_. join S1 S1)
+-- [b x. inl x; l x i j. ?_];

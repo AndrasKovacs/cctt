@@ -683,6 +683,7 @@ inferNonSplit t = frcPos t \case
   P.GlueTy a sys -> do
     a   <- check a VU
     sys <- elabSys (equivInto (eval a)) sys
+
     pure $! Infer (GlueTy a sys) VU
 
   P.GlueTm base (Just eqs) sys -> do
@@ -700,8 +701,10 @@ inferNonSplit t = frcPos t \case
   P.Unglue t -> do
     Infer t a <- infer t
     case frc a of
-      VGlueTy a sys -> pure $! Infer (Unglue t (quote sys)) a
-      a             -> err $! ExpectedGlueTy (quote a)
+      VGlueTy a sys -> do
+        pure $! Infer (Unglue t (quote sys)) a
+      a ->
+        err $! ExpectedGlueTy (quote a)
 
   P.Com r r' a sys t -> do
     r  <- checkI r
@@ -756,6 +759,7 @@ inferNonSplit t = frcPos t \case
         cs <- elabCases params bv cons cs
         pure $! Infer (Case t x b cs) (bv ∙ eval t)
       VHTyCon inf params -> do
+
         b <- bind x a (quote a) \_ -> check b VU
         let bv = makeNCl x b
         frz <- readIORef (inf^.frozen)
@@ -774,40 +778,38 @@ inferNonSplit t = frcPos t \case
 
 ----------------------------------------------------------------------------------------------------
 
-elabCase :: Elab (Env -> Tel -> Val -> [Name] -> P.Tm -> IO Tm)
-elabCase tyenv fieldtypes rhstype xs body = case (fieldtypes, xs) of
-  (TNil, []) ->
-    check body rhstype
+-- | The spine consisting of the last N bound vars, for each constructor field.
+lhsSpine :: Elab (Tel -> VDSpine)
+lhsSpine fs = go ?dom fs VDNil where
+  go :: Lvl -> Tel -> VDSpine -> VDSpine
+  go dom tel acc = case tel of
+    TNil          -> acc
+    TCons _ _ tel -> go (dom - 1) tel (VDCons (vVar (dom - 1)) acc)
+
+elabCase :: Elab (Env -> DConInfo -> NamedClosure -> Tel -> [Name] -> P.Tm -> IO Tm)
+elabCase params inf retty fieldtypes xs body = case (fieldtypes, xs) of
+  (TNil, []) -> do
+    let lhsval = VDCon inf (lhsSpine (inf^.fieldTypes))
+    check body (retty ∙ lhsval)
   (TCons _ a fieldtypes, x:xs) -> do
-    let ~va = evalIn tyenv a
+    let ~va = evalIn params a
     bind x va (quote va) \x ->
-      elabCase (EDef tyenv x) fieldtypes rhstype xs body
+      elabCase (EDef params x) inf retty fieldtypes xs body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
-
-caseLhsSp :: Lvl -> Tel -> VDSpine
-caseLhsSp dom = \case
-  TNil          -> VDNil
-  TCons _ _ tel -> VDCons (vVar dom) (caseLhsSp (dom + 1) tel)
 
 elabCases :: Elab (Env -> NamedClosure -> [DConInfo] -> [P.CaseItem] -> IO Cases)
 elabCases params b cons cs = case (cons, cs) of
   ([], []) ->
     pure CSNil
   (dci:cons, (pos, x', xs, body):cs) | dci^.name == x' -> setPos pos do
-    let rhstype = b ∙ VDCon dci (caseLhsSp ?dom (dci^.fieldTypes))
-    t  <- elabCase params (dci^.fieldTypes) rhstype xs body
-    cs <- elabCases params b cons  cs
+    t  <- elabCase params dci b (dci^.fieldTypes) xs body
+    cs <- elabCases params b cons cs
     pure $ CSCons (dci^.name) xs t cs
   _ ->
     err CaseMismatch
 
 ----------------------------------------------------------------------------------------------------
-
-caseLhsIFields :: [Name] -> Sub -> Sub
-caseLhsIFields xs acc = case xs of
-  []   -> acc
-  _:xs -> caseLhsIFields xs (liftSub acc)
 
 evalBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure HCases -> VSys)
 evalBoundary bnd casety casecl = case bnd of
@@ -815,11 +817,13 @@ evalBoundary bnd casety casecl = case bnd of
   SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety casecl)
                             (evalBoundary bnd casety casecl)
 
-elabHCase' :: Elab (Env -> Sub -> [Name] -> Val -> [Name] -> NamedClosure
+elabHCase' :: Elab (Env -> HDConInfo -> Env -> Sub -> [Name] -> [Name] -> NamedClosure
            -> EvalClosure HCases -> Sys -> P.Tm -> IO Tm)
-elabHCase' params sub ifields rhstype xs ~casety ~casecl bnd body = case (ifields, xs) of
+elabHCase' params ~inf typarams sub ifields_ xs ~casety ~casecl bnd body = case (ifields_, xs) of
   ([], []) -> do
-    t <- check body rhstype
+    let lhsval = hdcon inf typarams (lhsSpine (inf^.fieldTypes)) sub
+    let rhsty  = casety ∙ lhsval
+    t <- check body rhsty
     let vbnd = (let ?env = params; ?sub = sub; ?recurse = DontRecurse
                 in evalBoundary bnd casety casecl)
     case vbnd of
@@ -831,20 +835,20 @@ elabHCase' params sub ifields rhstype xs ~casety ~casecl bnd body = case (ifield
 
   (_:ifields, x:xs) -> do
     bindI x \_ ->
-      elabHCase' params (liftSub sub) ifields rhstype xs casety casecl bnd body
+      elabHCase' params inf typarams (liftSub sub) ifields xs casety casecl bnd body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
-elabHCase :: Elab (Env -> Tel -> [Name] -> Val -> [Name] -> NamedClosure
+elabHCase :: Elab (Env -> HDConInfo -> Tel -> [Name] -> [Name] -> NamedClosure
           -> EvalClosure HCases -> Sys -> P.Tm -> IO ([Name], [Name], Tm))
-elabHCase params fieldtypes ifields rhstype xs ~casety ~casecl bnd body = case (fieldtypes, xs) of
+elabHCase params ~inf fieldtypes ifields xs ~casety ~casecl bnd body = case (fieldtypes, xs) of
   (TNil, xs) -> do
-    t <- elabHCase' params (emptySub (dom ?cof)) ifields rhstype xs casety casecl bnd body
+    t <- elabHCase' params inf params (emptySub (dom ?cof)) ifields xs casety casecl bnd body
     pure ([], xs, t)
   (TCons _ a fieldtypes, x:xs) -> do
     let ~va = evalIn params a
     bind x va (quote va) \var -> do
-      (xs, is, t) <- elabHCase (EDef params var) fieldtypes ifields rhstype xs casety casecl bnd body
+      (xs, is, t) <- elabHCase (EDef params var) inf fieldtypes ifields xs casety casecl bnd body
       pure (x:xs, is, t)
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
@@ -854,15 +858,11 @@ elabHCases params b cons cs prevCases = case (cons, cs) of
   ([], []) ->
     pure prevCases
   (dci:cons, (pos, x', xs, body):cs) | dci^.name == x' -> setPos pos do
-    let lhsTm = HDCon dci (quoteParams params)
-                          (quote (caseLhsSp ?dom (dci^.fieldTypes)))
-                          (caseLhsIFields (dci^.ifields) (emptySub (dom ?cof)))
-    let rhstype = b ∙ eval lhsTm
-    let casecl  = EC (idSub (dom ?cof)) ?env DontRecurse prevCases
 
-    (xs, is, t) <- elabHCase params (dci^.fieldTypes)
+    let casecl  = EC (idSub (dom ?cof)) ?env DontRecurse prevCases
+    (xs, is, t) <- elabHCase params dci (dci^.fieldTypes)
                             (dci^.ifields)
-                            rhstype xs b casecl (dci^.boundary) body
+                            xs b casecl (dci^.boundary) body
     elabHCases params b cons cs (snocHCases prevCases x' xs is t)
   _ ->
     err CaseMismatch

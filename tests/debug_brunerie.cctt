@@ -197,15 +197,41 @@ eInv : join S1 S1 → S3 := λ[
   push x y i. eInvAux x y i
 ];
 
+eInvNF : join S1 S1 → S3 :=
+λ _. case @0 (_. S3) [inl x. base3; inr y. base3; push x y i. case y (_. (base3
+={_. S3} base3)) [base1. λ {base3} {base3} _. base3; loop1 i. case x (_. ((λ
+{base3} {base3} _. base3) ={_. base3 ={_. S3} base3} (λ {base3} {base3}
+_. base3))) [base1. λ {λ {base3} {base3} _. base3} {λ {base3} {base3} _. base3}
+_ {base3} {base3} _. base3; loop1 i. λ {λ {base3} {base3} _. base3} {λ {base3}
+{base3} _. base3} j {base3} {base3} k. loop3 i j k] {λ {base3} {base3} _. base3}
+{λ {base3} {base3} _. base3} i] {base3} {base3} i];
+
+eInvNFOK : eInvNF = eInv := refl;
+
 merid : S1 → base2 = base2 := λ[
   base1. refl;
   loop1 i. λ j. loop2 i j];
+
+meridNF : S1 → base2 = base2 :=
+λ _. case @0 (_. base2 ={_. S2} base2) [base1. λ {base2} {base2} _. base2; loop1
+i. λ {base2} {base2} j. loop2 i j];
+
+meridNFOK : meridNF = merid := refl;
 
 alpha : join S1 S1 → S2 := λ[
   inl _. base2;
   inr _. base2;
   push x y i. (merid y ∙ merid x) i
 ];
+
+alphaNF : join S1 S1 → S2 :=
+λ _. case @0 (_. S2) [inl _. base2; inr _. base2; push x y i. hcom 0 1 S2 [i = 0
+_. base2; i = 1 j. case x (_. (base2 ={_. S2} base2)) [base1. λ {base2} {base2}
+_. base2; loop1 i. λ {base2} {base2} j. loop2 i j] {base2} {base2} j] (case y
+(_. (base2 ={_. S2} base2)) [base1. λ {base2} {base2} _. base2; loop1 i. λ
+{base2} {base2} j. loop2 i j] {base2} {base2} i)];
+
+alphaNFOK : alphaNF = alpha := refl;
 
 ptType : U := (A : U) * A;
 pt (A : ptType) : A.1 := A.2;
@@ -218,6 +244,16 @@ S3pt : ptType := (S3,base3);
 Omega (A : ptType) : ptType := (pt A = pt A, refl);
 Omega2 (A : ptType) : ptType := Omega (Omega A);
 Omega3 (A : ptType) : ptType := Omega2 (Omega A);
+
+Omega3NF : (A : ptType) → ptType :=
+λ A. ((λ {λ {A.2} {A.2} _. A.2} {λ {A.2} {A.2} _. A.2} _ {A.2} {A.2} _. A.2)
+={_. (λ {A.2} {A.2} _. A.2) ={_. A.2 ={_. A.A} A.2} (λ {A.2} {A.2} _. A.2)} (λ
+{λ {A.2} {A.2} _. A.2} {λ {A.2} {A.2} _. A.2} _ {A.2} {A.2} _. A.2), λ {λ {λ
+{A.2} {A.2} _. A.2} {λ {A.2} {A.2} _. A.2} _ {A.2} {A.2} _. A.2} {λ {λ {A.2}
+{A.2} _. A.2} {λ {A.2} {A.2} _. A.2} _ {A.2} {A.2} _. A.2} _ {λ {A.2} {A.2}
+_. A.2} {λ {A.2} {A.2} _. A.2} _ {A.2} {A.2} _. A.2);
+
+Omega3NFOK : Omega3NF = Omega3 := refl;
 
 mapOmegaRefl (A : ptType) (B : U) (h : A.1 → B) (p : (Omega A).1) :
   (Omega (B, h (pt A))).1 := λ i. h (p i);
@@ -236,7 +272,14 @@ connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
     ]
     (p 1);
 
--- BUG: NF DOESN'T PRINT
+connection-bothNF (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+hcom 0 1 A [i = 0 k. hcom 1 j A [k = 0 _. p 1; k = 1 l. p l] (p
+1); i = 1 k. hcom 0 j A [k = 0 _. p 1; k = 1 l. q {p 1} {rhs} l] (p 1); j = 0
+k. hcom 1 i A [k = 0 _. p 1; k = 1 l. p l] (p 1); j = 1 k. hcom 0 i A [k = 0
+_. p 1; k = 1 l. q {p 1} {rhs} l] (p 1)] (p 1);
+
+connection-bothNFOK : connection-bothNF = connection-both := refl;
+
 rotLoop : (a : S1) → a = a := λ[
   base1.   λ i. loop1 i;
   loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
@@ -251,13 +294,32 @@ k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1];
 
 rotLoopOK : rotLoop = rotLoopNF := refl;
 
-
 unrotLoop (a : S1) : a = a := (rotLoop a)⁻¹;
+
+unrotLoopNF (a : S1) : a = a :=
+λ {a} {a} i. hcom 0 1 S1 [i = 0 j. case a (a. (a ={_. S1} a)) [base1. λ
+{base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0
+k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k =
+1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1] base1] {a} {a} j; i = 1 _. a] a;
+
+unrotLoopNFOK : unrotLoopNF = unrotLoop := refl;
 
 rot : S1 → S1 → S1 := λ[
   base1. λ y. y;
   loop1 i. λ y. rotLoop y i
   ];
+
+rotNF : S1 → S1 → S1 :=
+λ _. case @0 (_. S1 → S1) [base1. λ y. y; loop1 i. λ y. case y (a. (a ={_. S1}
+a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom
+0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1
+k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k =
+1 l. loop1 l] base1] base1] {y} {y} i];
+
+rotNFOK : rotNF = rot := refl;
 
 -- TODO: redtt/cool/Hopf
 square : (λ _. S1) ={_. S1 = S1} (λ _. S1) := λ i j.
@@ -266,10 +328,46 @@ square : (λ _. S1) ={_. S1 = S1} (λ _. S1) := λ i j.
            ;j = 0. (S1, (λ x. rotLoop x i), (λ x. unrotLoop x i), ?_)
            ;j = 1. (S1, idEquiv S1)];
 
+squareNF : (λ _. S1) ={_. S1 = S1} (λ _. S1) :=
+λ {λ {S1} {S1} _. S1} {λ {S1} {S1} _. S1} i {S1} {S1} j. Glue S1 [i = 0. S1, λ
+x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x {λ {x} {x} _. x} {λ {x}
+{x} _. x} _ {x} {x} _. x; i = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x}
+{x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x; j = 0. S1, λ
+x. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} i, λ
+x. hcom 0 1 S1 [i = 0 j. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1}
+i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1
+[k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1;
+k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x}
+{x} j; i = 1 _. x] x, ?_; j = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x}
+{x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x];
+
 Hopf : S2 → U := λ[
   base2. S1;
   loop2 i j. square i j
 ];
+
+HopfNF : S2 → U :=
+λ _. case @0 (_. U) [base2. S1; loop2 i j. Glue S1 [i = 0. S1, λ x. x, λ x. x, λ
+x {x} {x} _. x, λ x {x} {x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x}
+{x} _. x; i = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x {λ
+{x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x; j = 0. S1, λ x. case x (a. (a
+={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1
+i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0
+k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} i, λ x. hcom 0 1 S1 [i = 0
+j. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} j; i = 1
+_. x] x, ?_; j = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x
+{λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x]];
 
 fibOmega (B : ptType) (P : B.1 → U) (f : P (pt B)) (p : (Omega B).1) : U :=
   f ={i. P (p i)} f;
@@ -280,7 +378,43 @@ itFibOmega2 (B : ptType) (P : B.1 → U) (f : P (pt B)) : (Omega2 B).1 → U :=
 itFibOmega3 (B : ptType) (P : B.1 → U) (f : P (pt B)) : (Omega3 B).1 → U :=
   itFibOmega2 (Omega B) (fibOmega B P f) refl;
 
+itFibOmega3NF (B : ptType) (P : B.1 → U) (f : P (pt B)) : (Omega3 B).1 → U :=
+λ p. (λ {λ {f} {f} _. f} {λ {f} {f} _. f} _ {f} {f} _. f) ={i. (λ {f} {f}
+_. f) ={i. f ={i. P (p {λ {λ {B.2} {B.2} _. B.2} {λ {B.2} {B.2} _. B.2} _ {B.2}
+{B.2} _. B.2} {λ {λ {B.2} {B.2} _. B.2} {λ {B.2} {B.2} _. B.2} _ {B.2} {B.2}
+_. B.2} @0 {λ {B.2} {B.2} _. B.2} {λ {B.2} {B.2} _. B.2} @1 {B.2} {B.2} i)} f}
+(λ {f} {f} _. f)} (λ {λ {f} {f} _. f} {λ {f} {f} _. f} _ {f} {f} _. f);
+
+itFibOmega3NFOK : itFibOmega3NF = itFibOmega3 := refl;
+
 HopfThree : (Omega3 S2pt).1 → U := itFibOmega3 S2pt Hopf base1;
+
+HopfThreeNF : (Omega3 S2pt).1 → U :=
+λ p. (λ {λ {base1} {base1} _. base1} {λ {base1} {base1} _. base1} _ {base1}
+{base1} _. base1) ={i. (λ {base1} {base1} _. base1) ={i. base1 ={i. case (p {λ
+{λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2} {base2}
+_. base2} {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2}
+{base2} _. base2} @0 {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2}
+@1 {base2} {base2} i) (_. U) [base2. S1; loop2 i j. Glue S1 [i = 0. S1, λ x. x,
+λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x}
+_. x} _ {x} {x} _. x; i = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x}
+_. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x; j = 0. S1, λ x. case
+x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i}
+{loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1
+l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0
+k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} i, λ x. hcom 0 1 S1 [i = 0
+j. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} j; i = 1
+_. x] x, ?_; j = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x
+{λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x]]} base1} (λ {base1} {base1}
+_. base1)} (λ {λ {base1} {base1} _. base1} {λ {base1} {base1} _. base1} _
+{base1} {base1} _. base1);
+
+HopfThreeNFOK : HopfThreeNF = HopfThree := refl;
 
 higher inductive PostTotalHopf :=
     b (x : S1)
@@ -295,7 +429,7 @@ higher inductive PostTotalHopf :=
 tee12 : (x : S2) → Hopf x → PostTotalHopf := λ[
   base2. λ y. b y;
   loop2 i j . λ y.
-    hcom 0 1 PostTotalHopf [
+    hcom 0 1 [
       i=0 _. b y;
       i=1 _. b y;
       j=0 k. b ?_;
@@ -303,7 +437,27 @@ tee12 : (x : S2) → Hopf x → PostTotalHopf := λ[
       (l (unglue y) i j)
 ];
 
-the (A : U) (x : A) : A := x;
+tee12NF : (x : S2) → Hopf x → PostTotalHopf :=
+λ x. case x (x. case x (_. U) [base2. S1; loop2 i j. Glue S1 [i = 0. S1, λ x. x,
+λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x}
+_. x} _ {x} {x} _. x; i = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x}
+_. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x; j = 0. S1, λ x. case
+x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i}
+{loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1
+l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0
+k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} i, λ x. hcom 0 1 S1 [i = 0
+j. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} j; i = 1
+_. x] x, ?_; j = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x
+{λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x]] → PostTotalHopf) [base2. λ
+y. b y; loop2 i j. λ y. hcom 0 1 PostTotalHopf [i = 0 _. b y; i = 1 _. b y; j =
+0 k. b ?_; j = 1 _. b y] (l (unglue y) i j)];
+
+tee12NFOK : tee12NF = tee12 := refl;
 
 tee34 : PostTotalHopf → join S1 S1 := λ[
   b x. inl x;
@@ -382,52 +536,115 @@ test0To3NFOK : test0To3NF = test0To3 := refl;
 f4 : (Omega3 (joinpt S1pt S1)).1 → (Omega3 S2pt).1 :=
   mapOmegaRefl3 (joinpt S1pt S1) S2 alpha;
 
--- FAIL: DOESN'T RECHECK!
--- f4NF : (Omega3 (joinpt S1pt S1)).1 → (Omega3 S2pt).1 :=
--- λ {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2} {base2}
--- _. base2} {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2}
--- {base2} _. base2} i {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} j
--- {base2} {base2} k. hcom 1 0 S2 [i = 1 l. hcom 0 1 S2 [l = 0 _. base2; l = 1
--- i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2; j = 0
--- l. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
--- j. base2] (loop2 k i)] base2; j = 1 l. hcom 0 i S2 [l = 0 _. base2; l = 1
--- i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2; i = 0
--- l. hcom 1 0 S2 [j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i =
--- 0 _. base2; i = 1 j. base2] base2] base2; j = 1 i. hcom 0 i S2 [l = 0 _. base2;
--- l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2; l = 0
--- _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
--- (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
--- j. base2] base2] base2); k = 0 l. hcom 1 i S2 [j = 0 i. hcom 0 i S2 [l = 0
--- _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2; j
--- = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
--- j. base2] base2] base2; l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i
--- = 1 j. loop2 @1 j] base2] (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i
--- = 0 _. base2; i = 1 j. base2] base2] base2); k = 1 l. hcom 1 i S2 [j = 0 i. hcom
--- 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2]
--- base2] base2; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0
--- _. base2; i = 1 j. base2] base2] base2; l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i
--- = 0 _. base2; i = 1 j. loop2 @1 j] base2] (hcom 0 1 S2 [l = 0 _. base2; l = 1
--- i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)] (hcom 0 1 S2 [i =
--- 0 _. base2; i = 1 j. loop2 @1 j] (loop2 k i));
+f4NF : (Omega3 (joinpt S1pt S1)).1 → (Omega3 S2pt).1 :=
+λ p {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2}
+{base2} _. base2} {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _
+{base2} {base2} _. base2} i {λ {base2} {base2} _. base2} {λ {base2} {base2}
+_. base2} j {base2} {base2} k. case (p {λ {λ {inl base1} {inl base1} _. inl
+base1} {λ {inl base1} {inl base1} _. inl base1} _ {inl base1} {inl base1} _. inl
+base1} {λ {λ {inl base1} {inl base1} _. inl base1} {λ {inl base1} {inl base1}
+_. inl base1} _ {inl base1} {inl base1} _. inl base1} i {λ {inl base1} {inl
+base1} _. inl base1} {λ {inl base1} {inl base1} _. inl base1} j {inl base1} {inl
+base1} k) (_. S2) [inl _. base2; inr _. base2; push x y i. hcom 0 1 S2 [i = 0
+_. base2; i = 1 j. case x (_. (base2 ={_. S2} base2)) [base1. λ {base2} {base2}
+_. base2; loop1 i. λ {base2} {base2} j. loop2 i j] {base2} {base2} j] (case y
+(_. (base2 ={_. S2} base2)) [base1. λ {base2} {base2} _. base2; loop1 i. λ
+{base2} {base2} j. loop2 i j] {base2} {base2} i)];
+
+f4NFOK : f4NF = f4 := refl;
 
 test0To4 : (Omega3 S2pt).1 := f4 test0To3;
 
--- FAIL: impossible in nf (VHCom case missing!)
+test0To4NF : (Omega3 S2pt).1 :=
+λ {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2} {base2}
+_. base2} {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2}
+{base2} _. base2} i {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} j
+{base2} {base2} k. hcom 1 0 S2 [i = 1 l. hcom 0 1 S2 [l = 0 _. base2; l = 1
+i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2; j = 0
+l. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
+j. base2] (loop2 k i)] base2; j = 1 l. hcom 0 i S2 [l = 0 _. base2; l = 1
+i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2; i = 0
+l. hcom 1 0 S2 [j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i =
+0 _. base2; i = 1 j. base2] base2] base2; j = 1 i. hcom 0 i S2 [l = 0 _. base2;
+l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2; l = 0
+_. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
+(hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
+j. base2] base2] base2); k = 0 l. hcom 1 i S2 [j = 0 i. hcom 0 i S2 [l = 0
+_. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2; j
+= 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1
+j. base2] base2] base2; l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i
+= 1 j. loop2 @1 j] base2] (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i
+= 0 _. base2; i = 1 j. base2] base2] base2); k = 1 l. hcom 1 i S2 [j = 0 i. hcom
+0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2]
+base2] base2; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0
+_. base2; i = 1 j. base2] base2] base2; l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i
+= 0 _. base2; i = 1 j. loop2 @1 j] base2] (hcom 0 1 S2 [l = 0 _. base2; l = 1
+i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)] (hcom 0 1 S2 [i =
+0 _. base2; i = 1 j. loop2 @1 j] (loop2 k i));
+
+test0To4NFOK : test0To4NF = test0To4 := refl;
+
 f5 : (Omega3 S2pt).1 → (Omega3 (joinpt S1pt S1)).1 := h;
 
+f5NF : (Omega3 S2pt).1 → (Omega3 (joinpt S1pt S1)).1 :=
+λ p {λ {λ {inl base1} {inl base1} _. inl base1} {λ {inl base1} {inl base1}
+_. inl base1} _ {inl base1} {inl base1} _. inl base1} {λ {λ {inl base1} {inl
+base1} _. inl base1} {λ {inl base1} {inl base1} _. inl base1} _ {inl base1} {inl
+base1} _. inl base1} i {λ {inl base1} {inl base1} _. inl base1} {λ {inl base1}
+{inl base1} _. inl base1} j {inl base1} {inl base1} k. case (case (p {λ {λ
+{base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2} {base2}
+_. base2} {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2}
+{base2} _. base2} i {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} j
+{base2} {base2} k) (x. (case x (_. U) [base2. S1; loop2 i j. Glue S1 [i = 0. S1,
+λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x} {x} _. x, λ x {λ {x} {x} _. x} {λ {x}
+{x} _. x} _ {x} {x} _. x; i = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x}
+{x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x; j = 0. S1, λ
+x. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} i, λ
+x. hcom 0 1 S1 [i = 0 j. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1}
+i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1
+[k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1;
+k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x}
+{x} j; i = 1 _. x] x, ?_; j = 1. S1, λ x. x, λ x. x, λ x {x} {x} _. x, λ x {x}
+{x} _. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x]] →
+PostTotalHopf)) [base2. λ y. b y; loop2 i j. λ y. hcom 0 1 PostTotalHopf [i = 0
+_. b y; i = 1 _. b y; j = 0 k. b ?_; j = 1 _. b y] (l (unglue y) i j)] ?_)
+(_. join S1 S1) [b x. inl x; l x i j. ?_];
+
+f5NFOK : f5NF = f5 := refl;
+
+-- FAIL: impossible in nf
 test0To5 : (Omega3 (joinpt S1pt S1)).1 := f5 test0To4;
 
 f6 : (Omega3 (joinpt S1pt S1)).1 -> (Omega3 S3pt).1 :=
   mapOmegaRefl3 (joinpt S1pt S1) S3 eInv;
+
+f6NF : (Omega3 (joinpt S1pt S1)).1 -> (Omega3 S3pt).1 :=
+λ p {λ {λ {base3} {base3} _. base3} {λ {base3} {base3} _. base3} _ {base3}
+{base3} _. base3} {λ {λ {base3} {base3} _. base3} {λ {base3} {base3} _. base3} _
+{base3} {base3} _. base3} i {λ {base3} {base3} _. base3} {λ {base3} {base3}
+_. base3} j {base3} {base3} k. case (p {λ {λ {inl base1} {inl base1} _. inl
+base1} {λ {inl base1} {inl base1} _. inl base1} _ {inl base1} {inl base1} _. inl
+base1} {λ {λ {inl base1} {inl base1} _. inl base1} {λ {inl base1} {inl base1}
+_. inl base1} _ {inl base1} {inl base1} _. inl base1} i {λ {inl base1} {inl
+base1} _. inl base1} {λ {inl base1} {inl base1} _. inl base1} j {inl base1} {inl
+base1} k) (_. S3) [inl x. base3; inr y. base3; push x y i. case y (_. (base3
+={_. S3} base3)) [base1. λ {base3} {base3} _. base3; loop1 i. case x (_. ((λ
+{base3} {base3} _. base3) ={_. base3 ={_. S3} base3} (λ {base3} {base3}
+_. base3))) [base1. λ {λ {base3} {base3} _. base3} {λ {base3} {base3} _. base3}
+_ {base3} {base3} _. base3; loop1 i. λ {λ {base3} {base3} _. base3} {λ {base3}
+{base3} _. base3} j {base3} {base3} k. loop3 i j k] {λ {base3} {base3} _. base3}
+{λ {base3} {base3} _. base3} i] {base3} {base3} i];
 
 test0To6 : (Omega3 S3pt).1 := f6 test0To5;
 
 -- f7 : (Omega3 S3pt).1 → (Omega2 trS2pt).1 := pi3S3;
 
 --- test0To7 : (Omega2 trS2pt).1 = f7 test0To6
-
-
-
 
 
 -- OLD FILE
