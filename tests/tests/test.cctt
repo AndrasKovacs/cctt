@@ -1,22 +1,58 @@
 
-higher inductive S1 :=
-    base1
-  | loop1 (i : I) [i=0. base1; i=1. base1];
+higher inductive join (A B : U) :=
+  inl A
+| inr B
+| push (a : A) (b : B) (i : I) [ i = 0. inl a
+                               ; i = 1. inr b ];
 
-higher inductive S3 :=
-  base3
-| loop3 (i j k : I) [ i=0. base3
-                     ;i=1. base3
-                     ;j=0. base3
-                     ;j=1. base3
-                     ;k=0. base3
-                     ;k=1. base3];
+test : (A : U) → join A A → join A A := λ A. λ[
+  inl x. inl x;
+  inr x. inr x;
+  push x y i. push x y i];
 
--- FAILS recheck!
-eInvAuxNF : S1 → S1 → base3 = base3 :=
-λ x y. case y (_. base3 = base3)
-  [base1. λ _. base3;
-   loop1 i. case x (_. refl ={_. base3 = base3} refl)
-               [base1. λ _ _. base3
-	       ;loop1 kek. λ j k. loop3 kek j k]
-               i];
+
+
+-- higher inductive S1 :=
+--     base1
+--   | loop1 (i : I) [i=0. base1; i=1. base1];
+
+-- higher inductive S3 :=
+--   base3
+-- | loop3 (i j k : I) [ i=0. base3
+--                      ;i=1. base3
+--                      ;j=0. base3
+--                      ;j=1. base3
+--                      ;k=0. base3
+--                      ;k=1. base3];
+
+-- inductive Unit := tt;
+
+
+
+-- test' : S3 → S3 := λ[
+--   base3. base3;
+--   loop3 i j k. loop3 i j k
+-- ];
+
+-- test1 : S1 → S1 → base3 = base3 :=
+-- λ x y. case y (_. base3 = base3)
+--   [base1. λ _. base3;
+--    loop1 i. case x (_. refl ={_. base3 = base3} refl)
+--                [base1. λ _ _. base3
+-- 	       ;loop1 i. λ j k. loop3 i j k]
+--                i];
+
+-- -- ERR variables in NF
+-- test2 : join S1 S1 → S3 := λ[
+--   inl x. base3;
+--   inr y. base3;
+--   push x y i. test1 x y i
+-- ];
+
+-- λ _. case @0 [
+--   inl x. base3;
+--   inr y. base3;
+--   push x y. case y [
+--        base1. λ _. base3;
+--        loop1 i. case x [base1. λ _ _. base3; loop1 kek. λ j k. loop3 j k (ERR 4)]
+--                        (ERR 1)] (ERR 0)]

@@ -201,7 +201,7 @@ hcaseBody' xs t = case xs of
 hcaseBody :: PrettyArgs ([Name] -> [Name] -> Tm -> Txt)
 hcaseBody xs is t = case xs of
   []   -> hcaseBody' is t
-  [x]  -> bind x \x -> " " <> x <> ". " <> pair t
+  [x]  -> bind x \x -> " " <> x <> hcaseBody' is t
   x:xs -> bind x \x -> " " <> x <> hcaseBody xs is t
 
 cases :: PrettyArgs (Cases -> Txt)
@@ -428,6 +428,7 @@ topEntries = LM.foldrWithKey'
          "\n" <> str (inf^.name)
           <> " : " <> pair (inf^.defTy)
           <> " :=\n  " <> pair (inf^.def) <> ";\n" <> acc
+          -- <> " :=\n  " <> str (show (inf^.def)) <> ";\n" <> acc
       TETyCon inf -> withPrettyArgs0 $ runIO do
         cons <- readIORef (inf^.constructors)
         pure $!

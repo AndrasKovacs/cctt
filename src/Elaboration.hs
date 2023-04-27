@@ -859,6 +859,7 @@ elabHCases params b cons cs prevCases = case (cons, cs) of
                           (caseLhsIFields (dci^.ifields) (emptySub (dom ?cof)))
     let rhstype = b ∙ eval lhsTm
     let casecl  = EC (idSub (dom ?cof)) ?env DontRecurse prevCases
+
     (xs, is, t) <- elabHCase params (dci^.fieldTypes)
                             (dci^.ifields)
                             rhstype xs b casecl (dci^.boundary) body
