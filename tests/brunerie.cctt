@@ -160,21 +160,10 @@ connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
     ]
     (p 1);
 
--- BUG: NF DOESN'T PRINT
 rotLoop : (a : S1) → a = a := λ[
   base1.   λ i. loop1 i;
   loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
   ];
-
-rotLoopNF : (a : S1) → a = a :=
-λ a. case a (a. a ={_. S1} a) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
-{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
-l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
-base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
-k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1];
-
-rotLoopOK : rotLoop = rotLoopNF := refl;
-
 
 unrotLoop (a : S1) : a = a := (rotLoop a)⁻¹;
 
@@ -291,8 +280,8 @@ f6 : (Omega3 (joinpt S1pt S1)).1 -> (Omega3 S3pt).1 :=
 test0To6 : (Omega3 S3pt).1 := f6 test0To5;
 
 -- f7 : (Omega3 S3pt).1 → (Omega2 trS2pt).1 := pi3S3;
-
 --- test0To7 : (Omega2 trS2pt).1 = f7 test0To6
+
 
 
 

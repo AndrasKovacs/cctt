@@ -1,18 +1,19 @@
 
 -- Comments are like in Haskell
--- This tutorial is intended for people who are already familiar with cubical
--- type theory.
 
 {-
 This is a multi-line comment.
 
-General usage: cctt <file> [nf <topdef>] [elab]
+General usage: cctt <file> [nf <topdef>] [elab] [verbose] [no-hole-cxts]
 
-Checks <file>. Options:
+Elaborates <file>. Options:
   nf <topdef>   prints the normal form of top-level definition <topdef>
   elab          prints the elaboration output
+  verbose       prints enough annotations so that everything can be re-checked
+  no-hole-cxts  disables printing local scopes of holes
 -}
 
+-- Basics
 --------------------------------------------------------------------------------
 
 -- A file consists of top-level definitions.
@@ -38,12 +39,17 @@ const : (A B : U) → A → B → A := λ A B x y. x;
 -- Arrows between function type binders can be ommitted:
 const2 : (A : U)(B : U) → A → B → A := λ A B x y. x;
 
--- Coq-style definition parameters:
+-- Coq-style definition parameters desugar to an annotated definition:
 const3 (A B : U)(x : A) (y : B) : A := x;
+const3' : (A B : U)(x : A) (y : B) → A := λ A B x y. x;
 
--- Return type annotations are mandatory when using Coq-style parameters.
--- This throws an error:
--- const4 (A B : U)(x : A) (y : B) := x;
+-- If we don't have a return type annotation on a Coq-style
+-- definition, that's desugared to annotated lambdas.
+const4 (A B : U)(x : A) (y : B) := x;
+const4' := λ (A : U)(B : U)(x : A)(y : B). x;
+
+-- Identifiers start with letters, can contain numbers and the following characters: ' \ -
+my-def\foo3' : U := U;
 
 -- Local let:
 foo : U :=
@@ -57,12 +63,34 @@ dbLevel0 (A B C : U) : U := @0;  -- stands for A
 dbLevel1 (A B C : U) : U := @1;  -- stands for B
 
 -- We can also use de Bruijn levels for top-level definitions. This
--- is generally only useful to ensure that cctt printing output is
+-- is generally only useful to ensure that printing output is
 -- well-formed even if some names are locally shadowed.
 
 topLevel0 := @@0;  -- stands for foo1, the 0-th top definition.
 topLevel1 := @@1;  -- stands for foo2
 
+
+-- Holes
+--------------------------------------------------------------------------------
+
+-- If we put ? anywhere, it will get printed as a hole, with its local scope and type.
+-- A hole can be named as "?foo", but the naming doesn't do much right now.
+
+-- NOTE: if we use "?_", this is a "silent" hole for which we only get a one-line
+-- message output.
+
+-- Holes are checkable only. Holes are convertible to any value.
+
+
+-- Imports
+--------------------------------------------------------------------------------
+
+-- We can put "import file.cctt;" declarations anywhere at the top-level in a file.
+--   - The imported file must be in the same directory as the importing file.
+--   - Imported files are elaborated upon import, without any caching.
+--   - There's a single top-level namespace for all files in a directory.
+--   - If a file is imported multiple times, it's only loaded once.
+--   - Import cycles are not allowed.
 
 -- Line type
 --------------------------------------------------------------------------------
@@ -80,31 +108,81 @@ reflLine (A : U)(x : A) : Line A := λ _. x;
 -- We can also use I in Coq-style parameters. This gets us line types:
 reflLine' (A : U)(x : A)(_ : I) : A := x;
 
+
 -- Sigma
 --------------------------------------------------------------------------------
 
 -- Notation : (x : A) × B or (x : A) * B
---   Also non-dependent product: A × B or A * B
+-- Also non-dependent product: A × B or A * B
 -- Pairing _,_ associates to the right
 -- Projections are .1 and .2
 -- Projections bind stronger than function application
 
 projEx (A : U)(f : A → A → A)(x : A × A × A) : A := f x.1 x.2.1;
 
+-- The first projection name can be used for overloaded name projections.
+-- Named projection binds stronger than function application.
+
+MySigma := (first : U) × (first → first);
+namedProj (x : MySigma) := x.first;
+
+-- We can project from nested sigmas using names.
+
+MySigma2 := (first : U) × (second : U) × (third : first → second) × U;
+namedProj2 (x : MySigma2) := x.third;
+
+-- NOTE: the projection names are nominal, meaning that two sigma
+-- types with different projection names are not definitionally equal!
+-- This is because we want projection overloading to be stable under
+-- definitional equality.
+
+-- fails : ((foo : U) * foo) = ((bar : U) * bar) := refl;
+
+
+-- Unary records
+--------------------------------------------------------------------------------
+
+-- Unary record types are a quick hack to allow named projection for the last
+-- field of a nested sigma.
+
+-- Syntax: a single parenthesised (name : Type):
+MyNewtype (A : U) := (unwrap : A);
+
+newtypeFun (x : MyNewtype U) : U := x.unwrap;
+
+-- There is no primitive constructor for unary records in the surface language!
+-- Instead, the constructor is inserted by elaboration in checking mode.
+
+wrap (A : U)(x : A) : MyNewtype A := x;
+
+-- Now we can put a unary record as the last field:
+
+MySigma3 := (first : U) × (second : U) × (third : first → second);
+namedProj3 (x : MySigma3) := x.third;
+
+-- Unary records also have nominal field names!
+
 
 -- Path type
 --------------------------------------------------------------------------------
 
 -- Notation:
---   x = y        for non-dependent path with inferred type parameter
---   x ={i.A} y   for  dependent path
-
--- We can use "x ={_. A} y" for type-annotated non-dependent paths,
--- when the types of sides can't be inferred.
+--   x = y        for non-dependent paths with inferred type parameter
+--   x ={_.A} y   for non-dependent paths with type annotation
+--   x ={i.A} y   for dependent paths
 
 -- Abstraction and application for paths is written the same as for functions
 -- and lines.
 refl' (A : U)(x : A) : x = x := λ _. x;
+
+-- Endpoints can be explicitly annotated in lambdas, to get inferable expressions:
+
+refl'' (A : U)(x : A) := λ {x}{x} _. x;
+
+-- Path applications can be also annotated. This is only useful for debugging in
+-- verbose printing mode.
+pathApp (p : U = U) (i : I) := p {U}{U} i;
+
 
 -- coe/hcom follow ABCFHL: https://www.cs.cmu.edu/~cangiuli/papers/abcfhl.pdf
 
@@ -114,7 +192,6 @@ coe01 (A B : U)(p : A = B)(x : A) : B := coe 0 1 (i. p i) x;
 -- The (i._) binder can be omitted. In this case, a path or a line in U is
 -- expected as argument. The path/line is desugared to the primitive binder.
 coe01' (A B : U)(p : A = B)(x : A) : B := coe 0 1 p x;
-
 
 -- hcom example:
 
@@ -127,7 +204,8 @@ sym (A : U)(x y : A) (p : x = y) : y = x :=
 sym' (A : U)(x y : A) (p : x = y) : y = x
   := λ i. hcom 0 1 A [i=0 j. p j; i=1 _. x] x;
 
--- We have the I binder sugar in hcom too:
+-- We have the I binder sugar in hcom too. If we omit the binder from system components,
+-- elaboration expects a path or line expression as the component.
 sym'' (A : U)(x y : A) (p : x = y) : y = x
   := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
@@ -147,8 +225,8 @@ cofTest (A : U)(x : A)(i j : I) : A :=
 -- Throws error:
 -- nonNeutralCof (A : U)(x : A)(i : I) : A := hcom 0 1 [i=0,i=1 _. x] x;
 
-
 -- Definitional equality drops system components with false cofibrations:
+
 cofEq : (A : U) (x : A)(i : I) →
    (let help (A : U)(x : A)(i j : I) : A := hcom 0 1 [i=0,j=1 _. x] x;
     help A x i i = hcom 0 1 [] x) :=
@@ -159,6 +237,7 @@ cofEq : (A : U) (x : A)(i : I) →
 -- noCofSorting (A : U)(x : A)(i : I) :
 --   hcom 0 1 [i=0 _. x; i=1 _. x] x = hcom 0 1 [i=1 _. x; i=0 _. x] x :=
 --     λ _.   hcom 0 1 [i=1 _. x; i=0 _. x] x;
+
 
 -- Builtins
 --------------------------------------------------------------------------------
@@ -181,7 +260,127 @@ myRefl (A : U)(x : A) : x = x := refl;
 selfInv (A : U)(x y : A)(p : x = y) : x = x :=  p ∙ p⁻¹;
 invPrecedence (A : U)(x y : A)(p : y = x)(f : x = y → U) : U := f p⁻¹;
 
+
 -- Glue types
 --------------------------------------------------------------------------------
 
--- TODO
+-- Glue types follow ABCFHL. Equivalences are internally defined as
+-- half-adjoint, exactly as follows (including the unary record for coh, and all
+-- the field names!)
+
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+-- The base type comes first in the syntax.
+
+myGlue (A : U)(i : I) : U := Glue A [i=0. A, idEquiv A];
+ua (A B : U)(e : equiv A B) : A = B := λ i. Glue B [i=0. A, e; i=1. B, idEquiv B];
+
+-- "glue" is the term introduction. Here, the system argument again comes second.
+
+-- We can provide two args, in which case glue is only checkable:
+glueTest (A : U)(i : I)(x : A) : Glue A [i=0. A, idEquiv A] := glue x [i=0. x];
+
+-- Or we can squeeze in an extra system arg, in which case it's inferable:
+glueTest' (A : U)(i : I)(x : A) := glue x [i=0. A, idEquiv A] [i=0. x];
+
+-- unglue doesn't support any extra annotations:
+unglueTest (A : U)(i : I)(x : Glue A [i=0. A, idEquiv A]) := unglue x;
+
+
+-- Inductive types
+--------------------------------------------------------------------------------
+
+-- Parameterized, single sorted.
+
+inductive Foo (A B C : U) :=
+    con1 (x : A)(y : B)                             -- constructors get a telescope of fields
+  | con2 (x y : A)                                  -- fields can be grouped
+  | con3 A B C                                      -- binders can be omitted
+  | con4 (x : A)(x = x)                             -- the telescope is dependent
+  | con5 (x : A)(y : B)
+         (p : con1 x y ={_. Foo A B C} con1 x y)    -- later constructors can depend on previous ones
+
+  | con6 (Foo A B C)                                -- recursive fields
+  | con7 (Foo A B (C * C))                          -- irregular recursive fields
+
+  | con8 (Foo A B C → Foo A B C);                   -- no positivity checking!
+
+-- Both type and value constructors must be fully applied in surface syntax.
+
+-- Constructors of parameterized types are checkable only.
+-- There's no surface syntax for annotating parameters.
+
+confoo1 : Foo U U U := con1 U U;
+
+-- Constructors of non-parameterized types are inferable.
+
+inductive Nat := zero | suc Nat;
+plus2 (x : Nat) := suc (suc x);
+
+-- Case splitting, recursion
+-- Any top-level definition can be recursive.
+-- Recursive definitions must be fully type-annotated.
+
+add : Nat → Nat → Nat := λ x y. case x [zero. y; suc x. suc (add x y)];
+
+-- Constructors in "case" must be listed in the same order as in the data declaration
+-- In checked mode, a "case" is inferred to be non-dependent.
+
+-- dependent case has to be annotated in inferred mode
+addzero : (n : Nat) → add n zero = n := λ n. case n (n. add n zero = n) [
+  zero. refl;
+  suc n. λ i. suc (addzero n i)];
+
+-- we can use split/lambdacase
+
+add' : Nat → Nat → Nat := λ[
+  zero.  λ y. y;
+  suc x. λ y. suc (add' x y)];
+
+-- splits are only checkable
+
+addzero' : (n : Nat) → add' n zero = n := λ[
+  zero. refl;
+  suc n. ap (λ x. suc x) (addzero' n)];
+
+-- Recursive definitions can't be unfolded under case splits (in the same definition)
+-- So "nf add" would print
+--    λ x y. case x [zero. y; suc x. suc (add x y)]
+-- This is useful for testing normalized definitions.
+
+-- There's no termination checking.
+
+
+
+-- Higher inductive types
+--------------------------------------------------------------------------------
+
+-- parameterized, single-sorted
+
+higher inductive join (A B : U) :=
+  inl A
+| inr B
+| push (a : A) (b : B) (i : I) [ i = 0. inl a
+                               ; i = 1. inr b ];
+
+-- In a higher constructor, interval vars must be the last fields.
+
+-- The boundary of a higher constructor must have as component type
+-- exactly the type being defined, applied to the parameters in order.
+
+-- checking and inferring constructors works the same as for non-HITs.
+
+-- Non-HITs can be defined as HITs.
+-- These different from strict inductives by only having weak hcom computation rules.
+
+higher inductive WeakNat := wzero | wsuc WeakNat;

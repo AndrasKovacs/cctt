@@ -1174,8 +1174,9 @@ glue ~t eqs sys = case (eqs, sys) of
 unglue :: NCofArg => DomArg => Val -> VSys -> Val
 unglue ~t sys = case sys of
   VSTotal teqv -> proj1 "f" (proj2 "Ty" teqv) ∙ t
-  VSNe sys     -> ungluen t sys
+  VSNe sys     -> traceShow (?cof, ?dom) $ ungluen t sys
 {-# inline unglue #-}
+
 
 -- | Unglue with neutral system arg.
 ungluen :: NCofArg => DomArg => Val -> NeSys' -> Val
@@ -1183,7 +1184,7 @@ ungluen t (WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
   VNe n is'               -> VNe (NUnglue n sys) (is <> is')
   v@VHole{}               -> v
-  _                       -> impossible
+  v                       -> impossible
 {-# inline ungluen #-}
 
 
