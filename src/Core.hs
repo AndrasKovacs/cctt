@@ -1174,7 +1174,7 @@ glue ~t eqs sys = case (eqs, sys) of
 unglue :: NCofArg => DomArg => Val -> VSys -> Val
 unglue ~t sys = case sys of
   VSTotal teqv -> proj1 "f" (proj2 "Ty" teqv) ∙ t
-  VSNe sys     -> traceShow (?cof, ?dom) $ ungluen t sys
+  VSNe sys     -> ungluen t sys
 {-# inline unglue #-}
 
 

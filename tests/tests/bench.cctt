@@ -9,5 +9,5 @@ BoolPathN (n : ℕ) :=
 fun (n : ℕ) (x : Bool) : Bool := coe 0 1 (BoolPathN n) x;
 val (n : ℕ) : Bool := coe 0 1 (BoolPathN n) true;
 
-test := val n1m;
+test := val n10k;
 -- test : val n1m = false := refl;
