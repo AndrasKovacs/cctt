@@ -47,11 +47,13 @@ higher inductive S3 :=
                      ;k=1. base3];
 
 rotLoop : (a : S1) → a = a :=
-λ a. case a (a. a ={_. S1} a) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
-{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
-l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
-base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
-k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1];
+λ a. case a (a. a ={_. S1} a) [
+    base1.   λ i. loop1 i
+  ; loop1 i. λ j. hcom 0 1 S1 [
+            i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1
+	  ; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1
+	  ; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1
+	  ; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1];
 
 unrotLoop (a : S1) : a = a := (rotLoop a)⁻¹;
 
@@ -65,52 +67,60 @@ higher inductive PostTotalHopf :=
 
 the (A : U)(x : A) := x;
 
-f5NF :
+test0To4 :
+(λ _ _. base2) ={_. (λ _. base2) ={_. base2 ={_. S2} base2} (λ _. base2)} (λ  _ _. base2) :=
+λ i j k. hcom 1 0 S2 [
+   i = 1 l. hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2
+ ; j = 0 l. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2
+ ; j = 1 l. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2
+ ; i = 0 l. hcom 1 0 S2 [
+                   j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
+                 ; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
+	         ; l = 0 _. base2
+	         ; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
+	         (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)
+ ; k = 0 l. hcom 1 i S2 [
+                   j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
+		 ; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
+		 ; l = 0 _. base2
+		 ; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
+		 (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)
+ ; k = 1 l. hcom 1 i S2 [
+                   j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
+		 ; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
+		 ; l = 0 _. base2
+		 ; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
+		(hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)]
+ (hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] (loop2 k i));
+
+f5 :
   (λ _ _. base2) ={_. (λ _. base2) ={_. base2 ={_. S2} base2} (λ _. base2)} (λ _ _. base2)
+
 → (λ _ _. inl base1) ={_. (λ _. inl base1) ={_. inl base1 ={_. join S1 S1} inl base1} (λ _. inl base1)}
+
   (λ _ _. inl base1) :=
 
-λ p i j k. case
+λ p i j k.
+case
+  (case (p i j k)
+    (x. (case x (_. U) [
+        base2. S1;
+        loop2 i j. Glue S1 [
+          i = 0. S1, idEquiv S1;
+          i = 1. S1, idEquiv S1;
+          j = 0. S1, ?_;
+          j = 1. S1, idEquiv S1]]) → PostTotalHopf)
 
-(case (p i j k)
-  (x. (case x (_. U) [
-      base2. S1;
-      loop2 i j. Glue S1 [
-        i = 0. S1, idEquiv S1;
-        i = 1. S1, idEquiv S1;
-        j = 0. S1, ?_;
-        j = 1. S1, idEquiv S1]]) → PostTotalHopf)
-
-  [base2.     λ y. b y
-  ;loop2 i j. λ y. hcom 0 1 PostTotalHopf
-                            [i = 0 _. b y;
-			     i = 1 _. b y;
-			     j = 0 k. b ?_;
-			     j = 1 _. b y
-			     ]
-			     (l (unglue y) i j)]
-  ?_)
-
-(_. join S1 S1)
+    [base2.     λ y. b y
+    ;loop2 i j. λ y. hcom 0 1 PostTotalHopf
+                              [i = 0 _. b y;
+  			     i = 1 _. b y;
+  			     j = 0 k. b ?_;
+  			     j = 1 _. b y
+  			     ]
+  			     (l (unglue y) i j)]
+    ?_)
+  (_. join S1 S1)
 [b x. inl x; l x i j. ?_];
 
-
-
--- f5NF :
---   (λ _ _. base2) ={_. (λ _. base2) ={_. base2 ={_. S2} base2} (λ _. base2)} (λ _ _. base2)
--- → (λ _ _. inl base1) ={_. (λ _. inl base1) ={_. inl base1 ={_. join S1 S1} inl base1} (λ _. inl base1)}
---   (λ _ _. inl base1) :=
--- λ p i j k. case
--- (case (p i j k)
---   (x. S1 → PostTotalHopf)
---   [base2.     λ y. b y
---   ;loop2 i j. λ y. hcom 0 1 PostTotalHopf
---                             [i = 0 _. b y;
--- 			     i = 1 _. b y;
--- 			     j = 0 k. b ?_;
--- 			     j = 1 _. b y
--- 			     ]
--- 			     (l y i j)]
---   ?_)
--- (_. join S1 S1)
--- [b x. inl x; l x i j. ?_];
+test0To5 := f5 test0To4;

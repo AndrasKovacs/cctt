@@ -555,6 +555,8 @@ f4NFOK : f4NF = f4 := refl;
 
 test0To4 : (Omega3 S2pt).1 := f4 test0To3;
 
+test0To4Type := (Omega3 S2pt).1;
+
 test0To4NF : (Omega3 S2pt).1 :=
 λ {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2} {base2}
 _. base2} {λ {λ {base2} {base2} _. base2} {λ {base2} {base2} _. base2} _ {base2}
