@@ -29,7 +29,7 @@ type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
 freshIVar :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshIVar act =
   let fresh = dom ?cof in
-  if  fresh == maxivar then error "RAN OUT OF IVARS IN EVAL" else
+  if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
   let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
   seq ?cof (act fresh)
 {-# inline freshIVar #-}

@@ -42,6 +42,7 @@ executable cctt
       Conversion
       Core
       CoreTypes
+      Data.IntIntMap
       Elaboration
       ElabState
       Errors

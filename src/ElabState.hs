@@ -141,7 +141,7 @@ define x ~a ~qa ~v act =
 bindI :: Name -> Elab (IVar -> a) -> Elab a
 bindI x act =
   let fresh = dom ?cof in
-  if  fresh == maxivar then error "RAN OUT OF IVARS IN ELABORATION" else
+  if  fresh == maxIVar then error "RAN OUT OF IVARS IN ELABORATION" else
   let ?cof    = setDom (fresh + 1) ?cof `ext` IVar fresh in
   let ?locals = LBindI ?locals x in
   let _ = ?cof in
