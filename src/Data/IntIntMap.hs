@@ -8,7 +8,6 @@ module Data.IntIntMap (
   , delete
   , Data.IntIntMap.lookup
   , union
-  , map
   , elems
   , keys
   , assocs
@@ -117,23 +116,23 @@ null Nil = True
 null _   = False
 {-# INLINE null #-}
 
-lookup :: (Int -> a) -> (Int -> Int -> a) -> Int -> IntIntMap -> a
+lookup :: (Int -> a) -> (Int -> a) -> Int -> IntIntMap -> a
 lookup nothing just !k = go k
   where
     go k (Bin _p m l r) | zero k m  = go k l
                         | otherwise = go k r
-    go k (Tip kx x) | k == kx   = just k x
+    go k (Tip kx x) | k == kx   = just x
                     | otherwise = nothing k
     go k Nil = nothing k
 {-# inline lookup #-}
 
 infixl 9 !
 (!) :: IntIntMap -> Int -> Int
-(!) m k = Data.IntIntMap.lookup not_found (\_ x -> x) k m where
+(!) m k = Data.IntIntMap.lookup not_found id k m where
   not_found k = error ("IntMap.!: key " ++ show k ++ " is not an element of the map")
 
 member :: Int -> IntIntMap -> Bool
-member k m = Data.IntIntMap.lookup (\_ -> False) (\_ _ -> True) k m
+member k m = Data.IntIntMap.lookup (\_ -> False) (\_ -> True) k m
 
 instance Semigroup IntIntMap where
   (<>) = union; {-# inline (<>) #-}

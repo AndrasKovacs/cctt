@@ -54,6 +54,7 @@ executable cctt
       Presyntax
       Pretty
       Quotation
+      SmallInterval
   hs-source-dirs:
       src
   default-extensions:
