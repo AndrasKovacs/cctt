@@ -16,7 +16,7 @@ import Common
 import CoreTypes
 import Interval
 import ElabState hiding (bind, bindI, isNameUsed)
-import qualified LvlMap as LM
+import qualified Data.LvlMap as LM
 
 --------------------------------------------------------------------------------
 

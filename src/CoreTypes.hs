@@ -4,7 +4,7 @@ module CoreTypes where
 
 import Common
 import Interval
-import qualified LvlMap as LM
+import qualified Data.LvlMap as LM
 
 -- Syntax
 --------------------------------------------------------------------------------

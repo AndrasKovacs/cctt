@@ -1,5 +1,5 @@
 
-module LvlMap where
+module Data.LvlMap where
 
 import qualified Data.IntMap.Strict as IM
 import Common

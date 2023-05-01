@@ -7,7 +7,7 @@ import Data.Bits
 import Data.Foldable
 
 import Common
-import qualified LvlSet as LS
+import qualified Data.LvlSet as LS
 
 --------------------------------------------------------------------------------
 

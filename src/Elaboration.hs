@@ -21,7 +21,7 @@ import qualified Common
 import qualified Conversion
 import qualified Core
 import qualified Presyntax as P
-import qualified LvlMap as LM
+import qualified Data.LvlMap as LM
 
 import Pretty hiding (bind, bindI)
 import qualified Pretty

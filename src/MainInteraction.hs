@@ -50,7 +50,6 @@ parseArgs args = do
     _                 -> exit
   pure (path, printnf, elab, verbose, holeCxts)
 
-
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   reset

@@ -1,7 +1,7 @@
 
 -- | Level sets (limited to 64 entries).
 
-module LvlSet where
+module Data.LvlSet where
 
 import Data.Foldable
 import Common
@@ -38,7 +38,7 @@ member (Lvl x) (LvlSet s) = (unsafeShiftL 1 (w2i x) .&. s) /= 0
 {-# inline member #-}
 
 toList :: LvlSet -> [Lvl]
-toList = LvlSet.foldr (:) []
+toList = Data.LvlSet.foldr (:) []
 
 fromList :: [Lvl] -> LvlSet
 fromList = foldl' (flip insert) mempty
@@ -50,7 +50,7 @@ popSmallest (LvlSet s) success ~fail = case s of
 {-# inline popSmallest #-}
 
 instance Show LvlSet where
-  show = show . LvlSet.toList
+  show = show . Data.LvlSet.toList
 
 foldl :: forall b. (b -> Lvl -> b) -> b -> LvlSet -> b
 foldl f b s = go s b where
@@ -63,3 +63,9 @@ foldr f b s = go s where
   go :: LvlSet -> b
   go s = popSmallest s (\s i -> f i $! go s) b
 {-# inline foldr #-}
+
+foldrAccum :: forall acc r. (Lvl -> (acc -> r) -> acc -> r) -> acc -> r -> LvlSet -> r
+foldrAccum f acc r s = go s acc where
+  go :: LvlSet -> acc -> r
+  go s acc = popSmallest s (\s i -> f i (go s) acc) r
+{-# inline foldrAccum #-}

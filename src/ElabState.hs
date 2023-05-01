@@ -9,7 +9,7 @@ import Data.Time.Clock
 import Common
 import CoreTypes
 import Interval
-import qualified LvlMap as LM
+import qualified Data.LvlMap as LM
 
 data TopEntry
   = TEDef DefInfo

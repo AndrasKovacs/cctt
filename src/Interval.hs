@@ -45,22 +45,21 @@ import Data.Word
 
 import Common
 import qualified Data.IntIntMap as IIM
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
+-- import qualified Data.IntSet as IS
+-- import qualified Data.IntSet.Internal as IS
+import qualified Data.LvlSet as LS
 
 --------------------------------------------------------------------------------
 
--- TODO for arbitrary precision:
---       - export explicit minimal interface
---       - represent I0 and I1 as maxBound and (maxBound - 1), adjust accordingly
---       - define and test parallel Interval module using *only* IntIntMap subs.
---       - have 3 modules: one with smallSub, one with Big, one with the coproduct of these
+-- TODO for general arbitrary precision representations:
+--   - LvlSet is an unboxed sum of a 64 bit mask and a 32-bit-keyed custom IntSet
+--   - Sub is a 32-bit keyed custom IntMap
 
 ----------------------------------------------------------------------------------------------------
 
 
 maxIVar :: IVar
-maxIVar = 4294967294
+maxIVar = 63
 
 {-
 
@@ -81,10 +80,6 @@ Small:
 
 Big:
   - DomSize (32 bits) + CodSize (32 bits) + IntIntMap
-
-TODO:
-  - We'll need large IVarSet-s as well.
-  - Current IVarSet-s work up to 63 so there's a bit more leeway.
 -}
 
 -- data I = I0 | I1 | IVar IVar
@@ -126,21 +121,21 @@ instance Show I where
 
 ----------------------------------------------------------------------------------------------------
 
-newtype IVarSet = IVarSet IS.IntSet
-  deriving (Eq, Semigroup, Monoid, Show) via IS.IntSet
+newtype IVarSet = IVarSet LS.LvlSet
+  deriving (Eq, Bits, Semigroup, Monoid, Show) via LS.LvlSet
 
 emptyIS :: IVarSet -> Bool
-emptyIS = coerce IS.null
+emptyIS = coerce LS.null
 {-# inline emptyIS #-}
 
 -- | Insert a forced I.
 insertIF :: I -> IVarSet -> IVarSet
-insertIF i is = matchIVarF i (\x -> coerce (IS.insert (fromIntegral x) (coerce is))) is
+insertIF i is = matchIVarF i (\x -> coerce LS.insert x is) is
 {-# inline insertIF #-}
 
 -- | Insert a forced variable.
 insertIVarF :: IVar -> IVarSet -> IVarSet
-insertIVarF i is = coerce (IS.insert (fromIntegral i) (coerce is))
+insertIVarF i is = coerce LS.insert i is
 {-# inline insertIVarF #-}
 
 insertI :: NCofArg => I -> IVarSet -> IVarSet
@@ -148,28 +143,84 @@ insertI i is = matchIVar i (\x -> insertIVarF x is) is
 {-# inline insertI #-}
 
 deleteIS :: IVar -> IVarSet -> IVarSet
-deleteIS i is = coerce (IS.delete (fromIntegral i) (coerce is))
+deleteIS = coerce LS.delete
 {-# inline deleteIS #-}
 
 memberIS :: IVar -> IVarSet -> Bool
-memberIS i is = IS.member (fromIntegral i) (coerce is)
+memberIS = coerce LS.member
 {-# inline memberIS #-}
 
 toListIS :: IVarSet -> [IVar]
-toListIS is = IS.foldr' (\i is -> fromIntegral i : is) [] (coerce is)
+toListIS = coerce LS.toList
 {-# inline toListIS #-}
 
 fromListIS :: [IVar] -> IVarSet
-fromListIS is = coerce (IS.fromList (map fromIntegral is))
+fromListIS = coerce LS.fromList
 {-# inline fromListIS #-}
 
+popSmallestIS :: IVarSet -> (IVarSet -> IVar -> a) -> a -> a
+popSmallestIS is f ~a = LS.popSmallest (coerce is) (coerce f) a
+{-# inline popSmallestIS #-}
+
 foldlIS :: forall b. (b -> IVar -> b) -> b -> IVarSet -> b
-foldlIS f b is = IS.foldl' (\b i -> f b (fromIntegral i)) b (coerce is)
+foldlIS f b is = LS.foldl (coerce f) b (coerce is)
 {-# inline foldlIS #-}
 
 foldrIS :: forall b. (IVar -> b -> b) -> b -> IVarSet -> b
-foldrIS f b is = IS.foldr (\i ~b -> f (fromIntegral i) b) b (coerce is)
+foldrIS f b is = LS.foldr (coerce f) b (coerce is)
 {-# inline foldrIS #-}
+
+foldrAccumIS :: forall acc r. (IVar -> (acc -> r) -> acc -> r)
+                -> acc -> r -> IVarSet -> r
+foldrAccumIS f acc r s = LS.foldrAccum (\x hyp acc -> f (coerce x) hyp acc) acc r (coerce s)
+{-# inline foldrAccumIS #-}
+
+--------------------------------------------------------------------------------
+
+-- newtype IVarSet = IVarSet IS.IntSet
+--   deriving (Eq, Semigroup, Monoid, Show) via IS.IntSet
+
+-- emptyIS :: IVarSet -> Bool
+-- emptyIS = coerce IS.null
+-- {-# inline emptyIS #-}
+
+-- -- | Insert a forced I.
+-- insertIF :: I -> IVarSet -> IVarSet
+-- insertIF i is = matchIVarF i (\x -> coerce (IS.insert (fromIntegral x) (coerce is))) is
+-- {-# inline insertIF #-}
+
+-- -- | Insert a forced variable.
+-- insertIVarF :: IVar -> IVarSet -> IVarSet
+-- insertIVarF i is = coerce (IS.insert (fromIntegral i) (coerce is))
+-- {-# inline insertIVarF #-}
+
+-- insertI :: NCofArg => I -> IVarSet -> IVarSet
+-- insertI i is = matchIVar i (\x -> insertIVarF x is) is
+-- {-# inline insertI #-}
+
+-- deleteIS :: IVar -> IVarSet -> IVarSet
+-- deleteIS i is = coerce (IS.delete (fromIntegral i) (coerce is))
+-- {-# inline deleteIS #-}
+
+-- memberIS :: IVar -> IVarSet -> Bool
+-- memberIS i is = IS.member (fromIntegral i) (coerce is)
+-- {-# inline memberIS #-}
+
+-- toListIS :: IVarSet -> [IVar]
+-- toListIS is = IS.foldr' (\i is -> fromIntegral i : is) [] (coerce is)
+-- {-# inline toListIS #-}
+
+-- fromListIS :: [IVar] -> IVarSet
+-- fromListIS is = coerce (IS.fromList (map fromIntegral is))
+-- {-# inline fromListIS #-}
+
+-- foldlIS :: forall b. (b -> IVar -> b) -> b -> IVarSet -> b
+-- foldlIS f b is = IS.foldl' (\b i -> f b (fromIntegral i)) b (coerce is)
+-- {-# inline foldlIS #-}
+
+-- foldrIS :: forall b. (IVar -> b -> b) -> b -> IVarSet -> b
+-- foldrIS f b is = IS.foldr (\i ~b -> f (fromIntegral i) b) b (coerce is)
+-- {-# inline foldrIS #-}
 
 ----------------------------------------------------------------------------------------------------
 
@@ -189,7 +240,6 @@ data Sub = Sub Word32 Word32 IIM.IntIntMap  -- dom, cod, map
 type SubArg = (?sub :: Sub)  -- ImplicitParams
 
 
-
 {-|
 Normalized cofibrations are also represented as interval substitutions. Here,
 every ivar is mapped to the *least* (as a De Bruijn level) representative of
@@ -203,20 +253,23 @@ emptySub :: IVar -> Sub
 emptySub i = Sub (fromIntegral i) 0 mempty
 {-# inline emptySub #-}
 
-idSubCacheLimit :: IVar
-idSubCacheLimit = 100
-
--- Precomputed identity subs up to some limit
-idSubs :: IM.IntMap Sub
-idSubs = go 0 mempty mempty where
-  go :: IVar -> IIM.IntIntMap -> IM.IntMap Sub -> IM.IntMap Sub
-  go i s acc | i > idSubCacheLimit = acc
-  go i s acc = let s' = (IIM.insert (fromIntegral i) (fromIntegral (unI (IVar (fromIntegral i)))) s)
-               in go (i + 1) s' (IM.insert (fromIntegral i) (Sub (fromIntegral i) (fromIntegral i) s) acc)
+-- idSubCacheLimit :: IVar
+-- idSubCacheLimit = 100
 
 idSub :: IVar -> Sub
-idSub i | i < idSubCacheLimit = idSubs IM.! fromIntegral i
-        | otherwise           = undefined
+idSub i = Sub (fromIntegral i) (fromIntegral i) mempty
+
+-- -- Precomputed identity subs up to some limit
+-- idSubs :: IM.IntMap Sub
+-- idSubs = go 0 mempty mempty where
+--   go :: IVar -> IIM.IntIntMap -> IM.IntMap Sub -> IM.IntMap Sub
+--   go i s acc | i > idSubCacheLimit = acc
+--   go i s acc = let s' = (IIM.insert (fromIntegral i) (fromIntegral (unI (IVar (fromIntegral i)))) s)
+--                in go (i + 1) s' (IM.insert (fromIntegral i) (Sub (fromIntegral i) (fromIntegral i) s) acc)
+
+-- idSub :: IVar -> Sub
+-- idSub i | i < idSubCacheLimit = idSubs IM.! fromIntegral i
+--         | otherwise           = undefined
 
 -- -- direct recomp
 -- idSub :: IVar -> Sub
@@ -252,14 +305,23 @@ lookupSub i (Sub _ _ m) = IIM.lookup (\_ -> IVar i) (\i -> I (fromIntegral i)) (
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
 foldrSub :: forall b. (IVar -> I -> b -> b) -> b -> Sub -> b
-foldrSub f b (Sub _ _ m) =
-  IIM.foldrWithKey' (\k i acc -> f (fromIntegral k) (I (fromIntegral i)) acc) b m
-
+foldrSub f b (Sub _ c m) = go 0 (fromIntegral c) where
+  go :: Int -> Int -> b
+  go i c | i < c = IIM.lookup
+                     (\_ -> f (fromIntegral i) (IVar (fromIntegral i)) (go (i + 1) c))
+                     (\x -> f (fromIntegral i) (I (fromIntegral x)) (go (i + 1) c)) i m
+         | True  = b
 {-# inline foldrSub #-}
 
-foldlSub :: (IVar -> b -> I -> b) -> b -> Sub -> b
-foldlSub f b (Sub _ _ m) =
-  IIM.foldlWithKey' (\acc k i -> f (fromIntegral k) acc (I (fromIntegral i))) b m
+foldlSub :: forall b. (IVar -> b -> I -> b) -> b -> Sub -> b
+foldlSub f b (Sub _ c m) = go 0 (fromIntegral c) b where
+  go :: Int -> Int -> b -> b
+  go i c b | i < c = IIM.lookup
+                       (\_ -> go (i + 1) c (f (fromIntegral i) b (IVar (fromIntegral i))))
+                       (\x -> go (i + 1) c (f (fromIntegral i) b (I (fromIntegral x)))) i m
+           | True  = b
+{-# inline foldlSub #-}
+
 
 -- | Extend a sub with an expression. Domain doesn't change.
 ext :: Sub -> I -> Sub
@@ -314,16 +376,6 @@ instance SubAction Sub where
   sub f = mapSub (\_ -> dom ?sub) (\_ i -> sub i) f
   {-# noinline sub #-}
 
-goIsUnblocked :: NCofArg => IVarSet -> IVarSet -> Bool
-goIsUnblocked is varset = trace "mallac" $
-  foldrIS
-    (\x hyp varset -> matchIVar (lookupSub x ?cof)
-       (\x -> memberIS x varset || hyp (insertIVarF x varset))
-       True)
-    (\_ -> False)
-    is
-    varset
-
 -- goIsUnblocked :: NCofArg => IVarSet -> IVarSet -> Bool
 -- goIsUnblocked is varset = popSmallestIS is
 --   (\is x -> matchIVar (lookupSub x ?cof)
@@ -331,24 +383,34 @@ goIsUnblocked is varset = trace "mallac" $
 --      True)
 --   False
 
+goIsUnblocked :: NCofArg => IVarSet -> IVarSet -> Bool
+goIsUnblocked is varset =
+  foldrAccumIS
+    (\x hyp varset -> matchIVar (lookupSub x ?cof)
+       (\x -> memberIS x varset || hyp (insertIVarF x varset))
+       True)
+    varset
+    False
+    is
+
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
 isUnblocked :: NCofArg => IVarSet -> Bool
 isUnblocked is | emptyIS is = False
-isUnblocked is = undefined -- goIsUnblocked is mempty
+isUnblocked is = goIsUnblocked is mempty
 {-# inline isUnblocked #-}
 
 goIsUnblockedS :: SubArg => NCofArg => IVarSet -> IVarSet -> Bool
 goIsUnblockedS is varset =
-  foldrIS
+  foldrAccumIS
     (\x hyp varset -> matchIVar (lookupSub x ?sub)
-       (\x -> matchIVar (lookupSub x ?cof)
-         (\x -> memberIS x varset || hyp (insertIVarF x varset))
-         True)
-       True)
-    (\_ -> False)
-    is
+      (\x -> matchIVar (lookupSub x ?cof)
+        (\x -> memberIS x varset || hyp (insertIVarF x varset))
+        True)
+      True)
     varset
+    False
+    is
 
 -- goIsUnblockedS :: SubArg => NCofArg => IVarSet -> IVarSet -> Bool
 -- goIsUnblockedS is varset = popSmallestIS is
