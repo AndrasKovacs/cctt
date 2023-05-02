@@ -824,13 +824,15 @@ elabHCase' params ~inf typarams sub ifields_ xs ~casety ~casecl bnd body = case 
     let lhsval = hdcon inf typarams (lhsSpine (inf^.fieldTypes)) sub
     let rhsty  = casety ∙ lhsval
     t <- check body rhsty
-    let vbnd = (let ?env = params; ?sub = sub; ?recurse = DontRecurse
-                in evalBoundary bnd casety casecl)
-    case vbnd of
-      VSTotal v -> do
-        conv (eval t) v
-      VSNe (WIS sys _) -> do
-        neSysCompat t sys
+
+    -- let vbnd = (let ?env = params; ?sub = sub; ?recurse = DontRecurse
+    --             in evalBoundary bnd casety casecl)
+    -- case vbnd of
+    --   VSTotal v -> do
+    --     conv (eval t) v
+    --   VSNe (WIS sys _) -> do
+    --     neSysCompat t sys
+
     pure t
 
   (_:ifields, x:xs) -> do
