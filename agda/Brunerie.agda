@@ -79,8 +79,7 @@ data ∥_∥₀ (A : Type ℓ) : Type ℓ where
 rec₀ : {A : Type ℓ} {B : Type ℓ'} → isSet B → (A → B) → ∥ A ∥₀ → B
 rec₀ Bset f ∣ x ∣₀ = f x
 rec₀ Bset f (squash₀ x y p q i j) =
-  ?
---  Bset (rec₀ Bset f x) (rec₀ Bset f y) (cong (rec₀ Bset f) p) (cong (rec₀ Bset f) q) i j
+ Bset (rec₀ Bset f x) (rec₀ Bset f y) (cong (rec₀ Bset f) p) (cong (rec₀ Bset f) q) i j
 
 
 -- GroupoidTruncation

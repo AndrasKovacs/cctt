@@ -1,0 +1,4 @@
+
+Refactoring:
+- try to get rid of all S/non-S distinction, by *always* working under interval subs
+- then try to get rid of redundancy in the many bind/push/fresh functions in Core
