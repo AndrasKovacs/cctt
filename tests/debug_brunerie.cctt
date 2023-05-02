@@ -619,8 +619,39 @@ _. b y; i = 1 _. b y; j = 0 k. b ?_; j = 1 _. b y] (l (unglue y) i j)] ?_)
 
 f5NFOK : f5NF = f5 := refl;
 
+f5NF' : (Omega3 S2pt).1 → (Omega3 (joinpt S1pt S1)).1 :=
+λ p i j k. case (case (p i j k) (x. (case x (_. U) [
+  base2. S1;
+  loop2 i j. Glue S1 [i = 0. S1, idEquiv S1; i = 1. S1, idEquiv S1;
+
+j = 0.
+
+S1
+
+, λ x. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x} {x} i
+
+, λ x. hcom 0 1 S1 [i = 0 j. case x (a. (a ={_. S1} a)) [base1. λ {base1} {base1}
+i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1
+[k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1;
+k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {x}
+{x} j; i = 1 _. x] x
+
+-- , ?_
+
+, ?_
+
+; j = 1. S1, idEquiv S1]] →
+PostTotalHopf)) [base2. λ y. b y; loop2 i j. λ y. hcom 0 1 PostTotalHopf [i = 0
+_. b y; i = 1 _. b y; j = 0 k. b ?_; j = 1 _. b y] ?_] ?_)
+(_. join S1 S1) [b x. inl x; l x i j. ?_];
+
 -- FAIL: impossible in nf
-test0To5 : (Omega3 (joinpt S1pt S1)).1 := f5 test0To4;
+test0To5 : (Omega3 (joinpt S1pt S1)).1 := f5NF' test0To4;
 
 f6 : (Omega3 (joinpt S1pt S1)).1 -> (Omega3 S3pt).1 :=
   mapOmegaRefl3 (joinpt S1pt S1) S3 eInv;

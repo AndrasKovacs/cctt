@@ -154,7 +154,7 @@ data Tm
   | Glue   Tm ~Sys ~Sys      -- glue a <equiv> <fib>
   | Unglue Tm ~Sys           -- unglue g [α ↦ B]
 
-  | Hole (Maybe Name) (DontShow SourcePos)
+  | Hole Hole
 
   | Com I I Name Tm SysHCom Tm
 
@@ -165,6 +165,11 @@ data Tm
   | Sym ~Tm ~Tm ~Tm Tm
   | Trans ~Tm ~Tm ~Tm ~Tm Tm Tm
   | Ap Tm ~Tm ~Tm Tm
+  deriving Show
+
+data Hole
+  = SrcHole (Maybe Name) (DontShow SourcePos)
+  | ErrHole String
   deriving Show
 
 data Cases
@@ -319,7 +324,11 @@ data Val
   | VDCon {-# nounpack #-} DConInfo VDSpine
 
   -- misc
-  | VHole (Maybe Name) (DontShow SourcePos) Sub Env
+  | VHole VHole
+  deriving Show
+
+data VHole = VSrcHole (Maybe Name) (DontShow SourcePos) Sub Env
+           | VErrHole String
   deriving Show
 
 data Ne

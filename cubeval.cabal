@@ -55,6 +55,7 @@ executable cctt
       Pretty
       Quotation
       SmallInterval
+      Statistics
   hs-source-dirs:
       src
   default-extensions:

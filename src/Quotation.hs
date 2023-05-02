@@ -48,7 +48,7 @@ instance Quote Val Tm where
     VWrap x a            -> Wrap x (quote a)
     VPack x t            -> Pack x (quote t)
     VU                   -> U
-    VHole i p _ _        -> Hole i p                   -- we forget the context when quoting a hole!
+    VHole h              -> Hole (quote h)
     VLine t              -> Line (t^.name) (quote t)
     VLLam t              -> LLam (t^.name) (quote t)
     VTyCon x ts          -> TyCon x (quote ts)
@@ -56,6 +56,11 @@ instance Quote Val Tm where
     VHTyCon i ts         -> HTyCon i (quote ts)
     VHDCon i ps fs s _   -> HDCon i (quoteParams ps) (quote fs) s
     VHCom r r' a sys t _ -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
+
+instance Quote VHole Hole where
+  quote = \case
+    VSrcHole i p _ _ -> SrcHole i p -- we forget the context when quoting a hole!
+    VErrHole msg     -> ErrHole msg
 
 --------------------------------------------------------------------------------
 

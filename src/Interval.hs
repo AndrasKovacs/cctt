@@ -45,41 +45,23 @@ import Data.Word
 
 import Common
 import qualified Data.IntIntMap as IIM
--- import qualified Data.IntSet as IS
--- import qualified Data.IntSet.Internal as IS
 import qualified Data.LvlSet as LS
 
---------------------------------------------------------------------------------
-
--- TODO for general arbitrary precision representations:
---   - LvlSet is an unboxed sum of a 64 bit mask and a 32-bit-keyed custom IntSet
---   - Sub is a 32-bit keyed custom IntMap
-
 ----------------------------------------------------------------------------------------------------
-
 
 maxIVar :: IVar
 maxIVar = 63
 
 {-
-
 Interval expressions are 64 bits:
 
 - I0 is 0, I1 is 1, any other value N represents IVar (n - 2)
 
-We have small and big interval substitutions.
-
-Small:
-  - domain & codomain sizes are at most 12
-  - storage: 64 bits, 16 nibbles
-    - 0    : always 0
-    - 1    : always 1
-    - 2-14 : stores 4-bit interval expression
-  - When indexing into a small Sub, we add 2 to an IVar, to skip over the 0-1 nibbles
-  - This implies that sub-ing and I with a SmallSub is just nibble lookup.
-
-Big:
+Substitution:
   - DomSize (32 bits) + CodSize (32 bits) + IntIntMap
+
+IVarSet:
+  - 64 bit mask of 0-63 var range
 -}
 
 -- data I = I0 | I1 | IVar IVar

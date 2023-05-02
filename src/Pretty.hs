@@ -330,11 +330,14 @@ tm = \case
   Glue a s1 s2       -> ifVerbose
                           (appp ("glue " <> proj a <> " " <> sys s1 <> " " <> sys s2))
                           (appp ("glue " <> proj a <> " " <> sys s2))
-  Hole i p           -> case i of
-                          Just x -> "?" <> str x
-                          _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
-                            True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
-                            _    -> pure "?"
+  Hole h             -> case h of
+                          SrcHole i p -> case i of
+                            Just x -> "?" <> str x
+                            _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
+                              True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
+                              _    -> pure "?"
+                          ErrHole msg ->
+                            "(ERR " <> str msg <> ")"
   Com r r' i a t u   -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in bindI i \i ->
                         "com " <> pr <> " " <> pr' <> " (" <> i <> ". " <> pair a <> ") "
                                <> pt <> " " <> pu)

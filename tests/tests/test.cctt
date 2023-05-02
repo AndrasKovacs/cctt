@@ -114,9 +114,9 @@ case
     [base2.     λ y. b y
     ;loop2 i j. λ y. hcom 0 1 PostTotalHopf
                               [i = 0 _. b y;
-  			     i = 1 _. b y;
-  			     j = 0 k. b ?_;
-  			     j = 1 _. b y
+  			       i = 1 _. b y;
+  			       j = 0 k. b ?_;
+  			       j = 1 _. b y
   			     ]
   			     (l (unglue y) i j)]
     ?_)

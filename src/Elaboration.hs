@@ -254,7 +254,7 @@ check t topA = frcPos t \case
 
     (P.Hole (Just "_") p, a) -> do
       putStrLn ("HOLE ?" ++ sourcePosPretty (coerce p))
-      pure (Hole Nothing p)
+      pure (Hole (SrcHole Nothing p))
 
     (P.Hole i p, a) -> do
       putStrLn ("HOLE ?" ++ maybe (sourcePosPretty (coerce p)) id i)
@@ -275,7 +275,7 @@ check t topA = frcPos t \case
               when showcxt $ do
                 putStrLn ("────────────────────────────────────────────────────────────")
               putStrLn (" : " ++ pretty qa ++ "\n")
-              pure (Hole i p)
+              pure (Hole (SrcHole i p))
             RLBind x _ a ls -> do
               when showcxt $ putStrLn (showBinder x ++ " : " ++ pretty a)
               Pretty.bind x \_ -> go ls

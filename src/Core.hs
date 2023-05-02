@@ -993,8 +993,10 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
   v@VHole{} -> v
 
-  _ ->
-    impossible
+  v ->
+    error $ take 300 $ show v
+    -- VHole (VErrHole $ take 300 $ show v)
+    -- impossible
 
 
 coe :: NCofArg => DomArg => I -> I -> BindI Val -> Val -> Val
@@ -1402,6 +1404,12 @@ lookupHCase i sp s cs = case i // cs of
   (i, HCSCons _ _ _ _    cs) -> lookupHCase (i - 1) sp s cs
   _                          -> impossible
 
+
+sysCofs :: NeSys -> [NeCof]
+sysCofs = \case
+  NSEmpty -> []
+  NSCons t cs -> t^.binds : sysCofs cs
+
 hcase :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure HCases -> Val)
 hcase t b ecs@(EC sub env rc cs) = case frc t of
 
@@ -1423,7 +1431,7 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
 
   n@(VNe _ is) -> VNe (NHCase n b ecs) is
   v@VHole{}    -> v
-  _            -> impossible
+  v            -> impossible
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
@@ -1517,7 +1525,8 @@ eval = \case
 
   -- Misc
   WkI t             -> wkIS (eval t)
-  Hole x p          -> VHole x p ?sub ?env
+  Hole h            -> case h of SrcHole x p -> VHole (VSrcHole x p ?sub ?env)
+                                 ErrHole msg -> VHole (VErrHole msg)
 
   -- Builtins
   Refl t            -> refl (eval t)
@@ -1599,7 +1608,7 @@ instance Force Val Val where
     VWrap x t             -> VWrap x (sub t)
     VPack x t             -> VPack x (sub t)
     VU                    -> VU
-    VHole x p s env       -> VHole x p (sub s) (sub env)
+    VHole h               -> VHole (frcS h)
     VLine t               -> VLine (sub t)
     VLLam t               -> VLLam (sub t)
     VTyCon x ts           -> VTyCon x (sub ts)
@@ -1608,6 +1617,13 @@ instance Force Val Val where
     VHDCon i ps fs s is   -> VHDCon i (sub ps) (sub fs) (sub s) (sub is)
     VHCom r r' a sys t is -> VHCom (sub r) (sub r') (sub a) (sub sys) (sub t) (sub is)
   {-# noinline frcS #-}
+
+instance Force VHole VHole where
+  frc h = h; {-# inline frc #-}
+  frcS = \case
+    VSrcHole x p s env -> VSrcHole x p (sub s) (sub env)
+    VErrHole msg       -> VErrHole msg
+  {-# inline frcS #-}
 
 instance Force Ne Val where
   frc = \case

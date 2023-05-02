@@ -12,6 +12,7 @@ import Elaboration
 import Interval
 import Pretty
 import Quotation
+-- import Statistics
 
 helpMsg = unlines [
    "usage: cctt <file> [nf <topdef>] [elab] [verbose] [no-hole-cxts]"
@@ -86,5 +87,6 @@ mainWith getArgs = do
       putStrLn $ "Normal form of " ++ x ++ ":\n\n" ++ pretty0 nf
       putStrLn ""
       putStrLn $ "Normalized in " ++ show nftime
+      -- print $ stats nf
     Nothing ->
       pure ()
