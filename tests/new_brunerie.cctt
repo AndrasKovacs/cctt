@@ -183,11 +183,7 @@ isContr-isProp : (A : U) → isContr A → isProp A :=
   λ A cA a b. (cA.2 a)⁻¹ ∙ cA.2 b;
 
 isProp-PathP (B : I → U)(hB : (i : I) → isProp (B i))(b0 : B 0)(b1 : B 1) : b0 ={i. B i} b1 :=
-  ?;
--- isProp→PathP : ∀ {B : I → Type ℓ} → ((i : I) → isProp (B i))
---                → (b0 : B i0) (b1 : B i1)
---                → PathP B b0 b1
--- isProp→PathP hB b0 b1 = toPathP (hB _ _ _)
+  toPathP B b0 b1 (hB 1 (transport B b0) b1);
 
 isProp-isSet : (A : U) → isProp A → isSet A :=
   λ A h a b p q j i.
@@ -237,7 +233,9 @@ isOfHLevelDep : HLevel → (A : U)(B : A → U) → U := λ[
 ];
 
 isOfHLevel-isOfHLevelDep : (n : HLevel)(A : U)(B : A → U)(h : (a : A) → isOfHLevel n (B a)) → isOfHLevelDep n A B := λ[
-  zero. λ A B h a. ((h a).1, λ a' b' p. ?);
+  zero. λ A B h a.
+    ((h a).1
+    , λ a' b' p. isProp-PathP (λ i. B (p i)) (λ i. isContr-isProp (B (p i)) (h (p i))) (h a).1 b');
   suc n. ?
 ];
 
