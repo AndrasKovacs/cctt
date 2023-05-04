@@ -1,0 +1,371 @@
+
+
+-- Adapted from
+-- https://github.com/agda/cubical/blob/56363ae66898ad65d44795b6b474e0cbd964caa9/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
+
+-- Basics
+----------------------------------------------------------------------------------------------------
+
+isProp (A : U) : U := (a b : A) → a = b;
+isSet (A : U) : U := (a b : A) → isProp (a = b);
+isGroupoid (A : U) : U := (a b : A) → isSet (a = b);
+isTwoGroupoid (A : U) : U := (a b : A) → isGroupoid (a = b);
+
+J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
+     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
+
+propSet : (A : U) (h : isProp A) → isSet A
+  := λ A h a b p q j i.
+  hcom 0 1 A [i=0. h a a;
+              i=1. h a b;
+              j=0. h a (p i);
+              j=1. h a (q i)] a;
+
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+isPropIsEquiv (A B : U) (f : A → B) : isProp (isEquiv A B f) := ?_;
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+ua (A B : U)(f : equiv A B) : A = B :=
+  λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
+
+isIso (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x);
+
+iso (A B : U) : U := (f : A → B) × isIso A B f;
+
+isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
+    iso.f
+  , iso.g
+  , iso.linv
+  , ?_
+  , ?_;
+
+-- Decidability
+----------------------------------------------------------------------------------------------------
+
+inductive or (A B : U) := left (a : A) | right (b : B);
+
+inductive Unit := tt;
+
+inductive N0 :=;
+
+not (A : U) : U := A → N0;
+
+dec (A : U) : U := or A (not A);
+
+subst (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
+  := coe 0 1 (ap P p) e;
+
+discrete (A : U) : U := (a b : A) → dec (a = b);
+
+-- Integers
+----------------------------------------------------------------------------------------------------
+
+inductive nat := zero | suc nat;
+
+pred : nat → nat := λ[
+  zero. zero;
+  suc n. n];
+
+inductive Z := pos nat | neg nat;
+
+zeroZ := pos zero;
+
+predZ : Z → Z := λ[
+  pos u. case u [zero. neg zero; suc n. pos n];
+  neg v. neg (suc v)];
+
+sucZ : Z → Z := λ[
+  pos u. pos (suc u);
+  neg v. case v [zero. pos zero; suc n. neg n]];
+
+predsucZ : (x : Z) → x = predZ (sucZ x) := λ[
+  pos u. refl;
+  neg v. case v (v. neg v = predZ (sucZ (neg v))) [
+    zero. refl;
+    suc n. refl
+    ]
+  ];
+
+sucpredZ : (x : Z) → sucZ (predZ x) = x := λ[
+  pos u. case u (u. sucZ (predZ (pos u)) = pos u) [
+    zero.  refl;
+    suc n. refl
+    ];
+  neg v. refl
+  ];
+
+caseNat (A : U) (x y : A) : nat → A := λ[
+  zero.  x;
+  suc _. y];
+
+caseDNat (P : nat → U) (z : P zero) (s : (n : nat) → P (suc n)) : (n : nat) → P n := λ[
+  zero. z;
+  suc n. s n];
+
+znots (n : nat) : not (zero = suc n) :=
+  λ h. subst nat (caseNat U nat N0) zero (suc n) h zero;
+
+discreteNat : discrete nat := λ[
+  zero.  λ[zero.  left refl;
+           suc m. right (λ p. case (znots m p) [])];
+  suc n. λ[zero.  right (λ p. case (znots n p⁻¹) []);
+           suc m. case (discreteNat n m) [
+	     left p. left (ap (λ x. suc x) p);
+	     right p. right (λ q. case (p (ap pred q)) [])
+	   ]]
+  ];
+
+discreteNatNF : discrete nat :=
+λ a. case a (a. (b : nat) → or (a ={_. nat} b) (a ={_. nat} b → N0)) [zero. λ
+b. case b (b. or (zero ={_. nat} b) (zero ={_. nat} b → N0)) [zero. left (λ
+{zero} {zero} _. zero); suc m. right (λ p. case (coe 0 1 (i. case (p {zero} {suc
+m} i) (_. U) [zero. nat; suc _. N0]) zero) (_. N0) [])]; suc n. λ b. case b
+(b. or (suc n ={_. nat} b) (suc n ={_. nat} b → N0)) [zero. right (λ p. case
+(coe 0 1 (i. case (hcom 0 1 nat [i = 0 j. p {suc n} {zero} j; i = 1 _. suc n]
+(suc n)) (_. U) [zero. nat; suc _. N0]) zero) (_. N0) []); suc m. case
+(discreteNat n m) (_. or (suc n ={_. nat} suc m) (suc n ={_. nat} suc m → N0))
+[left p. left (λ {suc n} {suc m} i. suc (p {n} {m} i)); right p. right (λ
+q. case (p (λ {n} {m} i. case (q {suc n} {suc m} i) (_. nat) [zero. zero; suc
+n. n])) (_. N0) [])]]];
+
+posNotneg (a b : nat) : not (pos a = neg b) :=
+  λ h. subst Z (λ[pos _. Unit; neg _. N0]) (pos a) (neg b) h tt;
+
+injPos (a b : nat) (h : pos a = pos b) : a = b :=
+  subst Z (λ[pos c. a = c; neg _. N0]) (pos a) (pos b) h refl;
+
+injNeg (a b : nat) (h : neg a = neg b) : a = b :=
+  subst Z (λ[pos _. N0; neg c. a = c]) (neg a) (neg b) h refl;
+
+discreteZ : discrete Z := λ[
+  pos a. λ[
+    pos a'. case (discreteNat a a') [
+      left p. left (ap (λ x. pos x) p);
+      right p. right (λ q. p (injPos a a' q))
+      ];
+    neg b. right (λ p. case (posNotneg a b p) [])
+    ];
+  neg b. λ[
+    pos a. right (λ p. case (posNotneg a b p⁻¹) []);
+    neg b'. case (discreteNat b b') [
+      left p. left (ap (λ x. neg x) p);
+      right p. right (λ q. p (injNeg b b' q))
+      ]
+    ]
+];
+
+discreteZNF : discrete Z :=
+λ a. case a (a. (b : Z) → or (a ={_. Z} b) (a ={_. Z} b → N0)) [pos a. λ b. case
+b (b. or (pos a ={_. Z} b) (pos a ={_. Z} b → N0)) [pos a'. case (case a (a. ((b
+: nat) → or (a ={_. nat} b) (a ={_. nat} b → N0))) [zero. λ b. case b (b. or
+(zero ={_. nat} b) (zero ={_. nat} b → N0)) [zero. left (λ {zero} {zero}
+_. zero); suc m. right (λ p. case (coe 0 1 (i. case (p {zero} {suc m} i) (_. U)
+[zero. nat; suc _. N0]) zero) (_. N0) [])]; suc n. λ b. case b (b. or (suc n
+={_. nat} b) (suc n ={_. nat} b → N0)) [zero. right (λ p. case (coe 0 1 (i. case
+(hcom 0 1 nat [i = 0 j. p {suc n} {zero} j; i = 1 _. suc n] (suc n)) (_. U)
+[zero. nat; suc _. N0]) zero) (_. N0) []); suc m. case (discreteNat n m) (_. or
+(suc n ={_. nat} suc m) (suc n ={_. nat} suc m → N0)) [left p. left (λ {suc n}
+{suc m} i. suc (p {n} {m} i)); right p. right (λ q. case (p (λ {n} {m} i. case
+(q {suc n} {suc m} i) (_. nat) [zero. zero; suc n. n])) (_. N0) [])]]] a')
+(_. or (pos a ={_. Z} pos a') (pos a ={_. Z} pos a' → N0)) [left p. left (λ {pos
+a} {pos a'} i. pos (p {a} {a'} i)); right p. right (λ q. p (coe 0 1 (i. case (q
+{pos a} {pos a'} i) (_. U) [pos c. a ={_. nat} c; neg _. N0]) (λ {a} {a}
+_. a)))]; neg b. right (λ p. case (coe 0 1 (i. case (p {pos a} {neg b} i) (_. U)
+[pos _. Unit; neg _. N0]) tt) (_. N0) [])]; neg b. λ b. case b (b. or (neg @1
+={_. Z} b) (neg @1 ={_. Z} b → N0)) [pos a. right (λ p. case (coe 0 1 (i. case
+(hcom 0 1 Z [i = 0 j. p {neg @1} {pos a} j; i = 1 _. neg @1] (neg @1)) (_. U)
+[pos _. Unit; neg _. N0]) tt) (_. N0) []); neg b'. case (case @1 (a. ((b : nat)
+→ or (a ={_. nat} b) (a ={_. nat} b → N0))) [zero. λ b. case b (b. or (zero
+={_. nat} b) (zero ={_. nat} b → N0)) [zero. left (λ {zero} {zero} _. zero); suc
+m. right (λ p. case (coe 0 1 (i. case (p {zero} {suc m} i) (_. U) [zero. nat;
+suc _. N0]) zero) (_. N0) [])]; suc n. λ b. case b (b. or (suc n ={_. nat} b)
+(suc n ={_. nat} b → N0)) [zero. right (λ p. case (coe 0 1 (i. case (hcom 0 1
+nat [i = 0 j. p {suc n} {zero} j; i = 1 _. suc n] (suc n)) (_. U) [zero. nat;
+suc _. N0]) zero) (_. N0) []); suc m. case (discreteNat n m) (_. or (suc n
+={_. nat} suc m) (suc n ={_. nat} suc m → N0)) [left p. left (λ {suc n} {suc m}
+i. suc (p {n} {m} i)); right p. right (λ q. case (p (λ {n} {m} i. case (q {suc
+n} {suc m} i) (_. nat) [zero. zero; suc n. n])) (_. N0) [])]]] b') (_. or (neg
+@1 ={_. Z} neg b') (neg @1 ={_. Z} neg b' → N0)) [left p. left (λ {neg @1} {neg
+b'} i. neg (p {@1} {b'} i)); right p. right (λ q. p (coe 0 1 (i. case (q {neg
+@1} {neg b'} i) (_. U) [pos _. N0; neg c. @1 ={_. nat} c]) (λ {@1} {@1}
+_. @1)))]]];
+
+sucZIso : iso Z Z :=
+    λ x. sucZ x
+  , λ x. predZ x
+  , predsucZ
+  , sucpredZ;
+
+-- OR: use the hSet-ness of Z to define the equivalence
+
+sucPathZ : Z = Z :=
+  ua Z Z (isoToEquiv Z Z sucZIso);
+
+
+-- Brunerie
+----------------------------------------------------------------------------------------------------
+
+higher inductive S1 :=
+    base1
+  | loop1 (i : I) [i=0. base1; i=1. base1];
+
+helix : S1 → U := λ[
+  base1. Z;
+  loop1 i. sucPathZ i
+];
+
+connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+  let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
+  let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
+  hcom 0 1 [
+    i=0. pface j;
+    i=1. qface j;
+    j=0. pface i;
+    j=1. qface i]
+    (p 1);
+
+rotLoop : (a : S1) → a = a := λ[
+  base1.   λ i. loop1 i;
+  loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
+];
+
+rotLoopNF : (a : S1) → a = a :=
+λ a. case a (a. a ={_. S1} a) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ
+{loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1
+k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1];
+
+rotLoopOK : rotLoop = rotLoopNF := refl;
+
+rot : S1 → S1 → S1 := λ[
+  base1. λ y. y;
+  loop1 i. λ y. rotLoop y i
+];
+
+rotNF : S1 → S1 → S1 :=
+λ _. case @0 (_. S1 → S1) [base1. λ y. y; loop1 i. λ y. case y (a. (a ={_. S1}
+a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom
+0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1
+k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k =
+1 l. loop1 l] base1] base1] {y} {y} i];
+
+isPropFamS1 (P : S1 → U)(pP : (x : S1) → isProp (P x)) (b0 : P base1) : b0 ={i. P (loop1 i)} b0 :=
+  λ i. pP (loop1 i) (coe 0 i (K1. P (loop1 K1)) b0)
+                    (coe 1 i (K2. P (loop1 K2)) b0) i;
+
+rotIsEquiv : (a : S1) → isEquiv S1 S1 (rot a) := λ[
+  base1. (idEquiv S1).2;
+  loop1 i. isPropFamS1 (λ x. isEquiv S1 S1 (rot x))
+                       (λ x. isPropIsEquiv S1 S1 (rot x))
+		       ((idEquiv S1).2) i
+];
+
+rotIsEquivNF : (a : S1) → isEquiv S1 S1 (rot a) :=
+λ a. case a (a. (g : S1 → S1) × (linv : (x : S1) → x ={_. S1} g (case a (_. (S1
+→ S1)) [base1. λ y. y; loop1 i. λ y. case y (a. (a ={_. S1} a)) [base1. λ
+{base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0
+k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k =
+1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1] base1] {y} {y} i] x)) × (rinv : (x : S1) → case a (_. (S1 → S1))
+[base1. λ y. y; loop1 i. λ y. case y (a. (a ={_. S1} a)) [base1. λ {base1}
+{base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom
+1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0
+_. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1] base1] {y} {y} i] (g x) ={_. S1} x) × (coh : (x : S1) → (λ {case a
+(_. (S1 → S1)) [base1. λ y. y; loop1 i. λ y. case y (a. (a ={_. S1} a))
+[base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1
+S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom
+0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0
+_. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1] base1] {y} {y} i] x} {case a (_. (S1 → S1)) [base1. λ y. y;
+loop1 i. λ y. case y (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i;
+loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0
+_. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {y}
+{y} i] x} _. case a (_. (S1 → S1)) [base1. λ y. y; loop1 i. λ y. case y (a. (a
+={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1
+i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0
+k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1] base1] {y} {y} i] x) ={i. case a (_. (S1
+→ S1)) [base1. λ y. y; loop1 i. λ y. case y (a. (a ={_. S1} a)) [base1. λ
+{base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0
+k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k =
+1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1] base1] {y} {y} i] (linv x {x} {g (case a (_. (S1 → S1)) [base1. λ y. y;
+loop1 i. λ y. case y (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i;
+loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0
+_. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1
+l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1] {y}
+{y} i] x)} i) ={_. S1} case a (_. (S1 → S1)) [base1. λ y. y; loop1 i. λ y. case
+y (a. (a ={_. S1} a)) [base1. λ {base1} {base1} i. loop1 i; loop1 i. λ {loop1 i}
+{loop1 i} j. hcom 0 1 S1 [i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1
+l] base1; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 0
+k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1] base1] {y} {y} i] x} rinv (case a (_. (S1
+→ S1)) [base1. λ y. y; loop1 i. λ y. case y (a. (a ={_. S1} a)) [base1. λ
+{base1} {base1} i. loop1 i; loop1 i. λ {loop1 i} {loop1 i} j. hcom 0 1 S1 [i = 0
+k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1; i = 1 k. hcom 0 j S1 [k
+= 0 _. base1; k = 1 l. loop1 l] base1; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k =
+1 l. loop1 l] base1; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l]
+base1] base1] {y} {y} i] x))) [base1. λ x. x, λ x {x} {x} _. x, λ x {x} {x}
+_. x, λ x {λ {x} {x} _. x} {λ {x} {x} _. x} _ {x} {x} _. x; loop1 i. ?_];
+
+rotIsEquivOK : rotIsEquivNF = rotIsEquiv := refl;
+
+higher inductive S2 :=
+  base2
+| loop2 (i j : I) [i=0. base2
+                  ;i=1. base2
+                  ;j=0. base2
+                  ;j=1. base2];
+
+S2ToSetElim (A : S2 → U) (set : (x : S2) → isSet (A x))(b : A base2) : (x : S2) → A x := λ[
+  base2. b;
+  loop2 i j. ?_
+    -- isOfHLevel→isOfHLevelDep 2 set b b {a0 = refl} {a1 = refl} refl refl surf i j
+];
+
+higher inductive join (A B : U) :=
+  inl A
+| inr B
+| push (a : A) (b : B) (i : I) [ i = 0. inl a
+                               ; i = 1. inr b ];
+
+higher inductive sTrunc (A : U) :=
+    sinc (a : A)
+  | strunc (a b : sTrunc A) (p q : a = b) (i j : I)
+      [i=0. p j
+      ;i=1. q j
+      ;j=0. a
+      ;j=1. b];
+
+rec0 (A B : U) (Bset : isSet B) (f : A → B) : (x : sTrunc A) → B := λ[
+  sinc x. f x;
+  strunc x y p q i j.
+    Bset (rec0 A B Bset f x) (rec0 A B Bset f y)
+         (ap (rec0 A B Bset f) p)
+	 (ap (rec0 A B Bset f) q)
+	 i j
+];

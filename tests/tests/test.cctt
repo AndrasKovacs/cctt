@@ -1,7 +1,77 @@
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
 isIso (A B : U)(f : A → B) : U :=
     (g    : B → A)
   × (linv : (x : A) → x = g (f x))
   × (rinv : (x : B) → f (g x) = x);
+
+isSection (A B : U)(f : A → B) : U := (g : B → A) × ((x : A) → x = g (f x));
+
+isLogEquiv (A B : U)(f : A → B) : U := (B → A);
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+isProp (A : U) : U := (a b : A) → a = b;
+
+isPropIsEquiv (A B : U) (f : A → B) : isProp (isEquiv A B f) := ?_;
+
+higher inductive S1 :=
+    base1
+  | loop1 (i : I) [i=0. base1; i=1. base1];
+
+connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+  let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
+  let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
+  hcom 0 1 [
+    i=0. pface j;
+    i=1. qface j;
+    j=0. pface i;
+    j=1. qface i]
+    (p 1);
+
+rotLoop : (a : S1) → a = a := λ[
+  base1.   λ i. loop1 i;
+  loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
+];
+
+rot : S1 → S1 → S1 := λ[
+  base1. λ y. y;
+  loop1 i. λ y. rotLoop y i
+];
+
+isPropFamS1 (P : S1 → U)(pP : (x : S1) → isProp (P x)) (b0 : P base1) : b0 ={i. P (loop1 i)} b0 :=
+  λ i. pP (loop1 i) (coe 0 i (K1. P (loop1 K1)) b0)
+                    (coe 1 i (K2. P (loop1 K2)) b0) i;
+
+the (A : U) (x : A) := x;
+
+foo (P : S1 → U)(pP : (x : S1) → isProp (P x)) (b0 : P base1)(i : I) : P (loop1 i) :=
+       (coe 0 i (K1. P (loop1 K1)) b0);
+
+-- test (i : I) : isSection S1 S1 (λ y. rotLoop y i) :=
+--   coe 0 i (j. isSection S1 S1 (λ y. rotLoop y j)) ?_;
+
+test (i : I)(sec : isSection S1 S1 (λ y. rotLoop y 0)) : isSection S1 S1 (λ y. rotLoop y i) :=
+  --   coe 0 i (_. S1 → S1) sec.1
+  -- , coe 0 i (j. (x : S1) → x = (coe 0 j (_. S1 → S1) sec.1) (rotLoop x j)) sec.2;
+
+  -- coe 0 i (j. isSection S1 S1 (λ y. rotLoop y j)) sec;
+
+  coe 0 i (j. (g : S1 → S1) × ((x : S1) → x = g (rotLoop x j))) sec;
+
+
+
+-- (linv : (x : A) → x = g (f x));
+
+{-
 
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
@@ -12,115 +82,48 @@ isEquiv (A B : U)(f : A → B) : U :=
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
 
-iso (A B : U) : U := (f : A → B) × isIso A B f;
-
 idEquiv (A : U) : equiv A A :=
   (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
 
+isProp (A : U) : U := (a b : A) → a = b;
 
-----------------------------------------------------------------------------------------------------
-
-higher inductive join (A B : U) :=
-  inl A
-| inr B
-| push (a : A) (b : B) (i : I) [ i = 0. inl a
-                               ; i = 1. inr b ];
+isPropIsEquiv (A B : U) (f : A → B) : isProp (isEquiv A B f) := ?_;
 
 higher inductive S1 :=
     base1
   | loop1 (i : I) [i=0. base1; i=1. base1];
 
-higher inductive S2 :=
-  base2
-| loop2 (i j : I) [i=0. base2
-                  ;i=1. base2
-                  ;j=0. base2
-                  ;j=1. base2];
+connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+  let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
+  let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
+  hcom 0 1 [
+    i=0. pface j;
+    i=1. qface j;
+    j=0. pface i;
+    j=1. qface i]
+    (p 1);
 
-higher inductive S3 :=
-  base3
-| loop3 (i j k : I) [ i=0. base3
-                     ;i=1. base3
-                     ;j=0. base3
-                     ;j=1. base3
-                     ;k=0. base3
-                     ;k=1. base3];
+rotLoop : (a : S1) → a = a := λ[
+  base1.   λ i. loop1 i;
+  loop1 i. λ j. connection-both S1 (λ i. loop1 i) base1 (λ i. loop1 i) i j
+];
 
-rotLoop : (a : S1) → a = a :=
-λ a. case a (a. a ={_. S1} a) [
-    base1.   λ i. loop1 i
-  ; loop1 i. λ j. hcom 0 1 S1 [
-            i = 0 k. hcom 1 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1
-	  ; i = 1 k. hcom 0 j S1 [k = 0 _. base1; k = 1 l. loop1 l] base1
-	  ; j = 0 k. hcom 1 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1
-	  ; j = 1 k. hcom 0 i S1 [k = 0 _. base1; k = 1 l. loop1 l] base1] base1];
+rot : S1 → S1 → S1 := λ[
+  base1. λ y. y;
+  loop1 i. λ y. rotLoop y i
+];
 
-unrotLoop (a : S1) : a = a := (rotLoop a)⁻¹;
+isPropFamS1 (P : S1 → U)(pP : (x : S1) → isProp (P x)) (b0 : P base1) : b0 ={i. P (loop1 i)} b0 :=
+  λ i. pP (loop1 i) (coe 0 i (K1. P (loop1 K1)) b0)
+                    (coe 1 i (K2. P (loop1 K2)) b0) i;
 
-higher inductive PostTotalHopf :=
-    b (x : S1)
-  | l (x : S1) (i j : I)
-                     [ i=0. b x
-                     ; i=1. b x
-                     ; j=0. b (unrotLoop x i)
-                     ; j=1. b x ];
 
-the (A : U)(x : A) := x;
+-- TODO: NF throws error!
+rotIsEquiv : (a : S1) → isEquiv S1 S1 (rot a) := λ[
+  base1. (idEquiv S1).2;
+  loop1 i. isPropFamS1 (λ x. isEquiv S1 S1 (rot x))
+                       (λ x. isPropIsEquiv S1 S1 (rot x))
+		       ((idEquiv S1).2) i
+];
 
-test0To4 :
-(λ _ _. base2) ={_. (λ _. base2) ={_. base2 ={_. S2} base2} (λ _. base2)} (λ  _ _. base2) :=
-λ i j k. hcom 1 0 S2 [
-   i = 1 l. hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2
- ; j = 0 l. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2
- ; j = 1 l. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] (loop2 k i)] base2
- ; i = 0 l. hcom 1 0 S2 [
-                   j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
-                 ; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
-	         ; l = 0 _. base2
-	         ; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
-	         (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)
- ; k = 0 l. hcom 1 i S2 [
-                   j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
-		 ; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
-		 ; l = 0 _. base2
-		 ; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
-		 (hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)
- ; k = 1 l. hcom 1 i S2 [
-                   j = 0 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
-		 ; j = 1 i. hcom 0 i S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2
-		 ; l = 0 _. base2
-		 ; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] base2]
-		(hcom 0 1 S2 [l = 0 _. base2; l = 1 i. hcom 0 1 S2 [i = 0 _. base2; i = 1 j. base2] base2] base2)]
- (hcom 0 1 S2 [i = 0 _. base2; i = 1 j. loop2 @1 j] (loop2 k i));
-
-f5 :
-  (λ _ _. base2) ={_. (λ _. base2) ={_. base2 ={_. S2} base2} (λ _. base2)} (λ _ _. base2)
-
-→ (λ _ _. inl base1) ={_. (λ _. inl base1) ={_. inl base1 ={_. join S1 S1} inl base1} (λ _. inl base1)}
-
-  (λ _ _. inl base1) :=
-
-λ p i j k.
-case
-  (case (p i j k)
-    (x. (case x (_. U) [
-        base2. S1;
-        loop2 i j. Glue S1 [
-          i = 0. S1, idEquiv S1;
-          i = 1. S1, idEquiv S1;
-          j = 0. S1, ?_;
-          j = 1. S1, idEquiv S1]]) → PostTotalHopf)
-
-    [base2.     λ y. b y
-    ;loop2 i j. λ y. hcom 0 1 PostTotalHopf
-                              [i = 0 _. b y;
-  			       i = 1 _. b y;
-  			       j = 0 k. b ?_;
-  			       j = 1 _. b y
-  			     ]
-  			     (l (unglue y) i j)]
-    ?_)
-  (_. join S1 S1)
-[b x. inl x; l x i j. ?_];
-
-test0To5 := f5 test0To4;
+-}

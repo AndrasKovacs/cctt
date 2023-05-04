@@ -50,7 +50,7 @@ instance GetStats Tm where
     U                -> mempty
     Path x a t u     -> stats a <> stats t <> stats u
     PApp l r t i     -> stats l <> stats r <> stats t
-    PLam _ _ _ t     -> stats t
+    PLam l r _ t     -> stats l <> stats r <> stats t
     Line x a         -> stats a
     LApp t _         -> stats t
     LLam _ t         -> stats t

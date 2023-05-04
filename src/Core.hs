@@ -744,12 +744,15 @@ coed r r' topA t = case (frc topA) ^. body of
   VPi (rebind topA -> a) (rebind topA -> b) ->
     VLam $ NCl (b^.body.name) $ CCoePi r r' a b t
 
+  -- coe r r' (i. (x : A i) × B i x) t =
+  -- (coe r r' A t.1, coe r r' (i. B i (coe r i A t.1)) t.2)
   VSg (rebind topA -> a) (rebind topA -> b) ->
     let t1 = proj1 (b^.body.name) t
         t2 = proj2 (b^.body.name) t
+
     in VPair (b^.body.name)
              (coed r r' a t1)
-             (coed r r' (bindI "j" \j -> coe r j a t1) t2)
+             (coed r r' (bindI "j" \j -> b ∙ j ∙ coe r j a t1) t2)
 
   VPath (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
         VPLam (lhs ∙ r') (rhs ∙ r')
@@ -994,7 +997,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   v@VHole{} -> v
 
   v ->
-    error $ take 300 $ show v
+    error $ take 1000 $ show v
     -- VHole (VErrHole $ take 300 $ show v)
     -- impossible
 

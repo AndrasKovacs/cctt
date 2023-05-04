@@ -1,0 +1,40 @@
+
+
+isProp (A : U) : U := (a b : A) → a = b;
+isSet (A : U) : U := (a b : A) → isProp (a = b);
+
+higher inductive pTrunc (A : U) :=
+    pinc A
+  | pquot (x y : pTrunc A)(i : I) [i=0. x; i=1. y];
+
+recpt (A B : U) (Bprop : isProp B) (f : A → B) : (x : pTrunc A) → B := λ[
+  pinc x. f x;
+  pquot x y i. Bprop (recpt A B Bprop f x) (recpt A B Bprop f y) i
+];
+
+higher inductive sTrunc (A : U) :=
+    sinc (a : A)
+  | ssquash (a b : sTrunc A) (p q : a = b) (i j : I)
+      [i=0. p j
+      ;i=1. q j
+      ;j=0. a
+      ;j=1. b];
+
+rec0 (A B : U) (Bset : isSet B) (f : A → B) : (x : sTrunc A) → B := λ[
+  sinc x. f x;
+  ssquash x y p q i j.
+    Bset (rec0 A B Bset f x) (rec0 A B Bset f y)
+         (ap (rec0 A B Bset f) p)
+	 (ap (rec0 A B Bset f) q)
+	 i j
+];
+
+inductive bool := true | false;
+
+higher inductive Int := left | right | seg (i : I)[i=0. left; i=1.right];
+
+bad : Int → bool := λ[
+  left. true;
+  right. false;
+  seg i. true
+];

@@ -206,21 +206,11 @@ foldrAccumIS f acc r s = LS.foldrAccum (\x hyp acc -> f (coerce x) hyp acc) acc 
 
 ----------------------------------------------------------------------------------------------------
 
-{-|
-Small interval substitutions are nibble (4-bit) sequences stored in a 64-bit word.
-
-  - 0    : mapped to 0
-  - 1    : mapped to 1
-  - 2-13 : mapped to I expressions
-  - 14   : mapped to the domain size
-  - 15   : mapped to the codomain size
--}
 
 data Sub = Sub Word32 Word32 IIM.IntIntMap  -- dom, cod, map
   deriving Eq
 
 type SubArg = (?sub :: Sub)  -- ImplicitParams
-
 
 {-|
 Normalized cofibrations are also represented as interval substitutions. Here,

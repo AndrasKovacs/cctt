@@ -231,23 +231,38 @@ higher inductive join (A B : U) :=
 
 higher inductive sTrunc (A : U) :=
     sinc (a : A)
-  | ssquashC (a b : sTrunc A) (p q : a = b) (i j : I)
+  | strunc (a b : sTrunc A) (p q : a = b) (i j : I)
       [i=0. p j
       ;i=1. q j
       ;j=0. a
       ;j=1. b];
 
-rec0 (A B : U) (Bset : isSet B) (f : A → B) : (x : sTrunc A) → B := λ[
+rec0 (A B : U) (Bset : isSet B) (f : A → B) : sTrunc A → B := λ[
   sinc x. f x;
-  ssquashC x y p q i j.
+  strunc x y p q i j.
     Bset (rec0 A B Bset f x) (rec0 A B Bset f y)
          (ap (rec0 A B Bset f) p)
 	 (ap (rec0 A B Bset f) q)
 	 i j
 ];
 
---  Bset (rec₀ Bset f x) (rec₀ Bset f y) (cong (rec₀ Bset f) p) (cong (rec₀ Bset f) q) i j
--- rec₀ : {A : Type ℓ} {B : Type ℓ'} → isSet B → (A → B) → ∥ A ∥₀ → B
--- rec₀ Bset f ∣ x ∣₀ = f x
--- rec₀ Bset f (squash₀ x y p q i j) =
---   Bset _ _ (cong (rec₀ Bset f) p) (cong (rec₀ Bset f) q) i j
+higher inductive gTrunc (A : U) :=
+    ginc A
+  | gtrunc (a b : gTrunc A)(p q : a = b)(r s : p = q)(i j k : I)
+         [i=0. r j k
+	 ;i=1. s j k
+	 ;j=0. p k
+	 ;j=1. q k
+	 ;k=0. a
+	 ;k=1. b];
+
+rec1 (A B : U)(gB : isGroupoid B)(f : A → B) : gTrunc A → B := λ[
+  ginc x. f x;
+  gtrunc a b p q r s i j k.
+    gB (rec1 A B gB f a) (rec1 A B gB f b)
+       (λ n. rec1 A B gB f (r 0 n))
+       (λ n. rec1 A B gB f (r 1 n))
+       (λ n m. rec1 A B gB f (r n m))
+       (λ m n. rec1 A B gB f (s m n))
+       i j k
+];

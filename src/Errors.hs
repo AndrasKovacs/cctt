@@ -36,7 +36,7 @@ data Error
   | GlueTmSystemMismatch Sys
   | TopShadowing SourcePos
   | NonNeutralCofInSystem
-  | NoSuchField Tm
+  | NoSuchField Name Tm
   | CantInferHole
   | ImportCycle FilePath [FilePath]
   | CantOpenFile FilePath
@@ -164,8 +164,8 @@ showError = \case
   NonNeutralCofInSystem ->
     "Only neutral cofibrations are allowed in systems"
 
-  NoSuchField a ->
-    "Field projection is not supported by inferred type:\n\n" ++
+  NoSuchField x a ->
+    "Field projection " ++ show x ++ " is not supported by inferred type:\n\n" ++
     "  " ++ pretty a
 
   CantInferHole ->

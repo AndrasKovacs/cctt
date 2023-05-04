@@ -154,7 +154,7 @@ check t topA = frcPos t \case
         frz <- readIORef (inf^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- readIORef (inf^.constructors)
-        cs <- elabHCases params b (LM.elems cons) cs HCSNil
+        cs <- elabHCases params b (LM.elems cons) cs
         pure $! HSplit (b^.name) (quote b) cs
       _ ->
         err $ ExpectedInductiveType (quote a)
@@ -247,7 +247,7 @@ check t topA = frcPos t \case
           frz <- readIORef (inf^.frozen)
           unless frz $ err $ GenericError "Can't case split on the type that's being defined"
           cons <- LM.elems <$!> readIORef (inf^.constructors)
-          cs <- elabHCases params bv cons cs HCSNil
+          cs <- elabHCases params bv cons cs
           pure $ HCase t "_" qb cs
         _ ->
           err $ ExpectedInductiveType (quote a)
@@ -765,7 +765,7 @@ inferNonSplit t = frcPos t \case
         frz <- readIORef (inf^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- LM.elems <$!> readIORef (inf^.constructors)
-        cs <- elabHCases params bv cons cs HCSNil
+        cs <- elabHCases params bv cons cs
         pure $! Infer (HCase t x b cs) (bv ∙ eval t)
       a ->
         err $ ExpectedInductiveType (quote a)
@@ -776,6 +776,8 @@ inferNonSplit t = frcPos t \case
   P.Split _ ->
     err $ GenericError "Can't infer type for case splitting function"
 
+
+-- Inductive case
 ----------------------------------------------------------------------------------------------------
 
 -- | The spine consisting of the last N bound vars, for each constructor field.
@@ -809,65 +811,52 @@ elabCases params b cons cs = case (cons, cs) of
   _ ->
     err CaseMismatch
 
+
+-- HIT case
 ----------------------------------------------------------------------------------------------------
 
-evalBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure HCases -> VSys)
-evalBoundary bnd casety casecl = case bnd of
-  SEmpty          -> vsempty
-  SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety casecl)
-                            (evalBoundary bnd casety casecl)
 
-elabHCase' :: Elab (Env -> HDConInfo -> Env -> Sub -> [Name] -> [Name] -> NamedClosure
-           -> EvalClosure HCases -> Sys -> P.Tm -> IO Tm)
-elabHCase' params ~inf typarams sub ifields_ xs ~casety ~casecl bnd body = case (ifields_, xs) of
+elabHCase' :: Elab (Env -> HDConInfo -> Env -> Sub -> [Name] -> [Name] -> NamedClosure -> P.Tm -> IO Tm)
+elabHCase' params ~inf typarams sub ifields_ xs ~casety body = case (ifields_, xs) of
   ([], []) -> do
     let lhsval = hdcon inf typarams (lhsSpine (inf^.fieldTypes)) sub
     let rhsty  = casety ∙ lhsval
-    t <- check body rhsty
-
-    -- let vbnd = (let ?env = params; ?sub = sub; ?recurse = DontRecurse
-    --             in evalBoundary bnd casety casecl)
-    -- case vbnd of
-    --   VSTotal v -> do
-    --     conv (eval t) v
-    --   VSNe (WIS sys _) -> do
-    --     neSysCompat t sys
-
-    pure t
-
+    check body rhsty
   (_:ifields, x:xs) -> do
     bindI x \_ ->
-      elabHCase' params inf typarams (liftSub sub) ifields xs casety casecl bnd body
+      elabHCase' params inf typarams (liftSub sub) ifields xs casety body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
-elabHCase :: Elab (Env -> HDConInfo -> Tel -> [Name] -> [Name] -> NamedClosure
-          -> EvalClosure HCases -> Sys -> P.Tm -> IO ([Name], [Name], Tm))
-elabHCase params ~inf fieldtypes ifields xs ~casety ~casecl bnd body = case (fieldtypes, xs) of
+elabHCase :: Elab (Env -> HDConInfo -> Tel -> [Name] -> [Name] -> NamedClosure -> P.Tm -> IO ([Name], [Name], Tm))
+elabHCase params ~inf fieldtypes ifields xs ~casety body = case (fieldtypes, xs) of
   (TNil, xs) -> do
-    t <- elabHCase' params inf params (emptySub (dom ?cof)) ifields xs casety casecl bnd body
+    t <- elabHCase' params inf params (emptySub (dom ?cof)) ifields xs casety body
     pure ([], xs, t)
   (TCons _ a fieldtypes, x:xs) -> do
     let ~va = evalIn params a
     bind x va (quote va) \var -> do
-      (xs, is, t) <- elabHCase (EDef params var) inf fieldtypes ifields xs casety casecl bnd body
+      (xs, is, t) <- elabHCase (EDef params var) inf fieldtypes ifields xs casety body
       pure (x:xs, is, t)
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
-elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> HCases -> IO HCases)
-elabHCases params b cons cs prevCases = case (cons, cs) of
+elabHCases' :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> IO HCases)
+elabHCases' params b cons cs = case (cons, cs) of
   ([], []) ->
-    pure prevCases
+    pure HCSNil
   (dci:cons, (pos, x', xs, body):cs) | dci^.name == x' -> setPos pos do
-
-    let casecl  = EC (idSub (dom ?cof)) ?env DontRecurse prevCases
-    (xs, is, t) <- elabHCase params dci (dci^.fieldTypes)
-                            (dci^.ifields)
-                            xs b casecl (dci^.boundary) body
-    elabHCases params b cons cs (snocHCases prevCases x' xs is t)
+    (xs, is, t) <- elabHCase params dci (dci^.fieldTypes) (dci^.ifields) xs b body
+    cs <- elabHCases' params b cons cs
+    pure (HCSCons x' xs is t cs)
   _ ->
     err CaseMismatch
+
+elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> IO HCases)
+elabHCases params b cons cs = do
+  cs <- elabHCases' params b cons cs
+  modState (hCaseBoundaryChecks %~ (HCBC params cons b cs:))
+  pure cs
 
 ----------------------------------------------------------------------------------------------------
 
@@ -882,8 +871,8 @@ elabProjField x t ~tv a = case frc a of
   VWrap x' a -> if x == x' then
                   pure (Infer (Unpack t x) a)
                 else
-                  err $ NoSuchField (quote (VWrap x' a))
-  a          -> err $ NoSuchField (quote a)
+                  err $ NoSuchField x (quote (VWrap x' a))
+  a          -> err $ NoSuchField x (quote a)
 
 -- | Ensure that an IClosure is constant.
 constantICl :: Elab (NamedIClosure -> IO ())
@@ -1049,12 +1038,6 @@ sysCompat t = \case
       VCNe cof' _ -> bindCof cof' $ conv (eval t) (eval t')
     sysCompat t sys
 
-neSysCompat :: Elab (Tm -> NeSys -> IO ())
-neSysCompat t = \case
-  NSEmpty       -> pure ()
-  NSCons t' sys -> do (assumeCof (t'^.binds) (conv (eval t) (t'^.body)))
-                      neSysCompat t sys
-
 elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
 elabGlueTmSys base ts a equivs = case (ts, equivs) of
   (P.SEmpty, NSEmpty) ->
@@ -1107,6 +1090,72 @@ guardTopShadowing x = do
     Just (TEHDCon inf)  -> err $ TopShadowing (inf^.pos)
     Just (TERec _     ) -> impossible
 
+
+-- HIT case boundary checking
+----------------------------------------------------------------------------------------------------
+
+evalHCaseBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure HCases -> VSys)
+evalHCaseBoundary bnd casety casecl = case bnd of
+  SEmpty          -> vsempty
+  SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety casecl)
+                            (evalHCaseBoundary bnd casety casecl)
+
+neSysCompat :: Elab (Recurse -> Tm -> NeSys -> IO ())
+neSysCompat rc t = \case
+  NSEmpty       -> pure ()
+  NSCons t' sys -> do
+    assumeCof (t'^.binds) do
+      let lhs = (let ?recurse = rc; ?sub = idSub (dom ?cof) in Core.eval t)
+      let rhs = t'^.body
+      conv lhs rhs
+    neSysCompat rc t sys
+
+checkHCaseBoundary' :: Elab (   HDConInfo -> Recurse -> Env -> Sub
+                             -> [Name] -> Tm -> NamedClosure -> EvalClosure HCases -> IO ())
+checkHCaseBoundary' ~inf rc params sub is body casety casecl = case is of
+  [] -> do
+    let vbnd = (let ?env = params; ?sub = sub; ?recurse = rc
+                in evalHCaseBoundary (inf^.boundary) casety casecl)
+
+    case vbnd of
+      VSTotal v        -> conv (eval body) v
+      VSNe (WIS sys _) -> neSysCompat rc body sys
+
+  x:is ->
+    bindI x \_ -> checkHCaseBoundary' inf rc params (liftSub sub) is body casety casecl
+
+checkHCaseBoundary :: Elab (  HDConInfo -> Recurse -> Env -> Sub -> Tel -> [Name] -> [Name]
+                           -> Tm -> NamedClosure -> EvalClosure HCases -> IO ())
+checkHCaseBoundary ~inf rc params sub fields fs is body casety casecl = case (fields, fs) of
+  (TNil, []) ->
+    checkHCaseBoundary' inf rc params sub is body casety casecl
+  (TCons _ a fields, x:fs) -> do
+    let ~va = evalIn params a
+    bind x va (quote va) \var ->
+      checkHCaseBoundary inf rc (EDef params var) sub fields fs is body casety casecl
+  _ ->
+    impossible
+
+checkHCaseBoundaries' :: Elab (   Recurse -> Env -> [HDConInfo] -> HCases
+                               -> NamedClosure -> EvalClosure HCases -> IO ())
+checkHCaseBoundaries' rc params cons cs casety casecl = case (cons, cs) of
+  ([], HCSNil) ->
+    pure ()
+  (inf:cons, HCSCons _ fs is t cs) -> do
+    checkHCaseBoundary inf rc params (emptySub (dom ?cof)) (inf^.fieldTypes) fs is t casety casecl
+    checkHCaseBoundaries' rc params cons cs casety casecl
+  _ ->
+    impossible
+
+checkHCaseBoundaries :: Elab (Recurse -> IO ())
+checkHCaseBoundaries recurse = do
+  st <- getState
+  forM_ (st^.hCaseBoundaryChecks) \(HCBC params cons casety cs) -> do
+    checkHCaseBoundaries' recurse params cons cs casety (EC (idSub (dom ?cof)) ?env recurse cs)
+  putState (st & hCaseBoundaryChecks .~ [])
+
+----------------------------------------------------------------------------------------------------
+
 elabTop :: P.Top -> IO ()
 elabTop = \case
 
@@ -1145,6 +1194,7 @@ elabTop = \case
         (top  %~ M.insert x defEntry)
       . (top' %~ LM.insert l defEntry)
 
+    checkHCaseBoundaries (Recurse (coerce tv))
     elabTop ptop
 
   P.TImport pos modname ptop -> withTopElab $ setPos pos do
@@ -1177,6 +1227,7 @@ elabTop = \case
 
     bindTelescope ps $ elabConstructors inf 0 cs
     writeIORef frzRef True
+    checkHCaseBoundaries DontRecurse
     elabTop ptop
 
   P.THData pos tyname ps cs ptop -> withTopElab $ setPos pos do
@@ -1203,6 +1254,7 @@ elabTop = \case
 
     bindTelescope ps $ elabHConstructors inf tyConVal 0 cs
     writeIORef frzRef True
+    checkHCaseBoundaries DontRecurse
     elabTop ptop
 
   P.TEmpty ->

@@ -67,13 +67,19 @@ data LoadState = LoadState {
   , loadStateCurrentSrc  :: String
   } deriving Show
 
+data HCaseBoundaryCheck where
+  HCBC :: (LocalsArg, NCofArg, DomArg, EnvArg, PosArg) =>
+    Env -> [HDConInfo] -> NamedClosure -> HCases -> HCaseBoundaryCheck
+  deriving Show via DontShow HCaseBoundaryCheck
+
 data State = State {
-    stateTop          :: M.Map Name TopEntry
-  , stateTop'         :: LM.Map TopEntry
-  , stateLvl          :: Lvl
-  , stateLoadState    :: LoadState
-  , stateParsingTime  :: NominalDiffTime
-  , statePrintingOpts :: PrintingOpts
+    stateTop                 :: M.Map Name TopEntry
+  , stateTop'                :: LM.Map TopEntry
+  , stateLvl                 :: Lvl
+  , stateLoadState           :: LoadState
+  , stateParsingTime         :: NominalDiffTime
+  , statePrintingOpts        :: PrintingOpts
+  , stateHCaseBoundaryChecks :: [HCaseBoundaryCheck]
   } deriving Show
 
 makeFields ''LoadState
@@ -87,7 +93,7 @@ initLoadState :: LoadState
 initLoadState = LoadState mempty mempty mempty mempty
 
 initState :: State
-initState = State mempty mempty 0 initLoadState 0 defaultPrintingOpts
+initState = State mempty mempty 0 initLoadState 0 defaultPrintingOpts []
 
 stateRef :: IORef State
 stateRef = runIO $ newIORef initState

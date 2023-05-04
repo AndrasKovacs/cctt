@@ -90,7 +90,10 @@ data ∥_∥₁ (A : Type ℓ) : Type ℓ where
 rec₁ : {A : Type ℓ} {B : Type ℓ'} → isGroupoid B → (A → B) → ∥ A ∥₁ → B
 rec₁ gB f ∣ x ∣₁ = f x
 rec₁ gB f (squash₁ x y p q r s i j k) =
-  gB _ _ _ _ (λ m n → rec₁ gB f (r m n)) (λ m n → rec₁ gB f (s m n)) i j k
+  gB (rec₁ gB f x) (rec₁ gB f y)
+     (λ n → rec₁ gB f (r i0 n))
+     (λ n → rec₁ gB f (r i1 n))
+     (λ m n → rec₁ gB f (r m n)) (λ m n → rec₁ gB f (s m n)) i j k
 
 
 -- 2GroupoidTruncation
