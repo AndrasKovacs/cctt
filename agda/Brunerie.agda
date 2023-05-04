@@ -61,7 +61,6 @@ S²ToSetElim : {A : S² → Type ℓ}
             → (x : S²) → A x
 S²ToSetElim set b base = b
 S²ToSetElim set b (surf i j) =
-  -- let foo = {!isOfHLevel→isOfHLevelDep 2 set b b!} in
   isOfHLevel→isOfHLevelDep 2 set b b {a0 = refl} {a1 = refl} refl refl surf i j
 
 
@@ -103,18 +102,31 @@ data ∥_∥₂ (A : Type ℓ) : Type ℓ where
 
 rec₂ : ∀ {A : Type ℓ} {B : Type ℓ'} → is2Groupoid B → (A → B) → ∥ A ∥₂ → B
 rec₂ gB f ∣ x ∣₂ = f x
-rec₂ gB f (squash₂ _ _ _ _ _ _ t u i j k l) =
-  gB _ _ _ _ _ _ (λ m n o → rec₂ gB f (t m n o)) (λ m n o → rec₂ gB f (u m n o))
+rec₂ gB f (squash₂ a b p q r s t u i j k l) =
+  gB (rec₂ gB f a)
+     (rec₂ gB f b)
+     (λ o → rec₂ gB f (p o))
+     (λ o → rec₂ gB f (q o))
+     (λ n o → rec₂ gB f (t i0 n o))
+     (λ n o → rec₂ gB f (t i1 n o))
+     (λ m n o → rec₂ gB f (t m n o))
+     (λ m n o → rec₂ gB f (u m n o))
      i j k l
 
 elim₂ : {A : Type ℓ} {B : ∥ A ∥₂ → Type ℓ}
        (bG : (x : ∥ A ∥₂) → is2Groupoid (B x))
        (f : (x : A) → B ∣ x ∣₂) (x : ∥ A ∥₂) → B x
 elim₂ bG f ∣ x ∣₂ = f x
-elim₂ bG f (squash₂ x y p q r s u v i j k l) =
-  isOfHLevel→isOfHLevelDep 4 bG _ _ _ _ _ _
+elim₂ bG f (squash₂ a b p q r s u v i j k l) =
+  isOfHLevel→isOfHLevelDep 4 bG
+    (elim₂ bG f a)
+    (elim₂ bG f b)
+    (λ l₁ → elim₂ bG f (p l₁))
+    (λ l₁ → elim₂ bG f (q l₁))
+    (λ k₁ l₁ → elim₂ bG f (u i0 k₁ l₁))
+    (λ k₁ l₁ → elim₂ bG f (u i1 k₁ l₁))
     (λ j k l → elim₂ bG f (u j k l)) (λ j k l → elim₂ bG f (v j k l))
-    (squash₂ x y p q r s u v)
+    (squash₂ a b p q r s u v)
     i j k l
 
 
