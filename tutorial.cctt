@@ -4,13 +4,14 @@
 {-
 This is a multi-line comment.
 
-General usage: cctt <file> [nf <topdef>] [elab] [verbose] [no-hole-cxts]
+usage: cctt <file> [nf <topdef>] [ty <topdef>] [elab] [verbose] [no-hole-cxts]
 
-Elaborates <file>. Options:
+Checks <file>. Options:
   nf <topdef>   prints the normal form of top-level definition <topdef>
+  ty <topdef>   prints the type of the top-level definition <topdef>
   elab          prints the elaboration output
-  verbose       prints enough annotations so that everything can be re-checked
-  no-hole-cxts  disables printing local scopes of holes
+  verbose       prints path endpoints and hcom types explicitly
+  no-hole-cxt   turn off printing local contexts of holes
 -}
 
 -- Basics

@@ -15,10 +15,11 @@ import Quotation
 -- import Statistics
 
 helpMsg = unlines [
-   "usage: cctt <file> [nf <topdef>] [elab] [verbose] [no-hole-cxts]"
+   "usage: cctt <file> [nf <topdef>] [ty <topdef>] [elab] [verbose] [no-hole-cxts]"
   ,""
   ,"Checks <file>. Options:"
   ,"  nf <topdef>   prints the normal form of top-level definition <topdef>"
+  ,"  ty <topdef>   prints the type of the top-level definition <topdef>"
   ,"  elab          prints the elaboration output"
   ,"  verbose       prints path endpoints and hcom types explicitly"
   ,"  no-hole-cxt   turn off printing local contexts of holes"
@@ -30,15 +31,18 @@ elabPath path args = mainWith (pure $ path : words args)
 mainInteraction :: IO ()
 mainInteraction = mainWith getArgs
 
-parseArgs :: [String] -> IO (FilePath, Maybe Name, Bool, Bool, Bool)
+parseArgs :: [String] -> IO (FilePath, Maybe Name, Maybe Name, Bool, Bool, Bool)
 parseArgs args = do
   let exit = putStrLn helpMsg >> exitSuccess
   (path, args) <- case args of
     path:args -> pure (path, args)
     _         -> exit
   (printnf, args) <- case args of
-    "nf":printnf:args -> pure (Just printnf, args)
-    args              -> pure (Nothing, args)
+    "nf":def:args -> pure (Just def, args)
+    args          -> pure (Nothing, args)
+  (printty, args) <- case args of
+    "ty":def:args -> pure (Just def, args)
+    args          -> pure (Nothing, args)
   (elab, args) <- case args of
     "elab":args -> pure (True, args)
     args        -> pure (False, args)
@@ -49,12 +53,12 @@ parseArgs args = do
     "no-hole-cxts":[] -> pure False
     []                -> pure True
     _                 -> exit
-  pure (path, printnf, elab, verbose, holeCxts)
+  pure (path, printnf, printty, elab, verbose, holeCxts)
 
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   reset
-  (path, printnf, printelab, verbosity, holeCxts) <- parseArgs =<< getArgs
+  (path, printnf, printty, printelab, verbosity, holeCxts) <- parseArgs =<< getArgs
 
   modState $ printingOpts %~
       (verbose .~ verbosity)
@@ -63,6 +67,7 @@ mainWith getArgs = do
 
   (_, !totaltime) <- timed (elaborate path)
   st <- getState
+  putStrLn ""
   putStrLn ("parsing time: " ++ show (st^.parsingTime))
   putStrLn ("elaboration time: " ++ show (totaltime - st^.parsingTime))
   putStrLn ("checked " ++ show (st^.lvl) ++ " definitions")
@@ -87,6 +92,18 @@ mainWith getArgs = do
       putStrLn $ "Normal form of " ++ x ++ ":\n\n" ++ pretty0 nf
       putStrLn ""
       putStrLn $ "Normalized in " ++ show nftime
-      -- print $ stats nf
+    Nothing ->
+      pure ()
+
+  case printty of
+    Just x -> do
+      case M.lookup x (st^.top) of
+        Just (TEDef i) -> do
+          putStrLn ""
+          putStrLn $ sourcePosPretty (i^.pos)
+          putStrLn $ x ++ " : " ++ pretty0 (i^.defTy)
+        _ -> do
+          putStrLn $ "No top-level definition with name: " ++ show x
+          exitSuccess
     Nothing ->
       pure ()

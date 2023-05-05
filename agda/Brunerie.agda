@@ -60,8 +60,8 @@ S²ToSetElim : {A : S² → Type ℓ}
             → A base
             → (x : S²) → A x
 S²ToSetElim set b base = b
-S²ToSetElim set b (surf i j) =
-  isOfHLevel→isOfHLevelDep 2 set b b {a0 = refl} {a1 = refl} refl refl surf i j
+S²ToSetElim {A = A} set b (surf i j) =
+  isOfHLevel→isOfHLevelDep 2 {S²}{λ z → A z} set {base}{base} b b {a0 = refl} {a1 = refl} refl refl surf i j
 
 
 -- Join

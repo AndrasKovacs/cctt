@@ -232,25 +232,24 @@ isOfHLevelDep : HLevel → (A : U)(B : A → U) → U := λ[
   ]
 ];
 
-isOfHLevel-isOfHLevelDep : (n : HLevel)(A : U)(B : A → U)(h : (a : A) → isOfHLevel n (B a)) → isOfHLevelDep n A B := λ[
+isOfHLevel-isOfHLevelDep : (n : HLevel)(A : U)(B : A → U)
+                          (h : (a : A) → isOfHLevel n (B a)) → isOfHLevelDep n A B := λ[
   zero. λ A B h a.
     ((h a).1
     , λ a' b' p. isProp-PathP (λ i. B (p i)) (λ i. isContr-isProp (B (p i)) (h (p i))) (h a).1 b');
-  suc n. ?
-];
 
--- isOfHLevel→isOfHLevelDep : (n : HLevel)
---   → {A : Type ℓ} {B : A → Type ℓ'} (h : (a : A) → isOfHLevel n (B a)) → isOfHLevelDep n {A = A} B
--- isOfHLevel→isOfHLevelDep 0 h {a} =
---   (h a .fst , λ b' p → isProp→PathP (λ i → isContr→isProp (h (p i))) (h a .fst) b')
--- isOfHLevel→isOfHLevelDep 1 h = λ b0 b1 p → isProp→PathP (λ i → h (p i)) b0 b1
--- isOfHLevel→isOfHLevelDep (suc (suc n)) {A = A} {B} h {a0} {a1} b0 b1 =
---   isOfHLevel→isOfHLevelDep (suc n) (λ p → helper p)
---   where
---   helper : (p : a0 ≡ a1) →
---     isOfHLevel (suc n) (PathP (λ i → B (p i)) b0 b1)
---   helper p = J (λ a1 p → ∀ b1 → isOfHLevel (suc n) (PathP (λ i → B (p i)) b0 b1))
---                      (λ _ → h _ _ _) p b1
+  suc n. case n (n. (A : U)(B : A → U)(h : (a : A) → isOfHLevel (suc n) (B a)) → isOfHLevelDep (suc n) A B) [
+
+    zero. λ A B h a0 a1 b0 b1 p.
+      isProp-PathP (λ i. B (p i)) (λ i. h (p i)) b0 b1;
+
+    suc n. λ A B h a0 a1 b0 b1.
+      isOfHLevel-isOfHLevelDep
+        (suc n) (a0 = a1) (λ p. b0 ={i. B (p i)} b1)
+	(λ p. J A a0 (λ a1 p. (b1 : B (p 1)) → isOfHLevel (suc n) (b0 ={i. B (p i)} b1))
+	             (λ b1. h a0 b0 b1) a1 p b1)
+  ]
+];
 
 
 -- Brunerie
@@ -303,10 +302,11 @@ higher inductive S2 :=
                   ;j=0. base2
                   ;j=1. base2];
 
-S2ToSetElim (A : S2 → U) (set : (x : S2) → isSet (A x))(b : A base2) : (x : S2) → A x := λ[
+S2ToSetElim (B : S2 → U) (set : (x : S2) → isSet (B x))(b : B base2) : (x : S2) → B x := λ[
   base2. b;
-  loop2 i j. ?_
-     -- isOfHLevel→isOfHLevelDep 2 set b b {a0 = refl} {a1 = refl} refl refl surf i j
+  loop2 i j.
+     isOfHLevel-isOfHLevelDep (suc (suc zero)) S2 B set base2 base2
+                              b b refl refl refl refl (λ i j. loop2 i j) i j
 ];
 
 higher inductive join (A B : U) :=
@@ -386,7 +386,9 @@ rec2 (A B : U)(gB : is2Groupoid B)(f : A → B) : g2Trunc A → B := λ[
 elim2 (A : U) (B : g2Trunc A → U)(bG : (x : g2Trunc A) → is2Groupoid (B x))
       (f : (x : A) → B (g2inc x)) : (x : g2Trunc A) → B x := λ[
   g2inc x. f x;
-  g2trunc a b p q r s u v i j k l. ?_
+  g2trunc a b p q r s u v i j k l.
+    let hyp := elim2 A B bG f;
+    ?
 ];
 
 -- elim₂ : {A : Type ℓ} {B : ∥ A ∥₂ → Type ℓ}
