@@ -117,14 +117,22 @@ elim₂ : {A : Type ℓ} {B : ∥ A ∥₂ → Type ℓ}
        (bG : (x : ∥ A ∥₂) → is2Groupoid (B x))
        (f : (x : A) → B ∣ x ∣₂) (x : ∥ A ∥₂) → B x
 elim₂ bG f ∣ x ∣₂ = f x
-elim₂ bG f (squash₂ a b p q r s u v i j k l) =
-  isOfHLevel→isOfHLevelDep 4 bG
-    (elim₂ bG f a)
-    (elim₂ bG f b)
+elim₂ {A = A}{B} bG f (squash₂ a b p q r s u v i j k l) =
+  isOfHLevel→isOfHLevelDep 4 {A = ∥ A ∥₂}{λ z → B z} bG
+    {a}
+    {b}
+    (elim₂ {A = A}{B} bG f a)
+    (elim₂ {A = A}{B} bG f b)
+    {p}
+    {q}
     (λ l₁ → elim₂ bG f (p l₁))
     (λ l₁ → elim₂ bG f (q l₁))
+    {u i0}
+    {u i1}
     (λ k₁ l₁ → elim₂ bG f (u i0 k₁ l₁))
     (λ k₁ l₁ → elim₂ bG f (u i1 k₁ l₁))
+    {u}
+    {v}
     (λ j k l → elim₂ bG f (u j k l)) (λ j k l → elim₂ bG f (v j k l))
     (squash₂ a b p q r s u v)
     i j k l

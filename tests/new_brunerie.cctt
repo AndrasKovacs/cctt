@@ -78,6 +78,11 @@ discrete (A : U) : U := (a b : A) → dec (a = b);
 
 inductive nat := zero | suc nat;
 
+num1 := suc zero;
+num2 := suc (suc zero);
+num3 := suc (suc (suc zero));
+num4 := suc (suc (suc (suc zero)));
+
 pred : nat → nat := λ[
   zero. zero;
   suc n. n];
@@ -163,7 +168,7 @@ sucZIso : iso Z Z :=
   , predsucZ
   , sucpredZ;
 
--- OR: use the hSet-ness of Z to define the equivalence
+-- OR: use the Hedberg and the hSet-ness of Z to define the equivalence
 
 sucPathZ : Z = Z :=
   ua Z Z (isoToEquiv Z Z sucZIso);
@@ -305,7 +310,7 @@ higher inductive S2 :=
 S2ToSetElim (B : S2 → U) (set : (x : S2) → isSet (B x))(b : B base2) : (x : S2) → B x := λ[
   base2. b;
   loop2 i j.
-     isOfHLevel-isOfHLevelDep (suc (suc zero)) S2 B set base2 base2
+     isOfHLevel-isOfHLevelDep num2 S2 B set base2 base2
                               b b refl refl refl refl (λ i j. loop2 i j) i j
 ];
 
@@ -383,11 +388,25 @@ rec2 (A B : U)(gB : is2Groupoid B)(f : A → B) : g2Trunc A → B := λ[
        i j k l
 ];
 
+-- Boundary checking (probably) hangs
 elim2 (A : U) (B : g2Trunc A → U)(bG : (x : g2Trunc A) → is2Groupoid (B x))
       (f : (x : A) → B (g2inc x)) : (x : g2Trunc A) → B x := λ[
   g2inc x. f x;
   g2trunc a b p q r s u v i j k l.
     let hyp := elim2 A B bG f;
+    let foo := isOfHLevel-isOfHLevelDep
+                 num4 (g2Trunc A) B bG a b
+		 (hyp a) (hyp b)
+		 p q
+		 (λ i. hyp (p i)) (λ i. hyp (q i))
+		 (u 0) (u 1)
+		 (λ i j. hyp (u 0 i j))(λ i j. hyp (u 1 i j))
+		 u v
+		 (λ j k l. hyp (u j k l)) (λ j k l. hyp (v j k l))
+		 (λ i j k l. g2trunc a b p q r s u v i j k l)
+		 i j k l
+    ;
+
     ?
 ];
 
@@ -395,14 +414,22 @@ elim2 (A : U) (B : g2Trunc A → U)(bG : (x : g2Trunc A) → is2Groupoid (B x))
 --        (bG : (x : ∥ A ∥₂) → is2Groupoid (B x))
 --        (f : (x : A) → B ∣ x ∣₂) (x : ∥ A ∥₂) → B x
 -- elim₂ bG f ∣ x ∣₂ = f x
--- elim₂ bG f (squash₂ a b p q r s u v i j k l) =
---   isOfHLevel→isOfHLevelDep 4 bG
---     (elim₂ bG f a)
---     (elim₂ bG f b)
+-- elim₂ {A = A}{B} bG f (squash₂ a b p q r s u v i j k l) =
+--   isOfHLevel→isOfHLevelDep 4 {A = ∥ A ∥₂}{λ z → B z} bG
+--     {a}
+--     {b}
+--     (elim₂ {A = A}{B} bG f a)
+--     (elim₂ {A = A}{B} bG f b)
+--     {p}
+--     {q}
 --     (λ l₁ → elim₂ bG f (p l₁))
 --     (λ l₁ → elim₂ bG f (q l₁))
+--     {u i0}
+--     {u i1}
 --     (λ k₁ l₁ → elim₂ bG f (u i0 k₁ l₁))
 --     (λ k₁ l₁ → elim₂ bG f (u i1 k₁ l₁))
+--     {u}
+--     {v}
 --     (λ j k l → elim₂ bG f (u j k l)) (λ j k l → elim₂ bG f (v j k l))
 --     (squash₂ a b p q r s u v)
 --     i j k l
