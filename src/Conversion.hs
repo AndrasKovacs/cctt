@@ -83,7 +83,7 @@ instance Conv Ne where
     (NLocalVar x     , NLocalVar x'      ) -> x == x'
     (NDontRecurse inf, NDontRecurse inf' ) -> inf^.recId == inf'^.recId
     (NApp t u        , NApp t' u'        ) -> conv t t' && conv u u'
-    (NPApp p t u r   , NPApp p' t' u' r' ) -> conv p p' && conv r r'
+    (NPApp l r t i   , NPApp l' r' t' i' ) -> conv t t' && conv i i'
     (NProj1 n _      , NProj1 n' _       ) -> conv n n'
     (NProj2 n _      , NProj2 n' _       ) -> conv n n'
     (NLApp t i       , NLApp t' i'       ) -> conv t t' && conv i i'
