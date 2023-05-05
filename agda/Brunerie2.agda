@@ -161,15 +161,21 @@ f7 p = coe0→1 (λ i → Code (p i)) ∣ base ∣₂
                ; (surf i j) x → surfc x i j})
     where
     surfc : (x : ∥ S² ∥₂) → refl {x = x} ≡ refl {x = x}
-    surfc = elim₂ (λ x → isOfHLevelPath 4 (isOfHLevelPath 4 squash₂ _ _) refl refl)
-                  (S²ToSetElim (λ _ → squash₂ _ _ _ _) λ i j → ∣ surf i j ∣₂)
+    surfc = elim₂ {A = S²}{λ x → refl {x = x} ≡ refl}
+                  (λ x → isOfHLevelPath {A = x ≡ x} 4 (isOfHLevelPath {A = ∥ S² ∥₂} 4 squash₂ x x) refl refl)
+                  (S²ToSetElim {A = λ x → refl {x = ∣ x ∣₂} ≡ refl}
+                               (λ x → squash₂ ∣ x ∣₂ ∣ x ∣₂ refl refl)
+                               (λ i j → ∣ surf i j ∣₂))
 
   ∥S²∥₂≃∥S²∥₂ : (x : S²) → ∥ S² ∥₂ ≃ ∥ S² ∥₂
   fst (∥S²∥₂≃∥S²∥₂ x) = ∣ x ∣₂ +₂_
   snd (∥S²∥₂≃∥S²∥₂ x) = help x
     where
-    help : (x : _) → isEquiv (λ y → ∣ x ∣₂ +₂ y)
-    help = S²ToSetElim (λ _ → isProp→isSet (isPropIsEquiv _)) (idIsEquiv _)
+    help : (x : S²) → isEquiv {A = ∥ S² ∥₂}{∥ S² ∥₂} (∣ x ∣₂ +₂_)
+    help = S²ToSetElim {A = λ x → isEquiv (_+₂_ ∣ x ∣₂)}
+                       (λ x → isProp→isSet {A = isEquiv {A = ∥ S² ∥₂}{∥ S² ∥₂} (_+₂_ ∣ x ∣₂)}
+                                           (isPropIsEquiv {A = ∥ S² ∥₂}{B = ∥ S² ∥₂} (_+₂_ ∣ x ∣₂)))
+                       (idIsEquiv ∥ S² ∥₂)
 
   Code : Susp S² → Type₀
   Code north = ∥ S² ∥₂
