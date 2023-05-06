@@ -638,23 +638,51 @@ g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
 g10 : sTrunc ℤ → ℤ :=
   rec0 ℤ ℤ isSetℤ (λ x. x);
 
--- Original η₃ as in the paper
 η₃ : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
   push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
 ];
 
--- Dropping the syms makes it compute fast (why?! maybe some slow inverse map gets applied with the sym?)
 η₃' : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
   push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
 ];
 
+----------------------------------------------------------------------------------------------------
+
+inductive List (A : U) := nil | cons A (List A);
+
+bnd3 (A : U)(f : I → I → I → A) : List A :=
+  cons (f 0 0 0) (
+  cons (f 0 0 1) (
+  cons (f 0 1 0) (
+  cons (f 0 1 1) (
+  cons (f 1 0 0) (
+  cons (f 1 0 1) (
+  cons (f 1 1 0) (
+  cons (f 1 1 1) nil)))))));
+
+bnd2 (A : U)(f : I → I → A) : List A :=
+  cons (f 0 0) (
+  cons (f 0 1) (
+  cons (f 1 0) (
+  cons (f 1 1) nil)));
+
+v1 (i j k : I) : Susp S² :=
+  η₃ (push (loop1 i) (loop1 j) k);
+
+v1bnd := bnd3 (Susp S²) v1;
+
+v2 (i j : I) : g2S² :=
+  f7 (λ k. η₃' (push (loop1 i) (loop1 j) k));
+
+v2bnd := bnd2 g2S² v2;
+
 -- Not well-typed because of 22 extra empty hcom-s!
 β₃ : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
 
--- β₃' : ℤ :=
---   g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));
+β₃fast : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));

@@ -5,7 +5,8 @@ module Brunerie2 where
 open import Cubical.Core.Primitives
 
 open import Cubical.Foundations.Prelude using
-  (_,_ ; fst ; snd ; _≡_ ; cong ; _∙_ ; refl ; isProp→isSet ; J ; sym ; isProp ; isSet ; isGroupoid ; is2Groupoid)
+  (_,_ ; fst ; snd ; _≡_ ; cong ; _∙_ ; refl ; isProp→isSet ; J ; sym ; isProp ; isSet ; isGroupoid ; is2Groupoid;
+   doubleComp-faces)
 open import Cubical.Foundations.Equiv using
   (_≃_ ; isEquiv ; isPropIsEquiv ; idIsEquiv ; idEquiv)
 open import Cubical.Foundations.HLevels using
@@ -236,6 +237,49 @@ g10 = rec₀ {A = ℤ}{ℤ} isSetℤ (λ x → x)
 
 β₃' : ℤ
 β₃' = g10 (g9 (g8 λ i j → f7 λ k → η₃' (push (loop i) (loop j) k)))
+
+----------------------------------------------------------------------------------------------------
+
+v1 : (i j k : I) → Susp S²
+v1 i j k = η₃' (push (loop i) (loop j) k)
+
+data List (A : Set) : Set where
+  nil  : List A
+  cons : A → List A → List A
+
+bnd3 : {A : Set}(f : I → I → I → A) → List A
+bnd3 f =
+  cons (f i0 i0 i0) (
+  cons (f i0 i0 i1) (
+  cons (f i0 i1 i0) (
+  cons (f i0 i1 i1) (
+  cons (f i1 i0 i0) (
+  cons (f i1 i0 i1) (
+  cons (f i1 i1 i0) (
+  cons (f i1 i1 i1) nil)))))))
+
+bnd2 : {A : Set}(f : I → I → A) → List A
+bnd2 f =
+  cons (f i0 i0) (
+  cons (f i0 i1) (
+  cons (f i1 i0) (
+  cons (f i1 i1) nil)))
+
+v2 : (i j : I) → ∥ S² ∥₂
+v2 i j = f7 λ k → η₃' (push (loop i) (loop j) k)
+
+-- nf doesn't terminate
+v3 : (Ω ∥ S¹∙ ∥₁∙) .fst
+v3 = g8 (λ i j → f7 λ k → η₃' (push (loop i) (loop j) k))
+
+v4 = g9 v3 -- ∣ ℤ.negsuc 1 ∣₀
+
+v5 = g10 v4
+
+foo : ℤ
+foo = -2
+
+--------------------------------------------------------------------------------
 
 -- This terminates fast
 β₃'≡-2 : β₃' ≡ -2

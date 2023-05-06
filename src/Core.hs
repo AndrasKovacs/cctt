@@ -1007,6 +1007,16 @@ coe r r' ~a t
   | True            = coed r r' a t
 {-# inline coe #-}
 
+vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
+vhcom r r' a sys base ~is = case sys^.body of
+  NSHEmpty -> base
+  _        -> VHCom r r' a sys base is
+{-# inline vhcom #-}
+
+-- vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
+-- vhcom = VHCom
+-- {-# inline vhcom #-}
+
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
 hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
@@ -1051,7 +1061,7 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
       $ ICHComPath r r' a lhs rhs nts base
 
   a@(VNe n is') ->
-    VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
+    vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1129,7 +1139,7 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
 
   -- "fhcom", hcom on HITs is blocked
   a@(VHTyCon tyinf ps) ->
-    VHCom r r' a ts base (insertI r $ insertI r' is)
+    vhcom r r' a ts base (insertI r $ insertI r' is)
 
   v@VHole{} -> v
 
