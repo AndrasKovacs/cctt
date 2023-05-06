@@ -1007,15 +1007,15 @@ coe r r' ~a t
   | True            = coed r r' a t
 {-# inline coe #-}
 
-vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
-vhcom r r' a sys base ~is = case sys^.body of
-  NSHEmpty -> base
-  _        -> VHCom r r' a sys base is
-{-# inline vhcom #-}
-
 -- vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
--- vhcom = VHCom
+-- vhcom r r' a sys base ~is = case sys^.body of
+--   NSHEmpty -> base
+--   _        -> VHCom r r' a sys base is
 -- {-# inline vhcom #-}
+
+vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
+vhcom = VHCom
+{-# inline vhcom #-}
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
@@ -1198,7 +1198,8 @@ ungluen t (WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
   VNe n is'               -> VNe (NUnglue n sys) (is <> is')
   v@VHole{}               -> v
-  v                       -> impossible
+  v                       -> error (take 1000 $ show v)
+  -- v                       -> impossible
 {-# inline ungluen #-}
 
 

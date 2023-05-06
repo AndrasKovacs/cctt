@@ -1,4 +1,5 @@
 
+
 -- Adapted from
 -- https://github.com/agda/cubical/blob/50f0e7b8fb156d14b12be21ec5e529fe3ca497ca/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
 
@@ -626,6 +627,8 @@ codeTruncS² : g2S² → hGroupoid :=
           (isOfHLevelTypeOfHLevel num3)
           (λ s. (gTrunc (HopfS² s), gtrunc' (HopfS² s)));
 
+g8Ty := (Ω² (g2dot S²dot)).1 → (Ω (gdot S¹dot)).1;
+
 g8 : (Ω² (g2dot S²dot)).1 → (Ω (gdot S¹dot)).1 :=
   λ p i. coe 0 1 (j. (codeTruncS² (p i j)).1) (ginc base1);
 
@@ -650,6 +653,74 @@ g10 : sTrunc ℤ → ℤ :=
   push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
 ];
 
+
+----------------------------------------------------------------------------------------------------
+
+gbase2' : g2S² :=
+  hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 []
+  (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 []
+  (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+  (g2inc base2))))))))))))))))));
+
+BIGGLUE :=
+  Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue
+ (Glue (Glue (Glue (Glue (Glue (gTrunc S¹) []) []) []) []) []) []) []) []) [])
+ []) []) []) []) []) []) []) []) [];
+
+gbase1' : BIGGLUE :=
+  glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (ginc base1)
+  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
+
+gbase1'' : BIGGLUE :=
+glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+(glue (glue (glue (glue (glue (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1
+[] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+(hcom 1 0 [] (hcom 0 1 [] (ginc base1))))))))))))))))))))))))))))))))))))) [])
+[]) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
+
+g8' :  Square g2S² gbase2' gbase2' gbase2' gbase2'
+                   refl refl refl refl
+     → gbase1'' = gbase1'' :=
+  λ p i. coe 0 1 (j. (codeTruncS² (p i j)).1) gbase1';
+
+v3' : gbase1'' = gbase1'' := g8' (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
+
+BIGGLUEZ :=
+  Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue
+  (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue
+  (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (sTrunc ℤ) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) [];
+
+spos0 : BIGGLUEZ :=
+  glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  ((sinc (pos zero))) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
+
+codeTruncS¹' : BIGGLUE → hSet :=
+  λ x. rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)))
+       (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
+       unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue x))))))))))))))))));
+
+g9' : gbase1'' = gbase1'' → sTrunc ℤ :=
+  λ p.
+    unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
+    unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
+    unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
+    unglue (unglue (unglue (unglue (unglue (unglue (
+
+    (coe 0 1 (i. (codeTruncS¹' (p 1)).1) spos0)
+    ))))))))))))))))))))))))))))))))))));
+
+v4' := g9' v3';
+
+v5' := g10 v4';
+
 ----------------------------------------------------------------------------------------------------
 
 inductive List (A : U) := nil | cons A (List A);
@@ -671,29 +742,41 @@ bnd2 (A : U)(f : I → I → A) : List A :=
   cons (f 1 1) nil)));
 
 v1 (i j k : I) : Susp S² :=
-  η₃ (push (loop1 i) (loop1 j) k);
+  η₃' (push (loop1 i) (loop1 j) k);
 
-v1bnd := bnd3 (Susp S²) v1;
+v1NF (i j k : I) : Susp S² :=
 
+  hcom 0 1 (Susp S²) [
+       k = 0 _. north
+     ; k = 1 j. hcom 0 1 (Susp S²) [
+                  j = 0 _. north
+                ; j = 1 j. hcom 0 1 (Susp S²) [
+                              j = 0 j. merid base2 j
+                            ; j = 1 _. north] north]
+                (merid (loop2 i @1) j)]
+
+     (hcom 0 1 (Susp S²) [
+         k = 0 _. north;
+         k = 1 j. hcom 0 1 (Susp S²) [
+                       j = 0 j. merid base2 j
+                     ; j = 1 _. north] north]
+       (merid (loop2 i j) k));
+
+v1NFOK : v1 = v1NF := refl;
+
+
+-- Nf checks out fine
 v2 (i j : I) : g2S² :=
   f7 (λ k. η₃' (push (loop1 i) (loop1 j) k));
 
 v2bnd := bnd2 g2S² v2;
 
-v3 : (Ω (gdot S¹dot)).1
- := g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
+v20j := v2 0;
+v21j := v2 1;
+v2i0 (i : I) := v2 i 0;
+v2i1 (i : I) := v2 i 1;
 
--- -- nf doesn't terminate
--- v3 : (Ω ∥ S¹∙ ∥₁∙) .fst
--- v3 = g8 (λ i j → f7 λ k → η₃' (push (loop i) (loop j) k))
+-- v3 : (Ω (gdot S¹dot)).1
+--  := g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
 
--- v4 = g9 v3 -- ∣ ℤ.negsuc 1 ∣₀
-
--- v5 = g10 v4
-
--- Not well-typed because of 22 extra empty hcom-s!
-β₃ : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
-
-β₃fast : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));
+-- v4 := g9 v3;
