@@ -30,8 +30,8 @@ instance Quote Ne Tm where
     NUnglue t sys     -> Unglue (quote t) (quote sys)
     NLApp t i         -> LApp (quote t) (quote i)
     NDontRecurse x    -> RecursiveCall x
-    NCase t b cs      -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
-    NHCase t b cs     -> HCase (quote t) (b^.name) (quote b) (quoteHCases cs)
+    NCase t b tag cs  -> Case (quote t) (b^.name) (quote b) tag (quoteCases cs)
+    NHCase t b tag cs -> HCase (quote t) (b^.name) (quote b) tag (quoteHCases cs)
 
 instance Quote Val Tm where
   quote t = case frc t of

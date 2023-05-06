@@ -97,9 +97,9 @@ instance Conv Ne where
     -- but the "a" here aren't neutrals!
     (NUnglue a sys    , NUnglue a' sys'      ) -> conv sys sys' && conv a a'
 
+    (NCase t b tag cs , NCase t' b' tag' cs' ) -> conv t t' && conv b b' && convCases tag cs tag' cs'
+    (NHCase t b tag cs, NHCase t' b' tag' cs') -> conv t t' && conv b b' && convHCases tag cs tag' cs'
 
-    (NCase t b cs     , NCase t' b' cs'      ) -> conv t t' && conv b b' && convCases cs cs'
-    (NHCase t b cs    , NHCase t' b' cs'     ) -> conv t t' && conv b b' && convHCases cs cs'
     (NUnpack n _      , NUnpack n' _         ) -> conv n n'
 
     (NSub{} , _      ) -> impossible
@@ -122,11 +122,6 @@ convCases' sub env cs sub' env' cs' = case (cs, cs') of
   _ ->
     impossible
 
-convCases :: NCofArg => DomArg => EvalClosure Cases -> EvalClosure Cases -> Bool
-convCases (EC sub env _ cs) (EC sub' env' _ cs') =
-  let ?recurse = DontRecurse
-  in convCases' sub env cs sub' env' cs'
-
 convHCases' :: NCofArg => DomArg => RecurseArg => Sub -> Env -> HCases -> Sub -> Env -> HCases -> Bool
 convHCases' sub env cs sub' env' cs' = case (cs, cs') of
   (HCSNil               , HCSNil               ) -> True
@@ -146,10 +141,19 @@ convHCases' sub env cs sub' env' cs' = case (cs, cs') of
   _ ->
     impossible
 
-convHCases :: NCofArg => DomArg => EvalClosure HCases -> EvalClosure HCases -> Bool
-convHCases (EC sub env _ cs) (EC sub' env' _ cs') =
-  let ?recurse = DontRecurse
-  in convHCases' sub env cs sub' env' cs'
+convCases :: NCofArg => DomArg => CaseTag -> EvalClosure Cases -> CaseTag -> EvalClosure Cases -> Bool
+convCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') =
+  (tag == tag' && conv sub sub' && conv env env')
+  ||
+  (let ?recurse = DontRecurse
+   in convCases' sub env cs sub' env' cs')
+
+convHCases :: NCofArg => DomArg => CaseTag -> EvalClosure HCases -> CaseTag -> EvalClosure HCases -> Bool
+convHCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') =
+  (tag == tag' && conv sub sub' && conv env env')
+  ||
+  (let ?recurse = DontRecurse
+   in convHCases' sub env cs sub' env' cs')
 
 instance Conv NeCof where
   conv c c' = case (c, c') of

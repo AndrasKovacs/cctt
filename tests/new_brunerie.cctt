@@ -476,30 +476,25 @@ plus₂ : g2S² → g2S² → g2S² :=
           (λ[base2.     λ x. x;
              loop2 i j. λ x. surfc x i j]);
 
-f7 : (Ω (Suspdot S²)).1 → g2Trunc S² :=
+-- S²ToSetElim (B : S² → U) (set : (x : S²) → isSet (B x))(b : B base2) : (x : S²) → B x
 
-  let g2S²-eqv-g2S² (x : S²) : equiv g2S² g2S² :=
-        plus₂ (g2inc x)
-      , ?_
+-- foo (x : S²) : isEquiv g2S² g2S² (plus₂ (g2inc x)) :=
+--   S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x))) ?_ ?_;
 
-      -- -- hangs! (in constant memory)
-      -- , S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x)))
-      --               (λ x. isProp-isSet (isEquiv g2S² g2S² (plus₂ (g2inc x)))
-      --                                  (isPropIsEquiv g2S² g2S² (plus₂ (g2inc x))))
-      --               (idIsEquiv g2S²)
-      ;
-  ?
-;
+-- g2S²-eqv-g2S² (x : S²) : equiv g2S² g2S² :=
+--     plus₂ (g2inc x)
+--   , S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x))) ?_ ?_;
 
-  -- ∥S²∥₂≃∥S²∥₂ : (x : S²) → ∥ S² ∥₂ ≃ ∥ S² ∥₂
-  -- fst (∥S²∥₂≃∥S²∥₂ x) = ∣ x ∣₂ +₂_
-  -- snd (∥S²∥₂≃∥S²∥₂ x) = help x
-  --   where
-  --   help : (x : S²) → isEquiv {A = ∥ S² ∥₂}{∥ S² ∥₂} (∣ x ∣₂ +₂_)
-  --   help = S²ToSetElim {A = λ x → isEquiv (_+₂_ ∣ x ∣₂)}
-  --                      (λ x → isProp→isSet {A = isEquiv {A = ∥ S² ∥₂}{∥ S² ∥₂} (_+₂_ ∣ x ∣₂)}
-  --                                          (isPropIsEquiv {A = ∥ S² ∥₂}{B = ∥ S² ∥₂} (_+₂_ ∣ x ∣₂)))
-  --                      (idIsEquiv ∥ S² ∥₂)
+  -- , S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x)))
+  --               (λ x. isProp-isSet (isEquiv g2S² g2S² (plus₂ (g2inc x)))
+  --                                  (isPropIsEquiv g2S² g2S² (plus₂ (g2inc x))))
+  --               ((idEquiv g2S²).2)
+
+
+-- f7 : (Ω (Suspdot S²)).1 → g2Trunc S² :=
+--   ?
+-- ;
+
 
   -- Code : Susp S² → Type₀
   -- Code north = ∥ S² ∥₂

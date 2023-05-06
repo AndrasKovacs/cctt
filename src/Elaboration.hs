@@ -149,13 +149,15 @@ check t topA = frcPos t \case
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- readIORef (tyinfo^.constructors)
         cs <- elabCases params b (LM.elems cons) cs
-        pure $! Split (b^.name) (quote b) cs
+        tag <- newCaseTag
+        pure $! Split (b^.name) (quote b) tag cs
       VHTyCon inf params -> do
         frz <- readIORef (inf^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- readIORef (inf^.constructors)
-        cs <- elabHCases params b (LM.elems cons) cs
-        pure $! HSplit (b^.name) (quote b) cs
+        tag <- newCaseTag
+        cs <- elabHCases params b tag (LM.elems cons) cs
+        pure $! HSplit (b^.name) (quote b) tag cs
       _ ->
         err $ ExpectedInductiveType (quote a)
 
@@ -240,15 +242,17 @@ check t topA = frcPos t \case
           unless frz $ err $ GenericError "Can't case split on the type that's being defined"
           cons <- readIORef $ typeinfo^.constructors
           cs <- elabCases params bv (LM.elems cons) cs
-          pure $ Case t "_" qb cs
+          tag <- newCaseTag
+          pure $ Case t "_" qb tag cs
         VHTyCon inf params -> do
           let qb = bind "_" a (quote a) \_ -> quote b
           let bv = NCl "_" $ CConst b
           frz <- readIORef (inf^.frozen)
           unless frz $ err $ GenericError "Can't case split on the type that's being defined"
           cons <- LM.elems <$!> readIORef (inf^.constructors)
-          cs <- elabHCases params bv cons cs
-          pure $ HCase t "_" qb cs
+          tag <- newCaseTag
+          cs <- elabHCases params bv tag cons cs
+          pure $ HCase t "_" qb tag cs
         _ ->
           err $ ExpectedInductiveType (quote a)
 
@@ -757,7 +761,8 @@ inferNonSplit t = frcPos t \case
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- LM.elems <$!> readIORef (tyinfo^.constructors)
         cs <- elabCases params bv cons cs
-        pure $! Infer (Case t x b cs) (bv ∙ eval t)
+        tag <- newCaseTag
+        pure $! Infer (Case t x b tag cs) (bv ∙ eval t)
       VHTyCon inf params -> do
 
         b <- bind x a (quote a) \_ -> check b VU
@@ -765,8 +770,9 @@ inferNonSplit t = frcPos t \case
         frz <- readIORef (inf^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- LM.elems <$!> readIORef (inf^.constructors)
-        cs <- elabHCases params bv cons cs
-        pure $! Infer (HCase t x b cs) (bv ∙ eval t)
+        tag <- newCaseTag
+        cs <- elabHCases params bv tag cons cs
+        pure $! Infer (HCase t x b tag cs) (bv ∙ eval t)
       a ->
         err $ ExpectedInductiveType (quote a)
 
@@ -852,10 +858,10 @@ elabHCases' params b cons cs = case (cons, cs) of
   _ ->
     err CaseMismatch
 
-elabHCases :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> IO HCases)
-elabHCases params b cons cs = do
+elabHCases :: Elab (Env -> NamedClosure -> CaseTag -> [HDConInfo] -> [P.CaseItem] -> IO HCases)
+elabHCases params b tag cons cs = do
   cs <- elabHCases' params b cons cs
-  modState (hCaseBoundaryChecks %~ (HCBC params cons b cs:))
+  modState (hCaseBoundaryChecks %~ (HCBC params cons b tag cs:))
   pure cs
 
 ----------------------------------------------------------------------------------------------------
@@ -1094,11 +1100,11 @@ guardTopShadowing x = do
 -- HIT case boundary checking
 ----------------------------------------------------------------------------------------------------
 
-evalHCaseBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure HCases -> VSys)
-evalHCaseBoundary bnd casety casecl = case bnd of
+evalHCaseBoundary :: EvalArgs (Sys -> NamedClosure -> CaseTag -> EvalClosure HCases -> VSys)
+evalHCaseBoundary bnd casety tag casecl = case bnd of
   SEmpty          -> vsempty
-  SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety casecl)
-                            (evalHCaseBoundary bnd casety casecl)
+  SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety tag casecl)
+                            (evalHCaseBoundary bnd casety tag casecl)
 
 neSysCompat :: Elab (Recurse -> Tm -> NeSys -> IO ())
 neSysCompat rc t = \case
@@ -1111,47 +1117,47 @@ neSysCompat rc t = \case
     neSysCompat rc t sys
 
 checkHCaseBoundary' :: Elab (   HDConInfo -> Recurse -> Env -> Sub
-                             -> [Name] -> Tm -> NamedClosure -> EvalClosure HCases -> IO ())
-checkHCaseBoundary' ~inf rc params sub is body casety casecl = case is of
+                             -> [Name] -> Tm -> NamedClosure -> CaseTag -> EvalClosure HCases -> IO ())
+checkHCaseBoundary' ~inf rc params sub is body casety tag casecl = case is of
   [] -> do
     let vbnd = (let ?env = params; ?sub = sub; ?recurse = rc
-                in evalHCaseBoundary (inf^.boundary) casety casecl)
+                in evalHCaseBoundary (inf^.boundary) casety tag casecl)
 
     case vbnd of
       VSTotal v        -> conv (eval body) v
       VSNe (WIS sys _) -> neSysCompat rc body sys
 
   x:is ->
-    bindI x \_ -> checkHCaseBoundary' inf rc params (liftSub sub) is body casety casecl
+    bindI x \_ -> checkHCaseBoundary' inf rc params (liftSub sub) is body casety tag casecl
 
 checkHCaseBoundary :: Elab (  HDConInfo -> Recurse -> Env -> Sub -> Tel -> [Name] -> [Name]
-                           -> Tm -> NamedClosure -> EvalClosure HCases -> IO ())
-checkHCaseBoundary ~inf rc params sub fields fs is body casety casecl = case (fields, fs) of
+                           -> Tm -> NamedClosure -> CaseTag -> EvalClosure HCases -> IO ())
+checkHCaseBoundary ~inf rc params sub fields fs is body casety tag casecl = case (fields, fs) of
   (TNil, []) ->
-    checkHCaseBoundary' inf rc params sub is body casety casecl
+    checkHCaseBoundary' inf rc params sub is body casety tag casecl
   (TCons _ a fields, x:fs) -> do
     let ~va = evalIn params a
     bind x va (quote va) \var ->
-      checkHCaseBoundary inf rc (EDef params var) sub fields fs is body casety casecl
+      checkHCaseBoundary inf rc (EDef params var) sub fields fs is body casety tag casecl
   _ ->
     impossible
 
 checkHCaseBoundaries' :: Elab (   Recurse -> Env -> [HDConInfo] -> HCases
-                               -> NamedClosure -> EvalClosure HCases -> IO ())
-checkHCaseBoundaries' rc params cons cs casety casecl = case (cons, cs) of
+                               -> NamedClosure -> CaseTag -> EvalClosure HCases -> IO ())
+checkHCaseBoundaries' rc params cons cs casety tag casecl = case (cons, cs) of
   ([], HCSNil) ->
     pure ()
   (inf:cons, HCSCons _ fs is t cs) -> do
-    checkHCaseBoundary inf rc params (emptySub (dom ?cof)) (inf^.fieldTypes) fs is t casety casecl
-    checkHCaseBoundaries' rc params cons cs casety casecl
+    checkHCaseBoundary inf rc params (emptySub (dom ?cof)) (inf^.fieldTypes) fs is t casety tag casecl
+    checkHCaseBoundaries' rc params cons cs casety tag casecl
   _ ->
     impossible
 
 checkHCaseBoundaries :: Elab (Recurse -> IO ())
 checkHCaseBoundaries recurse = do
   st <- getState
-  forM_ (st^.hCaseBoundaryChecks) \(HCBC params cons casety cs) -> do
-    checkHCaseBoundaries' recurse params cons cs casety (EC (idSub (dom ?cof)) ?env recurse cs)
+  forM_ (st^.hCaseBoundaryChecks) \(HCBC params cons casety tag cs) -> do
+    checkHCaseBoundaries' recurse params cons cs casety tag (EC (idSub (dom ?cof)) ?env recurse cs)
   putState (st & hCaseBoundaryChecks .~ [])
 
 ----------------------------------------------------------------------------------------------------

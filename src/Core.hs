@@ -13,7 +13,6 @@ FORCING
     - We lose system forcing
   - semantic system cons-es always take forced cofibrations
 
-
 TODO:
   - propagate VHole from strict system projection
 
@@ -455,8 +454,8 @@ localVar x = go ?env x where
 capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
   CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = s; ?recurse = rc in eval t
-  CSplit b ecs          -> case_ u b ecs
-  CHSplit b ecs         -> hcase u b ecs
+  CSplit b tag ecs      -> case_ u b tag ecs
+  CHSplit b tag ecs     -> hcase u b tag ecs
 
   CCoePi r r' a b t ->
     let ~x = u in
@@ -1258,11 +1257,11 @@ lookupCase i sp cs = case i // cs of
   (i, CSCons _ _  _    cs) -> lookupCase (i - 1) sp cs
   _                        -> impossible
 
-case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
-case_ t b ecs@(EC sub env rc cs) = case frc t of
+case_ :: NCofArg => DomArg => (Val -> NamedClosure -> CaseTag -> EvalClosure Cases -> Val)
+case_ t b tag ecs@(EC sub env rc cs) = case frc t of
   VDCon dci sp           -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
-  n@(VNe _ is)           -> VNe (NCase n b ecs) is
-  n@(VHCom _ _ _ _ _ is) -> VNe (NCase n b ecs) is
+  n@(VNe _ is)           -> VNe (NCase n b tag ecs) is
+  n@(VHCom _ _ _ _ _ is) -> VNe (NCase n b tag ecs) is
   v@VHole{}              -> v
   _                      -> impossible
 {-# inline case_ #-}
@@ -1413,8 +1412,8 @@ sysCofs = \case
   NSEmpty -> []
   NSCons t cs -> t^.binds : sysCofs cs
 
-hcase :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure HCases -> Val)
-hcase t b ecs@(EC sub env rc cs) = case frc t of
+hcase :: NCofArg => DomArg => (Val -> NamedClosure -> CaseTag -> EvalClosure HCases -> Val)
+hcase t b tag ecs@(EC sub env rc cs) = case frc t of
 
   VHDCon i ps fs s _ ->
     let ?sub = sub; ?env = env; ?recurse = rc in
@@ -1429,10 +1428,10 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
      --           (coe r r' B* (case base B cs))
     let bbind = bindI "i" \i -> b ∙ hcom r i a (frc sys) base in
     hcomdn r r' (b ∙ t)
-      (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs)) sys)
-      (coed r r' bbind (hcase base b ecs))
+      (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) sys)
+      (coed r r' bbind (hcase base b tag ecs))
 
-  n@(VNe _ is) -> VNe (NHCase n b ecs) is
+  n@(VNe _ is) -> VNe (NHCase n b tag ecs) is
   v@VHole{}    -> v
   v            -> impossible
 
@@ -1473,70 +1472,70 @@ evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 
 eval :: EvalArgs (Tm -> Val)
 eval = \case
-  TopVar inf        -> inf^.defVal
-  RecursiveCall inf -> recursiveCall inf
-  LocalVar x        -> localVar x
-  Let x _ t u       -> define (eval t) (eval u)
+  TopVar inf         -> inf^.defVal
+  RecursiveCall inf  -> recursiveCall inf
+  LocalVar x         -> localVar x
+  Let x _ t u        -> define (eval t) (eval u)
 
   -- Inductives
-  TyCon i ts        -> VTyCon i (params ts)
-  DCon i sp         -> VDCon i (spine sp)
-  Case t x b cs     -> case_ (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
-  Split x b cs      -> VLam $ NCl x $ CSplit (evalClosure x b) (EC ?sub ?env ?recurse cs)
-  HSplit x b cs     -> VLam $ NCl x $ CHSplit (evalClosure x b) (EC ?sub ?env ?recurse cs)
-  HTyCon i ts       -> VHTyCon i (params ts)
-  HDCon i ps fs s   -> hdcon i (lazyParams ps) (spine fs) (sub s)
-  HCase t x b cs    -> hcase (eval t) (evalClosure x b) (EC ?sub ?env ?recurse cs)
+  TyCon i ts         -> VTyCon i (params ts)
+  DCon i sp          -> VDCon i (spine sp)
+  Case t x b tag cs  -> case_ (eval t) (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
+  Split x b tag cs   -> VLam $ NCl x $ CSplit (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
+  HSplit x b tag cs  -> VLam $ NCl x $ CHSplit (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
+  HTyCon i ts        -> VHTyCon i (params ts)
+  HDCon i ps fs s    -> hdcon i (lazyParams ps) (spine fs) (sub s)
+  HCase t x b tag cs -> hcase (eval t) (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
 
   -- Pi
-  Pi x a b          -> VPi (eval a) (evalClosure x b)
-  App t u           -> eval t ∙ eval u
-  Lam x t           -> VLam (evalClosure x t)
+  Pi x a b           -> VPi (eval a) (evalClosure x b)
+  App t u            -> eval t ∙ eval u
+  Lam x t            -> VLam (evalClosure x t)
 
   -- Sigma
-  Sg x a b          -> VSg (eval a) (evalClosure x b)
-  Pair x t u        -> VPair x (eval t) (eval u)
-  Proj1 t x         -> proj1 x (eval t)
-  Proj2 t x         -> proj2 x (eval t)
+  Sg x a b           -> VSg (eval a) (evalClosure x b)
+  Pair x t u         -> VPair x (eval t) (eval u)
+  Proj1 t x          -> proj1 x (eval t)
+  Proj2 t x          -> proj2 x (eval t)
 
   -- Wrap
-  Wrap x a          -> VWrap x (eval a)
-  Pack x t          -> VPack x (eval t)
-  Unpack t x        -> unpack x (eval t)
+  Wrap x a           -> VWrap x (eval a)
+  Pack x t           -> VPack x (eval t)
+  Unpack t x         -> unpack x (eval t)
 
   -- U
-  U                 -> VU
+  U                  -> VU
 
   -- Path
-  Path x a t u      -> VPath (evalIClosure x a) (eval t) (eval u)
-  PApp l r t i      -> papp (eval l) (eval r) (eval t) (evalI i)
-  PLam l r x t      -> VPLam (eval l) (eval r) (evalIClosure x t)
+  Path x a t u       -> VPath (evalIClosure x a) (eval t) (eval u)
+  PApp l r t i       -> papp (eval l) (eval r) (eval t) (evalI i)
+  PLam l r x t       -> VPLam (eval l) (eval r) (evalIClosure x t)
 
   -- Kan
-  Coe r r' x a t    -> coe   (evalI r) (evalI r') (bindIS x \_ -> eval a) (eval t)
-  HCom r r' a t b   -> hcom' (evalI r) (evalI r') (eval a) (evalSysHCom' t) (eval b)
+  Coe r r' x a t     -> coe   (evalI r) (evalI r') (bindIS x \_ -> eval a) (eval t)
+  HCom r r' a t b    -> hcom' (evalI r) (evalI r') (eval a) (evalSysHCom' t) (eval b)
 
   -- Glue
-  GlueTy a sys      -> glueTy (eval a) (evalSys sys)
-  Glue t eqs sys    -> glue   (eval t) (evalSys eqs) (evalSys sys)
-  Unglue t sys      -> unglue (eval t) (evalSys sys)
+  GlueTy a sys       -> glueTy (eval a) (evalSys sys)
+  Glue t eqs sys     -> glue   (eval t) (evalSys eqs) (evalSys sys)
+  Unglue t sys       -> unglue (eval t) (evalSys sys)
 
   -- Line
-  Line x a          -> VLine (evalIClosure x a)
-  LApp t i          -> lapp (eval t) (evalI i)
-  LLam x t          -> VLLam (evalIClosure x t)
+  Line x a           -> VLine (evalIClosure x a)
+  LApp t i           -> lapp (eval t) (evalI i)
+  LLam x t           -> VLLam (evalIClosure x t)
 
   -- Misc
-  WkI t             -> wkIS (eval t)
-  Hole h            -> case h of SrcHole x p -> VHole (VSrcHole x p ?sub ?env)
-                                 ErrHole msg -> VHole (VErrHole msg)
+  WkI t              -> wkIS (eval t)
+  Hole h             -> case h of SrcHole x p -> VHole (VSrcHole x p ?sub ?env)
+                                  ErrHole msg -> VHole (VErrHole msg)
 
   -- Builtins
-  Refl t            -> refl (eval t)
-  Sym a x y p       -> sym (eval a) (eval x) (eval y) (eval p)
-  Trans a x y z p q -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
-  Ap f x y p        -> ap_ (eval f) (eval x) (eval y) (eval p)
-  Com r r' i a t b  -> com' (evalI r) (evalI r') (bindIS i \_ -> eval a) (evalSysHCom' t) (eval b)
+  Refl t             -> refl (eval t)
+  Sym a x y p        -> sym (eval a) (eval x) (eval y) (eval p)
+  Trans a x y z p q  -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
+  Ap f x y p         -> ap_ (eval f) (eval x) (eval y) (eval p)
+  Com r r' i a t b   -> com' (evalI r) (evalI r') (bindIS i \_ -> eval a) (evalSysHCom' t) (eval b)
 
 ----------------------------------------------------------------------------------------------------
 -- Forcing
@@ -1641,8 +1640,8 @@ instance Force Ne Val where
     NCoe r r' a t     -> frc (coe r r' (frc a) (frc t))
     NUnglue t sys     -> frc (unglue (frc t) (frc sys))
     NLApp t i         -> frc (lapp (frc t) i)
-    NCase t b cs      -> frc (case_ (frc t) b cs)
-    NHCase t b cs     -> frc (hcase (frc t) b cs)
+    NCase t b tag cs  -> frc (case_ (frc t) b tag cs)
+    NHCase t b tag cs -> frc (hcase (frc t) b tag cs)
   {-# noinline frc #-}
 
   frcS = \case
@@ -1657,8 +1656,8 @@ instance Force Ne Val where
     NCoe r r' a t     -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
     NUnglue t sys     -> frc (unglue (frcS t) (frcS sys))
     NLApp t i         -> frc (lapp (frcS t) (frcS i))
-    NCase t b cs      -> frc (case_ (frcS t) (sub b) (sub cs))
-    NHCase t b cs     -> frc (hcase (frcS t) (sub b) (sub cs))
+    NCase t b tag cs  -> frc (case_ (frcS t) (sub b) tag (sub cs))
+    NHCase t b tag cs -> frc (hcase (frcS t) (sub b) tag (sub cs))
 
 instance Force NeSys VSys where
 
@@ -1757,8 +1756,8 @@ unSubNeS = \case
   NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
   NUnglue a sys      -> NUnglue (sub a) (sub sys)
   NLApp t i          -> NLApp (sub t) (sub i)
-  NCase t b cs       -> NCase (sub t) (sub b) (sub cs)
-  NHCase t b cs      -> NHCase (sub t) (sub b) (sub cs)
+  NCase t b tag cs   -> NCase (sub t) (sub b) tag (sub cs)
+  NHCase t b tag cs  -> NHCase (sub t) (sub b) tag (sub cs)
 
 ----------------------------------------------------------------------------------------------------
 -- Definitions

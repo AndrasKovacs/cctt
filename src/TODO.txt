@@ -1,3 +1,0 @@
-
-Refactoring:
-- try to get rid of redundancy in the many bind/push/fresh functions in Core

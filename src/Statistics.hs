@@ -33,9 +33,9 @@ instance GetStats Tm where
     DCon _ sp        -> stats sp
     HTyCon _ ps      -> stats ps
     HDCon _ _ sp _   -> stats sp
-    HCase t _ b cs   -> stats t <> stats b <> stats cs
+    HCase t _ b _ cs -> stats t <> stats b <> stats cs
     HSplit{}         -> impossible
-    Case t _ b cs    -> stats t <> stats b <> stats cs
+    Case t _ b _ cs  -> stats t <> stats b <> stats cs
     Split{}          -> impossible
     Pi _ a b         -> stats a <> stats b
     App t u          -> stats t <> stats u

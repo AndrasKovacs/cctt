@@ -88,6 +88,7 @@ instance Show HTyConInfo where
 --------------------------------------------------------------------------------
 
 type Ty = Tm
+type CaseTag = Int
 
 data Tel
   = TNil
@@ -116,11 +117,11 @@ data Tm
   | HTyCon {-# nounpack #-} HTyConInfo Spine
   -- LazySpine is for params which are usually quoted from syntax.
   | HDCon {-# nounpack #-} HDConInfo LazySpine Spine Sub
-  | HCase Tm Name ~Ty HCases
-  | HSplit Name ~Ty HCases
+  | HCase Tm Name ~Ty CaseTag HCases
+  | HSplit Name ~Ty CaseTag HCases
 
-  | Case Tm Name ~Ty Cases
-  | Split Name ~Ty Cases
+  | Case Tm Name ~Ty CaseTag Cases
+  | Split Name ~Ty CaseTag Cases
 
   | Pi Name Ty Ty
   | App Tm Tm
@@ -343,8 +344,8 @@ data Ne
   | NUnpack Ne Name
   | NCoe I I (BindI Val) Val
   | NUnglue Ne NeSys
-  | NCase Val NamedClosure (EvalClosure Cases)
-  | NHCase Val NamedClosure (EvalClosure HCases)
+  | NCase Val NamedClosure CaseTag (EvalClosure Cases)
+  | NHCase Val NamedClosure CaseTag (EvalClosure HCases)
   deriving Show
 
 data VDSpine
@@ -377,8 +378,8 @@ data Closure
   = CEval (EvalClosure Tm)
 
   -- ^ Body of lambdaCase
-  | CSplit NamedClosure (EvalClosure Cases)
-  | CHSplit NamedClosure (EvalClosure HCases) -- HIT version
+  | CSplit NamedClosure CaseTag (EvalClosure Cases)
+  | CHSplit NamedClosure CaseTag (EvalClosure HCases) -- HIT version
 
   -- ^ Body of function coercions.
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
@@ -560,9 +561,9 @@ instance SubAction (EvalClosure a) where
 
 instance SubAction Closure where
   sub cl = case cl of
-    CEval     ecl -> CEval (sub ecl)
-    CSplit  b ecl -> CSplit (sub b) (sub ecl)
-    CHSplit b ecl -> CHSplit (sub b) (sub ecl)
+    CEval     ecl     -> CEval (sub ecl)
+    CSplit  b tag ecl -> CSplit (sub b) tag (sub ecl)
+    CHSplit b tag ecl -> CHSplit (sub b) tag (sub ecl)
 
     -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.

@@ -69,7 +69,7 @@ data LoadState = LoadState {
 
 data HCaseBoundaryCheck where
   HCBC :: (LocalsArg, NCofArg, DomArg, EnvArg, PosArg) =>
-    Env -> [HDConInfo] -> NamedClosure -> HCases -> HCaseBoundaryCheck
+    Env -> [HDConInfo] -> NamedClosure -> CaseTag -> HCases -> HCaseBoundaryCheck
   deriving Show via DontShow HCaseBoundaryCheck
 
 data State = State {
@@ -80,6 +80,7 @@ data State = State {
   , stateParsingTime         :: NominalDiffTime
   , statePrintingOpts        :: PrintingOpts
   , stateHCaseBoundaryChecks :: [HCaseBoundaryCheck]
+  , stateCaseTag             :: Int
   } deriving Show
 
 makeFields ''LoadState
@@ -89,11 +90,19 @@ makeFields ''PrintingOpts
 defaultPrintingOpts :: PrintingOpts
 defaultPrintingOpts = PrintingOpts Nothing False False True
 
+newCaseTag :: IO Int
+newCaseTag = do
+  s <- getState
+  let t = s^.caseTag
+  putState (s & caseTag .~ t + 1)
+  pure t
+{-# inline newCaseTag #-}
+
 initLoadState :: LoadState
 initLoadState = LoadState mempty mempty mempty mempty
 
 initState :: State
-initState = State mempty mempty 0 initLoadState 0 defaultPrintingOpts []
+initState = State mempty mempty 0 initLoadState 0 defaultPrintingOpts [] 0
 
 stateRef :: IORef State
 stateRef = runIO $ newIORef initState
