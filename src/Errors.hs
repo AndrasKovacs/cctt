@@ -17,31 +17,31 @@ data Error
   | UnexpectedI
   | UnexpectedIType
   | ExpectedI
-  | ExpectedPiPathLine Tm
-  | ExpectedSg Tm
-  | ExpectedGlueTy Tm
-  | ExpectedPathLine Tm
-  | ExpectedPath Tm
-  | ExpectedPathULineU Tm
-  | ExpectedNonDepFun Tm
+  | ExpectedPiPathLine ~Tm
+  | ExpectedSg ~Tm
+  | ExpectedGlueTy ~Tm
+  | ExpectedPathLine ~Tm
+  | ExpectedPath ~Tm
+  | ExpectedPathULineU ~Tm
+  | ExpectedNonDepFun ~Tm
   | CantInferLam
   | CantInferPair
   | CantInfer
   | CantInferGlueTm
-  | CantConvert Tm Tm
+  | CantConvert ~Tm ~Tm
   | CantConvertCof Cof Cof
-  | CantConvertEndpoints Tm Tm
-  | CantConvertReflEndpoints Tm Tm
-  | CantConvertExInf Tm Tm
+  | CantConvertEndpoints ~Tm ~Tm
+  | CantConvertReflEndpoints ~Tm ~Tm
+  | CantConvertExInf ~Tm ~Tm
   | GlueTmSystemMismatch Sys
   | TopShadowing SourcePos
   | NonNeutralCofInSystem
-  | NoSuchField Name Tm
+  | NoSuchField Name ~Tm
   | CantInferHole
   | ImportCycle FilePath [FilePath]
   | CantOpenFile FilePath
   | GenericError String
-  | ExpectedInductiveType Tm
+  | ExpectedInductiveType ~Tm
   | CaseMismatch
   deriving Show
 

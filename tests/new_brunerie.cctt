@@ -1,15 +1,24 @@
 
 -- Adapted from
--- https://github.com/agda/cubical/blob/56363ae66898ad65d44795b6b474e0cbd964caa9/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
+-- https://github.com/agda/cubical/blob/50f0e7b8fb156d14b12be21ec5e529fe3ca497ca/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
 
 -- Basics
 ----------------------------------------------------------------------------------------------------
 
-isContr (A : U) : U := (x : A) × ((y : A) → x = y);
+Square (A : U) (a0 a1 b0 b1 : A)
+               (u : a0 = a1) (v : b0 = b1)
+               (r0 : a0 = b0) (r1 : a1 = b1) : U
+ := r0 ={i. u i = v i} r1;
+
+isContr (A : U) : U := (fst : A) × ((y : A) → fst = y);
 isProp (A : U) : U := (a b : A) → a = b;
 isSet (A : U) : U := (a b : A) → isProp (a = b);
 isGroupoid (A : U) : U := (a b : A) → isSet (a = b);
 is2Groupoid (A : U) : U := (a b : A) → isGroupoid (a = b);
+
+hSet      : U := (fst : U) × isSet fst;
+hGroupoid : U := (fst : U) × isGroupoid fst;
+
 
 the (A : U)(x : A) := x;
 
@@ -23,6 +32,10 @@ propSet : (A : U) (h : isProp A) → isSet A
               i=1. h a b;
               j=0. h a (p i);
               j=1. h a (q i)] a;
+
+isLogEquiv (A B : U)(f : A → B) : U := (B → A);
+isSection (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
+isRetraction (A B : U)(f : A → B) : U := (g : B → A) × (rinv : (x : B) → f (g x) = x);
 
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
@@ -73,81 +86,137 @@ subst (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
 
 discrete (A : U) : U := (a b : A) → dec (a = b);
 
+dNot (A : U) (a : A) : not (not A) := λ f. f a;
+
+isPropN0 : isProp N0 := λ[];
+
+isPropNot (A : U) : isProp (not A) := λ f g i x. isPropN0 (f x) (g x) i;
+
+stable (A:U) : U := not (not A) → A;
+
+decStable (A : U) : dec A → stable A := λ[
+ left a. λ _. a;
+ right b. λ h. case (h b) []];
+
+
+-- Hedberg
+----------------------------------------------------------------------------------------------------
+
+wkConstant (A : U) (f : A → A) : U := (x y : A) → f x = f y;
+
+constant (A : U) : U := (f:A → A) * wkConstant A f;
+
+hedbergLemma (A : U)(a : A) (f : (x : A) → a = x → a = x) :
+  (b : A) (p : a = b) → Square A a a a b refl p (f a refl) (f b p) :=
+  J A a
+    (λ b p. Square A a a a b refl p (f a refl) (f b p))
+    refl;
+
+stable-constant (A : U) (sA : stable A) : constant A :=
+  (λ x. sA (dNot A x), λ x y i. sA (isPropNot (not A) (dNot A x) (dNot A y) i));
+
+hedbergStable (A : U) (a b : A) (h : (x : A) -> stable (a = x))(p q : a = b) : p = q :=
+
+  let rem1 (x : A) : constant (a = x) := stable-constant (a = x) (h x);
+
+  let f (x : A) : a = x → a = x := (rem1 x).1;
+
+  let fConst (x : A) : wkConstant (a = x) (f x) := (rem1 x).2;
+
+  let rem4 : Square A a a b b refl refl (f b p) (f b q) := fConst b p q;
+
+  let r : a = a := f a refl;
+
+  let rem2 (i j : I) := hedbergLemma A a f b p i j;
+  let rem3 (i j : I) := hedbergLemma A a f b q i j;
+
+  λ j i. hcom 0 1 [j=0. rem2 i
+                 ; j=1. rem3 i
+		 ; i=0. r
+		 ; i=1. rem4 j] a;
+
+hedbergS (A:U) (h : (a x : A) -> stable (a = x)) : isSet A :=
+  λ a b. hedbergStable A a b (h a);
+
+hedberg (A : U) (h : discrete A) : isSet A :=
+  λ a b. hedbergStable A a b (λ b. decStable (a = b) (h a b));
+
+
 -- Integers
 ----------------------------------------------------------------------------------------------------
 
-inductive nat := zero | suc nat;
+inductive ℕ := zero | suc ℕ;
 
 num1 := suc zero;
 num2 := suc (suc zero);
 num3 := suc (suc (suc zero));
 num4 := suc (suc (suc (suc zero)));
 
-pred : nat → nat := λ[
+pred : ℕ → ℕ := λ[
   zero. zero;
   suc n. n];
 
-inductive Z := pos nat | neg nat;
+inductive ℤ := pos ℕ | neg ℕ;
 
-zeroZ := pos zero;
+zeroℤ := pos zero;
 
-predZ : Z → Z := λ[
+predℤ : ℤ → ℤ := λ[
   pos u. case u [zero. neg zero; suc n. pos n];
   neg v. neg (suc v)];
 
-sucZ : Z → Z := λ[
+sucℤ : ℤ → ℤ := λ[
   pos u. pos (suc u);
   neg v. case v [zero. pos zero; suc n. neg n]];
 
-predsucZ : (x : Z) → x = predZ (sucZ x) := λ[
+predsucℤ : (x : ℤ) → x = predℤ (sucℤ x) := λ[
   pos u. refl;
-  neg v. case v (v. neg v = predZ (sucZ (neg v))) [
+  neg v. case v (v. neg v = predℤ (sucℤ (neg v))) [
     zero. refl;
     suc n. refl
     ]
   ];
 
-sucpredZ : (x : Z) → sucZ (predZ x) = x := λ[
-  pos u. case u (u. sucZ (predZ (pos u)) = pos u) [
+sucpredℤ : (x : ℤ) → sucℤ (predℤ x) = x := λ[
+  pos u. case u (u. sucℤ (predℤ (pos u)) = pos u) [
     zero.  refl;
     suc n. refl
     ];
   neg v. refl
   ];
 
-caseNat (A : U) (x y : A) : nat → A := λ[
+caseℕ (A : U) (x y : A) : ℕ → A := λ[
   zero.  x;
   suc _. y];
 
-caseDNat (P : nat → U) (z : P zero) (s : (n : nat) → P (suc n)) : (n : nat) → P n := λ[
+caseDℕ (P : ℕ → U) (z : P zero) (s : (n : ℕ) → P (suc n)) : (n : ℕ) → P n := λ[
   zero. z;
   suc n. s n];
 
-znots (n : nat) : not (zero = suc n) :=
-  λ h. subst nat (caseNat U nat N0) zero (suc n) h zero;
+znots (n : ℕ) : not (zero = suc n) :=
+  λ h. subst ℕ (caseℕ U ℕ N0) zero (suc n) h zero;
 
-discreteNat : discrete nat := λ[
+discreteℕ : discrete ℕ := λ[
   zero.  λ[zero.  left refl;
            suc m. right (λ p. case (znots m p) [])];
   suc n. λ[zero.  right (λ p. case (znots n p⁻¹) []);
-           suc m. case (discreteNat n m) [
+           suc m. case (discreteℕ n m) [
              left p. left (ap (λ x. suc x) p);
              right p. right (λ q. case (p (ap pred q)) [])
            ]]
   ];
 
-posNotneg (a b : nat) : not (pos a = neg b) :=
-  λ h. subst Z (λ[pos _. Unit; neg _. N0]) (pos a) (neg b) h tt;
+posNotneg (a b : ℕ) : not (pos a = neg b) :=
+  λ h. subst ℤ (λ[pos _. Unit; neg _. N0]) (pos a) (neg b) h tt;
 
-injPos (a b : nat) (h : pos a = pos b) : a = b :=
-  subst Z (λ[pos c. a = c; neg _. N0]) (pos a) (pos b) h refl;
+injPos (a b : ℕ) (h : pos a = pos b) : a = b :=
+  subst ℤ (λ[pos c. a = c; neg _. N0]) (pos a) (pos b) h refl;
 
-injNeg (a b : nat) (h : neg a = neg b) : a = b :=
-  subst Z (λ[pos _. N0; neg c. a = c]) (neg a) (neg b) h refl;
+injNeg (a b : ℕ) (h : neg a = neg b) : a = b :=
+  subst ℤ (λ[pos _. N0; neg c. a = c]) (neg a) (neg b) h refl;
 
-discreteZ : discrete Z := λ[
+discreteℤ : discrete ℤ := λ[
   pos a. λ[
-    pos a'. case (discreteNat a a') [
+    pos a'. case (discreteℕ a a') [
       left p. left (ap (λ x. pos x) p);
       right p. right (λ q. p (injPos a a' q))
       ];
@@ -155,23 +224,23 @@ discreteZ : discrete Z := λ[
     ];
   neg b. λ[
     pos a. right (λ p. case (posNotneg a b p⁻¹) []);
-    neg b'. case (discreteNat b b') [
+    neg b'. case (discreteℕ b b') [
       left p. left (ap (λ x. neg x) p);
       right p. right (λ q. p (injNeg b b' q))
       ]
     ]
 ];
 
-sucZIso : iso Z Z :=
-    λ x. sucZ x
-  , λ x. predZ x
-  , predsucZ
-  , sucpredZ;
+sucℤIso : iso ℤ ℤ :=
+    λ x. sucℤ x
+  , λ x. predℤ x
+  , predsucℤ
+  , sucpredℤ;
 
--- OR: use the Hedberg and the hSet-ness of Z to define the equivalence
+sucPathℤ : ℤ = ℤ :=
+  ua ℤ ℤ (isoToEquiv ℤ ℤ sucℤIso);
 
-sucPathZ : Z = Z :=
-  ua Z Z (isoToEquiv Z Z sucZIso);
+isSetℤ : isSet ℤ := hedberg ℤ discreteℤ;
 
 
 -- H-levels
@@ -182,7 +251,7 @@ transport (A : I → U) (x : A 0) : A 1 := coe 0 1 A x;
 toPathP (A : I → U)(x : A 0)(y : A 1)(p : transport A x = y) : x ={i. A i} y :=
   λ i. hcom 0 1 [i=0 _. x; i=1 j. p j] (coe 0 i A x);
 
-HLevel := nat;
+HLevel := ℕ;
 
 isContr-isProp : (A : U) → isContr A → isProp A :=
   λ A cA a b. (cA.2 a)⁻¹ ∙ cA.2 b;
@@ -264,6 +333,53 @@ is2GroupoidΠ : (A : U)(B : A → U)(h : (x : A) → isOfHLevel num4 (B x)) → 
         (ap (λ x. ap (λ f i. f i z) x) S)
         i j k l;
 
+TypeOfHLevel (n : HLevel) : U := (fst : U) × isOfHLevel n fst;
+
+lemPropFam (A : U) (P : A → U) (pP : (x : A) → isProp (P x)) (a0 a1 : A)
+           (p : a0 = a1) (b0 : P a0) (b1 : P a1) : b0 ={ap P p} b1
+  := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
+
+ΣeqProp (A : U) (B : A → U) (pB : (a : A) → isProp (B a))
+       (u v : (fst : A) × B fst) (p : u.1 = v.1) : u = v
+  := λ i. (p i, lemPropFam A B pB u.1 v.1 p u.2 v.2 i);
+
+isPropΠ (A : U) (B : A → U) (h : (x : A) → isProp (B x))
+       (f0 f1 : (x : A) → B x) : f0 = f1
+  := λ i x. h x (f0 x) (f1 x) i;
+
+isPropΣ (A : U) (B : A → U) (pA : isProp A)
+        (pB : (fst : A) → isProp (B fst)) (t u : (fst : A) × B fst) : t = u
+  := ΣeqProp A B pB t u (pA t.1 u.1);
+
+lemProp (A : U) (h : A → isProp A) : isProp A
+  := λ a. h a a;
+
+isPropIsContr (A : U) : isProp (isContr A)
+  := let rem (t : isContr A) : isProp (isContr A)
+
+       := let T (x : A) : U := (y : A) → x = y;
+          let pA (x y : A) : x = y := λ i. hcom 0 1 [i=0. t.2 x; i=1 _. y] (t.2 y i);
+          let pB (x : A) : isProp (T x) := isPropΠ A (λ y. x = y) (λ y. isProp-isSet A pA x y);
+          isPropΣ A T pA pB;
+
+     lemProp (isContr A) rem;
+
+contrTypesUnique (A B : U)(cA : isContr A)(cB : isContr B) : A = B :=
+  ua A B (isoToEquiv A B (
+      λ _. cB.1
+    , λ _. cA.1
+    , λ a. (cA.2 a)⁻¹
+    , λ b. cB.2 b));
+
+isPropHContr : isProp (TypeOfHLevel zero) :=
+  λ x y. ΣeqProp U isContr isPropIsContr x y (contrTypesUnique x.1 y.1 x.2 y.2);
+
+isOfHLevelTypeOfHLevel : (n : HLevel) → isOfHLevel (suc n) (TypeOfHLevel n) := λ[
+  zero. isPropHContr;
+  suc n. ?_
+];
+
+
 -- Brunerie
 ----------------------------------------------------------------------------------------------------
 
@@ -272,8 +388,8 @@ higher inductive S¹ :=
   | loop1 (i : I) [i=0. base1; i=1. base1];
 
 helix : S¹ → U := λ[
-  base1. Z;
-  loop1 i. sucPathZ i
+  base1. ℤ;
+  loop1 i. sucPathℤ i
 ];
 
 connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
@@ -335,6 +451,8 @@ higher inductive sTrunc (A : U) :=
       ;j=0. a
       ;j=1. b];
 
+strunc' (A : U)(a b : sTrunc A) (p q : a = b) : p = q := λ i j. strunc a b p q i j;
+
 rec0 (A B : U) (Bset : isSet B) (f : A → B) : sTrunc A → B := λ[
   sinc x. f x;
   strunc x y p q i j.
@@ -353,6 +471,9 @@ higher inductive gTrunc (A : U) :=
          ;j=1. q k
          ;k=0. a
          ;k=1. b];
+
+gtrunc' (A : U) (a b : gTrunc A)(p q : a = b)(r s : p = q) : r = s :=
+  λ i j k. gtrunc a b p q r s i j k;
 
 rec1 (A B : U)(gB : isGroupoid B)(f : A → B) : gTrunc A → B := λ[
   ginc x. f x;
@@ -438,10 +559,10 @@ S²dot : Pointed₀ := (S², base2);
 Suspdot : U → Pointed₀ :=
   λ A. (Susp A, north);
 
-gincdot : Pointed₀ → Pointed₀ :=
+gdot : Pointed₀ → Pointed₀ :=
   λ Aa. (gTrunc Aa.1, ginc Aa.2);
 
-g2incdot : Pointed₀ → Pointed₀ :=
+g2dot : Pointed₀ → Pointed₀ :=
   λ Aa. (g2Trunc Aa.1, g2inc Aa.2);
 
 Ω : Pointed₀ → Pointed₀ :=
@@ -476,27 +597,64 @@ plus₂ : g2S² → g2S² → g2S² :=
           (λ[base2.     λ x. x;
              loop2 i j. λ x. surfc x i j]);
 
--- S²ToSetElim (B : S² → U) (set : (x : S²) → isSet (B x))(b : B base2) : (x : S²) → B x
+g2S²-eqv-g2S² (x : S²) : equiv g2S² g2S² :=
+    plus₂ (g2inc x)
+  , S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x)))
+                (λ x. isProp-isSet (isEquiv g2S² g2S² (plus₂ (g2inc x)))
+                                   (isPropIsEquiv g2S² g2S² (plus₂ (g2inc x))))
+                ((idEquiv g2S²).2) x;
 
--- foo (x : S²) : isEquiv g2S² g2S² (plus₂ (g2inc x)) :=
---   S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x))) ?_ ?_;
+Code : Susp S² → U := λ[
+  north. g2S²;
+  south. g2S²;
+  merid a i. ua g2S² g2S² (g2S²-eqv-g2S² a) i
+];
 
--- g2S²-eqv-g2S² (x : S²) : equiv g2S² g2S² :=
---     plus₂ (g2inc x)
---   , S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x))) ?_ ?_;
+f7 : (Ω (Suspdot S²)).1 → g2S² :=
+  λ p. coe 0 1 (i. Code (p i)) (g2inc base2);
 
-  -- , S²ToSetElim (λ x. isEquiv g2S² g2S² (plus₂ (g2inc x)))
-  --               (λ x. isProp-isSet (isEquiv g2S² g2S² (plus₂ (g2inc x)))
-  --                                  (isPropIsEquiv g2S² g2S² (plus₂ (g2inc x))))
-  --               ((idEquiv g2S²).2)
+HopfS² : S² → U := λ[
+  base2. S¹;
+  loop2 i j. Glue S¹ [i=0. S¹, idEquiv S¹
+                     ;i=1. S¹, idEquiv S¹
+                     ;j=0. S¹, idEquiv S¹
+                     ;j=1. S¹, rot (loop1 i), rotIsEquiv (loop1 i)]
+];
 
+codeTruncS² : g2S² → hGroupoid :=
+  rec2 S² hGroupoid
+          (isOfHLevelTypeOfHLevel num3)
+          (λ s. (gTrunc (HopfS² s), gtrunc' (HopfS² s)));
 
--- f7 : (Ω (Suspdot S²)).1 → g2Trunc S² :=
---   ?
--- ;
+g8 : (Ω² (g2dot S²dot)).1 → (Ω (gdot S¹dot)).1 :=
+  λ p i. coe 0 1 (j. (codeTruncS² (p i j)).1) (ginc base1);
 
+codeTruncS¹ : gTrunc S¹ → hSet :=
+  rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)));
 
-  -- Code : Susp S² → Type₀
-  -- Code north = ∥ S² ∥₂
-  -- Code south = ∥ S² ∥₂
-  -- Code (merid a i) = ua (∥S²∥₂≃∥S²∥₂ a) i
+g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
+  λ p. coe 0 1 (i. (codeTruncS¹ (p 1)).1) (sinc (pos zero));
+
+g10 : sTrunc ℤ → ℤ :=
+  rec0 ℤ ℤ isSetℤ (λ x. x);
+
+-- Original η₃ as in the paper
+η₃ : join S¹ S¹ → Susp S² := λ[
+  inl x. north;
+  inr x. north;
+  push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
+];
+
+-- Dropping the syms makes it compute fast (why?! maybe some slow inverse map gets applied with the sym?)
+η₃' : join S¹ S¹ → Susp S² := λ[
+  inl x. north;
+  inr x. north;
+  push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
+];
+
+-- Not well-typed because of 22 extra empty hcom-s!
+β₃ : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
+
+-- β₃' : ℤ :=
+--   g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));

@@ -192,18 +192,20 @@ g8 p i =  coe0→1 (λ j → codeTruncS² (p i j) .fst) ∣ base ∣₁
                                  ; (j = i0) → S¹ , idEquiv S¹
                                  ; (j = i1) → S¹ , (loop i) ·_  , rotIsEquiv (loop i) } )
 
-  codeTruncS² : ∥ S² ∥₂ → hGroupoid _
-  codeTruncS² = rec₂ (isOfHLevelTypeOfHLevel 3) (λ s → ∥ HopfS² s ∥₁ , squash₁)
+  codeTruncS² : ∥ S² ∥₂ → hGroupoid ℓ-zero
+  codeTruncS² = rec₂ {A = S²}{hGroupoid ℓ-zero}
+                     (isOfHLevelTypeOfHLevel 3)
+                     (λ s → ∥ HopfS² s ∥₁ , squash₁)
 
 g9 : Ω ∥ S¹∙ ∥₁∙ .fst → ∥ ℤ ∥₀
 g9 p = coe0→1 (λ i → codeTruncS¹ (p i) .fst) ∣ pos 0 ∣₀
   where
   codeTruncS¹ : ∥ S¹ ∥₁ → hSet _
-  codeTruncS¹ = rec₁ (isOfHLevelTypeOfHLevel 2) (λ s → ∥ helix s ∥₀ , squash₀)
+  codeTruncS¹ = rec₁ {A = S¹}{hSet _} (isOfHLevelTypeOfHLevel 2) (λ s → ∥ helix s ∥₀ , squash₀)
 
 -- Use trick to eliminate away the truncation last
 g10 : ∥ ℤ ∥₀ → ℤ
-g10 = rec₀ isSetℤ (λ x → x)
+g10 = rec₀ {A = ℤ}{ℤ} isSetℤ (λ x → x)
 
 -- TODO: define η₁ and η₂ and some more maps
 
