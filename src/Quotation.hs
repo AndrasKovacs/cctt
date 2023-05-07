@@ -77,7 +77,7 @@ quoteCases' = \case
 -- We don't do recursive unfolding under Case binders
 quoteCases :: NCofArg => DomArg => EvalClosure Cases -> Cases
 quoteCases (EC sub env _ cs) =
-  let ?sub = sub; ?env = env; ?recurse = DontRecurse in quoteCases' cs
+  let ?sub = wkSub sub; ?env = env; ?recurse = DontRecurse in quoteCases' cs
 {-# inline quoteCases #-}
 
 quoteHCases' :: EvalArgs (HCases -> HCases)
@@ -93,7 +93,7 @@ quoteHCases' = \case
 -- We don't do recursive unfolding under Case binders
 quoteHCases :: NCofArg => DomArg => EvalClosure HCases -> HCases
 quoteHCases (EC sub env _ cs) =
-  let ?sub = sub; ?env = env; ?recurse = DontRecurse in quoteHCases' cs
+  let ?sub = wkSub sub; ?env = env; ?recurse = DontRecurse in quoteHCases' cs
 {-# inline quoteHCases #-}
 
 quoteParams :: NCofArg => DomArg => Env -> LazySpine

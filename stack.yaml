@@ -16,9 +16,9 @@ packages:
 ghc-options:
     "$everything": -split-sections
 
-build:
-  library-profiling: true
-  executable-profiling: true
+# build:
+#   library-profiling: true
+#   executable-profiling: true
 
 extra-deps:
 - git: https://github.com/AndrasKovacs/ghc-strict-implicit-params.git

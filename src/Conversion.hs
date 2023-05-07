@@ -142,18 +142,20 @@ convHCases' sub env cs sub' env' cs' = case (cs, cs') of
     impossible
 
 convCases :: NCofArg => DomArg => CaseTag -> EvalClosure Cases -> CaseTag -> EvalClosure Cases -> Bool
-convCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') =
-  (tag == tag' && conv sub sub' && conv env env')
-  ||
-  (let ?recurse = DontRecurse
-   in convCases' sub env cs sub' env' cs')
+convCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') = case (wkSub sub, wkSub sub') of
+  (!sub, !sub') ->
+    (tag == tag' && conv sub sub' && conv env env')
+    ||
+    (let ?recurse = DontRecurse
+     in convCases' sub env cs sub' env' cs')
 
 convHCases :: NCofArg => DomArg => CaseTag -> EvalClosure HCases -> CaseTag -> EvalClosure HCases -> Bool
-convHCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') =
-  (tag == tag' && conv sub sub' && conv env env')
-  ||
-  (let ?recurse = DontRecurse
-   in convHCases' sub env cs sub' env' cs')
+convHCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') = case (wkSub sub, wkSub sub') of
+  (!sub, !sub') ->
+    (tag == tag' && conv sub sub' && conv env env')
+    ||
+    (let ?recurse = DontRecurse
+     in convHCases' sub env cs sub' env' cs')
 
 instance Conv NeCof where
   conv c c' = case (c, c') of

@@ -1258,7 +1258,7 @@ pushVars env = \case
 pushIVars :: NCofArg => Sub -> [Name] -> (Sub, NCof)
 pushIVars s = \case
   []   -> (s // ?cof)
-  _:is -> freshI \v -> pushIVars (s `ext` v) is
+  _:is -> freshI \v -> pushIVars (wkSub s `ext` v) is
 
 pushSp :: Env -> VDSpine -> Env
 pushSp env = \case
