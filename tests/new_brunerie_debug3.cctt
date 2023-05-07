@@ -622,6 +622,17 @@ codeTruncS² : g2S² → U := λ[
 g8 : (Ω² (g2dot S²dot)).1 → (Ω (gdot S¹dot)).1 :=
   λ p i. coe 0 1 (j. codeTruncS² (p i j)) (ginc base1);
 
+
+
+
+
+  -- rec1 S¹ U
+  --     ?_ -- (isOfHLevelTypeOfHLevel num2)
+  --     (λ s. (sTrunc (helix s)));
+
+
+-- foo := (Ω (gdot S¹dot)).1;
+
 helix : S¹ → U := λ[
   base1. ℤ;
   loop1 i. sucPathℤ i
@@ -631,13 +642,6 @@ codeTruncS¹ : gTrunc S¹ → U := λ[
   ginc s. sTrunc (helix s);
   gtrunc a b p q r s i j k. ?_
 ];
-
-  -- rec1 S¹ U
-  --     ?_ -- (isOfHLevelTypeOfHLevel num2)
-  --     (λ s. (sTrunc (helix s)));
-
-
--- foo := (Ω (gdot S¹dot)).1;
 
 -- g9 : ginc base1 ={_. gTrunc S¹} ginc base1 → sTrunc ℤ :=
 --   λ p. coe 0 1 (i. codeTruncS¹ (p i)) (sinc (pos zero));
@@ -791,68 +795,21 @@ v3 : (Ω (gdot S¹dot)).1
  := g8 (λ i j. f7 (λ k5. η₃' (push (loop1 i) (loop1 j) k5)));
 
 v3NF : (Ω (gdot S¹dot)).1 :=
-λ i.
-
-hcom 1 0 (gTrunc S¹)
-   [i = 0 j. hcom 1 0 (gTrunc S¹) [
-                 j = 0 k. ginc base1
-               ; j = 1 k. ginc base1] (ginc base1)
-  ; i = 1 j. hcom 1 0 (gTrunc S¹) [
-                 j = 0 k. ginc base1
-               ; j = 1 k. ginc base1] (ginc base1)
-               ; i = 0 j. hcom 1 0 (gTrunc S¹) [
-                           j = 0 k. ginc base1
-                         ; j = 1 k. ginc base1] (ginc base1)
-                         ; i = 1 j. hcom 1 0 (gTrunc S¹) [j = 0 k. ginc base1; j = 1 k. ginc base1]
-                                                        (ginc base1)]
-
-    (hcom 0 1 (gTrunc S¹) [
-         i = 0 j. ginc base1
-       ; i = 1 j. ginc base1
-       ; i = 0 j. ginc base1
-       ; i = 1 j. ginc base1]
-
-       (hcom 1 0 (gTrunc S¹) [
-           0 = i j. ginc base1
-          ;i = 0 j. ginc base1
-          ;i = 1 j. hcom 1 0 (gTrunc S¹) [
-                      j = 0 k. ginc base1
-                    ; j = 1 k. ginc base1] (ginc base1)]
-
-          (hcom 0 1 (gTrunc S¹) [
-                 0 = i j. ginc base1
-               ; i = 0 j. ginc base1
-               ; i = 1 j. ginc base1]
-
-            (hcom 1 0 (gTrunc S¹) [
-                  0 = i j. ginc base1
-                ; i = 0 j. ginc base1
-                ; i = 1 j. hcom 1 0 (gTrunc S¹) [j = 0 k. ginc base1 ; j = 1 k. ginc base1] (ginc base1)]
-
-               (hcom 0 1 (gTrunc S¹) [
+λ i. hcom 0 1 (gTrunc S¹) [
                     0 = i j. ginc base1
                   ; i = 0 j. ginc base1
                   ; i = 1 j. hcom 1 0 (gTrunc S¹) [
-                                 j = 1 i. hcom 1 0 (gTrunc S¹) [i = 0 k. ginc base1; i = 1 k. ginc base1] (ginc base1)]
-                                 (hcom 1 0 (gTrunc S¹) [
-                                      j = 0 j. ginc base1
-                                    ; j = 1 j. ginc base1]
-                                      (hcom 1 0 (gTrunc S¹) [
                                          j = 0 i. ginc base1
                                         ;j = 1 i. ginc base1]
                                           (ginc (
                                              hcom 1 0 S¹ [
                                                  j = 0 i. base1
                                                ; j = 1 i. base1]
-                                               (hcom 1 0 S¹ [j = 0 i. base1; j = 1 i. loop1 i] base1)))))]
+                                               (hcom 1 0 S¹ [j = 0 i. base1; j = 1 i. loop1 i] base1)))]
+                  (hcom 1 0 (gTrunc S¹) [0 = i j. ginc base1]
+                    (hcom 0 1 (gTrunc S¹) [0 = i j. ginc base1] (ginc ?_)));
 
-                  (hcom 1 0 (gTrunc S¹) [
-                      0 = i j. ginc base1]
-                    (hcom 0 1 (gTrunc S¹) [
-                      0 = i j. ginc base1]
-                        (ginc (hcom 1 0 S¹ [i = 0 j. ?_; i = 1 j. ?_] ?_)))))))));
-
-v3OK : v3NF = v3 := refl;
+-- v3OK : v3NF = v3 := refl;
 
 
 v4 := g9 v3NF;

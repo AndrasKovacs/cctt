@@ -33,8 +33,8 @@ inductive bool := true | false;
 
 higher inductive Int := left | right | seg (i : I)[i=0. left; i=1.right];
 
-bad : Int → bool := λ[
-  left. true;
-  right. false;
-  seg i. true
-];
+-- bad : Int → bool := λ[
+--   left. true;
+--   right. false;
+--   seg i. true
+-- ];

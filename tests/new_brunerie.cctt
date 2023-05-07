@@ -633,7 +633,7 @@ codeTruncS¹ : gTrunc S¹ → hSet :=
   rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)));
 
 g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
-  λ p. coe 0 1 (i. (codeTruncS¹ (p 1)).1) (sinc (pos zero));
+  λ p. coe 0 1 (i. (codeTruncS¹ (p i)).1) (sinc (pos zero));
 
 g10 : sTrunc ℤ → ℤ :=
   rec0 ℤ ℤ isSetℤ (λ x. x);
@@ -680,8 +680,8 @@ v2 (i j : I) : g2S² :=
 
 v2bnd := bnd2 g2S² v2;
 
-v3 : (Ω (gdot S¹dot)).1
- := g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
+-- v3 : (Ω (gdot S¹dot)).1
+--  := g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
 
 -- -- nf doesn't terminate
 -- v3 : (Ω ∥ S¹∙ ∥₁∙) .fst
@@ -691,9 +691,9 @@ v3 : (Ω (gdot S¹dot)).1
 
 -- v5 = g10 v4
 
--- Not well-typed because of 22 extra empty hcom-s!
-β₃ : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
+-- -- Not well-typed because of 22 extra empty hcom-s!
+-- β₃ : ℤ :=
+--   g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
 
-β₃fast : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));
+-- β₃fast : ℤ :=
+--   g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));

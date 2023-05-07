@@ -536,14 +536,14 @@ instance SubAction Env where
 instance SubAction a => SubAction (BindI a) where
   sub (BindI x i a) =
     let fresh = dom ?sub in
-    let ?sub  = setCod i ?sub `ext` IVar fresh in
+    let ?sub  = setDomCod (fresh + 1) i ?sub `ext` IVar fresh in
     seq ?sub (BindI x fresh (sub a))
   {-# inline sub #-}
 
 instance SubAction a => SubAction (BindILazy a) where
   sub (BindILazy x i a) =
     let fresh = dom ?sub in
-    let ?sub  = setCod i ?sub `ext` IVar fresh in
+    let ?sub  = setDomCod (fresh + 1) i ?sub `ext` IVar fresh in
     seq ?sub (BindILazy x fresh (sub a))
   {-# inline sub #-}
 

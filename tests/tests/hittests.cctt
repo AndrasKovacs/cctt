@@ -74,21 +74,13 @@ test11 (A : I → U)(x y : SetTrunc (A 0))(p q : x = y)(j k : I)
   : SetTrunc (A 1) :=
   coe 0 1 (i. SetTrunc (A i)) (st-quot x y p q j k);
 
-
-{-
--- DOESN'T RECHECK
--- (ill-typed thing in conv error message)
-test11Nf (A : I → U)(x y : SetTrunc (A 0))(p q : x = y)(j k : I)
-  : SetTrunc (A 1) :=
-hcom 0 1 (SetTrunc (A 1)) [
-  j = 0 i. hcom 0 i (SetTrunc (A 1)) [
-             k = 0 i. coe @2 1 (i. SetTrunc (A i)) (coe i @2 (i. SetTrunc (A i)) (coe 0 i
-                        (i. SetTrunc (A i)) x));
-             k = 1 i. coe @2 1 (i. SetTrunc (A i)) (coe i @2
-                      (i. SetTrunc (A i)) (coe 0 i (i. SetTrunc (A i)) y))]
-
-          (coe i 1 (i. SetTrunc (A i)) (coe 0 i (i. SetTrunc (A i)) (p {x} {y} k)))
- ; j = 1 i. hcom 0 i (SetTrunc (A 1)) [k = 0 i. coe @2 1 (i. SetTrunc (A i)) (coe i @2 (i. SetTrunc (A i)) (coe 0
+test11Nf (A : I → U)(x y : SetTrunc (A 0))(p q : x = y)(j k : I) : SetTrunc (A 1) :=
+hcom 1 0 (SetTrunc (A 1)) [j = 0 i. hcom 0 i (SetTrunc (A 1))
+[k = 0 i. coe @2 1 (i. SetTrunc (A i)) (coe i @2 (i. SetTrunc (A i)) (coe 0 i
+(i. SetTrunc (A i)) x)); k = 1 i. coe @2 1 (i. SetTrunc (A i)) (coe i @2
+(i. SetTrunc (A i)) (coe 0 i (i. SetTrunc (A i)) y))] (coe i 1 (i. SetTrunc (A
+i)) (coe 0 i (i. SetTrunc (A i)) (p {x} {y} k))); j = 1 i. hcom 0 i (SetTrunc (A
+1)) [k = 0 i. coe @2 1 (i. SetTrunc (A i)) (coe i @2 (i. SetTrunc (A i)) (coe 0
 i (i. SetTrunc (A i)) x)); k = 1 i. coe @2 1 (i. SetTrunc (A i)) (coe i @2
 (i. SetTrunc (A i)) (coe 0 i (i. SetTrunc (A i)) y))] (coe i 1 (i. SetTrunc (A
 i)) (coe 0 i (i. SetTrunc (A i)) (q {x} {y} k))); k = 0 i. coe i 1 (i. SetTrunc
@@ -102,13 +94,12 @@ i)) (p {x} {y} @2))) (λ {coe 0 1 (i. SetTrunc (A i)) x} {coe 0 1 (i. SetTrunc (
 i)) y} _. hcom 0 1 (SetTrunc (A 1)) [@2 = 0 i. coe i 1 (i. SetTrunc (A i)) (coe
 0 i (i. SetTrunc (A i)) x); @2 = 1 i. coe i 1 (i. SetTrunc (A i)) (coe 0 i
 (i. SetTrunc (A i)) y)] (coe 0 1 (i. SetTrunc (A i)) (q {x} {y} @2))) j k);
--}
+
+test11OK : test11 = test11Nf := refl;
 
 
 -- Simple incoherent HIT examples
 
--- THIS WORKS
--- However, this is not actually incoherent
 higher inductive CohTest (b : Bool) :=
   ct-quot (f : I → CohTest b)(i : I) [i=0. f 0; i=1. f 1];
 
@@ -129,14 +120,11 @@ test13 (A : I → U)(f : A 0 → CohTest2 (A 0))(x : A 0)(i : I) :=
   coe 0 1 (i. CohTest2 (A i)) (ct2-quot f x i);
 
 test13NF (A : I → U)(f : A 0 → CohTest2 (A 0))(x : A 0)(i : I) : CohTest2 (A 1) :=
+hcom 1 0 (CohTest2 (A 1)) [i = 0 i. coe i 1 (i. CohTest2 (A i)) (coe
+0 i (j. CohTest2 (A j)) (f (coe i 0 A (coe 0 i A x))))] (ct2-quot (λ _. coe 0 1
+(j. CohTest2 (A j)) (f (coe 1 0 A @3))) (coe 0 1 A x) i);
 
-  -- SWITCH HCOM DIRECTION HERE
-  hcom 1 0 (CohTest2 (A 1)) [
-       i = 0 j. coe j 1 (k. CohTest2 (A k))
-                  (coe 0 j (k. CohTest2 (A k))
-                    (f (coe j 0 A (coe 0 j A x))))]
-
-  (ct2-quot (λ x. coe 0 1 (j. CohTest2 (A j)) (f (coe 1 0 A x))) (coe 0 1 A x) i);
+test13OK : test13 = test13NF := refl;
 
 
 -- U-Quotient
@@ -151,8 +139,14 @@ test14 (A : I → U)(R : (i : I) → A i → A i → U)
   coe 0 1 (i. Quot (A i) (R i)) (q-quot x y r i);
 -- OK (coherent)
 
--- TODO: more precise coherence checking!!
--- For example: applications to vars with closed inductive type are OK
+test14NF (A : I → U)(R : (i : I) → A i → A i → U)
+       (x y : A 0)(r : R 0 x y)(i : I) : Quot (A 1) (R 1) :=
+q-quot (coe 0 1 A x) (coe 0 1 A y) (coe 0 1 (i. R i (coe 0 i A x) (coe 0 i A y)) r) i;
+
+test14OK : test14 = test14NF := refl;
+
+-- TODO: more precise coherence checking!
+-- For example: applications to vars with closed inductive types are OK
 -- How to do it more generally?
 
 --------------------------------------------------------------------------------

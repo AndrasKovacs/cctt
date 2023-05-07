@@ -453,7 +453,7 @@ localVar x = go ?env x where
 -- | Apply a closure. Note: *lazy* in argument.
 capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
-  CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = s; ?recurse = rc in eval t
+  CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = wkSub s; ?recurse = rc in eval t
   CSplit b tag ecs      -> case_ u b tag ecs
   CHSplit b tag ecs     -> hcase u b tag ecs
 
@@ -569,7 +569,7 @@ icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
 icapp (NICl _ t) arg = case t of
 
   ICEval s env rc t ->
-    let ?env = env; ?sub = ext s arg; ?recurse = rc in eval t
+    let ?env = env; ?sub = ext (wkSub s) arg; ?recurse = rc in eval t
 
   -- coe r r' (i. t i ={j. A i j} u i) p =
   --   λ {t r'}{u r'} j*. com r r' (i. A i j) [j=0 i. t i; j=1 i. u i] (p {t r} {u r}j)
@@ -989,9 +989,13 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     t@VHole{} ->
       t
 
-    _ ->
-      impossible
-
+    v -> error (
+           "\n" ++
+           show ?dom ++ "\n" ++ show ?cof ++ "\n" ++
+           take 100000 (show v) ++ "\n\n\n" ++ take 200 (show ps)
+           )
+    -- _ ->
+    --   impossible
 
   v@VHole{} -> v
 
@@ -1125,13 +1129,13 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
         TTPProject prj  ->
           VDCon dci (hcomindsp r r' a (WIS prj (ts^.ivars)) ps (dci^.conId) 0 sp (dci^.fieldTypes))
         TTPNe (WIS sys is) -> -- NOTE: this "is" is extended with the blocking neutral component's ivars
-          VHCom r r' a (WIS sys is) base (insertI r $ insertI r' is)
+          vhcom r r' a (WIS sys is) base (insertI r $ insertI r' is)
 
     base@(VNe n is') ->
-      VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
+      vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
     base@(VHCom _ _ _ _ _ is') ->
-      VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
+      vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
     base@VHole{} -> base
     _            -> impossible
@@ -1191,14 +1195,13 @@ unglue ~t sys = case sys of
   VSNe sys     -> ungluen t sys
 {-# inline unglue #-}
 
-
 -- | Unglue with neutral system arg.
 ungluen :: NCofArg => DomArg => Val -> NeSys' -> Val
 ungluen t (WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
   VNe n is'               -> VNe (NUnglue n sys) (is <> is')
   v@VHole{}               -> v
-  v                       -> error (take 1000 $ show v)
+  v                       -> error ("ungluen:  " ++ take 1000 (show v))
   -- v                       -> impossible
 {-# inline ungluen #-}
 
@@ -1270,7 +1273,7 @@ lookupCase i sp cs = case i // cs of
 
 case_ :: NCofArg => DomArg => (Val -> NamedClosure -> CaseTag -> EvalClosure Cases -> Val)
 case_ t b tag ecs@(EC sub env rc cs) = case frc t of
-  VDCon dci sp           -> let ?sub = sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
+  VDCon dci sp           -> let ?sub = wkSub sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
   n@(VNe _ is)           -> VNe (NCase n b tag ecs) is
   n@(VHCom _ _ _ _ _ is) -> VNe (NCase n b tag ecs) is
   v@VHole{}              -> v
@@ -1417,7 +1420,6 @@ lookupHCase i sp s cs = case i // cs of
   (i, HCSCons _ _ _ _    cs) -> lookupHCase (i - 1) sp s cs
   _                          -> impossible
 
-
 sysCofs :: NeSys -> [NeCof]
 sysCofs = \case
   NSEmpty -> []
@@ -1427,7 +1429,7 @@ hcase :: NCofArg => DomArg => (Val -> NamedClosure -> CaseTag -> EvalClosure HCa
 hcase t b tag ecs@(EC sub env rc cs) = case frc t of
 
   VHDCon i ps fs s _ ->
-    let ?sub = sub; ?env = env; ?recurse = rc in
+    let ?sub = wkSub sub; ?env = env; ?recurse = rc in
     lookupHCase (i^.conId) fs s cs
 
   t@(VHCom r r' a sys base is) ->
@@ -1444,7 +1446,7 @@ hcase t b tag ecs@(EC sub env rc cs) = case frc t of
 
   n@(VNe _ is) -> VNe (NHCase n b tag ecs) is
   v@VHole{}    -> v
-  v            -> impossible
+  v            -> error $ take 1000 $ show v
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
@@ -1592,7 +1594,7 @@ instance Force NeCof VCof where
 
 instance Force Val Val where
   frc = \case
-    VSub v s                                -> let ?sub = s in frcS v
+    VSub v s                                -> let ?sub = wkSub s in frcS v
     VNe t is               | isUnblocked is -> frc t
     VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
     VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
@@ -1642,7 +1644,7 @@ instance Force Ne Val where
   frc = \case
     t@NLocalVar{}     -> VNe t mempty
     t@NDontRecurse{}  -> VNe t mempty
-    NSub n s          -> let ?sub = s in frcS n
+    NSub n s          -> let ?sub = wkSub s in frcS n
     NApp t u          -> frc (frc t ∙ u)
     NPApp l r t i     -> frc (papp l r (frc t) i)
     NProj1 t x        -> frc (proj1 x (frc t))
@@ -1707,12 +1709,15 @@ instance Force NeSysHCom VSysHCom where
       VCFalse     -> frcS sys
       VCNe cof is -> case frcS sys of
         VSHTotal v'         -> VSHTotal v'
-        VSHNe (WIS sys is') -> VSHNe (WIS (NSHCons (bindCof cof (frcS (t^.body))) sys) (is <> is'))
+        VSHNe (WIS sys is') ->
+          VSHNe (WIS (NSHCons (bindCof cof (frcS (t^.body))) sys) (is <> is'))
 
+-- TODO: check IVarSet
 instance Force NeSysHCom' VSysHCom where
   frc sys = frc (sys^.body); {-# inline frc #-}
   frcS sys = frcS (sys^.body); {-# inline frcS #-}
 
+-- TODO: check IVarSet
 instance Force NeSys' VSys where
   frc sys = frc (sys^.body); {-# inline frc #-}
   frcS sys = frcS (sys^.body); {-# inline frcS #-}
@@ -1726,7 +1731,7 @@ instance Force a fa => Force (BindI a) (BindI fa) where
 
   frcS (BindI x i a) =
     let fresh = dom ?cof in
-    let ?sub  = setCod i ?sub `ext` IVar fresh in
+    let ?sub  = setDomCod (fresh+1) i ?sub `ext` IVar fresh in
     let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
     seq ?sub $ seq ?cof $ BindI x fresh (frcS a)
   {-# inline frcS #-}
@@ -1740,7 +1745,7 @@ instance Force a fa => Force (BindILazy a) (BindILazy fa) where
 
   frcS (BindILazy x i a) =
     let fresh = dom ?cof in
-    let ?sub  = setCod i ?sub `ext` IVar fresh in
+    let ?sub  = setDomCod (fresh+1) i ?sub `ext` IVar fresh in
     let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
     seq ?sub $ seq ?cof $ BindILazy x fresh (frcS a)
   {-# inline frcS #-}

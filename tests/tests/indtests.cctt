@@ -154,4 +154,16 @@ pred : ℕ → ℕ := λ[zero. zero; suc n. n];
 
 test := ℕ-Dec (suc zero) zero;
 
+ℕ-DecNF : (n m : ℕ) → Dec (n = m) :=
+λ n. case n (n. (m : ℕ) → Sum (n ={_. ℕ} m) (n ={_. ℕ} m → Bot)) [zero. λ
+m. case m (m. Sum (zero ={_. ℕ} m) (zero ={_. ℕ} m → Bot)) [zero. Left (λ {zero}
+{zero} _. zero); suc m. Right (λ p. coe 0 1 (i. case (p {zero} {suc m} i) (_. U)
+[zero. Top; suc _. Bot]) tt)]; suc n. λ m. case m (m. Sum (suc n ={_. ℕ} m) (suc
+n ={_. ℕ} m → Bot)) [zero. Right (λ p. coe 0 1 (i. case (hcom 0 1 ℕ [i = 0 j. p
+{suc n} {zero} j; i = 1 _. suc n] (suc n)) (_. U) [zero. Top; suc _. Bot]) tt);
+suc m. case (ℕ-Dec n m) (_. Sum (suc n ={_. ℕ} suc m) (suc n ={_. ℕ} suc m →
+Bot)) [Left p. Left (λ {suc n} {suc m} i. suc (p {n} {m} i)); Right p. Right (λ
+q. p (λ {n} {m} i. case (q {suc n} {suc m} i) (_. ℕ) [zero. zero; suc
+n. n]))]]];
+
 --------------------------------------------------------------------------------

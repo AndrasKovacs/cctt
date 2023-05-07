@@ -636,7 +636,7 @@ codeTruncS¹ : gTrunc S¹ → hSet :=
   rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)));
 
 g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
-  λ p. coe 0 1 (i. (codeTruncS¹ (p 1)).1) (sinc (pos zero));
+  λ p. coe 0 1 (i. (codeTruncS¹ (p i)).1) (sinc (pos zero));
 
 g10 : sTrunc ℤ → ℤ :=
   rec0 ℤ ℤ isSetℤ (λ x. x);
@@ -714,69 +714,71 @@ g9' : gbase1'' = gbase1'' → sTrunc ℤ :=
     unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
     unglue (unglue (unglue (unglue (unglue (unglue (
 
-    (coe 0 1 (i. (codeTruncS¹' (p 1)).1) spos0)
+    (coe 0 1 (i. (codeTruncS¹' (p i)).1) spos0)
     ))))))))))))))))))))))))))))))))))));
 
 v4' := g9' v3';
+-- v4' := g9' refl;
 
 v5' := g10 v4';
 
-----------------------------------------------------------------------------------------------------
 
-inductive List (A : U) := nil | cons A (List A);
+-- ----------------------------------------------------------------------------------------------------
 
-bnd3 (A : U)(f : I → I → I → A) : List A :=
-  cons (f 0 0 0) (
-  cons (f 0 0 1) (
-  cons (f 0 1 0) (
-  cons (f 0 1 1) (
-  cons (f 1 0 0) (
-  cons (f 1 0 1) (
-  cons (f 1 1 0) (
-  cons (f 1 1 1) nil)))))));
+-- inductive List (A : U) := nil | cons A (List A);
 
-bnd2 (A : U)(f : I → I → A) : List A :=
-  cons (f 0 0) (
-  cons (f 0 1) (
-  cons (f 1 0) (
-  cons (f 1 1) nil)));
+-- bnd3 (A : U)(f : I → I → I → A) : List A :=
+--   cons (f 0 0 0) (
+--   cons (f 0 0 1) (
+--   cons (f 0 1 0) (
+--   cons (f 0 1 1) (
+--   cons (f 1 0 0) (
+--   cons (f 1 0 1) (
+--   cons (f 1 1 0) (
+--   cons (f 1 1 1) nil)))))));
 
-v1 (i j k : I) : Susp S² :=
-  η₃' (push (loop1 i) (loop1 j) k);
+-- bnd2 (A : U)(f : I → I → A) : List A :=
+--   cons (f 0 0) (
+--   cons (f 0 1) (
+--   cons (f 1 0) (
+--   cons (f 1 1) nil)));
 
-v1NF (i j k : I) : Susp S² :=
+-- v1 (i j k : I) : Susp S² :=
+--   η₃' (push (loop1 i) (loop1 j) k);
 
-  hcom 0 1 (Susp S²) [
-       k = 0 _. north
-     ; k = 1 j. hcom 0 1 (Susp S²) [
-                  j = 0 _. north
-                ; j = 1 j. hcom 0 1 (Susp S²) [
-                              j = 0 j. merid base2 j
-                            ; j = 1 _. north] north]
-                (merid (loop2 i @1) j)]
+-- v1NF (i j k : I) : Susp S² :=
 
-     (hcom 0 1 (Susp S²) [
-         k = 0 _. north;
-         k = 1 j. hcom 0 1 (Susp S²) [
-                       j = 0 j. merid base2 j
-                     ; j = 1 _. north] north]
-       (merid (loop2 i j) k));
+--   hcom 0 1 (Susp S²) [
+--        k = 0 _. north
+--      ; k = 1 j. hcom 0 1 (Susp S²) [
+--                   j = 0 _. north
+--                 ; j = 1 j. hcom 0 1 (Susp S²) [
+--                               j = 0 j. merid base2 j
+--                             ; j = 1 _. north] north]
+--                 (merid (loop2 i @1) j)]
 
-v1NFOK : v1 = v1NF := refl;
+--      (hcom 0 1 (Susp S²) [
+--          k = 0 _. north;
+--          k = 1 j. hcom 0 1 (Susp S²) [
+--                        j = 0 j. merid base2 j
+--                      ; j = 1 _. north] north]
+--        (merid (loop2 i j) k));
+
+-- v1NFOK : v1 = v1NF := refl;
 
 
--- Nf checks out fine
-v2 (i j : I) : g2S² :=
-  f7 (λ k. η₃' (push (loop1 i) (loop1 j) k));
+-- -- Nf checks out fine
+-- v2 (i j : I) : g2S² :=
+--   f7 (λ k. η₃' (push (loop1 i) (loop1 j) k));
 
-v2bnd := bnd2 g2S² v2;
+-- v2bnd := bnd2 g2S² v2;
 
-v20j := v2 0;
-v21j := v2 1;
-v2i0 (i : I) := v2 i 0;
-v2i1 (i : I) := v2 i 1;
+-- v20j := v2 0;
+-- v21j := v2 1;
+-- v2i0 (i : I) := v2 i 0;
+-- v2i1 (i : I) := v2 i 1;
 
--- v3 : (Ω (gdot S¹dot)).1
---  := g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
+-- -- v3 : (Ω (gdot S¹dot)).1
+-- --  := g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
 
--- v4 := g9 v3;
+-- -- v4 := g9 v3;

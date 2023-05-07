@@ -37,6 +37,7 @@ module Interval (
   , setCod
   , setDom
   , setDomCod
+  , wkSub
   ) where
 
 import GHC.Exts
@@ -272,7 +273,10 @@ setDomCod d c (Sub _ _ m) = Sub (fromIntegral d) (fromIntegral c) m
 {-# inline setDomCod #-}
 
 lookupSub :: IVar -> Sub -> I
-lookupSub i (Sub _ _ m) = IIM.lookup (\_ -> IVar i) (\i -> I (fromIntegral i)) (fromIntegral i) m
+lookupSub i (Sub d c m)
+  | 0 <= i && i < fromIntegral c =
+      IIM.lookup (\_ -> IVar i) (\i -> I (fromIntegral i)) (fromIntegral i) m
+  | True = impossible
 {-# inline lookupSub #-}
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
@@ -294,10 +298,16 @@ foldlSub f b (Sub _ c m) = go 0 (fromIntegral c) b where
            | True  = b
 {-# inline foldlSub #-}
 
+validI :: IVar -> I -> I
+validI d = \case
+  IVar i -> if i < d then IVar i else error (show i ++ " " ++ show d)
+  i      -> i
 
 -- | Extend a sub with an expression. Domain doesn't change.
 ext :: Sub -> I -> Sub
-ext (Sub d c m) i = Sub d (c + 1) (IIM.insert (fromIntegral c) (fromIntegral (unI i)) m)
+ext (Sub d c m) i =
+  let vi = validI (fromIntegral d) i in
+  Sub d (c + 1) (IIM.insert (fromIntegral c) (fromIntegral (unI vi)) m)
 
 liftSub :: Sub -> Sub
 liftSub (Sub d c m) =
@@ -406,3 +416,8 @@ instance SubAction IVarSet where
 
 pushSub :: Sub -> Sub -> Sub
 pushSub s s' = foldlSub (\_ -> ext) s s'
+
+-- Weaken a sub to the current environment.
+wkSub :: NCofArg => Sub -> Sub
+wkSub s = setDom (dom ?cof) s
+{-# inline wkSub #-}

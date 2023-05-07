@@ -198,11 +198,11 @@ g8 p i =  coe0→1 (λ j → codeTruncS² (p i j) .fst) ∣ base ∣₁
                      (isOfHLevelTypeOfHLevel 3)
                      (λ s → ∥ HopfS² s ∥₁ , squash₁)
 
+codeTruncS¹ : ∥ S¹ ∥₁ → hSet _
+codeTruncS¹ = rec₁ {A = S¹}{hSet _} (isOfHLevelTypeOfHLevel 2) (λ s → ∥ helix s ∥₀ , squash₀)
+
 g9 : Ω ∥ S¹∙ ∥₁∙ .fst → ∥ ℤ ∥₀
 g9 p = coe0→1 (λ i → codeTruncS¹ (p i) .fst) ∣ pos 0 ∣₀
-  where
-  codeTruncS¹ : ∥ S¹ ∥₁ → hSet _
-  codeTruncS¹ = rec₁ {A = S¹}{hSet _} (isOfHLevelTypeOfHLevel 2) (λ s → ∥ helix s ∥₀ , squash₀)
 
 -- Use trick to eliminate away the truncation last
 g10 : ∥ ℤ ∥₀ → ℤ
