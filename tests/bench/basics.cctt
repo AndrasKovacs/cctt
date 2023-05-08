@@ -1,0 +1,116 @@
+
+inductive Top := tt;
+inductive Bot :=;
+not (A : U) := A → Bot;
+
+inductive Sum (A B : U) := left A | right B;
+
+Dec (A : U) := Sum A (not A);
+
+Square (A : U) (a0 a1 b0 b1 : A)
+               (u : a0 = a1) (v : b0 = b1)
+               (r0 : a0 = b0) (r1 : a1 = b1) : U
+ := r0 ={i. u i = v i} r1;
+
+prop (A : U) : U := (a b : A) → a = b;
+
+set (A : U) : U := (a b : A) → prop (a = b);
+
+discrete (A : U) : U := (a b : A) → Dec (a = b);
+
+stable (A:U) : U := not (not A) → A;
+
+decStable (A : U) : Dec A → stable A := λ[
+ left a. λ _. a;
+ right b. λ h. case (h b) []];
+
+const (A : U) (f : A → A) : U := (x y : A) → f x = f y;
+
+exConst (A : U) : U := (f:A → A) * const A f;
+
+propBot : prop Bot := λ[];
+
+propNot (A : U) : prop (not A) := λ f g i x. propBot (f x) (g x) i;
+
+dNot (A : U) (a : A) : not (not A) := λ f. f a;
+
+stableConst (A : U) (sA : stable A) : exConst A :=
+  (λ x. sA (dNot A x), λ x y i. sA (propNot (not A) (dNot A x) (dNot A y) i));
+
+--------------------------------------------------------------------------------
+
+isLogEquiv (A B : U)(f : A → B) : U := (B → A);
+
+isSection (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
+
+isRetraction (A B : U)(f : A → B) : U := (g : B → A) × (rinv : (x : B) → f (g x) = x);
+
+isIso (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x);
+
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
+  let f'    (i : I)(x : A r)        : A i := coe r i A x;
+  let g'    (i : I)(x : A i)        : A r := coe i r A x;
+  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x;
+  let rinv' (i : I)(x : A i)(j : I) : A i := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
+
+  ( λ x. g' r' x
+  , λ x j. linv' r' x j
+  , λ x j. rinv' r' x j
+  , λ x l k. com r r' A
+                      [k=0 i. f' i (linv' i x l)
+                      ;k=1 i. f' i x
+		      ;l=0 i. f' i x
+		      ;l=1 i. rinv' i (f' i x) k]
+		      x
+  );
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+iso (A B : U) : U := (f : A → B) × isIso A B f;
+
+idIso (A : U) : iso A A := (λ x. x, λ x. x, λ x _. x, λ x _. x);
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+ua (A B : U)(f : equiv A B) : A = B :=
+  λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
+
+J (A : U) (a : A) (C : (x : A) → a = x → U)
+  (d : C a (λ _. a))(x : A) (p : a = x) : C x p
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
+     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
+
+JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
+  : J A a C d a (λ _. a) = d :=
+
+  let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1 _. a] a;
+  let cube (i j k : I) : A := hcom 0 j [k=0 x. sq i x;
+                                        k=1 _. a;
+                                        i=0 _. a;
+                                        i=1 _. a] a;
+
+  λ k. com 0 1 (i. C (cube i 1 k) (λ j. cube i j k))
+               [k=0 i. coe 0 i (i. C (sq i 1) (λ j. sq i j)) d;
+                k=1 _. d]
+               d;
+
+isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
+    iso.f
+  , iso.g
+  , ?_
+  , iso.rinv
+  , ?_
+  ;
+
+isoToPath (A B : U)(i : iso A B) : A = B := ua A B (isoToEquiv A B i);

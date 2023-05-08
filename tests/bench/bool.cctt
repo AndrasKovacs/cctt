@@ -1,0 +1,24 @@
+import basics;
+
+inductive Bool := false | true;
+
+falseNeqTrue : not (false = true) :=
+  λ p. coe 0 1 (i. case (p i) [false. Top; true. Bot]) tt;
+
+trueNeqFalse : not (true = false) :=
+  λ p. coe 0 1 (i. case (p i) [false. Bot; true. Top]) tt;
+
+boolDec : (b1 b2 : Bool) → Dec (b1 = b2) := λ[
+  false. λ[false. left  refl        ; true. right falseNeqTrue];
+  true.  λ[false. right trueNeqFalse; true. left  refl        ]
+  ];
+
+negBool : Bool → Bool := λ[false. true; true. false];
+
+negIso : iso Bool Bool :=
+    negBool
+  , negBool
+  , λ[false. refl; true. refl]
+  , λ[false. refl; true. refl];
+
+negPath : Bool = Bool := isoToPath Bool Bool negIso;

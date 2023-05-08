@@ -1,0 +1,46 @@
+
+import basics;
+import nat;
+
+inductive ℤ := pos ℕ | neg ℕ;
+
+forceℤ : ℤ → Top := λ[
+  pos n. forceℕ n;
+  neg n. forceℕ n
+];
+
+zeroℤ := pos zero;
+
+predℤ : ℤ → ℤ := λ[
+  pos u. case u [zero. neg zero; suc n. pos n];
+  neg v. neg (suc v)];
+
+pos' : ℕ → ℤ := λ n. pos n;
+neg' : ℕ → ℤ := λ n. neg n;
+
+sucℤ : ℤ → ℤ := λ[
+  pos u. pos (suc u);
+  neg v. case v [zero. pos zero; suc n. neg n]];
+
+predsucℤ : (x : ℤ) → x = predℤ (sucℤ x) := λ[
+  pos u. refl;
+  neg v. case v (v. neg v = predℤ (sucℤ (neg v))) [
+    zero.  refl;
+    suc n. refl]
+  ];
+
+sucpredℤ : (x : ℤ) → sucℤ (predℤ x) = x := λ[
+  pos u. case u (u. sucℤ (predℤ (pos u)) = pos u) [
+    zero.  refl;
+    suc n. refl];
+  neg v. refl
+  ];
+
+sucℤIso : iso ℤ ℤ :=
+    λ x. sucℤ x
+  , λ x. predℤ x
+  , predsucℤ
+  , sucpredℤ;
+
+sucPathℤ : ℤ = ℤ :=
+  ua ℤ ℤ (isoToEquiv ℤ ℤ sucℤIso);

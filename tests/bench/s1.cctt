@@ -1,0 +1,34 @@
+
+import basics;
+import nat;
+import int;
+
+higher inductive S¹ :=
+    base
+  | loop (i : I)[i=0. base; i=1. base];
+
+helix : S¹ → U := λ[
+  base. ℤ;
+  loop i. sucPathℤ i
+];
+
+loop' : base = base :=
+  λ i. loop i;
+
+ΩS¹ : U :=
+  base = base;
+
+encode : (x : S¹) → base = x → helix x :=
+  λ x p. coe 0 1 (i. helix (p i)) (pos zero);
+
+winding : ΩS¹ → ℤ :=
+  encode base;
+
+intLoop : ℤ → ΩS¹ := λ[
+  pos n. case n [zero. refl; suc n. intLoop (pos n) ∙ loop'];
+  neg n. case n [zero. loop'⁻¹; suc n. intLoop (neg n) ∙ loop'⁻¹]
+];
+
+test1 := forceℤ (winding (intLoop (pos n10k)));
+test2 := forceℤ (winding (intLoop (neg n1k)));
+test3 := winding (intLoop (pos n10k) ∙ intLoop (neg n10k));
