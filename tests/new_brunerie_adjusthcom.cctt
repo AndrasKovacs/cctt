@@ -1,8 +1,8 @@
 
 
-
 -- Adapted from
 -- https://github.com/agda/cubical/blob/50f0e7b8fb156d14b12be21ec5e529fe3ca497ca/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
+-- https://github.com/agda/cubical/blob/dc5f5005726eb76e4eb5306a2d217a1a49140e4e/Cubical/Foundations/HLevels_temp.agda
 
 -- Basics
 ----------------------------------------------------------------------------------------------------
@@ -12,31 +12,24 @@ Square (A : U) (a0 a1 b0 b1 : A)
                (r0 : a0 = b0) (r1 : a1 = b1) : U
  := r0 ={i. u i = v i} r1;
 
-isContr (A : U) : U := (fst : A) × ((y : A) → fst = y);
-isProp (A : U) : U := (a b : A) → a = b;
-isSet (A : U) : U := (a b : A) → isProp (a = b);
-isGroupoid (A : U) : U := (a b : A) → isSet (a = b);
+isContr     (A : U) : U := (fst : A) × ((y : A) → fst = y);
+isProp      (A : U) : U := (a b : A) → a = b;
+isSet       (A : U) : U := (a b : A) → isProp (a = b);
+isGroupoid  (A : U) : U := (a b : A) → isSet (a = b);
 is2Groupoid (A : U) : U := (a b : A) → isGroupoid (a = b);
 
 hSet      : U := (fst : U) × isSet fst;
 hGroupoid : U := (fst : U) × isGroupoid fst;
 
-
 the (A : U)(x : A) := x;
+Σ (A : U)(B : A → U) : U := (fst : A) × B fst;
 
 J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
-propSet : (A : U) (h : isProp A) → isSet A
-  := λ A h a b p q j i.
-  hcom 0 1 A [i=0. h a a;
-              i=1. h a b;
-              j=0. h a (p i);
-              j=1. h a (q i)] a;
-
-isLogEquiv (A B : U)(f : A → B) : U := (B → A);
-isSection (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
+isLogEquiv   (A B : U)(f : A → B) : U := (B → A);
+isSection    (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
 isRetraction (A B : U)(f : A → B) : U := (g : B → A) × (rinv : (x : B) → f (g x) = x);
 
 isEquiv (A B : U)(f : A → B) : U :=
@@ -69,6 +62,30 @@ isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
   , iso.linv
   , ?_
   , ?_;
+
+isEquivCoe (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
+  let f'    (i : I)(x : A r)        : A i := coe r i A x;
+  let g'    (i : I)(x : A i)        : A r := coe i r A x;
+  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x;
+  let rinv' (i : I)(x : A i)(j : I) : A i := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
+
+  ( λ x. g' r' x
+  , λ x j. linv' r' x j
+  , λ x j. rinv' r' x j
+  , λ x l k. com r r' A
+                      [k=0 i. f' i (linv' i x l)
+                      ;k=1 i. f' i x
+		      ;l=0 i. f' i x
+		      ;l=1 i. rinv' i (f' i x) k]
+		      x
+  );
+
+pathToEquiv (A B : U)(p : A = B) : equiv A B :=
+  ((λ x. coe 0 1 p x), isEquivCoe (λ i. p i) 0 1);
+
+ua-pathToEquiv (A B : U)(p : A = B) : ua A B (pathToEquiv A B p) = p :=
+  ?_;
+
 
 -- Decidability
 ----------------------------------------------------------------------------------------------------
@@ -245,7 +262,141 @@ sucPathℤ : ℤ = ℤ :=
 isSetℤ : isSet ℤ := hedberg ℤ discreteℤ;
 
 
--- H-levels
+
+-- * From HLevels_temp.agda *
+----------------------------------------------------------------------------------------------------
+
+isProp-isSet : (A : U) → isProp A → isSet A :=
+  λ A h a b p q j i.
+    hcom 0 1 [i = 0. h a a
+             ;i = 1. h a b
+             ;j = 0. h a (p i)
+             ;j = 1. h a (q i)] a;
+
+isPropIsProp (A : U) : isProp (isProp A) :=
+  λ f g i a b. isProp-isSet A f a b (f a b) (g a b) i;
+
+isPropIsSet (A : U) : isProp (isSet A) :=
+  λ f g i a b. isPropIsProp (a = b) (f a b) (g a b) i;
+
+isPropIsGroupoid (A : U) : isProp (isGroupoid A) :=
+  λ f g i a b. isPropIsSet (a = b) (f a b) (g a b) i;
+
+lemPropFam (A : U) (P : A → U) (pP : (x : A) → isProp (P x)) (a0 a1 : A)
+           (p : a0 = a1) (b0 : P a0) (b1 : P a1) : b0 ={ap P p} b1
+  := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
+
+ΣeqProp (A : U) (B : A → U) (pB : (a : A) → isProp (B a))
+       (u v : Σ A B) (p : u.1 = v.1) : u = v
+  := λ i. (p i, lemPropFam A B pB u.1 v.1 p u.2 v.2 i);
+
+isPropΣ (A : U) (B : A → U) (pA : isProp A)(pB : (fst : A) → isProp (B fst)) (t u : Σ A B) : t = u
+  := ΣeqProp A B pB t u (pA t.1 u.1);
+
+isPropRetract (A B : U)(f : A → B) (g : B → A) (h : (x : A) → g (f x) = x)(p : isProp B) : isProp A :=
+  λ x y i. hcom 0 1 [i=0. h x; i=1. h y] (g (p (f x) (f y) i));
+
+isSetRetract (A B : U)(f : A → B) (g : B → A) (h : (x : A) → g (f x) = x)(set : isSet B) : isSet A :=
+  λ x y p q i j.
+  hcom 0 1 [ i = 0. h (p j)
+            ;i = 1. h (q j)
+            ;j = 0. h x
+            ;j = 1. h y ]
+        (g (set (f x) (f y) (ap f p) (ap f q) i j));
+
+isGroupoidRetract (A B : U)(f : A → B) (g : B → A) (h : (x : A) → g (f x) = x)(grp : isGroupoid B) : isGroupoid A
+  := λ x y p q P Q i j k.
+  hcom 0 1 [i = 0. h (P j k)
+           ;i = 1. h (Q j k)
+           ;j = 0. h (p k)
+           ;j = 1. h (q k)
+           ;k = 0. h x
+           ;k = 1. h y]
+       (g (grp (f x) (f y) (ap f p) (ap f q) (ap (λ x. ap f x) P) (ap (λ x. ap f x) Q) i j k));
+
+-- congFst⁻
+apFstMinus (A : U)(B : A → U)
+           (pB : (x : A) → isProp (B x))(t u : Σ A B)(q : t.fst = u.fst) : t = u :=
+  λ i. (q i
+      , hcom 0 1 [i = 0 j. pB t.fst t.2 t.2 j;
+                  i = 1 j. pB u.fst (coe 0 1 (k. B (q k)) t.2) u.2 j]
+                 (coe 0 i (x. B (q x)) t.2));
+
+-- congFst⁻-congFst
+apFstMinus-apFst (A : U)(B : A → U)(pB : (x : A) → isProp (B x)) (t u : Σ A B)(p : t = u)
+               : apFstMinus A B pB t u (ap (λ x. x.fst) p) = p :=
+  λ j i. ((p i).fst
+       , hcom 0 1 (B ((p i).fst)) [ i = 0 k. pB t.fst t.2 t.2 k;
+                                    i = 1 k. pB u.fst (coe 0 1 (k. B ((p k).fst)) t.2) u.2 k;
+                                    j = 1 k. pB ((p i).fst) (coe 0 i (k. B ((p k).fst)) t.2) (p i).2 k]
+              (coe 0 i (x. B ((p x).fst)) t.2));
+
+isSetSndProp (A : U)(B : A → U)(pB : (x : A) → isProp (B x)) (sA : (t u : Σ A B) → isProp (t.fst = u.fst))
+           : isSet ((fst : A) × B fst) :=
+  λ t u. isPropRetract
+            (t = u) (t.fst = u.fst)
+            (λ y. ap (λ x. x.fst) y)
+            (apFstMinus A B pB t u)
+            (apFstMinus-apFst A B pB t u)
+            (sA t u);
+
+isGroupoidSndProp (A : U)(B : A → U)(pB : (x : A) → isProp (B x))
+                  (sA : (t u : Σ A B) → isSet (t.fst = u.fst))
+                : isGroupoid (Σ A B) :=
+  λ t u. isSetRetract (t = u)(t.fst = u.fst)
+                      (λ y. ap (λ x. x.fst) y)
+                      (apFstMinus A B pB t u)
+                      (apFstMinus-apFst A B pB t u)
+                      (sA t u);
+
+is2GroupoidSndProp (A : U)(B : A → U)
+                   (pB : (x : A) → isProp (B x))
+                   (sA : (t u : Σ A B) → isGroupoid (t.fst = u.fst))
+                 : is2Groupoid (Σ A B) :=
+  λ t u. isGroupoidRetract (t = u) (t.fst = u.fst)
+                           (λ y. ap (λ x. x.fst) y)
+                           (apFstMinus A B pB t u)
+                           (apFstMinus-apFst A B pB t u)
+                           (sA t u);
+
+isSetΠ (A : U)(B : A → U)(h : (x : A) → isSet (B x)) : isSet ((x : A) → B x) :=
+  λ x y p q i j z. h z (x z) (y z) (λ k. p k z) (λ k. q k z) i j;
+
+setPath (A B : U) (sB : isSet B) : isSet (A = B) :=
+  isSetRetract (A = B)(equiv A B)
+    (pathToEquiv A B)
+    (ua A B)
+    (ua-pathToEquiv A B)
+    (isSetSndProp (A → B)(isEquiv A B)
+                  (isPropIsEquiv A B)
+                  (λ e1 e2. isSetΠ A (λ _. B) (λ _. sB) e1.fst e2.fst));
+
+isGroupoid-hSet : isGroupoid hSet :=
+  isGroupoidSndProp U isSet isPropIsSet (λ t u. setPath t.fst u.fst u.2);
+
+isGroupoidΠ (A : U)(B : A → U)(h : (x : A) → isGroupoid (B x)) : isGroupoid ((x : A) → B x) :=
+  λ x y p q r s i j k z. h z (x z) (y z) (λ k. p k z) (λ k. q k z) (λ k l. r k l z) (λ k l. s k l z) i j k;
+
+groupoidPath (A B : U) (sB : isGroupoid B) : isGroupoid (A = B) :=
+  isGroupoidRetract (A = B)(equiv A B)
+    (pathToEquiv A B)
+    (ua A B)
+    (ua-pathToEquiv A B)
+    (isGroupoidSndProp (A → B) (isEquiv A B)
+       (isPropIsEquiv A B)
+       (λ e1 e2. isGroupoidΠ A (λ _. B) (λ _. sB) e1.fst e2.fst));
+
+is2Groupoid-hGroupoid : is2Groupoid hGroupoid :=
+  is2GroupoidSndProp U isGroupoid
+    isPropIsGroupoid
+    (λ t u. groupoidPath t.fst u.fst u.2);
+
+
+-- * End of HLevels_temp.agda *
+----------------------------------------------------------------------------------------------------
+
+
+-- More H-levels
 ----------------------------------------------------------------------------------------------------
 
 transport (A : I → U) (x : A 0) : A 1 := coe 0 1 A x;
@@ -260,13 +411,6 @@ isContr-isProp : (A : U) → isContr A → isProp A :=
 
 isProp-PathP (B : I → U)(hB : (i : I) → isProp (B i))(b0 : B 0)(b1 : B 1) : b0 ={i. B i} b1 :=
   toPathP B b0 b1 (hB 1 (transport B b0) b1);
-
-isProp-isSet : (A : U) → isProp A → isSet A :=
-  λ A h a b p q j i.
-    hcom 0 1 [i = 0. h a a
-             ;i = 1. h a b
-             ;j = 0. h a (p i)
-             ;j = 1. h a (q i)] a;
 
 isOfHLevel (l : HLevel)(A : U) : U := case l [
   zero. isContr A;
@@ -337,21 +481,9 @@ is2GroupoidΠ : (A : U)(B : A → U)(h : (x : A) → isOfHLevel num4 (B x)) → 
 
 TypeOfHLevel (n : HLevel) : U := (fst : U) × isOfHLevel n fst;
 
-lemPropFam (A : U) (P : A → U) (pP : (x : A) → isProp (P x)) (a0 a1 : A)
-           (p : a0 = a1) (b0 : P a0) (b1 : P a1) : b0 ={ap P p} b1
-  := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
-
-ΣeqProp (A : U) (B : A → U) (pB : (a : A) → isProp (B a))
-       (u v : (fst : A) × B fst) (p : u.1 = v.1) : u = v
-  := λ i. (p i, lemPropFam A B pB u.1 v.1 p u.2 v.2 i);
-
 isPropΠ (A : U) (B : A → U) (h : (x : A) → isProp (B x))
        (f0 f1 : (x : A) → B x) : f0 = f1
   := λ i x. h x (f0 x) (f1 x) i;
-
-isPropΣ (A : U) (B : A → U) (pA : isProp A)
-        (pB : (fst : A) → isProp (B fst)) (t u : (fst : A) × B fst) : t = u
-  := ΣeqProp A B pB t u (pA t.1 u.1);
 
 lemProp (A : U) (h : A → isProp A) : isProp A
   := λ a. h a a;

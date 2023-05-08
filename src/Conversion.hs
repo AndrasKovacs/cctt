@@ -25,7 +25,8 @@ instance Conv Val where
     (VLam t           , VLam t'             ) -> conv t t'
     (VPath a t u      , VPath a' t' u'      ) -> conv a a' && conv t t' && conv u u'
     (VPLam _ _ t      , VPLam _ _ t'        ) -> conv t t'
-    (VSg a b          , VSg a' b'           ) -> b^.name == b'^.name && conv a a' && conv b b'
+    -- (VSg a b          , VSg a' b'           ) -> b^.name == b'^.name && conv a a' && conv b b'
+    (VSg a b          , VSg a' b'           ) -> conv a a' && conv b b'
     (VWrap x a        , VWrap x' a'         ) -> x == x' && conv a a'
     (VPair _ t u      , VPair _ t' u'       ) -> conv t t' && conv u u'
     (VU               , VU                  ) -> True
