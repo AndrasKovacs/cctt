@@ -103,6 +103,7 @@ executable cctt
     , ghc-prim
     , megaparsec
     , microlens-platform
+    , primdata
     , strict-impl-params
     , time
   default-language: Haskell2010

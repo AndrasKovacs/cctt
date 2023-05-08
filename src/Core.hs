@@ -4,6 +4,7 @@ module Core where
 import Common
 import CoreTypes
 import Interval
+import Statistics (bumpHCom)
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -297,6 +298,10 @@ mapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> Bin
 mapBindI t f = bindI (t^.name) (\i -> f i (t ∙ i))
 {-# inline mapBindI #-}
 
+mapBindILazy :: SubAction a => NCofArg => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
+mapBindILazy t f = bindILazy (t^.name) (\i -> f i (t ∙ i))
+{-# inline mapBindILazy #-}
+
 mapBindIVar :: SubAction a => NCofArg => BindI a -> (NCofArg => IVar -> a -> b) -> BindI b
 mapBindIVar t f = bindIVar (t^.name) (\i -> f i (t ∙ IVar i))
 {-# inline mapBindIVar #-}
@@ -311,6 +316,12 @@ umapBindILazy (BindILazy x i a) f =
   let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
   seq ?cof (BindILazy x i (f (IVar i) a))
 {-# inline umapBindILazy #-}
+
+-- umapBindILazy :: SubAction a => NCofArg => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
+-- umapBindILazy = mapBindILazy
+
+-- umapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
+-- umapBindI = mapBindI
 
 umapBindI :: NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
 umapBindI (BindI x i a) f =
@@ -1011,19 +1022,10 @@ coe r r' ~a t
   | True            = coed r r' a t
 {-# inline coe #-}
 
--- vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
--- vhcom r r' a sys base ~is = case sys^.body of
---   NSHEmpty -> base
---   _        -> VHCom r r' a sys base is
--- {-# inline vhcom #-}
-
-vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
-vhcom = VHCom
-{-# inline vhcom #-}
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
-hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
+hcomdn r r' topA ts@(WIS nts is) base = case runIO (do{bumpHCom; pure $! frc topA}) of
   VPi a b ->
     VLam $ NCl (b^.name) $ CHComPi r r' a b nts base
 
@@ -1079,7 +1081,7 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
             -- (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
             nts
 
-    in VGlueTy base (WIS sys (insertI r (insertI r' is)))
+    in vgluety base (WIS sys (insertI r (insertI r' is)))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -1106,7 +1108,7 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
                                       ∙ hcom r i (proj1 "Ty" tf) (frc betasys) gr) alphasys))
             (ungluen gr alphasys)
 
-    in VGlue hcombase alphasys (fib^.body)
+    in vglue hcombase alphasys (fib^.body)
              (insertI r $ insertI r' ((alphasys^.ivars) <> (betasys^.ivars)))
 
   VLine a ->
@@ -1156,36 +1158,83 @@ hcomdn r r' topA ts@(WIS nts is) base = case frc topA of
 -- | HCom with nothing known about semantic arguments.
 hcom :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
 hcom r r' ~a ~t ~b
-  | frc r == frc r' = b
+  | frc r == frc r' = runIO (bumpHCom >> pure b)
   | True = case t of
-      VSHTotal v -> v ∙ r'
+      VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
       VSHNe sys  -> hcomdn r r' a sys b
 {-# inline hcom #-}
 
 -- | HCom with neutral system input.
 hcomn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val
 hcomn r r' ~a ~sys ~b
-  | frc r == frc r' = b
+  | frc r == frc r' = runIO (bumpHCom >> pure b)
   | True            = hcomdn r r' a sys b
 {-# inline hcomn #-}
 
 -- | Off-diagonal HCom.
 hcomd :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
 hcomd r r' ~a ~sys ~b = case sys of
-  VSHTotal v -> v ∙ r'
+  VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
   VSHNe sys  -> hcomdn r r' a sys b
 {-# inline hcomd #-}
+
+
+-- EVIL CORNER (don't use the evil versions, they're bogus)
+--------------------------------------------------------------------------------
+
+vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
+vhcom = VHCom
+{-# inline vhcom #-}
+
+vgluety :: VTy -> NeSys' -> Val
+vgluety = VGlueTy
+{-# inline vgluety #-}
+
+vglue :: Val -> NeSys' -> NeSys -> IVarSet -> Val
+vglue = VGlue
+{-# inline vglue #-}
+
+nunglue :: Ne -> NeSys -> Ne
+nunglue = NUnglue
+{-# inline nunglue #-}
+
+-- vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
+-- vhcom r r' a sys base ~is = case sys^.body of
+--   NSHEmpty -> base
+--   _        -> VHCom r r' a sys base is
+-- {-# inline vhcom #-}
+
+-- vgluety :: VTy -> NeSys' -> Val
+-- vgluety ~a sys = case sys^.body of
+--   NSEmpty -> a
+--   _       -> VGlueTy a sys
+-- {-# inline vgluety #-}
+
+-- vglue :: Val -> NeSys' -> NeSys -> IVarSet -> Val
+-- vglue t eqs fibs is = case eqs^.body of
+--   NSEmpty -> t
+--   _       -> VGlue t eqs fibs is
+-- {-# inline vglue #-}
+
+-- nunglue :: Ne -> NeSys -> Ne
+-- nunglue t sys = case sys of
+--   NSEmpty -> t
+--   _       -> NUnglue t sys
+-- {-# inline nunglue #-}
+
+
+--------------------------------------------------------------------------------
 
 glueTy :: NCofArg => DomArg => Val -> VSys -> Val
 glueTy ~a sys = case sys of
   VSTotal b -> proj1 "Ty" b
-  VSNe sys  -> VGlueTy a sys
+  VSNe sys  -> vgluety a sys
 {-# inline glueTy #-}
 
 glue :: Val -> VSys -> VSys -> Val
 glue ~t eqs sys = case (eqs, sys) of
   (VSTotal{}, VSTotal v)         -> v
-  (VSNe eqs , VSNe (WIS sys is)) -> VGlue t eqs sys is
+  (VSNe eqs , VSNe (WIS sys is)) -> vglue t eqs sys is
   _                              -> impossible
 {-# inline glue #-}
 
@@ -1199,7 +1248,7 @@ unglue ~t sys = case sys of
 ungluen :: NCofArg => DomArg => Val -> NeSys' -> Val
 ungluen t (WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
-  VNe n is'               -> VNe (NUnglue n sys) (is <> is')
+  VNe n is'               -> VNe (nunglue n sys) (is <> is')
   v@VHole{}               -> v
   v                       -> error ("ungluen:  " ++ take 1000 (show v))
   -- v                       -> impossible

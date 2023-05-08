@@ -117,8 +117,8 @@ putState = writeIORef stateRef
 modState :: (State -> State) -> IO ()
 modState = modifyIORef' stateRef
 
-reset :: IO ()
-reset = putState initState
+resetElabState :: IO ()
+resetElabState = putState initState
 
 withTopElab :: Elab (IO a) -> IO a
 withTopElab act = do

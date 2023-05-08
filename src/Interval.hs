@@ -47,6 +47,8 @@ import Data.Word
 import Common
 import qualified Data.IntIntMap as IIM
 import qualified Data.LvlSet as LS
+-- import qualified Data.IntSet.Internal as IS
+-- import qualified Data.IntSet as IS
 
 ----------------------------------------------------------------------------------------------------
 
@@ -226,31 +228,8 @@ emptySub :: IVar -> Sub
 emptySub i = Sub (fromIntegral i) 0 mempty
 {-# inline emptySub #-}
 
--- idSubCacheLimit :: IVar
--- idSubCacheLimit = 100
-
 idSub :: IVar -> Sub
 idSub i = Sub (fromIntegral i) (fromIntegral i) mempty
-
--- -- Precomputed identity subs up to some limit
--- idSubs :: IM.IntMap Sub
--- idSubs = go 0 mempty mempty where
---   go :: IVar -> IIM.IntIntMap -> IM.IntMap Sub -> IM.IntMap Sub
---   go i s acc | i > idSubCacheLimit = acc
---   go i s acc = let s' = (IIM.insert (fromIntegral i) (fromIntegral (unI (IVar (fromIntegral i)))) s)
---                in go (i + 1) s' (IM.insert (fromIntegral i) (Sub (fromIntegral i) (fromIntegral i) s) acc)
-
--- idSub :: IVar -> Sub
--- idSub i | i < idSubCacheLimit = idSubs IM.! fromIntegral i
---         | otherwise           = undefined
-
--- -- direct recomp
--- idSub :: IVar -> Sub
--- idSub i = Sub (fromIntegral i) (fromIntegral i) (go 0 i mempty) where
---   go :: IVar -> IVar -> IIM.IntIntMap -> IIM.IntIntMap
---   go x i acc | x == i = acc
---   go x i acc = go (x + 1) i (IIM.insert (fromIntegral x) (fromIntegral (unI (IVar (fromIntegral x)))) acc)
--- {-# inline idSub #-}
 
 cod :: Sub -> IVar
 cod (Sub _ c _) = fromIntegral c
@@ -274,9 +253,9 @@ setDomCod d c (Sub _ _ m) = Sub (fromIntegral d) (fromIntegral c) m
 
 lookupSub :: IVar -> Sub -> I
 lookupSub i (Sub d c m)
-  | 0 <= i && i < fromIntegral c =
-      IIM.lookup (\_ -> IVar i) (\i -> I (fromIntegral i)) (fromIntegral i) m
-  | True = impossible
+  | 0 <= i && i < fromIntegral c
+     = IIM.lookup (\_ -> IVar i) (\i -> I (fromIntegral i)) (fromIntegral i) m
+  | True = error $ "lookupSub " ++ show i ++ " " ++ show (Sub d c m)
 {-# inline lookupSub #-}
 
 -- | Strict right fold over all (index, I) mappings in a substitution.
@@ -348,22 +327,20 @@ instance SubAction I where
   {-# inline sub #-}
 
 mapSub :: (IVar -> IVar) -> (IVar -> I -> I) -> Sub -> Sub
-mapSub domf f (Sub d c m) =
-  Sub (fromIntegral (domf (fromIntegral d)))
-      c (IIM.mapWithKey (\k i -> fromIntegral (unI (f (fromIntegral k) (I (fromIntegral i))))) m)
+mapSub domf f s@(Sub d c m) =
+  Sub (fromIntegral (domf (fromIntegral d))) c
+      (foldlSub
+         (\x acc i -> case f x i of
+             i' | IVar x == i' -> acc
+                | True         -> IIM.insert (fromIntegral x) (fromIntegral (unI i')) acc)
+         mempty
+         s)
 {-# inline mapSub #-}
 
 -- substitution composition
 instance SubAction Sub where
   sub f = mapSub (\_ -> dom ?sub) (\_ i -> sub i) f
   {-# noinline sub #-}
-
--- goIsUnblocked :: NCofArg => IVarSet -> IVarSet -> Bool
--- goIsUnblocked is varset = popSmallestIS is
---   (\is x -> matchIVar (lookupSub x ?cof)
---      (\x -> memberIS x varset || goIsUnblocked is (insertIVarF x varset))
---      True)
---   False
 
 goIsUnblocked :: NCofArg => IVarSet -> IVarSet -> Bool
 goIsUnblocked is varset =
@@ -393,15 +370,6 @@ goIsUnblockedS is varset =
     varset
     False
     is
-
--- goIsUnblockedS :: SubArg => NCofArg => IVarSet -> IVarSet -> Bool
--- goIsUnblockedS is varset = popSmallestIS is
---     (\is x -> matchIVar (lookupSub x ?sub)
---       (\x -> matchIVar (lookupSub x ?cof)
---         (\x -> memberIS x varset || goIsUnblockedS is (insertIVarF x varset))
---         True)
---       True)
---     False
 
 isUnblockedS :: SubArg => NCofArg => IVarSet -> Bool
 isUnblockedS is | emptyIS is = False

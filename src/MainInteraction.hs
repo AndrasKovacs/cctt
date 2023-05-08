@@ -12,7 +12,7 @@ import Elaboration
 import Interval
 import Pretty
 import Quotation
--- import Statistics
+import Statistics
 
 helpMsg = unlines [
    "usage: cctt <file> [nf <topdef>] [ty <topdef>] [elab] [verbose] [no-hole-cxts]"
@@ -57,7 +57,8 @@ parseArgs args = do
 
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
-  reset
+  resetElabState
+  resetStats
   (path, printnf, printty, printelab, verbosity, holeCxts) <- parseArgs =<< getArgs
 
   modState $ printingOpts %~
@@ -107,3 +108,6 @@ mainWith getArgs = do
           exitSuccess
     Nothing ->
       pure ()
+
+  hcs <- getHComStat
+  putStrLn $ "Number of hcom-s computed: " ++ show hcs

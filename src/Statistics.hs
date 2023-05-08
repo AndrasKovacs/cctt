@@ -3,6 +3,28 @@ module Statistics where
 
 import Common
 import CoreTypes
+import qualified Data.Ref.F as RF
+
+--------------------------------------------------------------------------------
+
+hcomStat :: RF.Ref Int
+hcomStat = runIO $ RF.new 0
+{-# noinline hcomStat #-}
+
+bumpHCom :: IO ()
+bumpHCom = RF.modify hcomStat (+1)
+
+-- bumpHCom :: IO ()
+-- bumpHCom = pure ()
+
+resetStats :: IO ()
+resetStats = do
+  RF.write hcomStat 0
+
+getHComStat :: IO Int
+getHComStat = RF.read hcomStat
+
+--------------------------------------------------------------------------------
 
 data Stats = Stats {
     statsHComs :: Int

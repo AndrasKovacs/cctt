@@ -78,7 +78,7 @@ default-extensions:
   - ViewPatterns
 
 ghc-options:
-- -O
+- -O2
 - -fdicts-strict
 - -fmax-worker-args=15
 - -fspecialise-aggressively
@@ -106,6 +106,7 @@ dependencies:
 - microlens-platform
 - strict-impl-params
 - time
+- primdata
 
 source-dirs: src
 
