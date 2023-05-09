@@ -73,12 +73,45 @@ JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
                 k=1 _. d]
                d;
 
-isoToEquiv (A B : U)(i : iso A B) : equiv A B :=
-    i.f
-  , i.g
-  , i.linv
-  , ?rinv
-  , ?coh
+fiber (A B : U) (f : A → B) (b : B) : U
+  := (x : A) * f x = b;
+
+fiberRefl (A B : U) (f : A → B) (a  : A) : fiber A B f (f a)
+  := (a , refl);
+
+contractIsoFiber (A B : U) (is : iso A B) (a : A)
+  (fib : fiber A B is.f (is.f a))
+  : fiberRefl A B is.f a = fib
+  :=
+  let sq (j k : I) : A :=
+      hcom 0 j [k=1 j. is.g (fib.2 j)] (is.linv (fib.1) k);
+  let sq2 (i k : I) : A :=
+      hcom 1 k
+        [i=0 k. is.linv a k;
+         i=1 k. sq k k]
+        (is.g (is.f a));
+  λ i.
+  (sq2 i 0,
+   λ j.
+   let aux : A :=
+     hcom j 1
+       [i=0 k. is.linv a k;
+        i=1 k. sq j k;
+        j=0 k. is.linv (sq2 i 0) k]
+       (sq2 i j);
+   hcom 0 1
+     [i=0 l. is.rinv (is.f a) l;
+      i=1 l. is.rinv (fib.2 j) l;
+      j=0 l. is.rinv (is.f (sq2 i 0)) l;
+      j=1 l. is.rinv (is.f a) l]
+     (is.f aux));
+
+isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
+    is.f
+  , is.g
+  , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).1
+  , is.rinv
+  , λ a i k. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).2 k
   ;
 
 --------------------------------------------------------------------------------
