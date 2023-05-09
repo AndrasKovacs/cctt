@@ -132,13 +132,15 @@ namedProj (x : MySigma) := x.first;
 MySigma2 := (first : U) × (second : U) × (third : first → second) × U;
 namedProj2 (x : MySigma2) := x.third;
 
--- NOTE: the projection names are nominal, meaning that two sigma
--- types with different projection names are not definitionally equal!
--- This is because we want projection overloading to be stable under
--- definitional equality.
+-- NOTE: even though elaboration depends on field names, two sigma types with
+-- different field names are convertible!  This is an *evil* temporary feature
+-- right now, used as a convenience feature that lets us avoid tedious field
+-- renaming conversions. Note that this means that printed normal forms may
+-- contain invalid field projections, because reduction can silently rename
+-- fields!
 
--- fails : ((foo : U) * foo) = ((bar : U) * bar) := refl;
-
+-- More graceful handling of field renamings is TODO for now.
+-- An option to only print unnamed (primitive) projections is also TODO.
 
 -- Unary records
 --------------------------------------------------------------------------------
@@ -161,7 +163,7 @@ wrap (A : U)(x : A) : MyNewtype A := x;
 MySigma3 := (first : U) × (second : U) × (third : first → second);
 namedProj3 (x : MySigma3) := x.third;
 
--- Unary records also have nominal field names!
+-- NOTE: the sigma field renaming issue is present here too.
 
 
 -- Path type
