@@ -1,0 +1,390 @@
+isEquiv (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x)
+  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+
+equiv (A B : U) : U :=
+  (f : A → B) × isEquiv A B f;
+
+idEquiv (A : U) : equiv A A :=
+  (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
+
+connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+  := let sq (l k : I) : A := hcom 1 l [k=0 _. a; k=1. p] (p k);
+     λ i j. hcom 0 1 [i=0. sq 0; i=1. sq j; j=0. sq 0; j=1. sq i; i=j. sq i] a;
+
+Ω (A : U) (x : A) : U := x = x;
+Ω² (A : U) (x : A) : U := Ω (Ω A x) refl;
+Ω³ (A : U) (x : A) : U := Ω (Ω² A x) refl;
+
+global (A : U) (h : Ω (A → A) (λ x. x))
+  : Ω² U A
+  := λ i j. Glue A [i=0. (A, idEquiv A);
+                    i=1. (A, idEquiv A);
+                    j=0. (A, h i, (λ x. h ⁻¹ i x), ?_);
+                    j=1. (A, idEquiv A)];
+
+local (A : U) (H : Ω² U A) : Ω (A → A) (λ x. x)
+  := λ i x. hcom 1 0
+              [i=0 k. coe 0 k (j. A) x;
+               i=1 k. coe 0 k (j. A) x]
+              (coe 0 1 (j. H i j) x);
+
+higher inductive S¹ :=
+    base1
+  | loop1 (i : I) [i=0. base1; i=1. base1];
+
+higher inductive S² :=
+  base2
+| loop2 (i j : I) [i=0. base2
+                  ;i=1. base2
+                  ;j=0. base2
+                  ;j=1. base2];
+
+globalS² (A : U) (h : Ω (A → A) (λ x. x))
+  : S² → U
+  := λ [ base2. A
+       ; loop2 i j. global A h i j
+       ];
+
+-- From new_brunerie.cctt
+
+Square (A : U) (a0 a1 b0 b1 : A)
+               (u : a0 = a1) (v : b0 = b1)
+               (r0 : a0 = b0) (r1 : a1 = b1) : U
+ := r0 ={i. u i = v i} r1;
+
+isContr (A : U) : U := (fst : A) × ((y : A) → fst = y);
+isProp (A : U) : U := (a b : A) → a = b;
+isSet (A : U) : U := (a b : A) → isProp (a = b);
+
+ua (A B : U)(f : equiv A B) : A = B :=
+  λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
+
+isIso (A B : U)(f : A → B) : U :=
+    (g    : B → A)
+  × (linv : (x : A) → x = g (f x))
+  × (rinv : (x : B) → f (g x) = x);
+
+iso (A B : U) : U := (f : A → B) × isIso A B f;
+
+isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
+    iso.f
+  , iso.g
+  , iso.linv
+  , ?_
+  , ?_;
+
+J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
+  := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
+     coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
+
+inductive or (A B : U) := left (a : A) | right (b : B);
+
+inductive Unit := tt;
+
+inductive N0 :=;
+
+not (A : U) : U := A → N0;
+
+dec (A : U) : U := or A (not A);
+
+subst (A : U) (P : A → U) (a b : A) (p : a = b) (e : P a) : P b
+  := coe 0 1 (ap P p) e;
+
+discrete (A : U) : U := (a b : A) → dec (a = b);
+
+dNot (A : U) (a : A) : not (not A) := λ f. f a;
+
+isPropN0 : isProp N0 := λ[];
+
+isPropNot (A : U) : isProp (not A) := λ f g i x. isPropN0 (f x) (g x) i;
+
+stable (A:U) : U := not (not A) → A;
+
+decStable (A : U) : dec A → stable A := λ[
+ left a. λ _. a;
+ right b. λ h. case (h b) []];
+
+
+-- Hedberg
+----------------------------------------------------------------------------------------------------
+
+wkConstant (A : U) (f : A → A) : U := (x y : A) → f x = f y;
+
+constant (A : U) : U := (f:A → A) * wkConstant A f;
+
+hedbergLemma (A : U)(a : A) (f : (x : A) → a = x → a = x) :
+  (b : A) (p : a = b) → Square A a a a b refl p (f a refl) (f b p) :=
+  J A a
+    (λ b p. Square A a a a b refl p (f a refl) (f b p))
+    refl;
+
+stable-constant (A : U) (sA : stable A) : constant A :=
+  (λ x. sA (dNot A x), λ x y i. sA (isPropNot (not A) (dNot A x) (dNot A y) i));
+
+hedbergStable (A : U) (a b : A) (h : (x : A) -> stable (a = x))(p q : a = b) : p = q :=
+
+  let rem1 (x : A) : constant (a = x) := stable-constant (a = x) (h x);
+
+  let f (x : A) : a = x → a = x := (rem1 x).1;
+
+  let fConst (x : A) : wkConstant (a = x) (f x) := (rem1 x).2;
+
+  let rem4 : Square A a a b b refl refl (f b p) (f b q) := fConst b p q;
+
+  let r : a = a := f a refl;
+
+  let rem2 (i j : I) := hedbergLemma A a f b p i j;
+  let rem3 (i j : I) := hedbergLemma A a f b q i j;
+
+  λ j i. hcom 0 1 [j=0. rem2 i
+                 ; j=1. rem3 i
+		 ; i=0. r
+		 ; i=1. rem4 j] a;
+
+hedbergS (A:U) (h : (a x : A) -> stable (a = x)) : isSet A :=
+  λ a b. hedbergStable A a b (h a);
+
+hedberg (A : U) (h : discrete A) : isSet A :=
+  λ a b. hedbergStable A a b (λ b. decStable (a = b) (h a b));
+
+
+-- Integers
+----------------------------------------------------------------------------------------------------
+
+inductive ℕ := zero | suc ℕ;
+
+num1 := suc zero;
+num2 := suc (suc zero);
+num3 := suc (suc (suc zero));
+num4 := suc (suc (suc (suc zero)));
+
+pred : ℕ → ℕ := λ[
+  zero. zero;
+  suc n. n];
+
+inductive ℤ := pos ℕ | neg ℕ;
+
+zeroℤ := pos zero;
+
+predℤ : ℤ → ℤ := λ[
+  pos u. case u [zero. neg zero; suc n. pos n];
+  neg v. neg (suc v)];
+
+sucℤ : ℤ → ℤ := λ[
+  pos u. pos (suc u);
+  neg v. case v [zero. pos zero; suc n. neg n]];
+
+predsucℤ : (x : ℤ) → x = predℤ (sucℤ x) := λ[
+  pos u. refl;
+  neg v. case v (v. neg v = predℤ (sucℤ (neg v))) [
+    zero. refl;
+    suc n. refl
+    ]
+  ];
+
+sucpredℤ : (x : ℤ) → sucℤ (predℤ x) = x := λ[
+  pos u. case u (u. sucℤ (predℤ (pos u)) = pos u) [
+    zero.  refl;
+    suc n. refl
+    ];
+  neg v. refl
+  ];
+
+caseℕ (A : U) (x y : A) : ℕ → A := λ[
+  zero.  x;
+  suc _. y];
+
+caseDℕ (P : ℕ → U) (z : P zero) (s : (n : ℕ) → P (suc n)) : (n : ℕ) → P n := λ[
+  zero. z;
+  suc n. s n];
+
+znots (n : ℕ) : not (zero = suc n) :=
+  λ h. subst ℕ (caseℕ U ℕ N0) zero (suc n) h zero;
+
+discreteℕ : discrete ℕ := λ[
+  zero.  λ[zero.  left refl;
+           suc m. right (λ p. case (znots m p) [])];
+  suc n. λ[zero.  right (λ p. case (znots n p⁻¹) []);
+           suc m. case (discreteℕ n m) [
+             left p. left (ap (λ x. suc x) p);
+             right p. right (λ q. case (p (ap pred q)) [])
+           ]]
+  ];
+
+posNotneg (a b : ℕ) : not (pos a = neg b) :=
+  λ h. subst ℤ (λ[pos _. Unit; neg _. N0]) (pos a) (neg b) h tt;
+
+injPos (a b : ℕ) (h : pos a = pos b) : a = b :=
+  subst ℤ (λ[pos c. a = c; neg _. N0]) (pos a) (pos b) h refl;
+
+injNeg (a b : ℕ) (h : neg a = neg b) : a = b :=
+  subst ℤ (λ[pos _. N0; neg c. a = c]) (neg a) (neg b) h refl;
+
+discreteℤ : discrete ℤ := λ[
+  pos a. λ[
+    pos a'. case (discreteℕ a a') [
+      left p. left (ap (λ x. pos x) p);
+      right p. right (λ q. p (injPos a a' q))
+      ];
+    neg b. right (λ p. case (posNotneg a b p) [])
+    ];
+  neg b. λ[
+    pos a. right (λ p. case (posNotneg a b p⁻¹) []);
+    neg b'. case (discreteℕ b b') [
+      left p. left (ap (λ x. neg x) p);
+      right p. right (λ q. p (injNeg b b' q))
+      ]
+    ]
+];
+
+sucℤIso : iso ℤ ℤ :=
+    λ x. sucℤ x
+  , λ x. predℤ x
+  , predsucℤ
+  , sucpredℤ;
+
+sucPathℤ : ℤ = ℤ :=
+  ua ℤ ℤ (isoToEquiv ℤ ℤ sucℤIso);
+
+isSetℤ : isSet ℤ := hedberg ℤ discreteℤ;
+
+helix : S¹ → U := λ[
+  base1. ℤ;
+  loop1 i. sucPathℤ i
+];
+
+connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+  let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
+  let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
+  hcom 0 1 [
+    i=0. pface j;
+    i=1. qface j;
+    j=0. pface i;
+    j=1. qface i]
+    (p 1);
+
+rotLoop : (a : S¹) → a = a := λ[
+  base1.   λ i. loop1 i;
+  loop1 i. λ j. connection-both S¹ (λ i. loop1 i) base1 (λ i. loop1 i) i j
+];
+
+rot : S¹ → S¹ → S¹ := λ[
+  base1. λ y. y;
+  loop1 i. λ y. rotLoop y i
+];
+
+-- end copy from new_brunerie.cctt
+
+
+
+-- TODO adapt from Cavallo library/cool/hopf.red...
+unrotLoop (a : S¹) : a = a := (rotLoop a) ⁻¹;
+
+rot-unrot (a : S¹) : refl ={i. rotLoop (unrotLoop a i) i = a} refl
+  := ?rotunrot;
+
+unrot-rot (a : S¹) : refl ={i. a = unrotLoop (rotLoop a i) i} refl
+  := ?unrotrot;
+
+rotEquiv (i : I) : equiv S¹ S¹ :=
+  isoToEquiv S¹ S¹
+    ((λ a. rotLoop a i),
+     (λ a. unrotLoop a i),
+     (λ a. unrot-rot a i),
+     (λ a. rot-unrot a i));
+
+HopfS² : S² → U := λ[
+  base2. S¹;
+  loop2 i j. Glue S¹ [i=0. S¹, idEquiv S¹
+                     ;i=1. S¹, idEquiv S¹
+                     -- works!!
+                     ;j=0. S¹, rotEquiv i
+                     ;j=1. S¹, idEquiv S¹
+                     ]
+];
+
+WrongHopfS² : S² → U := λ[
+  base2. S¹;
+  loop2 i j. Glue S¹ [i=0. S¹, idEquiv S¹
+                     ;i=1. S¹, idEquiv S¹
+                     ;j=0. S¹, idEquiv S¹
+                     ;j=1. S¹, rotEquiv i
+                     ]
+];
+
+windingS¹ : Ω S¹ base1 → ℤ :=
+  λ p. coe 0 1 (i. helix (p i)) (pos zero);
+
+windingS² : Ω² S² base2 → ℤ :=
+  λ p. windingS¹ (λ i. coe 0 1 (j. HopfS² (p i j)) base1);
+
+higher inductive J₃S¹ :=
+  j3s1-base
+| j3s1-loop1 (i : I)
+    [i=0. j3s1-base
+    ;i=1. j3s1-base]
+| j3s1-loop2 (i j : I)
+    [i=0. j3s1-loop1 j
+    ;i=1. j3s1-loop1 j
+    ;j=0. j3s1-loop1 i
+    ;j=1. j3s1-loop1 i]
+| j3s1-loop3 (i j k : I)
+    [i=0. j3s1-loop2 j k
+    ;i=1. j3s1-loop2 j k
+    ;j=0. j3s1-loop2 i k
+    ;j=1. j3s1-loop2 i k
+    ;k=0. j3s1-loop2 i j
+    ;k=1. j3s1-loop2 i j];
+
+-- cheating!
+loopsJ₃S¹ : (x : J₃S¹) → Ω J₃S¹ x := λ[
+  j3s1-base. λ l. j3s1-loop1 l;
+  j3s1-loop1 i. λ l. j3s1-loop2 i l;
+  j3s1-loop2 i j. λ l. j3s1-loop3 i j l;
+  j3s1-loop3 i j k. ?cheat -- TODO should 2-truncate
+];
+
+localJ₃S¹ : Ω (J₃S¹ → J₃S¹) (λ x. x) :=
+  λ i x. loopsJ₃S¹ x i;
+
+w22' : Ω (Ω² S² base2) (λ a b. loop2 a b) :=
+  λ j a b.
+    hcom 0 1
+      [j=0 i. loop2 a b;
+       j=1 i. loop2 a b;
+       a=0 i. loop2 i j;
+       a=1 i. loop2 i j;
+       b=0 i. loop2 i j;
+       b=1 i. loop2 i j]
+      (loop2 a b);
+
+dsqInv (A : U) (x y : A) (p : x = y) (r : p = p) : Ω² A x
+  := J A x (λ y p. p = p → Ω² A x)
+       (λ r. r)
+       y p r;
+
+w22 : Ω³ S² base2 :=
+  dsqInv (Ω S² base2) refl refl (λ i j. loop2 i j)
+    w22';
+
+toJ₃S¹ : Ω S² base2 → J₃S¹ :=
+  λ p. coe 0 1 (i. globalS² J₃S¹ localJ₃S¹ (p i)) j3s1-base;
+
+step2 : Ω² J₃S¹ j3s1-base :=
+  λ i j. toJ₃S¹ (λ k. w22 i j k);
+
+toS² : J₃S¹ → S² := λ[
+  j3s1-base. base2;
+  j3s1-loop1 i. base2;
+  j3s1-loop2 i j. loop2 i j;
+  j3s1-loop3 i j k. ?ccube -- TODO
+];
+
+step3 : Ω² S² base2 :=
+  λ i j. toS² (step2 i j);
+
+brunerie : ℤ :=
+  windingS² step3;

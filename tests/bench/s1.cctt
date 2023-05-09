@@ -9,7 +9,7 @@ higher inductive S¹ :=
 
 helix : S¹ → U := λ[
   base. ℤ;
-  loop i. sucPathℤ i
+  loop i. ua ℤ ℤ (sucℤ, predℤ, ?_) i -- sucPathℤ i
 ];
 
 loop' : base = base :=
@@ -29,6 +29,19 @@ intLoop : ℤ → ΩS¹ := λ[
   neg n. case n [zero. loop'⁻¹; suc n. intLoop (neg n) ∙ loop'⁻¹]
 ];
 
-test1 := forceℤ (winding (intLoop (pos n10k)));
-test2 := forceℤ (winding (intLoop (neg n1k)));
+intLoop' : ℤ → ΩS¹ := λ[
+  pos n. case n [zero. refl; suc n. loop' ∙ intLoop (pos n)];
+  neg n. case n [zero. loop'⁻¹; suc n. loop'⁻¹ ∙ intLoop (neg n)]
+];
+
+toℕ : ℤ → ℕ := λ[
+  pos n. n;
+  neg n. n
+];
+
+test1 := forceℤ (winding (intLoop' (pos n10k)));
+test2 := forceℤ (winding (intLoop' (neg n1k)));
 test3 := winding (intLoop (pos n10k) ∙ intLoop (neg n10k));
+
+foo (i : I) := helix (loop' i);
+bar := loop' ∙ loop';

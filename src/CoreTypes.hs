@@ -616,12 +616,6 @@ instance SubAction IClosure where
     ICCoeCoh0Rhs a r r' x   -> ICCoeCoh0Rhs (sub a) (sub r) (sub r') (sub x)
     ICBindI a               -> ICBindI (sub a)
 
-instance SubAction a => SubAction [a] where
-  sub = \case
-    []   -> []
-    a:as -> (:) $$! sub a $$! sub as
-  {-# inline sub #-}
-
 instance SubAction VDSpine where
   sub = \case
     VDNil       -> VDNil

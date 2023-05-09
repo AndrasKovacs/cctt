@@ -1685,7 +1685,11 @@ instance Force Val Val where
 instance Force VHole VHole where
   frc h = h; {-# inline frc #-}
   frcS = \case
-    VSrcHole x p s env -> VSrcHole x p (sub s) (sub env)
+    VSrcHole x p s env -> VSrcHole x p s env
+      -- trace
+      --   ("FRCHOLE " ++ sourcePosPretty (coerce p) ++ " " ++ show s
+      --               ++ " " ++ show ?sub ++ " " ++ show ?cof ++ " " ++ show (sub s)) $
+      -- VSrcHole x p (sub s) (sub env)
     VErrHole msg       -> VErrHole msg
   {-# inline frcS #-}
 

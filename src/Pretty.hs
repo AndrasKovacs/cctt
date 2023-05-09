@@ -335,7 +335,9 @@ tm = \case
                             Just x -> "?" <> str x
                             _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
                               True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
-                              _    -> pure "?"
+                              _    -> ifVerbose
+                                (pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos))))
+                                (pure "?")
                           ErrHole msg ->
                             "(ERR " <> str msg <> ")"
   Com r r' i a t u   -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in bindI i \i ->

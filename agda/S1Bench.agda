@@ -16,7 +16,7 @@ forceℤ : ℤ → Unit
 forceℤ (pos n)    = forceℕ n
 forceℤ (negsuc n) = forceℕ n
 
-test1 : forceℤ (winding (intLoop (pos 2000))) ≡ tt
+test1 : forceℤ (winding (intLoop (pos 10000))) ≡ tt
 test1 = refl
 
 -- test2 = forceℤ (winding (intLoop (neg 10)))
