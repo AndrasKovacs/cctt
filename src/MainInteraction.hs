@@ -21,7 +21,7 @@ helpMsg = unlines [
   ,"  nf <topdef>   prints the normal form of top-level definition <topdef>"
   ,"  ty <topdef>   prints the type of the top-level definition <topdef>"
   ,"  elab          prints the elaboration output"
-  ,"  verbose       prints path endpoints and hcom types explicitly"
+  ,"  verbose       prints path endpoints, hcom types and hole source positions explicitly"
   ,"  no-hole-cxt   turn off printing local contexts of holes"
   ]
 

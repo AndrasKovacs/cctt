@@ -109,9 +109,6 @@ bindILazyS :: Name -> (SubArg => NCofArg => I -> a) -> (SubArg => NCofArg => Bin
 bindILazyS x act = freshIVarS \i -> BindILazy x i (act (IVar i))
 {-# inline bindILazyS #-}
 
-bindIUnLazy :: BindILazy a -> BindI a
-bindIUnLazy (BindILazy x i a) = BindI x i a
-{-# inline bindIUnLazy #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Cof and Sys semantics
@@ -291,9 +288,6 @@ mapBindCofLazy t f = bindCofLazy (unBindCofLazy t) (f (t^.body))
 bindIFromLazy :: BindILazy a -> BindI a
 bindIFromLazy (BindILazy x i a) = BindI x i a; {-# inline bindIFromLazy #-}
 
-bindIToLazy :: BindILazy a -> BindI a
-bindIToLazy (BindILazy x i z) = BindI x i z; {-# inline bindIToLazy #-}
-
 mapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
 mapBindI t f = bindI (t^.name) (\i -> f i (t ∙ i))
 {-# inline mapBindI #-}
@@ -317,20 +311,20 @@ umapBindILazy (BindILazy x i a) f =
   seq ?cof (BindILazy x i (f (IVar i) a))
 {-# inline umapBindILazy #-}
 
--- umapBindILazy :: SubAction a => NCofArg => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
--- umapBindILazy = mapBindILazy
-
--- umapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
--- umapBindI = mapBindI
-
 umapBindI :: NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
 umapBindI (BindI x i a) f =
   let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
   seq ?cof (BindI x i (f (IVar i) a))
 {-# inline umapBindI #-}
 
+-- umapBindILazy :: SubAction a => NCofArg => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
+-- umapBindILazy = mapBindILazy
+
+-- umapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
+-- umapBindI = mapBindI
+
 proj1BindIFromLazy :: NCofArg => DomArg => Name -> BindILazy Val -> BindI Val
-proj1BindIFromLazy x t = umapBindI (bindIToLazy t) (\_ -> proj1 x)
+proj1BindIFromLazy x t = umapBindI (bindIFromLazy t) (\_ -> proj1 x)
 {-# inline proj1BindIFromLazy #-}
 
 mapNeSys :: NCofArg => (NCofArg => Val -> Val) -> NeSys -> NeSys
@@ -1000,20 +994,12 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     t@VHole{} ->
       t
 
-    v -> error (
-           "\n" ++
-           show ?dom ++ "\n" ++ show ?cof ++ "\n" ++
-           take 100000 (show v) ++ "\n\n\n" ++ take 200 (show ps)
-           )
-    -- _ ->
-    --   impossible
+    v -> impossible
 
   v@VHole{} -> v
 
   v ->
-    error $ take 1000 $ show v
-    -- VHole (VErrHole $ take 300 $ show v)
-    -- impossible
+    impossible
 
 
 coe :: NCofArg => DomArg => I -> I -> BindI Val -> Val -> Val
@@ -1077,7 +1063,7 @@ hcomdn r r' topA ts@(WIS nts is) base = case runIO (do{bumpHCom; pure $! frc top
     -- NOTE: r = r' can be false or neutral
     sys = nscons (ceq r r') (VPair "Ty" base (theIdEquiv base)) $
           mapNeSysFromH
-            (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindIUnLazy t) r' r))
+            (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindIFromLazy t) r' r))
             -- (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
             nts
 
@@ -1589,8 +1575,7 @@ eval = \case
 
   -- Misc
   WkI t              -> wkIS (eval t)
-  Hole h             -> case h of SrcHole x p -> VHole (VSrcHole x p ?sub ?env)
-                                  ErrHole msg -> VHole (VErrHole msg)
+  Hole h             -> VHole h
 
   -- Builtins
   Refl t             -> refl (eval t)
@@ -1598,6 +1583,7 @@ eval = \case
   Trans a x y z p q  -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
   Ap f x y p         -> ap_ (eval f) (eval x) (eval y) (eval p)
   Com r r' i a t b   -> com' (evalI r) (evalI r') (bindIS i \_ -> eval a) (evalSysHCom' t) (eval b)
+
 
 ----------------------------------------------------------------------------------------------------
 -- Forcing
@@ -1672,7 +1658,7 @@ instance Force Val Val where
     VWrap x t             -> VWrap x (sub t)
     VPack x t             -> VPack x (sub t)
     VU                    -> VU
-    VHole h               -> VHole (frcS h)
+    VHole h               -> VHole h
     VLine t               -> VLine (sub t)
     VLLam t               -> VLLam (sub t)
     VTyCon x ts           -> VTyCon x (sub ts)
@@ -1681,17 +1667,6 @@ instance Force Val Val where
     VHDCon i ps fs s is   -> VHDCon i (sub ps) (sub fs) (sub s) (sub is)
     VHCom r r' a sys t is -> VHCom (sub r) (sub r') (sub a) (sub sys) (sub t) (sub is)
   {-# noinline frcS #-}
-
-instance Force VHole VHole where
-  frc h = h; {-# inline frc #-}
-  frcS = \case
-    VSrcHole x p s env -> VSrcHole x p s env
-      -- trace
-      --   ("FRCHOLE " ++ sourcePosPretty (coerce p) ++ " " ++ show s
-      --               ++ " " ++ show ?sub ++ " " ++ show ?cof ++ " " ++ show (sub s)) $
-      -- VSrcHole x p (sub s) (sub env)
-    VErrHole msg       -> VErrHole msg
-  {-# inline frcS #-}
 
 instance Force Ne Val where
   frc = \case

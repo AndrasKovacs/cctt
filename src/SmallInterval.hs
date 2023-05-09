@@ -1,4 +1,3 @@
-{-# language UnboxedTuples #-}
 
 module SmallInterval where
 

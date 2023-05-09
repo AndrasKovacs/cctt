@@ -1,5 +1,4 @@
 
-{-# language UnboxedTuples #-}
 {-# options_ghc -Wno-unused-top-binds #-}
 
 module Interval (
@@ -339,7 +338,9 @@ mapSub domf f s@(Sub d c m) =
 
 -- substitution composition
 instance SubAction Sub where
-  sub f = mapSub (\_ -> dom ?sub) (\_ i -> sub i) f
+  sub f
+    | dom f > cod ?sub = error ("SUB " ++ show f ++ " " ++ show ?sub)
+    | True             = mapSub (\_ -> dom ?sub) (\_ i -> sub i) f
   {-# noinline sub #-}
 
 goIsUnblocked :: NCofArg => IVarSet -> IVarSet -> Bool

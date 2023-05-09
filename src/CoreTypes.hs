@@ -325,11 +325,7 @@ data Val
   | VDCon {-# nounpack #-} DConInfo VDSpine
 
   -- misc
-  | VHole VHole
-  deriving Show
-
-data VHole = VSrcHole (Maybe Name) (DontShow SourcePos) Sub Env
-           | VErrHole String
+  | VHole Hole
   deriving Show
 
 data Ne
@@ -546,6 +542,9 @@ instance SubAction a => SubAction (BindILazy a) where
     let ?sub  = setDomCod (fresh + 1) i ?sub `ext` IVar fresh in
     seq ?sub (BindILazy x fresh (sub a))
   {-# inline sub #-}
+
+instance SubAction a => SubAction (DontShow a) where
+  sub (DontShow a) = DontShow (sub a)
 
 instance SubAction NamedClosure where
   sub (NCl x cl) = NCl x (sub cl)
