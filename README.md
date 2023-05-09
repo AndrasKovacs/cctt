@@ -1,5 +1,5 @@
 
-## cubeval
+## cctt
 
 Installation: install [Haskell stack](https://docs.haskellstack.org/en/stable/),
 then run `stack install` in the source directory.
@@ -12,7 +12,7 @@ the implementation in a testable state and then port over a bunch of existing
 cubical benchmarks.
 
 Existing code was written by me (András Kovács), but Anders Mörtberg and Evan
-Cavallo have provided significant design input and code review.
+Cavallo have provided significant design input, code review and benchmark code.
 
 There are numerous examples which can't be checked in any existing cubical type
 theory implementation, like the infamous original definition of Brunerie's
@@ -186,14 +186,6 @@ In cubical NbE, weakening is *not for free*, because a value under a cofibration
 compute weakening eagerly, in fact we still do implicit weakening. We defer the
 cost of weakening until forcing, where we recompute cofibrations and interval
 expressions under the forcing cofibration.
-
-In the implementation, it can get fairly complicated to keep track of which
-values have been already forced w.r.t. the current context and which haven't.
-So I use a newtype wrapper called `F` to mark anything that is forced. Many
-functions also expect `F`-ed arguments, which can be very useful for avoiding
-duplicate forcing.  Now, `F` adds a *significant* amount of noise everywhere in
-the code. But I find it valuable because when I switched to using it I
-immediately found a handful of forcing-related bugs.
 
 #### Stability annotations
 
@@ -451,4 +443,3 @@ Comparing half-adjoint equivalences to contractible fibers in the Cartesian sett
 - `coeIsEquiv` becomes significantly smaller
 - `isoToEquiv` becomes somewhat larger
 - `coe Glue` becomes slightly smaller
-

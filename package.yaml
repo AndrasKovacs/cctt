@@ -1,7 +1,7 @@
 
-name:         cubeval
+name:         cctt
 version:      0.1.0.0
-github:       "AndrasKovacs/cubeval"
+github:       "AndrasKovacs/cctt"
 license:      MIT
 author:       "András Kovács"
 maintainer:   "puttamalac@gmail.com"
