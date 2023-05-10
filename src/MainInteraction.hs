@@ -15,7 +15,6 @@ import Quotation
 
 #ifdef RUNTIMESTATS
 import Statistics
-import qualified Data.Ref.F as RF
 #endif
 
 helpMsg = unlines [
@@ -116,15 +115,5 @@ mainWith getArgs = do
       pure ()
 
 #ifdef RUNTIMESTATS
-  hcs  <- RF.read hcomStat
-  ehcs <- RF.read emptyhcomStat
-  maxi <- RF.read maxIVarStat
-  bs   <- RF.read blockStat
-  ubs  <- RF.read unblockStat
-  putStrLn $ "Total hcom calls: " ++ show hcs
-  putStrLn $ "Non-diagonal empty hcom calls: " ++ show ehcs
-  putStrLn $ "Empty hcom ratio: " ++ show (fromIntegral ehcs / (fromIntegral hcs :: Double))
-  putStrLn $ "Largest interval scope size: " ++ show maxi
-  putStrLn $ "Total neutral forcings: " ++ show (bs + ubs)
-  putStrLn $ "Of which blocked: " ++ show bs
+  renderStats
 #endif
