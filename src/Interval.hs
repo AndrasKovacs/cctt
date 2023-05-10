@@ -48,6 +48,7 @@ import qualified Data.IntIntMap as IIM
 import qualified Data.LvlSet as LS
 -- import qualified Data.IntSet.Internal as IS
 -- import qualified Data.IntSet as IS
+import Statistics
 
 ----------------------------------------------------------------------------------------------------
 
@@ -356,8 +357,10 @@ goIsUnblocked is varset =
 -- A set of blocking ivars is still blocked under a cofibration
 -- if all vars in the set are represented by distinct vars.
 isUnblocked :: NCofArg => IVarSet -> Bool
-isUnblocked is | emptyIS is = False
-isUnblocked is = goIsUnblocked is mempty
+isUnblocked is | emptyIS is = runIO (bumpBlock >> pure False)
+isUnblocked is = runIO (case goIsUnblocked is mempty of
+  True -> bumpUnblock >> pure True
+  _    -> bumpBlock   >> pure False)
 {-# inline isUnblocked #-}
 
 goIsUnblockedS :: SubArg => NCofArg => IVarSet -> IVarSet -> Bool
@@ -373,8 +376,10 @@ goIsUnblockedS is varset =
     is
 
 isUnblockedS :: SubArg => NCofArg => IVarSet -> Bool
-isUnblockedS is | emptyIS is = False
-isUnblockedS is = goIsUnblockedS is mempty
+isUnblockedS is | emptyIS is = runIO (bumpBlock >> pure False)
+isUnblockedS is = runIO (case goIsUnblockedS is mempty of
+  True -> bumpUnblock >> pure True
+  _    -> bumpBlock   >> pure False)
 {-# inline isUnblockedS #-}
 
 instance SubAction IVarSet where

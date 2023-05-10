@@ -28,6 +28,7 @@ import System.IO.Unsafe
 import Text.Megaparsec (SourcePos(..), sourcePosPretty, initialPos, Pos, unPos)
 import Data.IORef
 import Debug.Trace (trace, traceM, traceShow, traceShowM)
+import Data.Flat
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
@@ -125,7 +126,7 @@ newtype Lvl = Lvl {unLvl :: Word}
   deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real) via Word
 
 newtype IVar = IVar# {unIVar :: Word}
-  deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real) via Word
+  deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real, Flat) via Word
 
 lvlToIx :: Lvl -> Lvl -> Ix
 lvlToIx (Lvl envl) (Lvl x) = Ix (envl - x - 1)

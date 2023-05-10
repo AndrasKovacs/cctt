@@ -2,7 +2,6 @@
 module Statistics where
 
 import Common
-import CoreTypes
 import qualified Data.Ref.F as RF
 
 --------------------------------------------------------------------------------
@@ -11,20 +10,92 @@ hcomStat :: RF.Ref Int
 hcomStat = runIO $ RF.new 0
 {-# noinline hcomStat #-}
 
+emptyhcomStat :: RF.Ref Int
+emptyhcomStat = runIO $ RF.new 0
+{-# noinline emptyhcomStat #-}
+
+maxIVarStat :: RF.Ref IVar
+maxIVarStat = runIO $ RF.new 0
+{-# noinline maxIVarStat #-}
+
+blockStat :: RF.Ref Int
+blockStat = runIO $ RF.new 0
+{-# noinline blockStat #-}
+
+unblockStat :: RF.Ref Int
+unblockStat = runIO $ RF.new 0
+{-# noinline unblockStat #-}
+
+------------------------------------------------------------
+
+#ifdef RUNTIMESTATS
 bumpHCom :: IO ()
 bumpHCom = RF.modify hcomStat (+1)
 
--- bumpHCom :: IO ()
--- bumpHCom = pure ()
+bumpMaxIVar :: IVar -> IO ()
+bumpMaxIVar i = do
+  m <- RF.read maxIVarStat
+  RF.write maxIVarStat (max i m)
+
+bumpBlock :: IO ()
+bumpBlock = RF.modify blockStat (+1)
+
+bumpUnblock :: IO ()
+bumpUnblock = RF.modify unblockStat (+1)
+
+bumpEmptyHCom :: IO ()
+bumpEmptyHCom = RF.modify emptyhcomStat (+1)
+
+bumpHCom' :: Bool -> IO ()
+bumpHCom' isEmpty = do
+  bumpHCom
+  if isEmpty then bumpEmptyHCom else pure ()
+
+{-# inline bumpHCom #-}
+{-# inline bumpMaxIVar #-}
+{-# inline bumpBlock #-}
+{-# inline bumpUnblock #-}
+{-# inline bumpEmptyHCom #-}
+{-# inline bumpHCom' #-}
+
+#else
+
+bumpHCom :: IO ()
+bumpHCom = pure ()
+{-# inline bumpHCom #-}
+
+bumpMaxIVar :: IVar -> IO ()
+bumpMaxIVar i = pure ()
+{-# inline bumpMaxIVar #-}
+
+bumpBlock :: IO ()
+bumpBlock = pure ()
+{-# inline bumpBlock #-}
+
+bumpUnblock :: IO ()
+bumpUnblock = pure ()
+{-# inline bumpUnblock #-}
+
+bumpEmptyHCom :: IO ()
+bumpEmptyHCom = pure ()
+{-# inline bumpEmptyHCom #-}
+
+bumpHCom' :: Bool -> IO ()
+bumpHCom' _ = pure ()
+{-# inline bumpHCom' #-}
+
+#endif
 
 resetStats :: IO ()
 resetStats = do
   RF.write hcomStat 0
-
-getHComStat :: IO Int
-getHComStat = RF.read hcomStat
+  RF.write emptyhcomStat 0
+  RF.write maxIVarStat 0
+  RF.write blockStat 0
+  RF.write unblockStat 0
 
 --------------------------------------------------------------------------------
+{-
 
 data Stats = Stats {
     statsHComs :: Int
@@ -113,3 +184,4 @@ instance GetStats Spine where
   stats = \case
     SPNil       -> mempty
     SPCons t sp -> stats t <> stats sp
+-}

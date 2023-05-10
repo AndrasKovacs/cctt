@@ -280,6 +280,10 @@ data NeSysHCom
   | NSHCons (BindCof (BindILazy Val)) NeSysHCom
   deriving Show
 
+isEmptyNSH :: NeSysHCom -> Bool
+isEmptyNSH = \case NSHEmpty -> True; _ -> False
+{-# inline isEmptyNSH #-}
+
 type NeSysHCom' = WithIS NeSysHCom
 
 -- TODO: unbox

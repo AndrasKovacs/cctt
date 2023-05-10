@@ -12,7 +12,11 @@ import Elaboration
 import Interval
 import Pretty
 import Quotation
+
+#ifdef RUNTIMESTATS
 import Statistics
+import qualified Data.Ref.F as RF
+#endif
 
 helpMsg = unlines [
    "usage: cctt <file> [nf <topdef>] [ty <topdef>] [elab] [verbose] [no-hole-cxts]"
@@ -58,7 +62,9 @@ parseArgs args = do
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   resetElabState
+#ifdef RUNTIMESTATS
   resetStats
+#endif
   (path, printnf, printty, printelab, verbosity, holeCxts) <- parseArgs =<< getArgs
 
   modState $ printingOpts %~
@@ -109,5 +115,16 @@ mainWith getArgs = do
     Nothing ->
       pure ()
 
-  hcs <- getHComStat
-  putStrLn $ "Number of hcom-s computed: " ++ show hcs
+#ifdef RUNTIMESTATS
+  hcs  <- RF.read hcomStat
+  ehcs <- RF.read emptyhcomStat
+  maxi <- RF.read maxIVarStat
+  bs   <- RF.read blockStat
+  ubs  <- RF.read unblockStat
+  putStrLn $ "Total hcom calls: " ++ show hcs
+  putStrLn $ "Non-diagonal empty hcom calls: " ++ show ehcs
+  putStrLn $ "Empty hcom ratio: " ++ show (fromIntegral ehcs / (fromIntegral hcs :: Double))
+  putStrLn $ "Largest interval scope size: " ++ show maxi
+  putStrLn $ "Total neutral forcings: " ++ show (bs + ubs)
+  putStrLn $ "Of which blocked: " ++ show bs
+#endif

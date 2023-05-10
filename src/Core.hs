@@ -4,7 +4,7 @@ module Core where
 import Common
 import CoreTypes
 import Interval
-import Statistics (bumpHCom)
+import Statistics (bumpHCom, bumpHCom', bumpMaxIVar)
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -30,7 +30,7 @@ freshIVar :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshIVar act =
   let fresh = dom ?cof in
   if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
-  let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
+  let ?cof  = runIO (bumpMaxIVar fresh >> (pure $! setDom (fresh+1) ?cof `ext` IVar fresh)) in
   seq ?cof (act fresh)
 {-# inline freshIVar #-}
 
@@ -43,7 +43,7 @@ freshIVarS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
 freshIVarS act =
   let fresh = dom ?cof in
   let ?sub  = setDom (fresh+1) ?sub `ext` IVar fresh in
-  let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
+  let ?cof  = runIO (bumpMaxIVar fresh >> (pure $! setDom (fresh+1) ?cof `ext` IVar fresh)) in
   seq ?sub (seq ?cof (act fresh))
 {-# inline freshIVarS #-}
 
@@ -1011,7 +1011,7 @@ coe r r' ~a t
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
 hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
-hcomdn r r' topA ts@(WIS nts is) base = case runIO (do{bumpHCom; pure $! frc topA}) of
+hcomdn r r' topA ts@(WIS nts is) base = case runIO (do{bumpHCom' (isEmptyNSH nts); pure $! frc topA}) of
   VPi a b ->
     VLam $ NCl (b^.name) $ CHComPi r r' a b nts base
 

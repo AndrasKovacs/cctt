@@ -12,6 +12,14 @@ Checks <file>. Options:
   elab          prints the elaboration output
   verbose       prints path endpoints and hcom types explicitly
   no-hole-cxt   turn off printing local contexts of holes
+
+
+Installation options.
+
+To disable runtime statistics gathering, for a performance boost,
+install cctt as follows:
+
+    stack install --flag cctt:-runtimestats
 -}
 
 -- Basics

@@ -956,81 +956,79 @@ g10 : sTrunc ℤ → ℤ :=
 η₃ : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
-  push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
+  push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))) i
 ];
-
-η₃' : join S¹ S¹ → Susp S² := λ[
-  inl x. north;
-  inr x. north;
-  push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
-];
-
 
 ----------------------------------------------------------------------------------------------------
 
 gbase2' : g2S² :=
-  hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 []
-  (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 []
-  (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
-  (g2inc base2))))))))))))))))));
+hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 []
+(hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+(hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 []
+(hcom 0 1 [] (hcom 1 0 [] (g2inc base2))))))))))))))))))));
 
-BIGGLUE :=
+GLUEgS¹ :=
   Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue
- (Glue (Glue (Glue (Glue (Glue (gTrunc S¹) []) []) []) []) []) []) []) []) [])
- []) []) []) []) []) []) []) []) [];
+  (Glue (Glue (Glue (Glue (Glue (Glue (Glue (gTrunc S¹) []) []) []) []) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) [];
 
-gbase1' : BIGGLUE :=
+gbase1' : GLUEgS¹ :=
   glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
-  (glue (glue (glue (glue (glue (ginc base1) []) []) []) []) []) []) []) []) [])
-  []) []) []) []) []) []) []) []) [];
+  (glue (glue (glue (glue (glue (glue (glue (ginc base1) []) []) []) []) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) [];
 
-gbase1'' : BIGGLUE :=
-glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
-(glue (glue (glue (glue (glue (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1
-[] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
-(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
-(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
-(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
-(hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
-(hcom 1 0 [] (hcom 0 1 [] (ginc base1))))))))))))))))))))))))))))))))))))) [])
-[]) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
+gbase1'' : GLUEgS¹ :=
+  glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  (glue (glue (glue (glue (glue (glue (glue (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0
+  [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0
+  [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0
+  [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0
+  [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0
+  [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0
+  [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0
+  [] (hcom 0 1 [] (ginc base1))))))))))))))))))))))))))))))))))))))))) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
 
 g8' :  Square g2S² gbase2' gbase2' gbase2' gbase2'
                    refl refl refl refl
      → gbase1'' = gbase1'' :=
   λ p i. coe 0 1 (j. (codeTruncS² (p i j)).1) gbase1';
 
-v3' : gbase1'' = gbase1'' := g8' (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
+v3 : gbase1'' = gbase1'' := g8' (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)));
 
-BIGGLUEZ :=
+codeTruncS¹' : GLUEgS¹ → hSet :=
+  λ x. rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)))
+  (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue
+  (unglue (unglue (unglue (unglue (unglue (unglue (unglue x))))))))))))))))))));
+
+GLUEsℤ :=
   Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue
   (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue
-  (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (sTrunc ℤ) []) [])
-  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
-  []) []) []) []) []) []) []) []) []) []) []) []) []) [];
+  (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue
+  (Glue (sTrunc ℤ) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
+  []) []) []) []) []) [];
 
-spos0 : BIGGLUEZ :=
-  glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
-  (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
-  ((sinc (pos zero))) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
-  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
-
-codeTruncS¹' : BIGGLUE → hSet :=
-  λ x. rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)))
-       (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
-       unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue x))))))))))))))))));
+spos0 : GLUEsℤ :=
+  glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  (glue (sinc (pos zero)) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
+  []) []) []) []) []) [];
 
 g9' : gbase1'' = gbase1'' → sTrunc ℤ :=
   λ p.
-    unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
-    unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
-    unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
-    unglue (unglue (unglue (unglue (unglue (unglue (
 
-    (coe 0 1 (i. (codeTruncS¹' (p i)).1) spos0)
-    ))))))))))))))))))))))))))))))))))));
+  unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue
+  (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue
+  (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue
+  (unglue
 
-v4' := g9' v3';
+  (coe 0 1 (i. (codeTruncS¹' (p i)).1) spos0)
 
--- The actual number
-brunerie := g10 v4';
+  )))))))))))))))))))))))))))))))))))))));
+
+v4 := g9' v3;
+
+brunerie : ℤ := g10 v4;

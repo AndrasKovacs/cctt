@@ -30,9 +30,6 @@ higher inductive S² :=
                   ;j=1. base2];
 
 
-
--- From new_brunerie.cctt
-
 Square (A : U) (a0 a1 b0 b1 : A)
                (u : a0 = a1) (v : b0 = b1)
                (r0 : a0 = b0) (r1 : a1 = b1) : U
@@ -52,12 +49,46 @@ isIso (A B : U)(f : A → B) : U :=
 
 iso (A B : U) : U := (f : A → B) × isIso A B f;
 
-isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
-    iso.f
-  , iso.g
-  , iso.linv
-  , ?_
-  , ?_;
+fiber (A B : U) (f : A → B) (b : B) : U
+  := (x : A) * f x = b;
+
+fiberRefl (A B : U) (f : A → B) (a  : A) : fiber A B f (f a)
+  := (a , refl);
+
+contractIsoFiber (A B : U) (is : iso A B) (a : A)
+  (fib : fiber A B is.f (is.f a))
+  : fiberRefl A B is.f a = fib
+  :=
+  let sq (j k : I) : A :=
+      hcom 0 j [k=1 j. is.g (fib.2 j)] (is.linv (fib.1) k);
+  let sq2 (i k : I) : A :=
+      hcom 1 k
+        [i=0 k. is.linv a k;
+         i=1 k. sq k k]
+        (is.g (is.f a));
+  λ i.
+  (sq2 i 0,
+   λ j.
+   let aux : A :=
+     hcom j 1
+       [i=0 k. is.linv a k;
+        i=1 k. sq j k;
+        j=0 k. is.linv (sq2 i 0) k]
+       (sq2 i j);
+   hcom 0 1
+     [i=0 l. is.rinv (is.f a) l;
+      i=1 l. is.rinv (fib.2 j) l;
+      j=0 l. is.rinv (is.f (sq2 i 0)) l;
+      j=1 l. is.rinv (is.f a) l]
+     (is.f aux));
+
+isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
+    is.f
+  , is.g
+  , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).1
+  , is.rinv
+  , λ a i k. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).2 k
+  ;
 
 J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
@@ -186,8 +217,6 @@ contrPath (A : U) (x y : A) (c : isContr A) : isContr (x = y)
         (lInv A c.1 x (c.2 x))
         y);
 
-fiber (A B : U) (f : A → B) (b : B) : U := (a : A) × f a = b;
-
 isCEquiv (A B : U) (f : A → B) : U
   := (b : B) → isContr (fiber A B f b);
 
@@ -225,7 +254,7 @@ retract (A B : U) : U := (f : A → B) × rinv A B f;
 
 retractContr (A B : U) (r : retract A B)
   : isContr A → isContr B
-  := λ c. (r.f c.1, (λ b. (ap r.f (c.2 (r.2.g b))) ∙ r.2.2 b)); 
+  := λ c. (r.f c.1, (λ b. (ap r.f (c.2 (r.2.g b))) ∙ r.2.2 b));
 
 postcompFiber (A B : U) (f : A → B) : U
   := fiber (B → A) (B → B) (λ g c. f (g c)) (λ b. b);
