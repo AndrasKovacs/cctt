@@ -120,29 +120,9 @@ isEquivCoe (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
 		      x
   );
 
-compPath (A : U)(a b c : A)(p : a = b)(q : b = c) : a = c :=
-  λ i. hcom 0 1 A [i=0 j.a ; i=1 j.q j] (p i);
-
-pathToEquiv (A B : U)(p : A = B) : equiv A B :=
-  ((λ x. coe 0 1 p x), isEquivCoe (λ i. p i) 0 1);
-
-equivEq (A B : U)(e f : equiv A B) : e.1 = f.1 → e = f :=
-  ΣeqProp (A → B) (isEquiv A B) (isPropIsEquiv A B) e f;
-
-pathToEquivRefl (A : U) : pathToEquiv A A refl = idEquiv A :=
-  equivEq A A (pathToEquiv A A refl) (idEquiv A) (λ i x. coe i 1 (i. A) x);
-
-uaIdEquiv (A : U) : ua A A (idEquiv A) = refl :=
-  λ i j. Glue A [i=1. (A, idEquiv A); j=0. (A, idEquiv A); j=1. (A, idEquiv A)];
-
-ua-pathToEquiv (A B : U)(p : A = B) : ua A B (pathToEquiv A B p) = p :=
-    J U A (λ X p. ua A X (pathToEquiv A X p) = p)
-      (compPath (A = A) (ua A A (pathToEquiv A A refl)) (ua A A (idEquiv A)) refl (ap (ua A A) (pathToEquivRefl A)) (uaIdEquiv A))
-      B p;
 
 -- isPropIsEquiv
 ----------------------------------------------------------------------------------------------------
-
 
 lemProp (A : U) (h : A → isProp A) : isProp A
   := λ x y. h x x y;
@@ -290,6 +270,26 @@ isPropIsEquiv (A B : U) (f : A → B) : isProp (isEquiv A B f)
                  (rinvContr A B f e)
                  (rcoh1Contr A B f e)));
 
+
+-- Univalence stuff
+----------------------------------------------------------------------------------------------------
+
+pathToEquiv (A B : U)(p : A = B) : equiv A B :=
+  ((λ x. coe 0 1 p x), isEquivCoe (λ i. p i) 0 1);
+
+equivEq (A B : U)(e f : equiv A B) : e.1 = f.1 → e = f :=
+  ΣeqProp (A → B) (isEquiv A B) (isPropIsEquiv A B) e f;
+
+pathToEquivRefl (A : U) : pathToEquiv A A refl = idEquiv A :=
+  equivEq A A (pathToEquiv A A refl) (idEquiv A) (λ i x. coe i 1 (i. A) x);
+
+uaIdEquiv (A : U) : ua A A (idEquiv A) = refl :=
+  λ i j. Glue A [i=1. (A, idEquiv A); j=0. (A, idEquiv A); j=1. (A, idEquiv A)];
+
+ua-pathToEquiv (A B : U)(p : A = B) : ua A B (pathToEquiv A B p) = p :=
+    J U A (λ X p. ua A X (pathToEquiv A X p) = p)
+      (ap (ua A A) (pathToEquivRefl A) ∙ uaIdEquiv A)
+      B p;
 
 -- Decidability
 ----------------------------------------------------------------------------------------------------
