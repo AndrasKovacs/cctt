@@ -4,31 +4,30 @@ module Common (
   , module Data.Bits
   , module Lens.Micro.Platform
   , module Data.IORef
+  , module GHC.Exts
   , SourcePos(..)
   , sourcePosPretty
   , initialPos
   , Pos
   , unPos
-  , oneShot
-  , inline
-  , noinline
+  , runIO
   , trace
   , traceM
   , traceShow
-  , traceShowM
-  , coerce) where
+  , traceShowM) where
 
 import Control.Monad
 import Data.Bits
 import Data.List
 import Data.Time.Clock
-import GHC.Exts
+import GHC.Exts hiding (lazy, fromList)
 import Lens.Micro.Platform
-import System.IO.Unsafe
 import Text.Megaparsec (SourcePos(..), sourcePosPretty, initialPos, Pos, unPos)
 import Data.IORef
 import Debug.Trace (trace, traceM, traceShow, traceShowM)
 import Data.Flat
+import IO (runIO)
+import GHC.IO
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
@@ -69,8 +68,9 @@ debugging' act = act
 
 --------------------------------------------------------------------------------
 
-runIO :: IO a -> a
-runIO = unsafeDupablePerformIO; {-# inline runIO #-}
+noinlineRunIO :: IO a -> a
+noinlineRunIO (IO f) = runRW# (\s -> case f s of (# _, a #) -> a)
+{-# noinline noinlineRunIO #-}
 
 type Name = String
 

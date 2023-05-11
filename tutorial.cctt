@@ -13,13 +13,13 @@ Checks <file>. Options:
   verbose       prints path endpoints and hcom types explicitly
   no-hole-cxt   turn off printing local contexts of holes
 
-
 Installation options.
 
-To disable runtime statistics gathering, for a performance boost,
-install cctt as follows:
+To enable runtime counting of empty hcoms, install cctt as follows:
 
-    stack install --flag cctt:-runtimestats
+    stack install --flag cctt:emptyhcomstats
+
+NOTE: this can cause space leaks, increasing memory usage.
 -}
 
 -- Basics

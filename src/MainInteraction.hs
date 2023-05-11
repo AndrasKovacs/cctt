@@ -12,10 +12,7 @@ import Elaboration
 import Interval
 import Pretty
 import Quotation
-
-#ifdef RUNTIMESTATS
 import Statistics
-#endif
 
 helpMsg = unlines [
    "usage: cctt <file> [nf <topdef>] [ty <topdef>] [elab] [verbose] [no-hole-cxts]"
@@ -61,9 +58,7 @@ parseArgs args = do
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   resetElabState
-#ifdef RUNTIMESTATS
   resetStats
-#endif
   (path, printnf, printty, printelab, verbosity, holeCxts) <- parseArgs =<< getArgs
 
   modState $ printingOpts %~
@@ -114,6 +109,4 @@ mainWith getArgs = do
     Nothing ->
       pure ()
 
-#ifdef RUNTIMESTATS
   renderStats
-#endif

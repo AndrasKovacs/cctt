@@ -22,9 +22,9 @@ flags:
     description: turn on debug info printing
     default: false
     manual: true
-  runtimestats:
-    description: turn on runtime statistics printing
-    default: true
+  emptyhcomstats:
+    description: turn on empty hcom counting
+    default: false
     manual: true
 
 when:
@@ -42,9 +42,9 @@ when:
   - condition: flag(debug)
     cpp-options:
       - -DDEBUG
-  - condition: flag(runtimestats)
+  - condition: flag(emptyhcomstats)
     cpp-options:
-      - -DRUNTIMESTATS
+      - -DEMPTYHCOMSTATS
 
 default-extensions:
   - AllowAmbiguousTypes
