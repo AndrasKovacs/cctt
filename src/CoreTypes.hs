@@ -399,7 +399,7 @@ data Closure
 
     ffill i x      := coe r i A x
     gfill i x      := coe i r A x
-    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    linvfill i x j := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x
     rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
     g    := λ x^0. gfill r' x
@@ -407,8 +407,8 @@ data Closure
     rinv := λ x^0 j^1. rinvfill r' x j
     coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
                                       ;k=1 i. ffill i x
-                                      ;l=0 i. ffill i x
-                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      ;l=0 i. rinvfill i (ffill i x) k
+                                      ;l=1 i. ffill i x]
                                       x
 -}
 
@@ -420,7 +420,7 @@ data Closure
 -- isEquiv : (A → B) → U
 -- isEquiv A B f :=
 --     (g^1    : B → A)
---   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+--   × (linv^2 : (x^4 : A) → Path A (g (f x)) x)
 --   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
 --   × (coh    : (x^6 : A) →
 --             Path (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
@@ -462,7 +462,7 @@ data IClosure
 
     ffill i x      := coe r i A x
     gfill i x      := coe i r A x
-    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    linvfill i x j := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x
     rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
     g    := λ x^0. gfill r' x
@@ -470,14 +470,14 @@ data IClosure
     rinv := λ x^0 j^1. rinvfill r' x j
     coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
                                       ;k=1 i. ffill i x
-                                      ;l=0 i. ffill i x
-                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      ;l=0 i. rinvfill i (ffill i x) k
+                                      ;l=1 i. ffill i x]
                                       x
 -}
 
   | ICCoeCoh1 (BindI Val) I I Val    -- a r r' x
   | ICCoeCoh2 (BindI Val) I I Val I  -- a r r' x l
-  | ICCoeCoh0Rhs (BindI Val) I I Val -- a r r' x
+  | ICCoeCoh0Lhs (BindI Val) I I Val -- a r r' x
 
   | ICSym Val ~Val ~Val Val
   | ICTrans Val ~Val ~Val ~Val Val Val
@@ -616,7 +616,7 @@ instance SubAction IClosure where
     ICAp f x y p            -> ICAp (sub f) (sub x) (sub y) (sub p)
     ICCoeCoh1 a r r' x      -> ICCoeCoh1 (sub a) (sub r) (sub r') (sub x)
     ICCoeCoh2 a r r' x l    -> ICCoeCoh2 (sub a) (sub r) (sub r') (sub x) (sub l)
-    ICCoeCoh0Rhs a r r' x   -> ICCoeCoh0Rhs (sub a) (sub r) (sub r') (sub x)
+    ICCoeCoh0Lhs a r r' x   -> ICCoeCoh0Lhs (sub a) (sub r) (sub r') (sub x)
     ICBindI a               -> ICBindI (sub a)
 
 instance SubAction VDSpine where

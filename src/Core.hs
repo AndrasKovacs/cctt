@@ -486,7 +486,7 @@ capp# d# c# m# t ~u =
   -- isEquiv : (A → B) → U
   -- isEquiv A B f :=
   --     (g^1    : B → A)
-  --   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+  --   × (linv^2 : (x^4 : A) → Path A (g (f x)) x)
   --   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
   --   × (coh    : (x^6 : A) →
   --             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
@@ -502,13 +502,13 @@ capp# d# c# m# t ~u =
   CIsEquiv3 a b f g linv -> let ~rinv = u in
     VWrap "coh" (VPi a $ NCl "a" $ CIsEquiv6 b f g linv rinv)
 
-  CIsEquiv4 a f g -> let ~x = u in path a x (g ∙ (f ∙ x))
+  CIsEquiv4 a f g -> let ~x = u in path a (g ∙ (f ∙ x)) x
   CIsEquiv5 b f g -> let ~x = u in path b (f ∙ (g ∙ x)) x
 
   CIsEquiv6 b f g linv rinv ->
     let ~x  = u
         ~fx = f ∙ x in
-    VPath (NICl "i" $ ICIsEquiv7 b f g linv x) (refl fx) (rinv ∙ fx)
+    VPath (NICl "i" $ ICIsEquiv7 b f g linv x) (rinv ∙ fx) (refl fx)
 
   -- equiv A B = (f* : A -> B) × isEquiv a b f
   CEquiv a b -> let ~f = u in isEquiv a b f
@@ -528,7 +528,7 @@ capp# d# c# m# t ~u =
 
     ffill i x      := coe r i A x
     gfill i x      := coe i r A x
-    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    linvfill i x j := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x
     rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
     g    := λ x^0. gfill r' x
@@ -536,8 +536,8 @@ capp# d# c# m# t ~u =
     rinv := λ x^0 j^1. rinvfill r' x j
     coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
                                       ;k=1 i. ffill i x
-                                      ;l=0 i. ffill i x
-                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      ;l=0 i. rinvfill i (ffill i x) k
+                                      ;l=1 i. ffill i x]
                                       x
 -}
 
@@ -547,8 +547,8 @@ capp# d# c# m# t ~u =
   CCoeLinv0 a r r' ->
     let ~x   = u
         -- x = g (f x)
-        ~lhs = x
-        ~rhs = coe r' r a (coe r r' a x)
+        ~lhs = coe r' r a (coe r r' a x)
+        ~rhs = x
     in VPLam lhs rhs $ NICl "j" $ ICCoeLinv1 a r r' x
 
   CCoeRinv0 a r r' ->
@@ -561,16 +561,16 @@ capp# d# c# m# t ~u =
   CCoeCoh0 a r r' ->
     let ~x = u
 
-        -- (λ k. coe r r' a x)
-        ~lhs = refl (coe r r' a x)
-
         -- (λ k. rinvfill a r r' (ffill a r r' x) k)
-        ~rhs =
+        ~lhs =
            -- coe r r' a (coe r' r a (coe r r' a x))
            let ~lhs' = coe r r' a (coe r' r a (coe r r' a x))
                ~rhs' = coe r r' a x in
 
-           VPLam lhs' rhs' $ NICl "k" $ ICCoeCoh0Rhs a r r' x
+           VPLam lhs' rhs' $ NICl "k" $ ICCoeCoh0Lhs a r r' x
+
+        -- (λ k. coe r r' a x)
+        ~rhs = refl (coe r r' a x)
 
     in VPLam lhs rhs $ NICl "l" $ ICCoeCoh1 a r r' x
 
@@ -626,18 +626,18 @@ icapp# d# c# m# t arg =
   -- isEquiv : (A → B) → U
   -- isEquiv A B f :=
   --     (g^1    : B → A)
-  --   × (linv^2 : (x^4 : A) → Path A x (g (f x)))
+  --   × (linv^2 : (x^4 : A) → Path A (g (f x)) x)
   --   × (rinv^3 : (x^5 : B) → Path B (f (g x)) x)
   --   × (coh    : (x^6 : A) →
   --             PathP (i^7) (Path B (f (linv x {x}{g (f x)} i)) (f x))
-  --                   (refl B (f x))
   --                   (rinv (f x)))
+  --                   (refl B (f x))
 
   ICIsEquiv7 b f g linv x ->
     let ~i   = arg
         ~fx  = f ∙ x
         ~gfx = g ∙ fx  in
-    path b (f ∙ papp x gfx (linv ∙ x) i) fx
+    path b (f ∙ papp gfx x (linv ∙ x) i) fx
 
 {-
   coeIsEquiv : (A : I → U) (r r' : I) → isEquiv (λ x. coe r r' A x)
@@ -653,8 +653,8 @@ icapp# d# c# m# t arg =
     rinv := λ x^0 j^1. rinvfill r' x j
     coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
                                       ;k=1 i. ffill i x
-                                      ;l=0 i. ffill i x
-                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      ;l=0 i. rinvfill i (ffill i x) k]
+                                      ;l=1 i. ffill i x
                                       x
 -}
 
@@ -680,7 +680,7 @@ icapp# d# c# m# t arg =
     coeCoherence a r r' x l k
 
   -- (λ k. rinvfill a r r' (ffill a r r' x) k)
-  ICCoeCoh0Rhs a r r' x ->
+  ICCoeCoh0Lhs a r r' x ->
     let k = arg in
     rinvfill a r r' (ffill a r r' x) k
 
@@ -847,14 +847,14 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
             ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
 
     fibval* : Tr'
-    fibval* = hcom 1 0 Tr' valSys fibval
+    fibval* = hcom 0 1 Tr' valSys fibval
 
     -- this should be a metatheoretic (I → Ar') function, because we only need it applied
     -- to the "i" variable in the end result. For clarity though, it's good to write it as a path here.
 
     fibpath* : fr' fibval = ar'
     fibpath* = λ j.
-       hcom 1 0 Ar' [j=0    i. fr' (hcom 1 i Tr' valSys fibval)    -- no need to force valSys because
+       hcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
                     ;j=1    i. ar'                                 -- it's independent from j=0
                     ;r=r'   i. fr'.coh gr i j
                     ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
@@ -931,12 +931,12 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
 
       -- fibval* : Tr'
-      -- fibval* = hcom 1 0 Tr' valSys fibval
-      ~fibval' = hcomd I1 I0 tr' valSys fibval
+      -- fibval* = hcom 0 1 Tr' valSys fibval
+      ~fibval' = hcomd I0 I1 tr' valSys fibval
 
       -- fibpath* : fr' fibval = ar'
       -- fibpath* = λ j.
-      --    hcom 1 0 Ar' [j=0    i. fr' (hcom 1 i Tr' valSys fibval)    -- no need to force valSys because
+      --    hcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
       --                 ;j=1    i. ar'                                 -- it's independent from j=0
       --                 ;r=r'   i. fr'.coh gr i j
       --                 ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
@@ -944,8 +944,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
       fibpath' =
         bindILazy "j" \j ->
-        hcomd I1 I0 _Ar'
-          (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcom I1 i tr' valSys fibval) $
+        hcomd I0 I1 _Ar'
+          (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcom I0 i tr' valSys fibval) $
            vshcons (ceq j I1) "i" (\i -> ar') $
            vshcons (ceq r r') "i" (\i -> app_r'coh gr i j) $
            mapVSysHCom (\i tf -> app_r'coh (coe r r' (proj1BindIFromLazy "Ty" tf) gr) i j) $
@@ -1911,7 +1911,7 @@ theIdEquiv a = VPair "f" (VLam $ NCl "x" C'λ'a''a) (idIsEquiv a)
 
     ffill i x      := coe r i A x
     gfill i x      := coe i r A x
-    linvfill i x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    linvfill i x j := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x
     rinvfill i x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
     g    := λ x^0. gfill r' x
@@ -1919,8 +1919,8 @@ theIdEquiv a = VPair "f" (VLam $ NCl "x" C'λ'a''a) (idIsEquiv a)
     rinv := λ x^0 j^1. rinvfill r' x j
     coh  := λ x^0 l^1 k^2. com r r' A [k=0 i. ffill i (linvfill i x l)
                                       ;k=1 i. ffill i x
-                                      ;l=0 i. ffill i x
-                                      ;l=1 i. rinvfill i (ffill i x) k]
+                                      ;l=0 i. rinvfill i (ffill i x) k]
+                                      ;l=1 i. ffill i x
                                       x
 -}
 
@@ -1933,8 +1933,8 @@ gfill a r i x = coe i r a x; {-# inline gfill #-}
 linvfill :: NCofArg => DomArg => BindI Val -> I -> I -> Val -> I -> Val
 linvfill a r i x j =
   hcom r i (a ∙ r)
-    (vshcons (ceq j I0) "k" (\_ -> x) $
-     vshcons (ceq j I1) "k" (\k -> coe k r a (coe r k a x)) $
+    (vshcons (ceq j I0) "k" (\k -> coe k r a (coe r k a x)) $
+     vshcons (ceq j I1) "k" (\_ -> x) $
      vshempty)
     x
 
@@ -1951,8 +1951,8 @@ coeCoherence a r r' x l k =
   hcom r r' (a ∙ r')
     (vshcons (ceq k I0) "i" (\i -> coe i r' a (ffill a r i (linvfill a r i x l))) $
      vshcons (ceq k I1) "i" (\i -> coe i r' a (ffill a r i x)) $
-     vshcons (ceq l I0) "i" (\i -> coe i r' a (ffill a r i x)) $
-     vshcons (ceq l I1) "i" (\i -> coe i r' a (rinvfill a r i (ffill a r i x) k)) $
+     vshcons (ceq l I0) "i" (\i -> coe i r' a (rinvfill a r i (ffill a r i x) k)) $
+     vshcons (ceq l I1) "i" (\i -> coe i r' a (ffill a r i x)) $
      vshempty)
     (coe r r' a x)
 
