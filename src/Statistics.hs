@@ -28,6 +28,24 @@ unblockStat = runIO $ RF.new 0
 
 ------------------------------------------------------------
 
+-- bumpHCom :: IO ()
+-- bumpHCom = pure ()
+
+-- bumpMaxIVar :: IVar -> IO ()
+-- bumpMaxIVar i = pure ()
+
+-- bumpBlock :: IO ()
+-- bumpBlock = pure ()
+
+-- bumpUnblock :: IO ()
+-- bumpUnblock = pure ()
+
+-- bumpEmptyHCom :: IO ()
+-- bumpEmptyHCom = pure ()
+
+-- bumpHCom' :: Bool -> IO ()
+-- bumpHCom' isEmpty = pure ()
+
 bumpHCom :: IO ()
 bumpHCom = RF.modify hcomStat (+1)
 

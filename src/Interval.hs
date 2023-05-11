@@ -3,11 +3,11 @@
 
 module Interval (
     maxIVar
-  , I
-  , IVarSet
+  , I(..)
+  , IVarSet(..)
   , NCof
   , NCofArg
-  , Sub
+  , Sub(..)
   , SubAction(..)
   , SubArg
   , cod
@@ -210,7 +210,7 @@ foldrAccumIS f acc r s = LS.foldrAccum (\x hyp acc -> f (coerce x) hyp acc) acc 
 ----------------------------------------------------------------------------------------------------
 
 
-data Sub = Sub Word32 Word32 IIM.IntIntMap  -- dom, cod, map
+data Sub = Sub Word32 Word32 IIM.Map  -- dom, cod, map
   deriving Eq
 
 type SubArg = (?sub :: Sub)  -- ImplicitParams

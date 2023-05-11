@@ -89,7 +89,7 @@ default-extensions:
 ghc-options:
 - -O2
 - -fdicts-strict
-- -fmax-worker-args=15
+- -fmax-worker-args=18
 - -fspecialise-aggressively
 - -fexpose-all-unfoldings
 - -fplugin StrictImplParams

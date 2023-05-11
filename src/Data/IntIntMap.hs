@@ -1,6 +1,6 @@
 
 module Data.IntIntMap (
-    IntIntMap
+    Map
   , Data.IntIntMap.null
   , singleton
   , member
@@ -84,12 +84,12 @@ branchMask p1 p2
   = intFromNat (highestBitMask (natFromInt p1 `xor` natFromInt p2))
 {-# inline branchMask #-}
 
-link :: Prefix -> IntIntMap -> Prefix -> IntIntMap -> IntIntMap
+link :: Prefix -> Map -> Prefix -> Map -> Map
 link p1 t1 p2 t2 = linkWithMask (branchMask p1 p2) p1 t1 {-p2-} t2
 {-# inline link #-}
 
 -- `linkWithMask` is useful when the `branchMask` has already been computed
-linkWithMask :: Mask -> Prefix -> IntIntMap -> IntIntMap -> IntIntMap
+linkWithMask :: Mask -> Prefix -> Map -> Map -> Map
 linkWithMask m p1 t1 {-p2-} t2
   | zero p1 m = Bin p m t1 t2
   | otherwise = Bin p m t2 t1
@@ -106,17 +106,17 @@ shorter m1 m2
 
 --------------------------------------------------------------------------------
 
-data IntIntMap
-  = Bin Prefix Mask IntIntMap IntIntMap
+data Map
+  = Bin Prefix Mask Map Map
   | Tip Int Int
   | Nil
 
-null :: IntIntMap -> Bool
+null :: Map -> Bool
 null Nil = True
 null _   = False
 {-# INLINE null #-}
 
-lookup :: (Int -> a) -> (Int -> a) -> Int -> IntIntMap -> a
+lookup :: (Int -> a) -> (Int -> a) -> Int -> Map -> a
 lookup nothing just !k = go k
   where
     go k (Bin _p m l r) | zero k m  = go k l
@@ -127,26 +127,26 @@ lookup nothing just !k = go k
 {-# inline lookup #-}
 
 infixl 9 !
-(!) :: IntIntMap -> Int -> Int
+(!) :: Map -> Int -> Int
 (!) m k = Data.IntIntMap.lookup not_found id k m where
   not_found k = error ("IntMap.!: key " ++ show k ++ " is not an element of the map")
 
-member :: Int -> IntIntMap -> Bool
+member :: Int -> Map -> Bool
 member k m = Data.IntIntMap.lookup (\_ -> False) (\_ -> True) k m
 
-instance Semigroup IntIntMap where
+instance Semigroup Map where
   (<>) = union; {-# inline (<>) #-}
 
-instance Monoid IntIntMap where
+instance Monoid Map where
   mempty = Nil; {-# inline mempty #-}
 
-instance Show IntIntMap where
+instance Show Map where
   show = show . assocs
 
-singleton :: Int -> Int -> IntIntMap
+singleton :: Int -> Int -> Map
 singleton = Tip; {-# inline singleton #-}
 
-insert :: Int -> Int -> IntIntMap -> IntIntMap
+insert :: Int -> Int -> Map -> Map
 insert !k x t@(Bin p m l r)
   | nomatch k p m = link k (Tip k x) p t
   | zero k m      = Bin p m (insert k x l) r
@@ -157,18 +157,18 @@ insert k x t@(Tip ky _)
 insert k x Nil = Tip k x
 
 -- binCheckLeft only checks that the left subtree is non-empty
-binCheckLeft :: Prefix -> Mask -> IntIntMap -> IntIntMap -> IntIntMap
+binCheckLeft :: Prefix -> Mask -> Map -> Map -> Map
 binCheckLeft _ _ Nil r = r
 binCheckLeft p m l r   = Bin p m l r
 {-# inline binCheckLeft #-}
 
 -- binCheckRight only checks that the right subtree is non-empty
-binCheckRight :: Prefix -> Mask -> IntIntMap -> IntIntMap -> IntIntMap
+binCheckRight :: Prefix -> Mask -> Map -> Map -> Map
 binCheckRight _ _ l Nil = l
 binCheckRight p m l r   = Bin p m l r
 {-# inline binCheckRight #-}
 
-delete :: Int -> IntIntMap -> IntIntMap
+delete :: Int -> Map -> Map
 delete !k t@(Bin p m l r)
   | nomatch k p m = t
   | zero k m      = binCheckLeft p m (delete k l) r
@@ -178,7 +178,7 @@ delete k t@(Tip ky _)
   | otherwise     = t
 delete _k Nil = Nil
 
-union :: IntIntMap -> IntIntMap -> IntIntMap
+union :: Map -> Map -> Map
 union m1 m2 = mergeWithKey' Bin const id id m1 m2
 
 
@@ -190,9 +190,9 @@ union m1 m2 = mergeWithKey' Bin const id id m1 m2
 -- * mergeWithKey' is given an equivalent of bin. The reason is that in union*,
 --   Bin constructor can be used, because we know both subtrees are nonempty.
 
-mergeWithKey' :: (Prefix -> Mask -> IntIntMap -> IntIntMap -> IntIntMap)
-              -> (IntIntMap -> IntIntMap -> IntIntMap) -> (IntIntMap -> IntIntMap) -> (IntIntMap -> IntIntMap)
-              -> IntIntMap -> IntIntMap -> IntIntMap
+mergeWithKey' :: (Prefix -> Mask -> Map -> Map -> Map)
+              -> (Map -> Map -> Map) -> (Map -> Map) -> (Map -> Map)
+              -> Map -> Map -> Map
 mergeWithKey' bin' f g1 g2 = go
   where
     go t1@(Bin p1 m1 l1 r1) t2@(Bin p2 m2 l2 r2)
@@ -234,14 +234,14 @@ mergeWithKey' bin' f g1 g2 = go
 
     go Nil t2 = g2 t2
 
-    maybe_link :: Int -> IntIntMap -> Int -> IntIntMap -> IntIntMap
+    maybe_link :: Int -> Map -> Int -> Map -> Map
     maybe_link _ Nil _ t2 = t2
     maybe_link _ t1 _ Nil = t1
     maybe_link p1 t1 p2 t2 = link p1 t1 p2 t2
     {-# INLINE maybe_link #-}
 {-# INLINE mergeWithKey' #-}
 
-mapWithKey :: (Int -> Int -> Int) -> IntIntMap -> IntIntMap
+mapWithKey :: (Int -> Int -> Int) -> Map -> Map
 mapWithKey f = go where
   go t = case t of
     Bin p m l r -> Bin p m (go l) (go r)
@@ -249,11 +249,11 @@ mapWithKey f = go where
     Nil         -> Nil
 {-# inline mapWithKey #-}
 
-instance Eq IntIntMap where
+instance Eq Map where
   t1 == t2  = equal t1 t2; {-# inline (==) #-}
   t1 /= t2  = nequal t1 t2; {-# inline (/=) #-}
 
-equal :: IntIntMap -> IntIntMap -> Bool
+equal :: Map -> Map -> Bool
 equal (Bin p1 m1 l1 r1) (Bin p2 m2 l2 r2)
   = (m1 == m2) && (p1 == p2) && (equal l1 l2) && (equal r1 r2)
 equal (Tip kx x) (Tip ky y)
@@ -261,7 +261,7 @@ equal (Tip kx x) (Tip ky y)
 equal Nil Nil = True
 equal _   _   = False
 
-nequal :: IntIntMap -> IntIntMap -> Bool
+nequal :: Map -> Map -> Bool
 nequal (Bin p1 m1 l1 r1) (Bin p2 m2 l2 r2)
   = (m1 /= m2) || (p1 /= p2) || (nequal l1 l2) || (nequal r1 r2)
 nequal (Tip kx x) (Tip ky y)
@@ -269,7 +269,7 @@ nequal (Tip kx x) (Tip ky y)
 nequal Nil Nil = False
 nequal _   _   = True
 
-foldlWithKey' :: (a -> Int -> Int -> a) -> a -> IntIntMap -> a
+foldlWithKey' :: (a -> Int -> Int -> a) -> a -> Map -> a
 foldlWithKey' f z = \t ->      -- Use lambda t to be inlinable with two arguments only.
   case t of
     Bin _ m l r
@@ -282,7 +282,7 @@ foldlWithKey' f z = \t ->      -- Use lambda t to be inlinable with two argument
     go z' (Bin _ _ l r) = go (go z' l) r
 {-# INLINE foldlWithKey' #-}
 
-foldrWithKey' :: (Int -> Int -> b -> b) -> b -> IntIntMap -> b
+foldrWithKey' :: (Int -> Int -> b -> b) -> b -> Map -> b
 foldrWithKey' f z = \t ->      -- Use lambda t to be inlinable with two arguments only.
   case t of
     Bin _ m l r
@@ -295,14 +295,14 @@ foldrWithKey' f z = \t ->      -- Use lambda t to be inlinable with two argument
     go z' (Bin _ _ l r) = go (go z' r) l
 {-# INLINE foldrWithKey' #-}
 
-elems :: IntIntMap -> [Int]
+elems :: Map -> [Int]
 elems = foldrWithKey' (\_ n ns -> n : ns) []
 
-keys  :: IntIntMap -> [Int]
+keys  :: Map -> [Int]
 keys = foldrWithKey' (\k _ ks -> k : ks) []
 
-assocs :: IntIntMap -> [(Int, Int)]
+assocs :: Map -> [(Int, Int)]
 assocs = foldrWithKey' (\k n ns -> (k, n):ns) []
 
-fromList :: [(Int, Int)] -> IntIntMap
+fromList :: [(Int, Int)] -> Map
 fromList = foldl' (\acc (k, n) -> insert k n acc) mempty

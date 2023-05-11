@@ -5,6 +5,7 @@ module Common (
   , module Lens.Micro.Platform
   , module Data.IORef
   , module GHC.Exts
+  , module GHC.Word
   , SourcePos(..)
   , sourcePosPretty
   , initialPos
@@ -28,6 +29,7 @@ import Debug.Trace (trace, traceM, traceShow, traceShowM)
 import Data.Flat
 import IO (runIO)
 import GHC.IO
+import GHC.Word
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------

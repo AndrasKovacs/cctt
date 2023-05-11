@@ -5,6 +5,7 @@ import Common
 import CoreTypes
 import Interval
 import Statistics (bumpHCom, bumpHCom', bumpMaxIVar)
+import qualified Data.IntIntMap as IIM
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -455,9 +456,17 @@ localVar x = go ?env x where
   go (EDef e _) x = go e (x - 1)
   go _          _ = impossible
 
--- | Apply a closure. Note: *lazy* in argument.
 capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
-capp (NCl _ t) ~u = case t of
+capp (NCl _ t) ~u =
+  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
+  capp# d# c# m# t u
+{-# inline capp #-}
+
+-- | Apply a closure. Note: *lazy* in argument.
+capp# :: Word32# -> Word32# -> IIM.Map -> DomArg => Closure -> Val -> Val
+capp# d# c# m# t ~u =
+ let ?cof = Sub (W32# d#) (W32# c#) m# in
+ seq ?cof $ case t of
   CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = wkSub s; ?recurse = rc in eval t
   CSplit b tag ecs      -> case_ u b tag ecs
   CHSplit b tag ecs     -> hcase u b tag ecs
@@ -568,11 +577,17 @@ capp (NCl _ t) ~u = case t of
   -- CHInd motive ms t ->
   --   elim motive ms (t ∙ u)
 
+icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
+icapp (NICl _ t) u =
+  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
+  icapp# d# c# m# t u
+{-# inline icapp #-}
 
 -- | Apply an ivar closure.
-icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
-icapp (NICl _ t) arg = case t of
-
+icapp# :: Word32# -> Word32# -> IIM.Map -> DomArg => IClosure -> I -> Val
+icapp# d# c# m# t arg =
+ let ?cof = Sub (W32# d#) (W32# c#) m# in
+ seq ?cof $ case t of
   ICEval s env rc t ->
     let ?env = env; ?sub = ext (wkSub s) arg; ?recurse = rc in eval t
 
@@ -741,9 +756,16 @@ lapp t i = case frc t of
   _         -> impossible
 {-# inline lapp #-}
 
--- assumption: r /= r'
 coed :: I -> I -> BindI Val -> Val -> NCofArg => DomArg => Val
-coed r r' topA t = case (frc topA) ^. body of
+coed (I (W# r)) (I (W# r')) topA t =
+  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
+  coed# r r' topA t d# c# m#; {-# inline coed #-}
+
+coed# :: Word# -> Word# -> BindI Val -> Val -> Word32# -> Word32# -> IIM.Map -> DomArg => Val
+coed# r# r'# topA t d# c# m# =
+ let r = I (W# r#); r' = I (W# r'#) in
+ let ?cof = Sub (W32# d#) (W32# c#) m# in
+ seq ?cof $ case (frc topA) ^. body of
 
   VPi (rebind topA -> a) (rebind topA -> b) ->
     VLam $ NCl (b^.body.name) $ CCoePi r r' a b t
@@ -1008,10 +1030,17 @@ coe r r' ~a t
   | True            = coed r r' a t
 {-# inline coe #-}
 
+hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
+hcomdn r r' topA ts base =
+  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
+  hcomdn# r r' topA ts base d# c# m#
+{-# inline hcomdn #-}
 
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
-hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
-hcomdn r r' topA ts@(WIS nts is) base = case runIO (do{bumpHCom' (isEmptyNSH nts); pure $! frc topA}) of
+hcomdn# :: I -> I -> Val -> NeSysHCom' -> Val -> Word32# -> Word32# -> IIM.Map -> DomArg => Val
+hcomdn# r r' topA ts@(WIS nts is) base d# c# m# =
+ let ?cof = Sub (W32# d#) (W32# c#) m# in
+ seq ?cof $ case runIO (do{bumpHCom' (isEmptyNSH nts); pure $! frc topA}) of
   VPi a b ->
     VLam $ NCl (b^.name) $ CHComPi r r' a b nts base
 
@@ -1405,7 +1434,7 @@ hcomindsp r r' a prj params conid fieldid sp fieldtypes = case (sp, fieldtypes) 
   _ ->
     impossible
 
-coeindsp :: NCofArg => DomArg => I -> I -> BindI Env -> VDSpine -> Tel -> VDSpine
+coeindsp :: I -> I -> BindI Env -> VDSpine -> Tel ->  NCofArg => DomArg =>  VDSpine
 coeindsp r r' params sp fieldtypes = case (sp, fieldtypes) of
   (VDNil, TNil) -> VDNil
   (VDCons t sp, TCons _ tty fieldtypes) ->
@@ -1460,7 +1489,7 @@ sysCofs = \case
   NSEmpty -> []
   NSCons t cs -> t^.binds : sysCofs cs
 
-hcase :: NCofArg => DomArg => (Val -> NamedClosure -> CaseTag -> EvalClosure HCases -> Val)
+hcase :: Val -> NamedClosure -> CaseTag -> EvalClosure HCases -> NCofArg => DomArg => Val
 hcase t b tag ecs@(EC sub env rc cs) = case frc t of
 
   VHDCon i ps fs s _ ->
@@ -1493,8 +1522,8 @@ evalCoeBoundary r' i a = \case
     VCNe cof _ -> NSHCons (bindCof cof (BindILazy (a^.name) i (coe (IVar i) r' a (eval t))))
                           (evalCoeBoundary r' i a bnd)
 
-coehindsp :: NCofArg => DomArg =>
-   I -> I -> BindI VTy -> BindI Env -> VDSpine -> Tel -> Sub -> Sys -> (VDSpine, NeSysHCom)
+coehindsp ::
+   I -> I -> BindI VTy -> BindI Env -> VDSpine -> Tel -> Sub -> Sys -> NCofArg => DomArg => (VDSpine, NeSysHCom)
 coehindsp r r' topA params sp fieldtypes s boundary = case (sp, fieldtypes) of
   (VDNil, TNil) ->
     let nesys = (mapBindIVar params \i ps -> let ?env = ps; ?sub = s; ?recurse = DontRecurse
@@ -1519,7 +1548,12 @@ evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 {-# inline evalIClosure #-}
 
 eval :: EvalArgs (Tm -> Val)
-eval = \case
+eval t = let !(Sub (W32# d#) (W32# c#) m) = ?cof in eval# d# c# m t; {-# inline eval #-}
+
+eval# :: SubArg => DomArg => EnvArg => RecurseArg => Word32# -> Word32# -> IIM.Map -> Tm -> Val
+eval# d# c# m# t =
+ let ?cof = Sub (W32# d#) (W32# c#) m# in
+ seq ?cof $ case t of
   TopVar inf         -> inf^.defVal
   RecursiveCall inf  -> recursiveCall inf
   LocalVar x         -> localVar x
@@ -1604,6 +1638,18 @@ instance Force Sub Sub where
   frc  s = doSub ?cof s; {-# inline frc #-}
   frcS s = doSub ?cof (doSub ?sub s); {-# inline frcS #-}
 
+frcVal# :: Word32# -> Word32# -> IIM.Map -> DomArg => Val -> Val
+frcVal# d# c# m# t =
+  let ?cof = (Sub (W32# d#) (W32# c#) m#)
+  in seq ?cof $ case t of
+    VSub v s                                -> let ?sub = wkSub s in frcS v
+    VNe t is               | isUnblocked is -> frc t
+    VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
+    VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
+    VHCom r r' a sys t is  | isUnblocked is -> frc (hcom r r' a (frc sys) t)
+    VGlue t eqs sys is     | isUnblocked is -> frc (glue t (frc eqs) (frc sys))
+    v                                       -> v
+
 instance Force NeCof VCof where
   frc = \case
     NCEq i j    -> ceq (frc i) (frc j)
@@ -1628,14 +1674,8 @@ instance Force NeCof VCof where
                               (is <> is')
 
 instance Force Val Val where
-  frc = \case
-    VSub v s                                -> let ?sub = wkSub s in frcS v
-    VNe t is               | isUnblocked is -> frc t
-    VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
-    VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
-    VHCom r r' a sys t is  | isUnblocked is -> frc (hcom r r' a (frc sys) t)
-    VGlue t eqs sys is     | isUnblocked is -> frc (glue t (frc eqs) (frc sys))
-    v                                       -> v
+  frc t = let !(Sub (W32# d#) (W32# c#) m#) = ?cof in frcVal# d# c# m# t
+  {-# inline frc #-}
 
   frcS = \case
     VSub v s                                 -> let ?sub = sub s in frcS v
