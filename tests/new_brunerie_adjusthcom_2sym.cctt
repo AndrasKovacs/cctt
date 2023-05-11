@@ -28,14 +28,14 @@ J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : 
      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
 
 isLogEquiv   (A B : U)(f : A → B) : U := (B → A);
-isSection    (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → x = g (f x));
+isSection    (A B : U)(f : A → B) : U := (g : B → A) × (linv : (x : A) → g (f x) = x);
 isRetraction (A B : U)(f : A → B) : U := (g : B → A) × (rinv : (x : B) → f (g x) = x);
 
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x))
+  × (linv : (x : A) → g (f x) = x)
   × (rinv : (x : B) → f (g x) = x)
-  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+  × (coh  : (x : A) → (rinv (f x)) ={i. f (linv x i) = f x} refl);
 
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
@@ -48,7 +48,7 @@ ua (A B : U)(f : equiv A B) : A = B :=
 
 isIso (A B : U)(f : A → B) : U :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x))
+  × (linv : (x : A) → g (f x) = x)
   × (rinv : (x : B) → f (g x) = x);
 
 iso (A B : U) : U := (f : A → B) × isIso A B f;
@@ -61,29 +61,29 @@ fiberRefl (A B : U) (f : A → B) (a  : A) : fiber A B f (f a)
 
 contractIsoFiber (A B : U) (is : iso A B) (a : A)
   (fib : fiber A B is.f (is.f a))
-  : fiberRefl A B is.f a = fib
+  : fib = fiberRefl A B is.f a
   :=
   let sq (j k : I) : A :=
-      hcom 0 j [k=1 j. is.g (fib.2 j)] (is.linv (fib.1) k);
+      hcom k j [k=0 j. is.g (fib.2 j); k=1 _. fib.1] (is.linv (fib.1) k);
   let sq2 (i k : I) : A :=
-      hcom 1 k
-        [i=0 k. is.linv a k;
-         i=1 k. sq k k]
+      hcom 0 k
+        [i=0. sq 1;
+         i=1. is.linv a]
         (is.g (is.f a));
   λ i.
-  (sq2 i 0,
+  (sq2 i 1,
    λ j.
    let aux : A :=
-     hcom j 1
-       [i=0 k. is.linv a k;
-        i=1 k. sq j k;
-        j=0 k. is.linv (sq2 i 0) k]
-       (sq2 i j);
+     hcom j 0
+       [i=0. sq j;
+        i=1. is.linv a;
+        j=1. sq2 i]
+       (is.linv (sq2 i 1) j);
    hcom 0 1
-     [i=0 l. is.rinv (is.f a) l;
-      i=1 l. is.rinv (fib.2 j) l;
-      j=0 l. is.rinv (is.f (sq2 i 0)) l;
-      j=1 l. is.rinv (is.f a) l]
+     [i=0. is.rinv (fib.2 j);
+      i=1. is.rinv (is.f a);
+      j=0. is.rinv (is.f (sq2 i 1));
+      j=1. is.rinv (is.f a)]
      (is.f aux));
 
 isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
@@ -91,13 +91,13 @@ isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
   , is.g
   , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).1
   , is.rinv
-  , λ a i k. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).2 k
+  , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).2
   ;
 
 isEquivCoe (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
   let f'    (i : I)(x : A r)        : A i := coe r i A x;
   let g'    (i : I)(x : A i)        : A r := coe i r A x;
-  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x;
+  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x;
   let rinv' (i : I)(x : A i)(j : I) : A i := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
 
   ( λ x. g' r' x
@@ -106,8 +106,8 @@ isEquivCoe (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
   , λ x l k. com r r' A
                       [k=0 i. f' i (linv' i x l)
                       ;k=1 i. f' i x
-		      ;l=0 i. f' i x
-		      ;l=1 i. rinv' i (f' i x) k]
+		      ;l=0 i. rinv' i (f' i x) k
+		      ;l=1 i. f' i x]
 		      x
   );
 
@@ -166,24 +166,24 @@ isCEquiv (A B : U) (f : A → B) : U
 
 toCEquivLemma (A B : U) (f : A → B) (e : isEquiv A B f)
   (b : B) (a : A) (p : f a = b)
-  : (a, p) ={_. fiber A B f b} (e.g b, e.rinv b)
+  : (e.g b, e.rinv b) ={_. fiber A B f b} (a, p)
   := J B (f a)
-       (λ b p. (a, p) ={_. fiber A B f b} (e.g b, e.rinv b))
+       (λ b p. (e.g b, e.rinv b) ={_. fiber A B f b} (a, p))
        (λ i. (e.linv a i, e.coh a i))
        b p;
 
 toCEquiv (A B : U) (f : A → B) (e : isEquiv A B f) : isCEquiv A B f
   := λ b. ((e.g b, e.rinv b),
-           (λ u. (toCEquivLemma A B f e b u.1 u.2) ⁻¹));
+           (λ u. toCEquivLemma A B f e b u.1 u.2));
 
-linv (A B : U) (f : A → B) : U := (g : B → A) × ((a : A) → a = g (f a));
+linv (A B : U) (f : A → B) : U := (g : B → A) × ((a : A) → g (f a) = a);
 rinv (A B : U) (f : A → B) : U := (g : B → A) × ((b : B) → f (g b) = b);
 
 precompIso (A B C : U) (f : A → B) (e : isIso A B f)
   : isIso (B → C) (A → C) (λ g a. g (f a))
   := ((λ h b. h (e.g b)),
-      (λ h i b. h ((e.rinv b) ⁻¹ i)),
-      (λ g i a. g ((e.linv a) ⁻¹ i)));
+      (λ h i b. h (e.rinv b i)),
+      (λ g i a. g (e.linv a i)));
 
 postcomp (A B C : U) (f : A → B) (g : C → A) (c : C) : B := f (g c);
 
@@ -220,11 +220,11 @@ rinvContr (A B : U) (f : A → B) (e : isEquiv A B f) : isContr (rinv A B f)
          (λ b. b));
 
 rcoh1 (A B : U) (f : A → B) (r : rinv A B f) : U
-  := (linv : (a : A) → a = r.g (f a))
-     × ((x : A) → refl ={i. f (linv x i) = f x} (r.2 (f x)));
+  := (linv : (a : A) → r.g (f a) = a)
+     × ((x : A) → (r.2 (f x)) ={i. f (linv x i) = f x} refl);
 
 rcoh2 (A B : U) (f : A → B) (r : rinv A B f) : U
-  := ((x : A) → (x, refl) ={_. fiber A B f (f x)} (r.g (f x), r.2 (f x)));
+  := ((x : A) → (r.g (f x), r.2 (f x)) ={_. fiber A B f (f x)} (x, refl));
 
 rcohRetract (A B : U) (f : A → B) (r : rinv A B f)
   : retract (rcoh2 A B f r) (rcoh1 A B f r)
@@ -234,11 +234,11 @@ rcohRetract (A B : U) (f : A → B) (r : rinv A B f)
 
 rcoh2Contr (A B : U) (f : A → B) (e : isEquiv A B f) (r : rinv A B f)
   : isContr (rcoh2 A B f r)
-  := contrPi A (λ x. (x, refl) ={_. fiber A B f (f x)} (r.g (f x), r.2 (f x)))
+  := contrPi A (λ x. (r.g (f x), r.2 (f x)) ={_. fiber A B f (f x)} (x, refl))
       (λ x. contrPath
               (fiber A B f (f x))
-              (x, refl)
               (r.g (f x), r.2 (f x))
+              (x, refl)
               (toCEquiv A B f e (f x)));
 
 rcoh1Contr (A B : U) (f : A → B) (e : isEquiv A B f) (r : rinv A B f)
@@ -368,9 +368,9 @@ sucℤ : ℤ → ℤ := λ[
   pos u. pos (suc u);
   neg v. case v [zero. pos zero; suc n. neg n]];
 
-predsucℤ : (x : ℤ) → x = predℤ (sucℤ x) := λ[
+predsucℤ : (x : ℤ) → predℤ (sucℤ x) = x := λ[
   pos u. refl;
-  neg v. case v (v. neg v = predℤ (sucℤ (neg v))) [
+  neg v. case v (v. predℤ (sucℤ (neg v)) = neg v) [
     zero. refl;
     suc n. refl
     ]
@@ -680,7 +680,7 @@ contrTypesUnique (A B : U)(cA : isContr A)(cB : isContr B) : A = B :=
   ua A B (isoToEquiv A B (
       λ _. cB.1
     , λ _. cA.1
-    , λ a. (cA.2 a)⁻¹
+    , λ a. cA.2 a
     , λ b. cB.2 b));
 
 isPropHContr : isProp (TypeOfHLevel zero) :=

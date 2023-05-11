@@ -4,9 +4,9 @@
 
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x))
+  × (linv : (x : A) → g (f x) = x)
   × (rinv : (x : B) → f (g x) = x)
-  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+  × (coh  : (x : A) → (rinv (f x)) ={i. f (linv x i) = f x} refl);
 
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;
@@ -19,7 +19,7 @@ ua (A B : U)(f : equiv A B) : A = B :=
 
 isIso (A B : U)(f : A → B) : U :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x))
+  × (linv : (x : A) → g (f x) = x)
   × (rinv : (x : B) → f (g x) = x);
 
 iso (A B : U) : U := (f : A → B) × isIso A B f;
@@ -57,9 +57,9 @@ sucℤ : ℤ → ℤ := λ[
   pos u. pos (suc u);
   neg v. case v [zero. pos zero; suc n. neg n]];
 
-predsucℤ : (x : ℤ) → x = predℤ (sucℤ x) := λ[
+predsucℤ : (x : ℤ) → predℤ (sucℤ x) = x := λ[
   pos u. refl;
-  neg v. case v (v. neg v = predℤ (sucℤ (neg v))) [
+  neg v. case v (v. predℤ (sucℤ (neg v)) = neg v) [
     zero. refl;
     suc n. refl
     ]
