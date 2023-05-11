@@ -911,13 +911,13 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       -- shorthands for path applications
       app_r'linv :: NCofArg => Val -> I -> Val
       app_r'linv ~x i =
-        papp x (fr'inv ∙ (fr' ∙ x)) (r'linv ∙ x) i
+        papp (fr'inv ∙ (fr' ∙ x)) x (r'linv ∙ x) i
 
       app_r'coh :: NCofArg => Val -> I -> I -> Val
       app_r'coh ~x i j =
         papp (fr' ∙ app_r'linv x i)
              (fr' ∙ x)
-             (papp (refl (fr' ∙ x)) (r'rinv ∙ (fr' ∙ x)) (r'coh ∙ x) i)
+             (papp (r'rinv ∙ (fr' ∙ x)) (refl (fr' ∙ x)) (r'coh ∙ x) i)
              j
 
       -- valSys should be fine without NCof polymorphism
