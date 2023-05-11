@@ -87,7 +87,7 @@ contractIsoFiber (A B : U) (is : iso A B) (a : A)
       hcom 0 j [k=1 j. is.g (fib.2 j)] (is.linv (fib.1) k);
   let sq2 (i k : I) : A :=
       hcom 1 k
-        [i=0 k. is.linv a k;
+        [i=0. is.linv a;
          i=1 k. sq k k]
         (is.g (is.f a));
   λ i.
@@ -95,15 +95,15 @@ contractIsoFiber (A B : U) (is : iso A B) (a : A)
    λ j.
    let aux : A :=
      hcom j 1
-       [i=0 k. is.linv a k;
-        i=1 k. sq j k;
-        j=0 k. is.linv (sq2 i 0) k]
+       [i=0. is.linv a;
+        i=1. sq j;
+        j=0. is.linv (sq2 i 0)]
        (sq2 i j);
    hcom 0 1
-     [i=0 l. is.rinv (is.f a) l;
-      i=1 l. is.rinv (fib.2 j) l;
-      j=0 l. is.rinv (is.f (sq2 i 0)) l;
-      j=1 l. is.rinv (is.f a) l]
+     [i=0. is.rinv (is.f a);
+      i=1. is.rinv (fib.2 j);
+      j=0. is.rinv (is.f (sq2 i 0));
+      j=1. is.rinv (is.f a)]
      (is.f aux));
 
 isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
@@ -111,7 +111,74 @@ isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
   , is.g
   , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).1
   , is.rinv
-  , λ a i k. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).2 k
+  , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).2
   ;
 
+isContr (A : U) : U
+  := (x : A) * ((y : A) → y = x);
+
+hasContrFibers (A B : U) (f : A → B) : U := (b : B) → isContr (fiber A B f b);
+
+connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+  :=
+  let sq (l k : I) : A := hcom 0 l [k=0 _. a; k=1. p] a;
+  λ i j. hcom 0 1 [i=0 _. a; i=1. sq j; j=0 _. a; j=1. sq i] a;
+
+connAndRefl (A : U)(a : A) : connAnd A a a refl = refl
+  :=
+  λ m.
+  let sq (l k : I) : A := hcom 0 l [k=0 _. a; k=1 _. a; m=1 _. a] a;
+  λ i j. hcom 0 1 [i=0 _. a; i=1. sq j; j=0 _. a; j=1. sq i; m=1 _. a] a;
+
+isEquivToContrFibers (A B : U) (f : A → B) (e : isEquiv A B f) : hasContrFibers A B f
+  :=
+  λ b.
+  ((e.g b, e.rinv b),
+   λ fib i.
+   let a : A := fib.1;
+   let p : f a = b := fib.2;
+   let domFiller (k : I) : A :=
+     hcom 0 k
+       [i=0 _. a;
+        i=1 k. e.g (p k)]
+       (e.linv a i);
+   (domFiller 1,
+    λ j.
+    hcom 0 1
+      [i=0. connAnd B (f a) b p j;
+       i=1 k. e.rinv (p k) j;
+       j=0 k. f (domFiller k);
+       j=1. p]
+      (e.coh a i j)));
+
+contrFibersToIsEquiv (A B : U) (f : A → B) (c : hasContrFibers A B f) : isEquiv A B f
+  :=
+  λ b. (c b).1.1,
+  λ a i. ((c (f a)).2 (a, refl) i).1,
+  λ b. (c b).1.2,
+  λ a i. ((c (f a)).2 (a, refl) i).2;
+
+isEquivRetractContrFibers (A B : U) (f : A → B) (e : isEquiv A B f)
+  : contrFibersToIsEquiv A B f (isEquivToContrFibers A B f e) = e
+  :=
+  λ l.
+  let domFiller (a : A) (i : I) (k : I) : A :=
+    hcom 0 k
+      [i=0 _. a;
+       i=1 _. e.g (f a);
+       l=1 _. e.linv a i]
+      (e.linv a i);
+  (e.g,
+   λ a i. domFiller a i 1,
+   e.rinv,
+   λ a i j.
+   hcom 0 1
+      [i=0. connAndRefl B (f a) l j;
+       i=1 _. e.rinv (f a) j;
+       j=0 k. f (domFiller a i k);
+       j=1 _. f a;
+       l=1 _. e.coh a i j]
+      (e.coh a i j));
+
 --------------------------------------------------------------------------------
+
