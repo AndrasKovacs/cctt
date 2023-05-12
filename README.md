@@ -417,20 +417,20 @@ definition of equivalences:
     isEquiv : (A → B) → U
     isEquiv f :=
         (f⁻¹  : B → A)
-      × (linv : ∀ a → a = f⁻¹ (f a))
+      × (linv : ∀ a → f⁻¹ (f a) = a)
       × (rinv : ∀ b → f (f⁻¹ b) = b)
       × (coh  : ∀ a →
-                PathP i (f (linv a i) = f a) (refl (f a)) (rinv (f a)))
+                PathP i (f (linv a i) = f a) (rinv (f a)) (refl (f a)))
 
 The coh ("coherence") component can be drawn as a square:
 
-                             refl
-                f a --------------------- f a
+                           rinv (f a)
+           f (f⁻¹ (f a))----------------- f a
                  |                         |
     f (linv a i) |                         | refl
                  |                         |
-           f (f⁻¹ (f a))----------------- f a
-                           rinv (f a)
+                f a --------------------- f a
+                             refl
 
 In `coe Glue`, we can choose something of the form `rinv (f a)` as the "center"
 fiber and use `coh` to connect a `refl` fiber to it. There are more details
