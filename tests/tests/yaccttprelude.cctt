@@ -65,37 +65,36 @@ symDep (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a
                   [i=0. p; i=1 _. a] a;
 
 symDepNf (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) : b ={P⁻¹} a :=
-λ {b} {a} i. glue (hcom 0 1 A [i = 0 j. coe 1 0 P (coe j 1 P (p {a}
-{b} j)); i = 1 _. coe 1 0 (_. A) (coe @1 1 (j. A) a); i = 0 i. coe 1 0 P (coe i
-1 P (p {a} {b} i)); i = 1 i. coe 1 0 (_. A) (coe i 1 (j. A) a)] (hcom 1 0 A [i =
-0 j. coe 1 0 P (coe 0 1 P a); i = 1 j. coe 1 0 (_. A) (coe 0 1 (j. A) a)] (hcom
-0 1 A [i = 0 j. coe j 1 (j. A) (coe j 0 P (coe 0 j P a)); i = 1 j. coe j 1
-(j. A) (coe j 0 (_. A) (coe 0 j (j. A) a))] (coe 0 1 (j. A) a)))) [i = 0. B, λ
-x. coe 1 0 P x, λ x. coe 0 1 P x, λ x {x} {coe 0 1 P (coe 1 0 P x)} j. hcom 1 0
-B [j = 0 k. x; j = 1 k. coe k 1 P (coe 1 k P x)] x, λ x {coe 1 0 P (coe 0 1 P
-x)} {x} j. hcom 0 1 A [j = 0 k. coe k 0 P (coe 0 k P x); j = 1 k. x] x, λ x {λ
-{coe 1 0 P x} {coe 1 0 P x} _. coe 1 0 P x} {λ {coe 1 0 P (coe 0 1 P (coe 1 0 P
-x))} {coe 1 0 P x} k. hcom 0 1 A [k = 0 k. coe k 0 P (coe 0 k P (coe 1 0 P x));
-k = 1 k. coe 1 0 P x] (coe 1 0 P x)} l {coe 1 0 P (hcom 1 0 B [l = 0 k. x; l = 1
-k. coe k 1 P (coe 1 k P x)] x)} {coe 1 0 P x} k. hcom 1 0 A [k = 0 i. coe i 0 P
-(coe 1 i P (hcom 1 i B [l = 0 k. x; l = 1 k. coe k 1 P (coe 1 k P x)] x)); k = 1
-i. coe i 0 P (coe 1 i P x); l = 0 i. coe i 0 P (coe 1 i P x); l = 1 i. coe i 0 P
-(hcom i 1 (P {A} {B} i) [k = 0 k. coe k i P (coe i k P (coe 1 i P x)); k = 1
-k. coe 1 i P x] (coe 1 i P x))] (coe 1 0 P x); i = 1. A, λ x. coe 1 0 (_. A) x,
-λ x. coe 0 1 (_. A) x, λ x {x} {coe 0 1 (_. A) (coe 1 0 (_. A) x)} j. hcom 1 0 A
-[j = 0 k. x; j = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x, λ x {coe 1 0 (_. A)
-(coe 0 1 (_. A) x)} {x} j. hcom 0 1 A [j = 0 k. coe k 0 (_. A) (coe 0 k (_. A)
-x); j = 1 k. x] x, λ x {λ {coe 1 0 (_. A) x} {coe 1 0 (_. A) x} _. coe 1 0
-(_. A) x} {λ {coe 1 0 (_. A) (coe 0 1 (_. A) (coe 1 0 (_. A) x))} {coe 1 0
-(_. A) x} k. hcom 0 1 A [k = 0 k. coe k 0 (_. A) (coe 0 k (_. A) (coe 1 0 (_. A)
-x)); k = 1 k. coe 1 0 (_. A) x] (coe 1 0 (_. A) x)} l {coe 1 0 (_. A) (hcom 1 0
-A [l = 0 k. x; l = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x)} {coe 1 0 (_. A)
-x} k. hcom 1 0 A [k = 0 i. coe i 0 (_. A) (coe 1 i (_. A) (hcom 1 i A [l = 0
-k. x; l = 1 k. coe k 1 (_. A) (coe 1 k (_. A) x)] x)); k = 1 i. coe i 0 (_. A)
-(coe 1 i (_. A) x); l = 0 i. coe i 0 (_. A) (coe 1 i (_. A) x); l = 1 i. coe i 0
-(_. A) (hcom i 1 A [k = 0 k. coe k i (_. A) (coe i k (_. A) (coe 1 i (_. A) x));
-k = 1 k. coe 1 i (_. A) x] (coe 1 i (_. A) x))] (coe 1 0 (_. A) x)] [i = 0. b; i
-= 1. a];
+λ {b} {a} i. glue (hcom 0 1 A [i = 0 j. coe 1 0 P (coe j 1 P (p {a} {b} j)); i =
+1 _. coe 1 0 (_. A) (coe @1 1 (j. A) a); i = 0 i. coe 1 0 P (coe i 1 P (p {a}
+{b} i)); i = 1 i. coe 1 0 (_. A) (coe i 1 (j. A) a)] (hcom 1 0 A [i = 0 j. coe 1
+0 P (coe 0 1 P a); i = 1 j. coe 1 0 (_. A) (coe 0 1 (j. A) a)] (hcom 0 1 A [i =
+0 j. coe j 1 (j. A) (coe j 0 P (coe 0 j P a)); i = 1 j. coe j 1 (j. A) (coe j 0
+(_. A) (coe 0 j (j. A) a))] (coe 0 1 (j. A) a)))) [i = 0. B, λ x. coe 1 0 P x, λ
+x. coe 0 1 P x, λ x {coe 0 1 P (coe 1 0 P x)} {x} j. hcom 1 0 B [j = 0 k. coe k
+1 P (coe 1 k P x); j = 1 k. x] x, λ x {coe 1 0 P (coe 0 1 P x)} {x} j. hcom 0 1
+A [j = 0 k. coe k 0 P (coe 0 k P x); j = 1 k. x] x, λ x {λ {coe 1 0 P (coe 0 1 P
+(coe 1 0 P x))} {coe 1 0 P x} k. hcom 0 1 A [k = 0 k. coe k 0 P (coe 0 k P (coe
+1 0 P x)); k = 1 k. coe 1 0 P x] (coe 1 0 P x)} {λ {coe 1 0 P x} {coe 1 0 P x}
+_. coe 1 0 P x} l {coe 1 0 P (hcom 1 0 B [l = 0 k. coe k 1 P (coe 1 k P x); l =
+1 k. x] x)} {coe 1 0 P x} k. hcom 1 0 A [k = 0 i. coe i 0 P (coe 1 i P (hcom 1 i
+B [l = 0 k. coe k 1 P (coe 1 k P x); l = 1 k. x] x)); k = 1 i. coe i 0 P (coe 1
+i P x); l = 0 i. coe i 0 P (hcom i 1 (P {A} {B} i) [k = 0 k. coe k i P (coe i k
+P (coe 1 i P x)); k = 1 k. coe 1 i P x] (coe 1 i P x)); l = 1 i. coe i 0 P (coe
+1 i P x)] (coe 1 0 P x); i = 1. A, λ x. coe 1 0 (_. A) x, λ x. coe 0 1 (_. A) x,
+λ x {coe 0 1 (_. A) (coe 1 0 (_. A) x)} {x} j. hcom 1 0 A [j = 0 k. coe k 1
+(_. A) (coe 1 k (_. A) x); j = 1 k. x] x, λ x {coe 1 0 (_. A) (coe 0 1 (_. A)
+x)} {x} j. hcom 0 1 A [j = 0 k. coe k 0 (_. A) (coe 0 k (_. A) x); j = 1 k. x]
+x, λ x {λ {coe 1 0 (_. A) (coe 0 1 (_. A) (coe 1 0 (_. A) x))} {coe 1 0 (_. A)
+x} k. hcom 0 1 A [k = 0 k. coe k 0 (_. A) (coe 0 k (_. A) (coe 1 0 (_. A) x)); k
+= 1 k. coe 1 0 (_. A) x] (coe 1 0 (_. A) x)} {λ {coe 1 0 (_. A) x} {coe 1 0
+(_. A) x} _. coe 1 0 (_. A) x} l {coe 1 0 (_. A) (hcom 1 0 A [l = 0 k. coe k 1
+(_. A) (coe 1 k (_. A) x); l = 1 k. x] x)} {coe 1 0 (_. A) x} k. hcom 1 0 A [k =
+0 i. coe i 0 (_. A) (coe 1 i (_. A) (hcom 1 i A [l = 0 k. coe k 1 (_. A) (coe 1
+k (_. A) x); l = 1 k. x] x)); k = 1 i. coe i 0 (_. A) (coe 1 i (_. A) x); l = 0
+i. coe i 0 (_. A) (hcom i 1 A [k = 0 k. coe k i (_. A) (coe i k (_. A) (coe 1 i
+(_. A) x)); k = 1 k. coe 1 i (_. A) x] (coe 1 i (_. A) x)); l = 1 i. coe i 0
+(_. A) (coe 1 i (_. A) x)] (coe 1 0 (_. A) x)] [i = 0. b; i = 1. a];
 
 symDepNfOK (A B : U) (P : A = B) (a : A) (b : B) (p : a ={P} b) :
   symDep A B P a b p = symDepNf A B P a b p := refl;

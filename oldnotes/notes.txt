@@ -23,29 +23,29 @@ Alternative:
 isEquiv : (A → B) → U
 isEquiv f :=
     (f⁻¹  : B → A)
-  × (linv : ∀ a → a = f⁻¹ (f a))
+  × (linv : ∀ a → f⁻¹ (f a) = a)
   × (rinv : ∀ b → f (f⁻¹ b) = b)
   × (coh  : ∀ a →
-            PathP i (f (linv a i) = f a) (refl (f a)) (rinv (f a)))
+            PathP i (f (linv a i) = f a) (rinv (f a)) (refl (f a)))
 
      refl       : f a = f a
      rinv (f a) : f (f⁻¹ (f a)) = f a
 
     -- without PathP
-    ap f (inv a) ◼ rinv (f a) = refl
+    ap f (inv a) = rinv (f a)
 
    with extension type:
-    [i, j] B [i=0 ↦ f a, i=1 ↦ rinv (f a) j, j=0 ↦ f (linv a i), j=1 ↦ f a]
+    [i, j] B [i=0 ↦ rinv (f a) j, i=1 ↦ f a, j=0 ↦ f (linv a i), j=1 ↦ f a]
 
    as a square:
 
-                           refl
-              f a --------------------- f a
+                         rinv (f a)
+         f (f⁻¹ (f a))----------------- f a
                |                         |
   f (linv a i) |                         | refl
                |                         |
-         f (f⁻¹ (f a))----------------- f a
-                         rinv (f a)
+              f a --------------------- f a
+                           refl
 
 --------------------------------------------------------------------------------
 
@@ -58,8 +58,8 @@ isEquiv id
 isEquiv (coeⁱ r r' A : Ar → Ar')
   _⁻¹ = coeⁱ r' r A
 
-  linvFill : ∀ s a → a = coeⁱ s r A (coeⁱ r s A a)
-  linvFill s a = λ j. hcomᵏ r s (A r) [j=0 ↦ a, j=1 ↦ coeⁱ k r A (coeⁱ r k A a)] a
+  linvFill : ∀ s a → coeⁱ s r A (coeⁱ r s A a) = a
+  linvFill s a = λ j. hcomᵏ r s (A r) [j=0 ↦ coeⁱ k r A (coeⁱ r k A a), j=1 ↦ a] a
 
   linv := linvFill r'
 
@@ -113,7 +113,7 @@ coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
   fib* = (fr'⁻¹ ar', fr'.rinv ar')
 
   (topt, fr'topt≡ar') : αr' ⊢ fib fr' ar'
-  (topt, fr'topt≡ar') = hcompⁱ 1 0 (fib fr' ar')
+  (topt, fr'topt≡ar') = hcompⁱ 0 1 (fib fr' ar')
      [ ∀i.α ↦ (fr'.linv (coeⁱ r r' T gr) i, fr'.coh (coeⁱ r r' T gr) i)
      , r=r' ↦ (fr'.linv gr i, fr'.coh gr i)
      ] fib*
@@ -176,14 +176,14 @@ coeⁱ r r' (Glue [α ↦ (T, f)] A) gr
 isEquiv : (A B : U) → (A → B) → U
 isEquiv A B f :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x)
+  × (linv : (x : A) → g (f x) = x
   × (rinv : (x : B) → f (g x) = x
-  × (coh  : (x : A) → refl (f x) ={i. f (linv x i) = f x} rinv (f x)
+  × (coh  : (x : A) → rinv (f x) ={i. f (linv x i) = f x} refl (f x)
 
 isEquivCoe : (A : I → U)(r r' : I) → isEquiv (λ x. coe r r' A x)
 isEquivCoe A r r' =
   g    := λ x. coe r' r A x
-  linv := λ x j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+  linv := λ x j. hcom r r' (A r)  [j=0 k. coe k r A (coe r k A x); j=1 k. x] x
   rinv := λ x j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x
   coh  := TODO
 
@@ -201,9 +201,9 @@ isEquivCoe : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
 isCoherent
   (f    : A → B)
   (g    : B → A)
-  (linv : (x : A) → x = g (f x))
+  (linv : (x : A) → g (f x) = x)
   (rinv : (x : B) → f (g x) = x)
-  := ((x : A) → refl (f x) ={l. f (linv x l) = f x} rinv (f x))
+  := ((x : A) → rinv (f x) ={l. f (linv x l) = f x} refl (f x))
 
 
 
@@ -220,28 +220,28 @@ with constant domain:
 isCoherentCoe :
   isCoherent (λ x. coe r r' A x)
              (λ x. coe r' r A x)
-             (λ x j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x)
+             (λ x j. hcom r r' (A r)  [j=0 k. coe k r A (coe r k A x); j=1 k. x] x)
              (λ x j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x)
   :=
   coe r r'
     (i. isCoherent
            f=    (λ x. coe r i A x)
            g=    (λ x. coe i r A x)
-           linv= (λ x j. hcom r i (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x)
+           linv= (λ x j. hcom r i (A r)  [j=0 k. coe k r A (coe r k A x); j=1 k. x] x)
            rinv= (λ x j. hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x))
     (λ x j k. x)
 
   coe r r'
-    (i. (x : A r) → refl (f x) ={l. f (linv x l) = f x} rinv (f x))
+    (i. (x : A r) → rinv (f x) ={l. f (linv x l) = f x} refl (f x))
     (λ x j k. x)
 
   λ x. coe r r'
-    (i. refl (f x) ={l. f (linv x l) = f x} (rinv (f x)))
+    (i. (rinv (f x)) ={l. f (linv x l) = f x} refl (f x))
     (λ j k. x)
 
   λ x l. com r r'
     (i. f (linv x l) ={_. A i} f x)
-    [l=0 i. refl (f x); l=1 i. rinv (f x)]
+    [l=0 i. rinv (f x) i; l=1 i. refl (f x)]
     (λ k. x)
 
   --------------------------------------------------------------------------------
@@ -249,14 +249,14 @@ isCoherentCoe :
   metatheoretic shorthands:
     fⁱ x      := coe r i A x
     gⁱ x      := coe i r A x
-    linvⁱ x j := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+    linvⁱ x j := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x
     rinvⁱ x j := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x
 
   coh := λ x l k. com r r' (i. A i)
                        [k=0 i. fⁱ (linvⁱ x l)
 		      ; k=1 i. fⁱ x
-		      ; l=0 i. fⁱ x
-		      ; l=1 i. rinvⁱ (fⁱ x) k]
+		      ; l=0 i. rinvⁱ (fⁱ x) k
+		      ; l=1 i. fⁱ x]
 		      x
 
   Check:
@@ -269,11 +269,11 @@ isCoherentCoe :
   System compat:
     l=0,k=0 ⊢ fⁱ (linvⁱ x l) = fⁱ x OK
     l=0,k=1 ⊢ fⁱ x = fⁱ x OK
-    l=1,k=0 ⊢ rinvⁱ (fⁱ x) k = rinvⁱ (fⁱ x) 0 =  coe r i A (coe i r A (coe r i A x))
+    l=1,k=0 ⊢ rinvⁱ (fⁱ x) k = rinvⁱ (fⁱ x) 1 = fⁱ x
+              fⁱ x = fⁱ x OK
+    l=1,k=1 ⊢ rinvⁱ (fⁱ x) k = rinvⁱ (fⁱ x) 0 =  coe r i A (coe i r A (coe r i A x))
               fⁱ (linvⁱ x l) = fⁱ (linvⁱ x 1) = fⁱ (coe i r A (coe r i A x))
 	        = coe r i A (coe i r A (coe r i A x) OK
-    l=1,k=1 ⊢ rinvⁱ (fⁱ x) k = rinvⁱ (fⁱ x) 1 = fⁱ x
-              fⁱ x = fⁱ x OK
 
   Top boundary: OK
 
