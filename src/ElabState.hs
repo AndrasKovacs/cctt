@@ -62,8 +62,12 @@ data PrintingOpts = PrintingOpts {
 
 data LoadState = LoadState {
     loadStateLoadedFiles :: S.Set FilePath
-  , loadStateCurrentPath :: FilePath
-  , loadStateLoadCycle   :: [FilePath]
+  , loadStateCurrentPath :: FilePath        -- path of file being currently processed
+
+  , loadStateBasePath    :: FilePath        -- Base path of the module hierarchy.
+
+  , loadStateLoadCycle   :: [FilePath]      -- Chain of imports going back to original input file to cctt.
+                                            -- We check for import cycles on this.
   , loadStateCurrentSrc  :: String
   } deriving Show
 
@@ -99,7 +103,7 @@ newCaseTag = do
 {-# inline newCaseTag #-}
 
 initLoadState :: LoadState
-initLoadState = LoadState mempty mempty mempty mempty
+initLoadState = LoadState mempty mempty mempty mempty mempty
 
 initState :: State
 initState = State mempty mempty 0 initLoadState 0 defaultPrintingOpts [] 0

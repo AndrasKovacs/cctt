@@ -1,0 +1,5 @@
+
+module Foo.Bar.bar;
+
+import Foo.foo;
+import foo;

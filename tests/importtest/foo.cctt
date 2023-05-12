@@ -1,0 +1,6 @@
+
+module foo;
+
+import a;
+
+frog := U;

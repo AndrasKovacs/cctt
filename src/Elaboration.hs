@@ -6,7 +6,10 @@ import Control.Exception
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import System.FilePath
+import System.Directory
 import System.Exit
+import Data.List
+import qualified Data.List.Split as List
 
 import Common hiding (debug)
 import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalSys, evalBoundary)
@@ -1205,8 +1208,8 @@ elabTop = \case
 
   P.TImport pos modname ptop -> withTopElab $ setPos pos do
     st <- getState <&> (^.loadState)
-    let dirpath = takeDirectory (st^.currentPath)
-        newpath = dirpath </> (modname <.> "cctt")
+    let modSuffix = dotsToSlashes modname <.> "cctt"
+    let newpath = st^.basePath </> modSuffix
     if S.member newpath (st^.loadedFiles) then do
       elabTop ptop
     else if elem newpath (st^.loadCycle) then do
@@ -1411,8 +1414,13 @@ bindIVars is act = case is of
 
 ----------------------------------------------------------------------------------------------------
 
+dotsToSlashes :: String -> String
+dotsToSlashes str = foldr (</>) "" (List.wordsBy (=='.') str)
+
 elabPath :: Maybe (DontShow SourcePos) -> FilePath -> IO ()
 elabPath pos path = do
+  path <- makeAbsolute path
+
   loadSt <- getState <&> (^.loadState)
   let oldpath  = loadSt^.currentPath
   let oldCycle = loadSt^.loadCycle
@@ -1426,12 +1434,27 @@ elabPath pos path = do
       Just pos -> withTopElab $ setPos pos do
         err $ CantOpenFile path
 
-  (!top, !tparse) <- timed (parseString path file)
+  ((!moddecl, !top), !tparse) <- timed (parseString path file)
+
+  base <- case moddecl of
+    Nothing  -> pure $ takeDirectory path
+    Just mod -> do
+      let modSuffix = dotsToSlashes mod <.> "cctt"
+      case reverse <$> stripPrefix (reverse modSuffix) (reverse path) of
+        Nothing -> do
+          putStrLn $ "Module name " ++ mod ++ " does not match file name"
+          exitSuccess
+        Just base ->
+          pure base
+
   modState $ (loadState.currentPath .~ path)
            . (loadState.loadCycle   .~ (path : oldCycle))
-           . (parsingTime           +~ tparse)
            . (loadState.currentSrc  .~ file)
+           . (loadState.basePath    .~ base)
+           . (parsingTime           +~ tparse)
+
   top <- elabTop top
+
   modState $ (loadState.currentPath .~ oldpath)
            . (loadState.loadCycle   .~ oldCycle)
            . (loadState.currentSrc  .~ oldSrc)

@@ -41,7 +41,7 @@ prod       = char '*' <|> char '×'
 branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
 branch p t f = (t =<< p) <|> f
 
--- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "inductive", "higher", "elim", "glue",
+-- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "inductive", "higher", "elim", "glue", "module"
 --             "hcom", "import", "let", "refl", "unglue", "λ"]
 
 isKeyword :: String -> Bool
@@ -60,6 +60,7 @@ isKeyword = \case
   'h':'i':'g':'h':'e':'r':[] -> True
   'i':'m':'p':'o':'r':'t':[] -> True
   'l':'e':'t':[]             -> True
+  'm':'o':'d':'u':'l':'e':[] -> True
   'r':'e':'f':'l':[]         -> True
   'u':'n':'g':'l':'u':'e':[] -> True
   'λ':[]                     -> True
@@ -403,7 +404,7 @@ top =
           u <- top
           pure $! TDef (coerce pos) x ma t u)
 
-        (branch ((//) <$!> getSourcePos <*!> (keyword "import" *> ident))
+        (branch ((//) <$!> getSourcePos <*!> (keyword "import" *> pPath))
           (\(pos, file) -> do
               char ';'
               u <- top
@@ -411,10 +412,18 @@ top =
 
           (pure TEmpty))))
 
-src :: Parser Top
-src = ws *> top <* eof
+pPath :: Parser String
+pPath = takeWhileP Nothing (\c -> isAlphaNum c || c == '.') <* ws
 
-parseString :: FilePath -> String -> IO Top
+src :: Parser (Maybe String, Top)
+src = do
+  ws
+  mod <- optional (keyword "module" *> pPath <* char ';')
+  t   <- top
+  eof
+  pure (mod, t)
+
+parseString :: FilePath -> String -> IO (Maybe String, Top)
 parseString path s =
   case parse src path s of
     Left e -> do
@@ -423,8 +432,8 @@ parseString path s =
     Right t ->
       pure t
 
-parseStdin :: IO (Top, String)
+parseStdin :: IO (Maybe String, Top, String)
 parseStdin = do
   s <- getContents
-  t <- parseString "(stdin)" s
-  pure (t, s)
+  (m, t) <- parseString "(stdin)" s
+  pure (m, t, s)

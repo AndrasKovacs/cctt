@@ -94,12 +94,27 @@ topLevel1 := @@1;  -- stands for foo2
 -- Imports
 --------------------------------------------------------------------------------
 
--- We can put "import file.cctt;" declarations anywhere at the top-level in a file.
---   - The imported file must be in the same directory as the importing file.
---   - Imported files are elaborated upon import, without any caching.
---   - There's a single top-level namespace for all files in a directory.
---   - If a file is imported multiple times, it's only loaded once.
---   - Import cycles are not allowed.
+{-
+We can put a "module" declaration on the top of any file. We can do this only at
+the top of a file and only once.
+
+Modules and imports follow basic Haskell and Agda path conventions.
+
+Example: if we have
+
+   Foo/Bar/bar.cctt      -- starts with "module Foo.Bar.bar;"
+   Foo/foo1.cctt         -- starts with "module Foo.foo1;"
+   Foo/foo2.cctt         -- starts with "module Foo.foo2;"
+
+Then we import each file using its declared module name. Note:
+
+   - Imports can't form a cycle.
+   - All top-level names are in the same flat namespace. Top-level name
+     collisions result in an error.
+   - If a file is imported multiple times, it is loaded only once. Hence,
+     diamonds are fine in imports.
+
+-}
 
 -- Line type
 --------------------------------------------------------------------------------
