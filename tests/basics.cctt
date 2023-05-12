@@ -17,19 +17,19 @@ isRetraction (A B : U)(f : A → B) : U := (g : B → A) × (rinv : (x : B) → 
 
 isIso (A B : U)(f : A → B) : U :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x))
+  × (linv : (x : A) → g (f x) = x)
   × (rinv : (x : B) → f (g x) = x);
 
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x))
+  × (linv : (x : A) → g (f x) = x)
   × (rinv : (x : B) → f (g x) = x)
-  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+  × (coh  : (x : A) → (rinv (f x)) ={i. f (linv x i) = f x} refl);
 
 coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
   let f'    (i : I)(x : A r)        : A i := coe r i A x;
   let g'    (i : I)(x : A i)        : A r := coe i r A x;
-  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x;
+  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x;
   let rinv' (i : I)(x : A i)(j : I) : A i := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
 
   ( λ x. g' r' x
@@ -38,8 +38,8 @@ coeIsEquiv (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
   , λ x l k. com r r' A
                       [k=0 i. f' i (linv' i x l)
                       ;k=1 i. f' i x
-		      ;l=0 i. f' i x
-		      ;l=1 i. rinv' i (f' i x) k]
+		      ;l=0 i. rinv' i (f' i x) k
+		      ;l=1 i. f' i x]
 		      x
   );
 
@@ -81,28 +81,28 @@ fiberRefl (A B : U) (f : A → B) (a  : A) : fiber A B f (f a)
 
 contractIsoFiber (A B : U) (is : iso A B) (a : A)
   (fib : fiber A B is.f (is.f a))
-  : fiberRefl A B is.f a = fib
+  : fib = fiberRefl A B is.f a
   :=
   let sq (j k : I) : A :=
-      hcom 0 j [k=1 j. is.g (fib.2 j)] (is.linv (fib.1) k);
+      hcom k j [k=0 j. is.g (fib.2 j); k=1 _. fib.1] (is.linv (fib.1) k);
   let sq2 (i k : I) : A :=
-      hcom 1 k
-        [i=0. is.linv a;
-         i=1 k. sq k k]
+      hcom 0 k
+        [i=0. sq 1;
+         i=1. is.linv a]
         (is.g (is.f a));
   λ i.
-  (sq2 i 0,
+  (sq2 i 1,
    λ j.
    let aux : A :=
-     hcom j 1
-       [i=0. is.linv a;
-        i=1. sq j;
-        j=0. is.linv (sq2 i 0)]
-       (sq2 i j);
+     hcom j 0
+       [i=0. sq j;
+        i=1. is.linv a;
+        j=1. sq2 i]
+       (is.linv (sq2 i 1) j);
    hcom 0 1
-     [i=0. is.rinv (is.f a);
-      i=1. is.rinv (fib.2 j);
-      j=0. is.rinv (is.f (sq2 i 0));
+     [i=0. is.rinv (fib.2 j);
+      i=1. is.rinv (is.f a);
+      j=0. is.rinv (is.f (sq2 i 1));
       j=1. is.rinv (is.f a)]
      (is.f aux));
 
@@ -115,7 +115,7 @@ isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
   ;
 
 isContr (A : U) : U
-  := (x : A) * ((y : A) → y = x);
+  := (x : A) * ((y : A) → x = y);
 
 hasContrFibers (A B : U) (f : A → B) : U := (b : B) → isContr (fiber A B f b);
 
@@ -139,14 +139,14 @@ isEquivToContrFibers (A B : U) (f : A → B) (e : isEquiv A B f) : hasContrFiber
    let p : f a = b := fib.2;
    let domFiller (k : I) : A :=
      hcom 0 k
-       [i=0 _. a;
-        i=1 k. e.g (p k)]
+       [i=0 k. e.g (p k);
+        i=1 _. a]
        (e.linv a i);
    (domFiller 1,
     λ j.
     hcom 0 1
-      [i=0. connAnd B (f a) b p j;
-       i=1 k. e.rinv (p k) j;
+      [i=0 k. e.rinv (p k) j;
+       i=1. connAnd B (f a) b p j;
        j=0 k. f (domFiller k);
        j=1. p]
       (e.coh a i j)));
@@ -164,8 +164,8 @@ isEquivRetractContrFibers (A B : U) (f : A → B) (e : isEquiv A B f)
   λ l.
   let domFiller (a : A) (i : I) (k : I) : A :=
     hcom 0 k
-      [i=0 _. a;
-       i=1 _. e.g (f a);
+      [i=0 _. e.g (f a);
+       i=1 _. a;
        l=1 _. e.linv a i]
       (e.linv a i);
   (e.g,
@@ -173,8 +173,8 @@ isEquivRetractContrFibers (A B : U) (f : A → B) (e : isEquiv A B f)
    e.rinv,
    λ a i j.
    hcom 0 1
-      [i=0. connAndRefl B (f a) l j;
-       i=1 _. e.rinv (f a) j;
+      [i=0 _. e.rinv (f a) j;
+       i=1. connAndRefl B (f a) l j;
        j=0 k. f (domFiller a i k);
        j=1 _. f a;
        l=1 _. e.coh a i j]

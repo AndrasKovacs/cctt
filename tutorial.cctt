@@ -296,9 +296,9 @@ invPrecedence (A : U)(x y : A)(p : y = x)(f : x = y → U) : U := f p⁻¹;
 
 isEquiv (A B : U)(f : A → B) : U :=
     (g    : B → A)
-  × (linv : (x : A) → x = g (f x))
+  × (linv : (x : A) → g (f x) = x)
   × (rinv : (x : B) → f (g x) = x)
-  × (coh  : (x : A) → refl ={i. f (linv x i) = f x} (rinv (f x)));
+  × (coh  : (x : A) → (rinv (f x)) ={i. f (linv x i) = f x} refl);
 
 equiv (A B : U) : U :=
   (f : A → B) × isEquiv A B f;

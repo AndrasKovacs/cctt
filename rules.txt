@@ -72,10 +72,10 @@ Composition (derived)
 isEquiv : (A → B) → U
 isEquiv f :=
     (f⁻¹  : B → A)
-  × (linv : ∀ a → a = f⁻¹ (f a))
+  × (linv : ∀ a → f⁻¹ (f a) = a)
   × (rinv : ∀ b → f (f⁻¹ b) = b)
   × (coh  : ∀ a →
-            Pathⁱ (f (linv a i) = f a) (refl (f a)) (rinv (f a)))
+            Pathⁱ (f (linv a i) = f a) (rinv (f a)) (refl (f a)))
 
 idIsEquiv : (A : U) → isEquiv (λ (a:A). a)
   _⁻¹  = λ a. a
@@ -89,7 +89,7 @@ isEquivCoe A r r' =
   _⁻¹ := coeⁱ r' r A
 
   linvFill : ∀ s a → a = coeⁱ s r A (coeⁱ r s A a)
-  linvFill s a = λ j. hcomᵏ r s (A r) [j=0 ↦ a, j=1 ↦ coeⁱ k r A (coeⁱ r k A a)] a
+  linvFill s a = λ j. hcomᵏ r s (A r) [j=0 ↦ coeⁱ k r A (coeⁱ r k A a), j=1 ↦ a] a
 
   linv := linvFill r'
 
@@ -118,25 +118,25 @@ Glue
 isEquiv : (A → B) → U
 isEquiv A B f :=
     (g      : B → A)
-  × (linv   : (x : A) → Path A x (g (f x)))
+  × (linv   : (x : A) → Path A (g (f x)) x)
   × (rinv   : (x : B) → Path B (f (g x)) x)
   × (coh    : (x : A) →
             PathP i (Path B (f (linv x {x}{g (f x)} i)) (f x))
-                    (refl B (f x))
-                    (rinv (f x)))
+                    (rinv (f x))
+                    (refl B (f x)))
 
 coeIsEquiv : (A : I → U) → (r r' : I) → isEquiv (coeⁱ r r' A : A r → A r')
 coeIsEquiv A r r' =
   _⁻¹  := λ x. coe r' r A x
-  linv := λ x. λ j. hcom r r' (A r)  [j=0 k. x; j=1 k. coe k r A (coe r k A x)] x
+  linv := λ x. λ j. hcom r r' (A r)  [j=0 k. coe k r A (coe r k A x); j=1 k. x] x
   rinv := λ x. λ j. hcom r' r (A r') [j=0 k. coe k r' A (coe r' k A x); j=1 k. x] x
   coh  := TODO
 
 -- coh :
 
 --             PathP i (Path B (f (linv x {x}{g (f x)} i)) (f x))
---                     (λ _. coe r r' A
 --                     (rinv (f x)))
+--                     (λ _. coe r r' A
 
 
 
