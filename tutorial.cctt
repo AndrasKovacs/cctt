@@ -106,7 +106,8 @@ Example: if we have
    Foo/foo1.cctt         -- starts with "module Foo.foo1;"
    Foo/foo2.cctt         -- starts with "module Foo.foo2;"
 
-Then we import each file using its declared module name. Note:
+Then we import each file using its declared module name. For example, as
+"import Foo.Bar.bar;". Note:
 
    - Imports can't form a cycle.
    - All top-level names are in the same flat namespace. Top-level name
