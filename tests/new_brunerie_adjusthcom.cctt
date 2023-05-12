@@ -1,5 +1,4 @@
 
-
 -- Adapted from
 -- https://github.com/agda/cubical/blob/50f0e7b8fb156d14b12be21ec5e529fe3ca497ca/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
 -- https://github.com/agda/cubical/blob/dc5f5005726eb76e4eb5306a2d217a1a49140e4e/Cubical/Foundations/HLevels_temp.agda
@@ -954,22 +953,23 @@ g10 : sTrunc ℤ → ℤ :=
 η₃ : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
-  push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
-];
-
-η₃' : join S¹ S¹ → Susp S² := λ[
-  inl x. north;
-  inr x. north;
   push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
 ];
 
+-- -- Having any of the extra sym-s below makes the computation too big (same as in Agda)!
+-- η₃ : join S¹ S¹ → Susp S² := λ[
+--   inl x. north;
+--   inr x. north;
+--   push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
+-- ];
 
 ----------------------------------------------------------------------------------------------------
 
+
 gbase2' : g2S² :=
-  hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 []
-  (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 []
-  (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+  hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 []
+  (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 []
+  (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 []
   (g2inc base2))))))))))))))))));
 
 BIGGLUE :=
@@ -993,12 +993,13 @@ glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
 (hcom 1 0 [] (hcom 0 1 [] (ginc base1))))))))))))))))))))))))))))))))))))) [])
 []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
 
+
 g8' :  Square g2S² gbase2' gbase2' gbase2' gbase2'
                    refl refl refl refl
      → gbase1'' = gbase1'' :=
   λ p i. coe 0 1 (j. (codeTruncS² (p i j)).1) gbase1';
 
-v3' : gbase1'' = gbase1'' := g8' (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)));
+v3' : gbase1'' = gbase1'' := g8' (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)));
 
 BIGGLUEZ :=
   Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue (Glue

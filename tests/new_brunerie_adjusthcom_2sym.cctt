@@ -23,6 +23,14 @@ hGroupoid : U := (fst : U) × isGroupoid fst;
 the (A : U)(x : A) := x;
 Σ (A : U)(B : A → U) : U := (fst : A) × B fst;
 
+lemPropFam (A : U) (P : A → U) (pP : (x : A) → isProp (P x)) (a0 a1 : A)
+           (p : a0 = a1) (b0 : P a0) (b1 : P a1) : b0 ={ap P p} b1
+  := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
+
+ΣeqProp (A : U) (B : A → U) (pB : (a : A) → isProp (B a))
+       (u v : Σ A B) (p : u.1 = v.1) : u = v
+  := λ i. (p i, lemPropFam A B pB u.1 v.1 p u.2 v.2 i);
+
 J (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))(x : A) (p : a = x) : C x p
   := let sq (i j : I) : A := hcom 0 j [i=0 _. a; i=1. p] a;
      coe 0 1 (i. C (sq i 1) (λ j. sq i j)) d;
@@ -111,15 +119,9 @@ isEquivCoe (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
 		      x
   );
 
-pathToEquiv (A B : U)(p : A = B) : equiv A B :=
-  ((λ x. coe 0 1 p x), isEquivCoe (λ i. p i) 0 1);
-
-ua-pathToEquiv (A B : U)(p : A = B) : ua A B (pathToEquiv A B p) = p :=
-  ?_;
 
 -- isPropIsEquiv
 ----------------------------------------------------------------------------------------------------
-
 
 lemProp (A : U) (h : A → isProp A) : isProp A
   := λ x y. h x x y;
@@ -267,6 +269,26 @@ isPropIsEquiv (A B : U) (f : A → B) : isProp (isEquiv A B f)
                  (rinvContr A B f e)
                  (rcoh1Contr A B f e)));
 
+
+-- Univalence stuff
+----------------------------------------------------------------------------------------------------
+
+pathToEquiv (A B : U)(p : A = B) : equiv A B :=
+  ((λ x. coe 0 1 p x), isEquivCoe (λ i. p i) 0 1);
+
+equivEq (A B : U)(e f : equiv A B) : e.1 = f.1 → e = f :=
+  ΣeqProp (A → B) (isEquiv A B) (isPropIsEquiv A B) e f;
+
+pathToEquivRefl (A : U) : pathToEquiv A A refl = idEquiv A :=
+  equivEq A A (pathToEquiv A A refl) (idEquiv A) (λ i x. coe i 1 (i. A) x);
+
+uaIdEquiv (A : U) : ua A A (idEquiv A) = refl :=
+  λ i j. Glue A [i=1. (A, idEquiv A); j=0. (A, idEquiv A); j=1. (A, idEquiv A)];
+
+ua-pathToEquiv (A B : U)(p : A = B) : ua A B (pathToEquiv A B p) = p :=
+    J U A (λ X p. ua A X (pathToEquiv A X p) = p)
+      (ap (ua A A) (pathToEquivRefl A) ∙ uaIdEquiv A)
+      B p;
 
 -- Decidability
 ----------------------------------------------------------------------------------------------------
@@ -463,14 +485,6 @@ isPropIsSet (A : U) : isProp (isSet A) :=
 isPropIsGroupoid (A : U) : isProp (isGroupoid A) :=
   λ f g i a b. isPropIsSet (a = b) (f a b) (g a b) i;
 
-lemPropFam (A : U) (P : A → U) (pP : (x : A) → isProp (P x)) (a0 a1 : A)
-           (p : a0 = a1) (b0 : P a0) (b1 : P a1) : b0 ={ap P p} b1
-  := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
-
-ΣeqProp (A : U) (B : A → U) (pB : (a : A) → isProp (B a))
-       (u v : Σ A B) (p : u.1 = v.1) : u = v
-  := λ i. (p i, lemPropFam A B pB u.1 v.1 p u.2 v.2 i);
-
 isPropΣ (A : U) (B : A → U) (pA : isProp A)(pB : (fst : A) → isProp (B fst)) (t u : Σ A B) : t = u
   := ΣeqProp A B pB t u (pA t.1 u.1);
 
@@ -660,8 +674,6 @@ is2GroupoidΠ : (A : U)(B : A → U)(h : (x : A) → isOfHLevel num4 (B x)) → 
         (ap (λ x. ap (λ f i. f i z) x) S)
         i j k l;
 
-TypeOfHLevel (n : HLevel) : U := (fst : U) × isOfHLevel n fst;
-
 isPropΠ (A : U) (B : A → U) (h : (x : A) → isProp (B x))
        (f0 f1 : (x : A) → B x) : f0 = f1
   := λ i x. h x (f0 x) (f1 x) i;
@@ -676,20 +688,6 @@ isPropIsContr (A : U) : isProp (isContr A)
 
      lemProp (isContr A) rem;
 
-contrTypesUnique (A B : U)(cA : isContr A)(cB : isContr B) : A = B :=
-  ua A B (isoToEquiv A B (
-      λ _. cB.1
-    , λ _. cA.1
-    , λ a. cA.2 a
-    , λ b. cB.2 b));
-
-isPropHContr : isProp (TypeOfHLevel zero) :=
-  λ x y. ΣeqProp U isContr isPropIsContr x y (contrTypesUnique x.1 y.1 x.2 y.2);
-
-isOfHLevelTypeOfHLevel : (n : HLevel) → isOfHLevel (suc n) (TypeOfHLevel n) := λ[
-  zero. isPropHContr;
-  suc n. ?_
-];
 
 
 -- Brunerie
@@ -905,7 +903,7 @@ surfc : (x : g2S²) → refl ={_. x = x} refl :=
 
 plus₂ : g2S² → g2S² → g2S² :=
   rec2 S² (g2S² → g2S²)
-          (is2GroupoidΠ (g2S²) (λ _. g2S²) (λ _. g2trunc' S²))
+          (is2GroupoidΠ g2S² (λ _. g2S²) (λ _. g2trunc' S²))
           (λ[base2.     λ x. x;
              loop2 i j. λ x. surfc x i j]);
 
@@ -935,7 +933,7 @@ HopfS² : S² → U := λ[
 
 codeTruncS² : g2S² → hGroupoid :=
   rec2 S² hGroupoid
-          (isOfHLevelTypeOfHLevel num3)
+          is2Groupoid-hGroupoid
           (λ s. (gTrunc (HopfS² s), gtrunc' (HopfS² s)));
 
 g8Ty := (Ω² (g2dot S²dot)).1 → (Ω (gdot S¹dot)).1;
@@ -944,7 +942,7 @@ g8 : (Ω² (g2dot S²dot)).1 → (Ω (gdot S¹dot)).1 :=
   λ p i. coe 0 1 (j. (codeTruncS² (p i j)).1) (ginc base1);
 
 codeTruncS¹ : gTrunc S¹ → hSet :=
-  rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)));
+  rec1 S¹ hSet isGroupoid-hSet (λ s. (sTrunc (helix s), strunc' (helix s)));
 
 g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
   λ p. coe 0 1 (i. (codeTruncS¹ (p i)).1) (sinc (pos zero));
@@ -952,26 +950,21 @@ g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
 g10 : sTrunc ℤ → ℤ :=
   rec0 ℤ ℤ isSetℤ (λ x. x);
 
+-- Having any of the extra sym-s below makes the computation too big (same as in Agda)!
 η₃ : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
   push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
 ];
 
-η₃' : join S¹ S¹ → Susp S² := λ[
-  inl x. north;
-  inr x. north;
-  push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
-];
-
 
 ----------------------------------------------------------------------------------------------------
 
 gbase2' : g2S² :=
-  hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 []
-  (hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
-  (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 [] (hcom 1 0 []
-  (hcom 1 0 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 [] (g2inc
+  hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+  (hcom 1 0 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 []
+  (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (hcom 0 1 [] (hcom 1 0 []
+  (hcom 0 1 [] (hcom 0 1 [] (hcom 0 1 [] (hcom 1 0 [] (g2inc
   base2))))))))))))))))))))));
 
 GLUEgS¹ :=
@@ -1006,7 +999,7 @@ g8' :  Square g2S² gbase2' gbase2' gbase2' gbase2'
 v3 : gbase1'' = gbase1'' := g8' (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)));
 
 codeTruncS¹' : GLUEgS¹ → hSet :=
-  λ x. rec1 S¹ hSet (isOfHLevelTypeOfHLevel num2) (λ s. (sTrunc (helix s), strunc' (helix s)))
+  λ x. rec1 S¹ hSet isGroupoid-hSet (λ s. (sTrunc (helix s), strunc' (helix s)))
        (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue
        (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue
        (unglue (unglue (unglue (unglue x ))))))))))))))))))))));
