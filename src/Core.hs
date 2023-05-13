@@ -162,7 +162,7 @@ evalCof = \case
     VCNe c is -> let ?cof = c^.extended in case evalCof cof of
       VCTrue      -> VCNe c is
       VCFalse     -> VCFalse
-      VCNe c' is' -> VCNe (NeCof' (c^.extended) (NCAnd (c^.extra) (c'^.extra)))
+      VCNe c' is' -> VCNe (NeCof' (c'^.extended) (NCAnd (c^.extra) (c'^.extra)))
                           (is <> is')
 
 vsempty :: VSys
