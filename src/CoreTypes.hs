@@ -188,14 +188,6 @@ snocHCases cs x xs is t = case cs of
   HCSNil                   -> HCSCons x xs is t HCSNil
   HCSCons x' xs' is' t' cs -> HCSCons x' xs' is' t' (snocHCases cs x xs is t)
 
--- | Atomic equation.
-data CofEq = CofEq I I
-  deriving Show
-
--- | Conjunction of equations.
-data Cof = CTrue | CAnd CofEq Cof
-  deriving Show
-
 data Sys = SEmpty | SCons Cof Tm Sys
   deriving Show
 
@@ -213,22 +205,6 @@ data NamedClosure = NCl {
 data NamedIClosure = NICl {
     namedIClosureName    :: Name
   , namedIClosureClosure :: IClosure }
-  deriving Show
-
-data NeCof
-  = NCEq I I
-  | NCAnd NeCof NeCof
-  deriving Show
-
-data NeCof' = NeCof' {
-    neCof'Extended :: NCof
-  , neCof'Extra    :: NeCof}
-  deriving Show
-
-data VCof
-  = VCTrue
-  | VCFalse
-  | VCNe NeCof' IVarSet
   deriving Show
 
 data Env
@@ -535,15 +511,15 @@ instance SubAction Env where
 
 instance SubAction a => SubAction (BindI a) where
   sub (BindI x i a) =
-    let fresh = dom ?sub in
-    let ?sub  = setDomCod (fresh + 1) i ?sub `ext` IVar fresh in
+    let fresh = ?sub^.dom in
+    let ?sub  = setDom (fresh + 1) (setCod i ?sub) `ext` IVar fresh in
     seq ?sub (BindI x fresh (sub a))
   {-# inline sub #-}
 
 instance SubAction a => SubAction (BindILazy a) where
   sub (BindILazy x i a) =
-    let fresh = dom ?sub in
-    let ?sub  = setDomCod (fresh + 1) i ?sub `ext` IVar fresh in
+    let fresh = ?sub^.dom in
+    let ?sub  = setDom (fresh + 1) (setCod i ?sub) `ext` IVar fresh in
     seq ?sub (BindILazy x fresh (sub a))
   {-# inline sub #-}
 

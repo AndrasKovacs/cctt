@@ -130,6 +130,11 @@ newtype Lvl = Lvl {unLvl :: Word}
 newtype IVar = IVar# {unIVar :: Word}
   deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real, Flat) via Word
 
+class HasDom s where dom :: Lens' s IVar
+class HasCod s where cod :: Lens' s IVar
+
+class Lift a where lift :: a -> a
+
 lvlToIx :: Lvl -> Lvl -> Ix
 lvlToIx (Lvl envl) (Lvl x) = Ix (envl - x - 1)
 {-# inline lvlToIx #-}
