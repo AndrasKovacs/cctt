@@ -8,7 +8,8 @@ import Data.Time.Clock
 
 import Common
 import CoreTypes
-import Interval
+import Cubical
+
 import qualified Data.LvlMap as LM
 
 data TopEntry

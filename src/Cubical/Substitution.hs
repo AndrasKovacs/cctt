@@ -24,12 +24,12 @@ pattern Sub d c is <- Sub# (fromIntegral -> d) (fromIntegral -> c) is where
 {-# complete Sub #-}
 
 instance HasDom Sub where
-  dom f (Sub d c s) = (\d -> Sub d c s) <$> f d
-  {-# inline dom #-}
+  dom (Sub d c s) = d; {-# inline dom #-}
+  setDom i (Sub _ c s) = Sub i c s; {-# inline setDom #-}
 
 instance HasCod Sub where
-  cod f (Sub d c s) = (\c -> Sub d c s) <$> f c
-  {-# inline cod #-}
+  cod (Sub d c s) = c;   {-# inline cod #-}
+  setCod i (Sub d c is) = Sub d i (dropIList (c - i) is); {-# inline setCod #-}
 
 type SubArg = (?sub :: Sub)
 
@@ -91,12 +91,6 @@ dropIList i is = case i // is of
   (i, ILDef is _) -> dropIList (i - 1) is
   _               -> impossible
 
-setCod :: IVar -> Sub -> Sub
-setCod i (Sub d c is) = Sub d i (dropIList (c - i) is)
-
-setDom :: IVar -> Sub -> Sub
-setDom d (Sub _ c is) = Sub d c is
-
 class SubAction a where
   sub :: SubArg => a -> a
 
@@ -111,8 +105,8 @@ instance SubAction I where
 -- | Substitution composition.
 instance SubAction Sub where
   sub s@(Sub d c is)
-    | d > ?sub^.cod = error ("SUB " ++ show s ++ " " ++ show ?sub)
-    | True = Sub (?sub^.dom) c (go is ?sub) where
+    | d > cod ?sub = error ("SUB " ++ show s ++ " " ++ show ?sub)
+    | True = Sub (dom ?sub) c (go is ?sub) where
         go :: IList -> Sub -> IList
         go is s = case is of
           ILNil      -> ILNil

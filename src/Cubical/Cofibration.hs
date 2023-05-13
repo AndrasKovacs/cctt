@@ -15,7 +15,7 @@ data Cof = CTrue | CEq I I Cof | CNEq I I Cof
 
 data NeCof
   = NCEq I I
-  | NCNeq I I
+  | NCNEq I I
   | NCAnd NeCof NeCof
   deriving Show
 
@@ -26,6 +26,7 @@ data NeCof' = NeCof' {
     neCof'Extended :: NCof
   , neCof'Extra    :: NeCof}
 
+-- TODO: unbox
 data VCof
   = VCTrue
   | VCFalse
@@ -39,8 +40,15 @@ data NCof# =
 makeFields ''NeCof'
 
 instance HasDom NCof where
-  dom f (NCof d is) = (\d -> NCof d is) <$> f d
-  {-# inline dom #-}
+  dom (NCof d is) = d; {-# inline dom #-}
+  setDom i (NCof d is) = NCof i (dropNCof# (d - i) is); {-# inline setDom #-}
+
+dropNCof# :: IVar -> NCof# -> NCof#
+dropNCof# i is = case i // is of
+  (0, is         ) -> is
+  (i, NCRep is _ ) -> dropNCof# (i - 1) is
+  (i, NCLink is _) -> dropNCof# (i - 1) is
+  _                -> impossible
 
 instance Show NCof where
   show nc = "[" ++ go nc "" ++ "]" where
@@ -235,6 +243,24 @@ neq# (!i, !ineq) (!j, !jneq)
              (IS.insertIVar j mempty)
 
     _ -> VCTrue
+
+-- | Extend with a forced neutral NeCof. Error if non-neutral.
+conjNeCof :: NCofArg => NeCof -> NCof
+conjNeCof = \case
+  NCEq i j    -> case eq  i j of VCNe (NeCof' nc  _) _ -> nc; _ -> impossible
+  NCNEq i j   -> case neq i j of VCNe (NeCof' nc  _) _ -> nc; _ -> impossible
+  NCAnd c1 c2 -> let ?cof = conjNeCof c1 in conjNeCof c2
+
+----------------------------------------------------------------------------------------------------
+
+appNCofToSub :: NCof -> Sub -> Sub
+appNCofToSub nc (Sub d c is) = Sub d c (go nc is) where
+  go nc ILNil        = ILNil
+  go nc (ILDef is i) = ILDef (go nc is) (appNCof nc i)
+
+wkSub :: NCofArg => Sub -> Sub
+wkSub s = setDom (dom ?cof) s
+{-# inline wkSub #-}
 
 ----------------------------------------------------------------------------------------------------
 

@@ -3,13 +3,15 @@
 module CoreTypes where
 
 import Common
-import Interval
+import Cubical
+
 import qualified Data.LvlMap as LM
+import qualified Data.ISet as IS
 
 -- Syntax
 --------------------------------------------------------------------------------
 
-data WithIS a = WIS {withISBody :: a, withISIvars :: IVarSet}
+data WithIS a = WIS {withISBody :: a, withISIvars :: IS.Set}
   deriving (Show)
 
 data RecInfo = RI {
@@ -115,7 +117,9 @@ data Tm
   | DCon  {-# nounpack #-} DConInfo  Spine
 
   | HTyCon {-# nounpack #-} HTyConInfo Spine
-  -- LazySpine is for params which are usually quoted from syntax.
+
+  -- LazySpine is for params which are usually quoted from syntax and we want
+  -- to avoid computing them.
   | HDCon {-# nounpack #-} HDConInfo LazySpine Spine Sub
   | HCase Tm Name ~Ty CaseTag HCases
   | HSplit Name ~Ty CaseTag HCases
@@ -138,8 +142,8 @@ data Tm
 
   | U
 
-  | Path Name Ty Tm Tm    -- PathP i.A x y
-  | PApp ~Tm ~Tm Tm I      -- (x : A i0)(y : A i1)(t : PathP i.A x y)(j : I)
+  | Path Name Ty Tm Tm     -- x ={i. a} y
+  | PApp ~Tm ~Tm Tm I      -- (x : A 0)(y : A 1)(t : x ={i.A i} y)(j : I)
   | PLam ~Tm ~Tm Name Tm   -- endpoints, body
 
   | Line Name Tm           -- (i : I) → A
@@ -182,11 +186,6 @@ data HCases
   = HCSNil
   | HCSCons Name [Name] [Name] Tm HCases
   deriving Show
-
-snocHCases :: HCases -> Name -> [Name] -> [Name] -> Tm -> HCases
-snocHCases cs x xs is t = case cs of
-  HCSNil                   -> HCSCons x xs is t HCSNil
-  HCSCons x' xs' is' t' cs -> HCSCons x' xs' is' t' (snocHCases cs x xs is t)
 
 data Sys = SEmpty | SCons Cof Tm Sys
   deriving Show
@@ -280,13 +279,13 @@ data Val
   = VSub Val Sub
 
   -- Neutrals. Not stable under substitution, no computation can ever match on them.
-  | VNe Ne IVarSet
+  | VNe Ne IS.Set
 
   -- Semineutrals. Not stable under substitution but computation can match on them.
-  | VGlueTy VTy NeSys'                                        -- coe can act on it
-  | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IVarSet -- case can act on it
-  | VHCom I I VTy NeSysHCom' Val IVarSet                      -- coe and case can act on it
-  | VGlue Val ~NeSys' NeSys IVarSet                            -- unglue can act on it
+  | VGlueTy VTy NeSys'                                       -- coe can act on it
+  | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IS.Set -- case can act on it
+  | VHCom I I VTy NeSysHCom' Val IS.Set                      -- coe and case can act on it
+  | VGlue Val ~NeSys' NeSys IS.Set                           -- unglue can act on it
 
   -- Canonicals. Stable under substitution.
   | VPi VTy NamedClosure
@@ -475,6 +474,7 @@ instance SubAction NeCof where
   sub = \case
     NCEq i j    -> NCEq (sub i) (sub j)
     NCAnd c1 c2 -> NCAnd (sub c1) (sub c2)
+    NCNEq i j   -> NCNEq (sub i) (sub j)
 
 instance SubAction a => SubAction (BindCofLazy a) where
   sub (BindCofLazy cof a) = BindCofLazy (sub cof) (sub a); {-# inline sub #-}
@@ -511,15 +511,15 @@ instance SubAction Env where
 
 instance SubAction a => SubAction (BindI a) where
   sub (BindI x i a) =
-    let fresh = ?sub^.dom in
-    let ?sub  = setDom (fresh + 1) (setCod i ?sub) `ext` IVar fresh in
+    let fresh = dom ?sub in
+    let ?sub  = lift (setCod i ?sub) in
     seq ?sub (BindI x fresh (sub a))
   {-# inline sub #-}
 
 instance SubAction a => SubAction (BindILazy a) where
   sub (BindILazy x i a) =
-    let fresh = ?sub^.dom in
-    let ?sub  = setDom (fresh + 1) (setCod i ?sub) `ext` IVar fresh in
+    let fresh = dom ?sub in
+    let ?sub  = lift (setCod i ?sub) in
     seq ?sub (BindILazy x fresh (sub a))
   {-# inline sub #-}
 
@@ -606,17 +606,16 @@ instance SubAction a => SubAction (WithIS a) where
 
 --------------------------------------------------------------------------------
 
-makeFields ''BindI
-makeFields ''BindILazy
 makeFields ''BindCof
 makeFields ''BindCofLazy
+makeFields ''BindI
+makeFields ''BindILazy
+makeFields ''DConInfo
+makeFields ''DefInfo
+makeFields ''HDConInfo
+makeFields ''HTyConInfo
 makeFields ''NamedClosure
 makeFields ''NamedIClosure
-makeFields ''NeCof'
-makeFields ''DefInfo
-makeFields ''DConInfo
-makeFields ''TyConInfo
 makeFields ''RecInfo
-makeFields ''HTyConInfo
-makeFields ''HDConInfo
+makeFields ''TyConInfo
 makeFields ''WithIS

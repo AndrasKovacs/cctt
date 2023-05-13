@@ -6,6 +6,7 @@ module Data.ISet where
 import Data.Foldable
 import Common
 import Cubical.Interval
+import Cubical.Substitution
 
 newtype Set = Set Word deriving (Eq, Bits) via Word
 
@@ -86,3 +87,11 @@ foldrAccum f acc r s = go s acc where
   go :: Set -> acc -> r
   go s acc = popSmallest s (\s i -> f i (go s) acc) r
 {-# inline foldrAccum #-}
+
+instance SubAction Set where
+  sub is =
+    snd $ Data.ISet.foldl
+      (\(!sub, !acc) i -> sub // insert (sub i) acc)
+      (sub, mempty)
+      is
+  {-# noinline sub #-}
