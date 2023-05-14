@@ -358,21 +358,14 @@ evalCof = \case
 
 isUnblocked :: NCofArg => IS.Set -> Bool
 isUnblocked is =
- let res =
-       IS.foldrAccum
-       (\x hyp (!varset, !cof) ->
-          matchIVar (appNCof cof x)
-            (\x -> IS.memberIVar x varset || hyp (IS.insertIVar x varset // cof))
-            True)
-       (mempty, ?cof)
-       False
-       (IS.delete01 is)
- in
-  trace "ISUNBLOCKED" $
-  traceShow is $
-  traceShow ?cof $
-  traceShow res $
-  res
+  IS.foldrAccum
+    (\x hyp (!varset, !cof) ->
+       matchIVar (appNCof cof x)
+         (\x -> IS.memberIVar x varset || hyp (IS.insertIVar x varset // cof))
+         True)
+    (mempty, ?cof)
+    False
+    (IS.delete01 is)
 
 isUnblockedS :: SubArg => NCofArg => IS.Set -> Bool
 isUnblockedS is = IS.foldrAccum
@@ -385,5 +378,16 @@ isUnblockedS is = IS.foldrAccum
   (mempty, ?sub, ?cof)
   False
   (IS.delete01 is)
+
+-- | Insert an *unforced* I to an `IS.Set`.
+insertI :: NCofArg => I -> IS.Set -> IS.Set
+insertI i s = IS.insert (appNCof ?cof i) s
+{-# inline insertI #-}
+
+neCofVars :: NeCof -> IS.Set
+neCofVars = \case
+  NCEq i j    -> IS.insert i $ IS.insert j mempty
+  NCNEq i j   -> IS.insert i $ IS.insert j mempty
+  NCAnd c1 c2 -> neCofVars c1 <> neCofVars c2
 
 ----------------------------------------------------------------------------------------------------

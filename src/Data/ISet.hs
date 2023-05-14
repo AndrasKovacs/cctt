@@ -26,6 +26,7 @@ delete01 :: Set -> Set
 delete01 (Set w) = Set (w .&. 18446744073709551612)
 {-# inline delete01 #-}
 
+-- | Insert an unforced I.
 insert :: I -> Set -> Set
 insert (I x) (Set s) = Set (unsafeShiftL 1 (w2i x) .|. s)
 {-# inline insert #-}

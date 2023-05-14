@@ -16,6 +16,15 @@
 
 test (A : U)(x : Glue A [])(j : I) := coe 0 j (i. Glue A [i=1. (A,?_)]) x;
 
+{-
+λ A x j.
+  glue (hcom 1 0 [0 = j i. unglue x
+                ; j = 1 k. hcom 0 1 [k = 0 l. ?
+                                   ; k = 1 l. hcom 0 1 [] (coe 0 1 (_. A) (unglue x))] ?]
+       (hcom 0 j [] (coe 0 j (i. A) (unglue x))))
+       [j = 1. hcom 0 1 [] ?]
+-}
+
 
 -- VHCom I0 (IVar 0)
 --      (VNe (NSub (NLocalVar 0) (1,2,[IVar 0,IVar 0])) [])

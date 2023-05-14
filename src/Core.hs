@@ -173,12 +173,6 @@ occursInNeCof cof i' = case cof of
   NCNEq i j   -> i == IVar i' || j == IVar i'
   NCAnd c1 c2 -> occursInNeCof c1 i' || occursInNeCof c2 i'
 
-neCofVars :: NeCof -> IS.Set
-neCofVars = \case
-  NCEq i j    -> IS.insert i $ IS.insert j mempty
-  NCNEq i j   -> IS.insert i $ IS.insert j mempty
-  NCAnd c1 c2 -> neCofVars c1 <> neCofVars c2
-
 -- Alternative hcom and com semantics which shortcuts to term instantiation if
 -- the system is total. We make use of the knowledge that the system argument
 -- comes from the syntax.
@@ -724,9 +718,9 @@ coed r r' topA t = case (frc topA) ^. body of
     VDCon dci sp ->
       VDCon dci (coeindsp r r' ps sp (dci^.fieldTypes))
     t@(VNe _ is) ->
-      VNe (NCoe r r' (rebind topA a) t) (IS.insert r $ IS.insert r' is)
+      VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
     t@(VHCom _ _ _ _ _ is) ->
-      VNe (NCoe r r' (rebind topA a) t) (IS.insert r $ IS.insert r' is)
+      VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
     v@VHole{} ->
       v
     _ ->
@@ -735,7 +729,7 @@ coed r r' topA t = case (frc topA) ^. body of
   -- NOTE: deleting the bound var from is
   a@(VNe _ is) ->
     VNe (NCoe r r' (rebind topA a) t)
-        (IS.insert r $ IS.insert r' $ IS.deleteIVar (topA^.binds) is)
+        (insertI r $ insertI r' $ IS.deleteIVar (topA^.binds) is)
 
 
 {-
@@ -921,7 +915,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
             VHCom r' r (VHTyCon ti psr')
               (WIS sys is)
               (VHDCon di psr' sp s is)
-              (IS.insert r $ IS.insert r' is)
+              (insertI r $ insertI r' is)
 
     -- coe r r' a (fhcom i j (a r) [α k. t k] b) =
     -- fhcom i j (a r') [α k. coe r r' a (t k)] (coe r r' a b)
@@ -934,7 +928,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
         is
 
     t@(VNe n is) ->
-      VNe (NCoe r r' (rebind topA a) t) (IS.insert r $ IS.insert r' is)
+      VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
 
     t@VHole{} ->
       t
@@ -998,7 +992,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
       $ ICHComPath r r' a lhs rhs nts base
 
   a@(VNe n is') ->
-    vhcom r r' a ts base (IS.insert r $ IS.insert r' $ is <> is')
+    vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1011,7 +1005,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
             (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindIFromLazy t) r' r))
             nts
 
-    in vgluety base (WIS sys (IS.insert r (IS.insert r' is)))
+    in vgluety base (WIS sys (insertI r $ insertI r' is))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -1039,7 +1033,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
             (ungluen gr alphasys)
 
     in vglue hcombase alphasys (fib^.body)
-             (IS.insert r $ IS.insert r' ((alphasys^.ivars) <> (betasys^.ivars)))
+             (insertI r $ insertI r' ((alphasys^.ivars) <> (betasys^.ivars)))
 
   VLine a ->
         VLLam
@@ -1061,13 +1055,13 @@ hcomdn r r' topA ts@(WIS nts is) base =
         TTPProject prj  ->
           VDCon dci (hcomindsp r r' a (WIS prj (ts^.ivars)) ps (dci^.conId) 0 sp (dci^.fieldTypes))
         TTPNe (WIS sys is) -> -- NOTE: this "is" is extended with the blocking neutral component's ivars
-          vhcom r r' a (WIS sys is) base (IS.insert r $ IS.insert r' is)
+          vhcom r r' a (WIS sys is) base (insertI r $ insertI r' is)
 
     base@(VNe n is') ->
-      vhcom r r' a ts base (IS.insert r $ IS.insert r' $ is <> is')
+      vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
     base@(VHCom _ _ _ _ _ is') ->
-      vhcom r r' a ts base (IS.insert r $ IS.insert r' $ is <> is')
+      vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
     base@VHole{} -> base
     _            -> impossible
@@ -1075,7 +1069,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
 
   -- "fhcom", hcom on HITs is blocked
   a@(VHTyCon tyinf ps) ->
-    vhcom r r' a ts base (IS.insert r $ IS.insert r' is)
+    vhcom r r' a ts base (insertI r $ insertI r' is)
 
   v@VHole{} -> v
 
@@ -1575,8 +1569,7 @@ instance Force NeCof VCof where
                               (is <> is')
 
 instance Force Val Val where
-  frc t = trace "FRCVAL" $ traceShow t $ traceShow ?cof $ case t of
-
+  frc = \case
     VSub v s                                -> let ?sub = wkSub s in frcS v
     VNe t is               | isUnblocked is -> frc t
     VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
