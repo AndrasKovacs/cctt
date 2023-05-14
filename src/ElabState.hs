@@ -129,7 +129,7 @@ withTopElab :: Elab (IO a) -> IO a
 withTopElab act = do
   st <- getState
   let ?locals = LNil
-      ?cof    = idSub 0
+      ?cof    = emptyNCof
       ?dom    = 0
       ?env    = ENil
       ?srcPos = initialPos (st^.loadState.currentPath)
@@ -162,10 +162,9 @@ bindI :: Name -> Elab (IVar -> a) -> Elab a
 bindI x act =
   let fresh = dom ?cof in
   if  fresh == maxIVar then error "RAN OUT OF IVARS IN ELABORATION" else
-  let ?cof    = setDom (fresh + 1) ?cof `ext` IVar fresh in
+  let ?cof    = lift ?cof in
   let ?locals = LBindI ?locals x in
-  let _ = ?cof in
-  act fresh
+  seq ?cof $ act fresh
 {-# inline bindI #-}
 
 bindCof :: NeCof' -> Elab a -> Elab a

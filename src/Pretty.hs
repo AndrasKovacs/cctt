@@ -14,7 +14,7 @@ import Data.String
 
 import Common
 import CoreTypes
-import Interval
+import Cubical hiding (eq)
 import ElabState hiding (bind, bindI, isNameUsed)
 import qualified Data.LvlMap as LM
 
@@ -147,19 +147,25 @@ int = \case
   I1     -> "1"
   IVar x -> ivar x
 
-cofEq :: PrettyArgs (CofEq -> Txt)
-cofEq (CofEq i j) = int i <> " = " <> int j
+cofEq :: PrettyArgs (I -> I -> Txt)
+cofEq i j = int i <> " = " <> int j
+
+cofNEq :: PrettyArgs (I -> I -> Txt)
+cofNEq i j = int i <> " ≠ " <> int j
 
 necof :: PrettyArgs (NeCof -> Txt)
 necof = \case
-  NCEq i j    -> int i <> " = " <> int j
+  NCEq i j    -> cofEq i j
+  NCNEq i j   -> cofNEq i j
   NCAnd c1 c2 -> necof c1 <> ", " <> necof c2
 
 cof :: PrettyArgs (Cof -> Txt)
 cof = \case
-  CTrue         -> "⊤"
-  CAnd eq CTrue -> cofEq eq
-  CAnd eq c     -> cofEq eq <> " , " <> cof c
+  CTrue          -> "⊤"
+  CEq i j CTrue  -> cofEq i j
+  CEq i j c      -> cofEq i j <> " , " <> cof c
+  CNEq i j CTrue -> cofNEq i j
+  CNEq i j c     -> cofNEq i j <> " , " <> cof c
 
 goSysH :: PrettyArgs (SysHCom -> Txt)
 goSysH = \case
@@ -278,7 +284,9 @@ hdcon inf = if isNameUsed (inf^.name) ?names
   else str (inf^.name)
 
 goSub :: PrettyArgs (Sub -> Txt)
-goSub = foldrSub (\_ i acc -> " " <> int i <> acc) mempty
+goSub (Sub _ _ is) = go is where
+  go ILNil        = mempty
+  go (ILDef is i) = go is <> " " <> int i
 
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case

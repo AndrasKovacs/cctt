@@ -19,7 +19,7 @@ data NeCof
   | NCAnd NeCof NeCof
   deriving Show
 
-data NCof = NCof IVar NCof#
+data NCof = NCof IVar NCof# deriving Eq
 type NCofArg = (?cof :: NCof)
 
 data NeCof' = NeCof' {
@@ -36,6 +36,7 @@ data NCof# =
     NCNil
   | NCLink NCof# I
   | NCRep NCof# IS.Set
+  deriving Eq
 
 makeFields ''NeCof'
 
@@ -58,6 +59,11 @@ instance Show NCof where
       NCNil         -> id
       NCLink is i   -> go (NCof (d - 1) is).sep is.((show (d - 1)++" = "++show i)++)
       NCRep is neqs -> go (NCof (d - 1) is).sep is.((show (d - 1)++" ≠ "++show neqs)++)
+
+instance Show NeCof' where
+  show (NeCof' c c') = show (c, c')
+
+deriving instance Show VCof
 
 instance Lift NCof where
   lift (NCof d is) = NCof (d + 1) (NCRep is mempty)
@@ -92,10 +98,11 @@ orient (!i, !ineq) (!j, !jneq)
 {-# inline orient #-}
 
 -- | Extend with an IVar-constant equation.
-conjFlexRigid# :: NCof -> (IVar, IS.Set) -> I -> NCof
-conjFlexRigid# (NCof d is) (!i, !ineq) j = let
+conjFlexRigidEq# :: NCof -> (IVar, IS.Set) -> I -> NCof
+conjFlexRigidEq# (NCof d is) (!i, !ineq) j = let
 
-  -- The Rep-s below i that are inequal to i are updated to be inequal to j.
+  -- Update:
+  --   - neq links from i to x --> neq links from x to j
   belowI :: NCof -> IS.Set -> I -> NCof#
   belowI (NCof d is) ineq j = case is of
     NCNil ->
@@ -133,14 +140,17 @@ conjFlexFlexEq# (NCof d is) (!i, !ineqs) (!j, !jneqs) = let
 
   -- Update
   --   - The neqset of i is merged with the weakening of the neqset of j
-  downToI :: NCof -> IVar -> IS.Set -> NCof#
-  downToI (NCof d is) i jneqs = case (is, i) of
+  --   - every neq link from j to x --> new link from x to i
+  downToI :: NCof -> IVar -> IVar -> IS.Set -> NCof#
+  downToI (NCof d is) i topi jneqs = case (is, i) of
     (NCRep is neqs, 0) ->
       NCRep is (neqs <> jneqs)
     (NCRep is neqs, i) ->
-      NCRep (downToI (NCof (d - 1) is) (i - 1) (IS.deleteIVar (d - 1) jneqs)) neqs
+      let neqs' | IS.memberIVar (d - 1) jneqs = IS.insertIVar topi neqs
+                | otherwise                   = neqs
+      in NCRep (downToI (NCof (d - 1) is) (i - 1) topi (IS.deleteIVar (d - 1) jneqs)) neqs'
     (NCLink is l, i) ->
-      NCLink (downToI (NCof (d - 1) is) (i - 1) (IS.deleteIVar (d - 1) jneqs)) l
+      NCLink (downToI (NCof (d - 1) is) (i - 1) topi (IS.deleteIVar (d - 1) jneqs)) l
     _ ->
       impossible
 
@@ -151,9 +161,9 @@ conjFlexFlexEq# (NCof d is) (!i, !ineqs) (!j, !jneqs) = let
   downToJ :: NCof -> IVar -> IVar -> IVar -> IVar -> IS.Set -> NCof#
   downToJ (NCof d is) i topi j topj jneqs = case (is, j) of
     (NCRep is _, 0) ->
-      NCLink (downToI (NCof (d - 1) is) (i - 1) jneqs) (IVar topi)
+      NCLink (downToI (NCof (d - 1) is) (i - 1) topi jneqs) (IVar topi)
     (NCRep is neqs, j) ->
-      let neqs' | IS.memberIVar topj neqs = IS.insertIVar i $ IS.deleteIVar topj neqs
+      let neqs' | IS.memberIVar topj neqs = IS.insertIVar topi $ IS.deleteIVar topj neqs
                 | otherwise               = neqs
       in NCRep (downToJ (NCof (d - 1) is) (i - 1) topi (j - 1) topj jneqs) neqs'
     (NCLink is l, j) ->
@@ -188,7 +198,7 @@ eq# (!i, !ineq) (!j, !jneq)
       | IS.member j ineq ->
         VCFalse
       | otherwise ->
-        VCNe (NeCof' (conjFlexRigid# ?cof (i,ineq) j)
+        VCNe (NeCof' (conjFlexRigidEq# ?cof (i,ineq) j)
                      (NCEq (IVar i) j))
              (IS.insertIVar i mempty)
 
@@ -196,7 +206,7 @@ eq# (!i, !ineq) (!j, !jneq)
       | IS.member i jneq ->
         VCFalse
       | otherwise ->
-        VCNe (NeCof' (conjFlexRigid# ?cof (j,jneq) i)
+        VCNe (NeCof' (conjFlexRigidEq# ?cof (j,jneq) i)
                      (NCEq i (IVar j)))
              (IS.insertIVar j mempty)
 
@@ -225,21 +235,21 @@ neq# (!i, !ineq) (!j, !jneq)
           | IS.member (IVar i) jneq ->
             VCTrue
           | otherwise ->
-            VCNe (NeCof' (conjFlexNEq# ?cof (IVar i) j) (NCEq (IVar i) (IVar j)))
+            VCNe (NeCof' (conjFlexNEq# ?cof (IVar i) j) (NCNEq (IVar i) (IVar j)))
                  (IS.insertIVar i $ IS.insertIVar j mempty)
 
     (IVar i, j)
       | IS.member j ineq ->
         VCTrue
       | otherwise ->
-        VCNe (NeCof' (conjFlexNEq# ?cof j i) (NCEq (IVar i) j))
+        VCNe (NeCof' (conjFlexNEq# ?cof j i) (NCNEq (IVar i) j))
              (IS.insertIVar i mempty)
 
     (i, IVar j)
       | IS.member i jneq ->
         VCTrue
       | otherwise ->
-        VCNe (NeCof' (conjFlexNEq# ?cof i j) (NCEq i (IVar j)))
+        VCNe (NeCof' (conjFlexNEq# ?cof i j) (NCNEq i (IVar j)))
              (IS.insertIVar j mempty)
 
     _ -> VCTrue
@@ -250,6 +260,51 @@ conjNeCof = \case
   NCEq i j    -> case eq  i j of VCNe (NeCof' nc  _) _ -> nc; _ -> impossible
   NCNEq i j   -> case neq i j of VCNe (NeCof' nc  _) _ -> nc; _ -> impossible
   NCAnd c1 c2 -> let ?cof = conjNeCof c1 in conjNeCof c2
+
+assumeNeCof :: NeCof -> (NCofArg => a) -> (NCofArg => a)
+assumeNeCof nc act = let ?cof = conjNeCof nc in act
+{-# inline assumeNeCof #-}
+
+idNCof :: IVar -> NCof
+idNCof i = NCof i (go i NCNil) where
+  go 0 acc = acc
+  go i acc = go (i - 1) (NCRep acc mempty)
+
+emptyNCof :: NCof
+emptyNCof = NCof 0 NCNil
+
+quoteNCof :: NCof -> Cof
+quoteNCof = go CTrue where
+  go :: Cof -> NCof -> Cof
+  go acc (NCof d is) = case is of
+    NCNil -> acc
+    NCRep is neqs -> go (IS.foldl (\c i -> CNEq (IVar (d - 1)) i c) acc neqs)
+                        (NCof (d - 1) is)
+    NCLink is j   -> go (CEq (IVar (d - 1)) j acc) (NCof (d - 1) is)
+
+reverseCof :: Cof -> Cof
+reverseCof = go CTrue where
+  go acc CTrue        = acc
+  go acc (CEq i j c)  = go (CEq i j acc) c
+  go acc (CNEq i j c) = go (CNEq i j acc) c
+
+-- | Validity:
+--    - Every eq/neq link goes downwards.
+validNCof :: NCof -> Bool
+validNCof = go where
+
+  validI :: IVar -> I -> Bool
+  validI i (IVar j) = j < i
+  validI _ _        = True
+
+  go :: NCof -> Bool
+  go (NCof d is) = case is of
+    NCNil         -> True
+    NCLink is j   -> validI (d - 1) j && go (NCof (d - 1) is)
+    NCRep is neqs -> IS.foldr (\i b -> validI (d - 1) i && b)
+                              (go (NCof (d - 1) is)) neqs
+
+-- TODO: additional validation: tripping through quote and evalCof
 
 ----------------------------------------------------------------------------------------------------
 
@@ -322,3 +377,5 @@ isUnblockedS is = IS.foldrAccum
   (mempty, ?sub, ?cof)
   False
   (IS.delete01 is)
+
+----------------------------------------------------------------------------------------------------

@@ -6,6 +6,7 @@ module Common (
   , module Data.IORef
   , module GHC.Exts
   , module GHC.Word
+  , module Text.Show
   , SourcePos(..)
   , sourcePosPretty
   , initialPos
@@ -30,6 +31,7 @@ import Data.Flat
 import IO (runIO)
 import GHC.IO
 import GHC.Word
+import Text.Show
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------

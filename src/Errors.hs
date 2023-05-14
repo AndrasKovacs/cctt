@@ -7,7 +7,7 @@ import Data.List
 import Common
 import CoreTypes
 import ElabState
-import Interval
+import Cubical
 import Pretty
 
 data Error

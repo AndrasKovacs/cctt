@@ -12,9 +12,9 @@ import Data.List
 import qualified Data.List.Split as List
 
 import Common hiding (debug)
-import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalSys, evalBoundary)
+import Core hiding (bindI, bindCof, define, eval, evalSys, evalBoundary)
 import CoreTypes
-import Interval
+import Cubical hiding (evalCof, evalI)
 import Quotation
 import ElabState
 import Errors
@@ -23,6 +23,7 @@ import Parser
 import qualified Common
 import qualified Conversion
 import qualified Core
+import qualified Cubical
 import qualified Presyntax as P
 import qualified Data.LvlMap as LM
 
@@ -76,10 +77,10 @@ instantiate t i = let ?sub = idSub (dom ?cof) `ext` i; ?recurse = DontRecurse
                   in Core.eval t
 
 evalCof :: NCofArg => Cof -> VCof
-evalCof cof = let ?sub = idSub (dom ?cof) in Core.evalCof cof
+evalCof cof = let ?sub = idSub (dom ?cof) in Cubical.evalCof cof
 
 evalI :: NCofArg => I -> I
-evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
+evalI i = let ?sub = idSub (dom ?cof) in Cubical.evalI i
 
 debug :: PrettyArgs [String] -> Elab (IO ())
 debug x = withPrettyArgs (Common.debug x)
@@ -1106,7 +1107,7 @@ guardTopShadowing x = do
 evalHCaseBoundary :: EvalArgs (Sys -> NamedClosure -> CaseTag -> EvalClosure HCases -> VSys)
 evalHCaseBoundary bnd casety tag casecl = case bnd of
   SEmpty          -> vsempty
-  SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety tag casecl)
+  SCons cof t bnd -> vscons (Cubical.evalCof cof) (hcase (eval t) casety tag casecl)
                             (evalHCaseBoundary bnd casety tag casecl)
 
 neSysCompat :: Elab (Recurse -> Tm -> NeSys -> IO ())
