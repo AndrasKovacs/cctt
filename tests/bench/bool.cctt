@@ -21,4 +21,4 @@ negIso : iso Bool Bool :=
   , λ[false. refl; true. refl]
   , λ[false. refl; true. refl];
 
-negPath : Bool = Bool := isoToPath Bool Bool negIso;
+negPath : Bool = Bool := ua Bool Bool (isoToEquiv Bool Bool negIso);
