@@ -825,7 +825,6 @@ elabCases params b cons cs = case (cons, cs) of
 -- HIT case
 ----------------------------------------------------------------------------------------------------
 
-
 elabHCase' :: Elab (Env -> HDConInfo -> Env -> Sub -> [Name] -> [Name] -> NamedClosure -> P.Tm -> IO Tm)
 elabHCase' params ~inf typarams sub ifields_ xs ~casety body = case (ifields_, xs) of
   ([], []) -> do
@@ -834,7 +833,7 @@ elabHCase' params ~inf typarams sub ifields_ xs ~casety body = case (ifields_, x
     check body rhsty
   (_:ifields, x:xs) -> do
     bindI x \_ ->
-      elabHCase' params inf typarams (liftSub sub) ifields xs casety body
+      elabHCase' params inf typarams (lift sub) ifields xs casety body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
@@ -976,13 +975,11 @@ isConstantU t = bindI "i" \i -> case frc (t ∙ IVar i) of
 
 --------------------------------------------------------------------------------
 
-checkCofEq :: Elab (P.CofEq -> IO CofEq)
-checkCofEq (P.CofEq t u) = CofEq <$!> checkI t <*!> checkI u
-
 checkCof :: Elab (P.Cof -> IO Cof)
 checkCof = \case
   P.CTrue       -> pure CTrue
-  P.CAnd eq cof -> CAnd <$!> checkCofEq eq <*!> checkCof cof
+  P.CEq  i j cof -> CEq  <$!> checkI i <*!> checkI j <*!> checkCof cof
+  P.CNEq i j cof -> CNEq <$!> checkI i <*!> checkI j <*!> checkCof cof
 
 -- Systems
 ----------------------------------------------------------------------------------------------------
@@ -1132,7 +1129,7 @@ checkHCaseBoundary' ~inf rc params sub is body casety tag casecl = case is of
       VSNe (WIS sys _) -> neSysCompat rc body sys
 
   x:is ->
-    bindI x \_ -> checkHCaseBoundary' inf rc params (liftSub sub) is body casety tag casecl
+    bindI x \_ -> checkHCaseBoundary' inf rc params (lift sub) is body casety tag casecl
 
 checkHCaseBoundary :: Elab (  HDConInfo -> Recurse -> Env -> Sub -> Tel -> [Name] -> [Name]
                            -> Tm -> NamedClosure -> CaseTag -> EvalClosure HCases -> IO ())

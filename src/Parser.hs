@@ -128,12 +128,18 @@ int = intLit
   <|> (ILvl <$!> (C.char '@' *> (coerce decimal)))
   <|> (Ident <$!> ident)
 
-cofEq :: Parser CofEq
-cofEq = CofEq <$!> int <*!> (char '=' *> int)
-
 -- TODO: do we even need CTrue anywhere?
 cof :: Parser Cof
-cof = CAnd <$!> cofEq <*!> ((char ',' *> cof) <|> pure CTrue)
+cof = do
+  i <- int
+  branch (char '=')
+    (\_ -> do j <- int
+              c <- ((char ',' *> cof) <|> pure CTrue)
+              pure (CEq i j c))
+    (do char '≠'
+        j <- int
+        c <- ((char ',' *> cof) <|> pure CTrue)
+        pure (CNEq i j c))
 
 goSys' :: Parser Sys
 goSys' =
