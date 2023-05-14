@@ -357,14 +357,22 @@ evalCof = \case
 ----------------------------------------------------------------------------------------------------
 
 isUnblocked :: NCofArg => IS.Set -> Bool
-isUnblocked is = IS.foldrAccum
-  (\x hyp (!varset, !cof) ->
-     matchIVar (appNCof cof x)
-       (\x -> IS.memberIVar x varset || hyp (IS.insertIVar x varset // cof))
-       True)
-  (mempty, ?cof)
-  False
-  (IS.delete01 is)
+isUnblocked is =
+ let res =
+       IS.foldrAccum
+       (\x hyp (!varset, !cof) ->
+          matchIVar (appNCof cof x)
+            (\x -> IS.memberIVar x varset || hyp (IS.insertIVar x varset // cof))
+            True)
+       (mempty, ?cof)
+       False
+       (IS.delete01 is)
+ in
+  trace "ISUNBLOCKED" $
+  traceShow is $
+  traceShow ?cof $
+  traceShow res $
+  res
 
 isUnblockedS :: SubArg => NCofArg => IS.Set -> Bool
 isUnblockedS is = IS.foldrAccum

@@ -1575,7 +1575,8 @@ instance Force NeCof VCof where
                               (is <> is')
 
 instance Force Val Val where
-  frc t = case t of
+  frc t = trace "FRCVAL" $ traceShow t $ traceShow ?cof $ case t of
+
     VSub v s                                -> let ?sub = wkSub s in frcS v
     VNe t is               | isUnblocked is -> frc t
     VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))

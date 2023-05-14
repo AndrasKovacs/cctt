@@ -1,34 +1,71 @@
 
-import basics;
+-- isEquiv (A B : U)(f : A → B) : U :=
+--     (g    : B → A)
+--   × (linv : (x : A) → g (f x) = x)
+--   × (rinv : (x : B) → f (g x) = x)
+--   × (coh  : (x : A) → (rinv (f x)) ={i. f (linv x i) = f x} refl);
 
-inductive Bool := false | true;
+-- equiv (A B : U) : U :=
+--   (f : A → B) × isEquiv A B f;
 
-falseNeqTrue : not (false = true) :=
-  λ p. coe 0 1 (i. case (p i) [false. Top; true. Bot]) tt;
+-- idEquiv (A : U) : equiv A A :=
+--   (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
 
-negBool : Bool → Bool := λ[false. true; true. false];
+-- ua (A B : U)(f : equiv A B) : A = B :=
+--   λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
 
-negIso : iso Bool Bool :=
-    negBool
-  , negBool
-  , λ[false. refl; true. refl]
-  , λ[false. refl; true. refl];
+test (A : U)(x : Glue A [])(j : I) := coe 0 j (i. Glue A [i=1. (A,?_)]) x;
 
-negPath : Bool = Bool := isoToPath Bool Bool negIso;
 
-higher inductive S¹ :=
-     base
-   | loop (i : I) [i=0. base; i=1. base];
+-- VHCom I0 (IVar 0)
+--      (VNe (NSub (NLocalVar 0) (1,2,[IVar 0,IVar 0])) [])
+--      (WIS {withISBody = NSHEmpty, withISIvars = []})
+--      (VNe (NCoe I0 (IVar 0)
+--              (BindI {bindIName = "i", bindIBinds = 1, bindIBody = VNe (NLocalVar 0) []})
+--              (VNe (NUnglue (NLocalVar 1) NSEmpty) [])) [I0,IVar 0])
+--      [I0,IVar 0]
 
-loop' : base = base := λ i. loop i;
+-- [0 = I1 | 1 = I1 | 2 ≠ []]
 
-F : S¹ → U := λ[
-  base. Bool;
-  loop i. negPath i];
 
-test : Bool = Bool := λ i. F (loop i);
 
-loopNeqRefl (p : loop' = refl) : Bot :=
-  let lem1 : ap F loop' = refl := ap (λ q. ap F q) p;
-  let lem2 : false = true := ap (λ p. coe 0 1 p true) lem1;
-  falseNeqTrue lem2;
+
+
+
+
+
+
+
+
+
+
+-- coe01isEquivNf (A : I → U) : isEquiv (A 0) (A 1)  (λ x. coe 0 1 A x) :=
+
+--   (λ x. coe 1 0 A x
+
+-- , λ x {coe 1 0 A (coe 0 1 A x)} {x} j. hcom 0 1 (A 0) [j = 0 k. coe k 0 A (coe 0 k A x); j = 1 k. x] x
+
+-- , λ x {coe 0 1 A (coe 1 0 A x)} {x} j. hcom 1 0 (A 1) [j = 0 k. coe k 1 A (coe 1 k A x); j = 1 k. x] x
+
+-- , λ x {λ {coe 0 1 A (coe 1 0 A (coe 0 1 A x))} {coe 0 1 A x} j.
+--           hcom 1 0 (A 1) [j = 0 k. coe k 1 A (coe 1 k A (coe 0 1 A x))
+--                         ; j = 1 k. coe 0 1 A x] (coe 0 1 A x)}
+--          {λ {coe 0 1 A x} {coe 0 1 A x} _. coe 0 1 A x}
+--          l
+--          {coe 0 1 A (hcom 0 1 (A 0) [l = 0 k. coe k 0 A (coe 0 k A x); l = 1 k. x] x)}
+--          {coe 0 1 A x}
+--          k.
+--          hcom 0 1 (A 1) [k = 0 i. coe i 1 A (coe 0 i A (
+--                                       hcom 0 i (A 0) [l = 0 k1. coe k1 0 A (coe 0 k1 A x); l = 1 k1. x] x))
+--                        ; k = 1 i. coe i 1 A (coe 0 i A x)
+--                        ; l = 0 i. coe i 1 A (
+--                                       hcom i 0 (A i) [k = 0 k1. coe k1 i A (coe i k1 A (coe 0 i A x))
+--                                                     ; k = 1 k1. coe 0 i A x] (coe 0 i A x))
+--                        ; l = 1 i. coe i 1 A (coe 0 i A x)]
+--                        (coe 0 1 A x));
+
+-- pathToEquiv (A B : U)(p : A = B) : equiv A B :=
+--   ((λ x. coe 0 1 p x), coe01isEquivNf (λ i. p i));
+
+-- uaTrip (A B : U)(f : equiv A B) : equiv A B :=
+--   pathToEquiv A B (ua A B f);

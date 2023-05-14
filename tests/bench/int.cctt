@@ -22,9 +22,9 @@ sucℤ : ℤ → ℤ := λ[
   pos u. pos (suc u);
   neg v. case v [zero. pos zero; suc n. neg n]];
 
-predsucℤ : (x : ℤ) → x = predℤ (sucℤ x) := λ[
+predsucℤ : (x : ℤ) → predℤ (sucℤ x) = x := λ[
   pos u. refl;
-  neg v. case v (v. neg v = predℤ (sucℤ (neg v))) [
+  neg v. case v (v. predℤ (sucℤ (neg v)) = neg v) [
     zero.  refl;
     suc n. refl]
   ];
