@@ -742,7 +742,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   sysr = [(α r). (T r, f r)]    -- instantiate system to r
 
   ar' : Ar'
-  ar' := com r r' (i. A i) [(∀i.α) i. f i (coe r i (i.T i) gr)] (unglue gr sysr)
+  ar' := gcom r r' (i. A i) [(∀i.α) i. f i (coe r i (i.T i) gr)] (unglue gr sysr)
 
   working under (α r'), mapping over the [(α r'). (T r', f r')] system, producing two output systems:
 
@@ -764,18 +764,18 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
             ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
 
     fibval* : Tr'
-    fibval* = hcom 0 1 Tr' valSys fibval
+    fibval* = ghcom 0 1 Tr' valSys fibval
 
     -- this should be a metatheoretic (I → Ar') function, because we only need it applied
-    -- to the "i" variable in the end result. For clarity though, it's good to write it as a path here.
+    -- to the "j" variable in the end result. For clarity though, it's good to write it as a path here.
 
     fibpath* : fr' fibval = ar'
     fibpath* = λ j.
-       hcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
-                    ;j=1    i. ar'                                 -- it's independent from j=0
-                    ;r=r'   i. fr'.coh gr i j
-                    ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
-                    (fibpath {fr' fibval} {ar'} j)
+       ghcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
+                     ;j=1    i. ar'                                 -- it's independent from j=0
+                     ;r=r'   i. fr'.coh gr i j
+                     ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
+                     (fibpath {fr' fibval} {ar'} j)
 
     -- one output system is a NeSys containing fibval*
     -- the other is NeSysHCom with fibpath* applied to the binder
@@ -796,7 +796,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     topSysr'f    = frc topSysr'
 
   -- ar' : Ar'
-  -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
+  -- ar' := gcom r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
     ~ar' = hcomdn r r' _Ar'
              (mapNeSysHCom'
                 (\i tf -> coe i r' a (  proj1 "f" (proj2 "Ty" (tf ∙ i))
@@ -848,12 +848,12 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
 
       -- fibval* : Tr'
-      -- fibval* = hcom 0 1 Tr' valSys fibval
+      -- fibval* = ghcom 0 1 Tr' valSys fibval
       ~fibval' = hcomd I0 I1 tr' valSys fibval
 
       -- fibpath* : fr' fibval = ar'
       -- fibpath* = λ j.
-      --    hcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
+      --   ghcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
       --                 ;j=1    i. ar'                                 -- it's independent from j=0
       --                 ;r=r'   i. fr'.coh gr i j
       --                 ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
@@ -1097,13 +1097,33 @@ hcomn r r' ~a ~sys ~b
 
 -- | Off-diagonal HCom.
 hcomd :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
-hcomd r r' ~a ~sys ~b = case sys of
+hcomd r r' ~a sys ~b = case sys of
   VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
   VSHNe sys  -> hcomdn r r' a sys b
 {-# inline hcomd #-}
 
 
--- EVIL CORNER (don't use the evil versions, they're bogus)
+-- ghcom
+----------------------------------------------------------------------------------------------------
+
+-- | Make a system total.
+totalize :: NeSysHCom' -> Val -> NeSysHCom'
+totalize sys ~base = uf
+
+-- | Off-diagonal ghcom with neutral system input.
+ghcomdn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val
+ghcomdn r r' ~a sys base = case sys^.body of
+  NSHEmpty -> runIO (bumpHCom >> pure base)
+  _        -> hcomdn r r' a (totalize sys base) base
+{-# inline ghcomdn #-}
+
+-- | Off-diagonal ghcom.
+ghcomd :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
+ghcomd r r' ~a sys ~base = case sys of
+  VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
+  VSHNe sys  -> ghcomdn r r' a sys base
+{-# inline ghcomd #-}
+
 --------------------------------------------------------------------------------
 
 vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IS.Set -> Val
@@ -1121,31 +1141,6 @@ vglue = VGlue
 nunglue :: Ne -> NeSys -> Ne
 nunglue = NUnglue
 {-# inline nunglue #-}
-
--- vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IS.Set -> Val
--- vhcom r r' a sys base ~is = case sys^.body of
---   NSHEmpty -> base
---   _        -> VHCom r r' a sys base is
--- {-# inline vhcom #-}
-
--- vgluety :: VTy -> NeSys' -> Val
--- vgluety ~a sys = case sys^.body of
---   NSEmpty -> a
---   _       -> VGlueTy a sys
--- {-# inline vgluety #-}
-
--- vglue :: Val -> NeSys' -> NeSys -> IS.Set -> Val
--- vglue t eqs fibs is = case eqs^.body of
---   NSEmpty -> t
---   _       -> VGlue t eqs fibs is
--- {-# inline vglue #-}
-
--- nunglue :: Ne -> NeSys -> Ne
--- nunglue t sys = case sys of
---   NSEmpty -> t
---   _       -> NUnglue t sys
--- {-# inline nunglue #-}
-
 
 --------------------------------------------------------------------------------
 

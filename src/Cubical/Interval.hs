@@ -7,15 +7,19 @@ import Common
 -- Interval expressions are 64 bits: I0 is 0, I1 is 1, any other value N
 -- represents IVar (n - 2).
 
--- We use 64-bit bitsets of I-s in cofibrations, where we spend 0 and 1 on
--- constants, so the largest representable IVar is 61.
+-- We use 64-bit bitsets of IVar-s.
 maxIVar :: IVar
-maxIVar = 61
+maxIVar = 63
 {-# inline maxIVar #-}
 
 -- data I = I0 | I1 | IVar IVar
 newtype I = I {unI :: Word}
   deriving Eq
+
+-- | Unsafely flip an I which is known to be 0 or 1.
+flip# :: I -> I
+flip# (I w) = I (1 - w)
+{-# inline flip# #-}
 
 unpackI# :: I -> (# (# #) | (# #) | Word# #)
 unpackI# (I (W# x)) = case x of

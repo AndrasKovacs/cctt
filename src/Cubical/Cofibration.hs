@@ -5,7 +5,7 @@ import Common
 import Cubical.Interval
 import Cubical.Substitution
 
-import qualified Data.ISet as IS
+import qualified Data.IVarSet as IS
 
 ----------------------------------------------------------------------------------------------------
 
@@ -69,27 +69,29 @@ instance Lift NCof where
   lift (NCof d is) = NCof (d + 1) (NCRep is mempty)
   {-# inline lift #-}
 
-lookupNCof# :: NCof -> IVar -> (I, IS.Set)
-lookupNCof# (NCof d is) i = go (NCof d is) (d - i - 1) where
-  go (NCof d is) i = case (is, i) of
-    (NCLink is i , 0) -> appNCof# (NCof (d - 1) is) i
-    (NCRep _ neqs, 0) -> IVar (d - 1) // neqs
-    (NCLink is _ , i) -> go (NCof (d - 1) is) (i - 1)
-    (NCRep is _  , i) -> go (NCof (d - 1) is) (i - 1)
-    _                 -> impossible
+lookupNCof :: IVar -> NCof -> I
+lookupNCof i (NCof d is) = case is of
+  NCLink is j | d - 1 == i -> j
+              | True       -> lookupNCof i (NCof (d - 1) is)
+  NCRep is _  | d - 1 == i -> IVar i
+              | True       -> lookupNCof i (NCof (d - 1) is)
+  _                        -> impossible
 
-lookupNCof :: NCof -> IVar -> I
-lookupNCof ncof i = fst (lookupNCof# ncof i)
-{-# inline lookupNCof #-}
-
--- | Note: the IS.Set is only meaningful when the result is IVar.
-appNCof# :: NCof -> I -> (I, IS.Set)
-appNCof# ncof i = matchIVar i (lookupNCof# ncof) (i // mempty)
-{-# inline appNCof# #-}
+lookupNCof# :: IVar -> NCof -> (I, IS.Set)
+lookupNCof# i (NCof d is) = case is of
+  NCLink is j  | d - 1 == i -> appNCof# (NCof (d - 1) is) j
+               | True       -> lookupNCof# i (NCof (d - 1) is)
+  NCRep is neq | d - 1 == i -> (IVar i, neq)
+               | True       -> lookupNCof# i (NCof (d - 1) is)
+  _                         -> impossible
 
 appNCof :: NCof -> I -> I
-appNCof ncof i = fst (appNCof# ncof i)
+appNCof ncof i = matchIVar i (\i -> lookupNCof i ncof) i
 {-# inline appNCof #-}
+
+appNCof# :: NCof -> I -> (I, IS.Set)
+appNCof# ncof i = matchIVar i (\i -> lookupNCof# i ncof) (i, mempty)
+{-# inline appNCof# #-}
 
 orient :: (IVar, IS.Set) -> (IVar, IS.Set) -> ((IVar, IS.Set), (IVar, IS.Set))
 orient (!i, !ineq) (!j, !jneq)
@@ -98,83 +100,118 @@ orient (!i, !ineq) (!j, !jneq)
 {-# inline orient #-}
 
 -- | Extend with an IVar-constant equation.
-conjFlexRigidEq# :: NCof -> (IVar, IS.Set) -> I -> NCof
-conjFlexRigidEq# (NCof d is) (!i, !ineq) j = let
+conjFlexRigidEq# :: NCof -> IVar -> I -> NCof
+conjFlexRigidEq# (NCof d is) i j = let
 
-  -- Update:
-  --   - neq links from i to x --> neq links from x to j
-  belowI :: NCof -> IS.Set -> I -> NCof#
-  belowI (NCof d is) ineq j = case is of
+  updRes :: IVar -> I -> (NCof#, IS.Set, IS.Set) -> (NCof#, IS.Set, IS.Set)
+  updRes x j (is, s0, s1) = case j of
+    I0 -> (,,) $$! NCLink is I0 $$! IS.insert x s0 $$! s1
+    I1 -> (,,) $$! NCLink is I1 $$! s0 $$! IS.insert x s1
+    _  -> impossible
+  {-# inline updRes #-}
+
+  belowI :: NCof -> IS.Set -> IS.Set -> (NCof#, IS.Set, IS.Set)
+  belowI (NCof d is) s0 s1 = case is of
     NCNil ->
-      NCNil
+      (NCNil, s0, s1)
+
     NCLink is l ->
-      NCLink (belowI (NCof (d - 1) is) ineq j) l
+      case belowI (NCof (d - 1) is) s0 s1 of
+        (is, s0, s1) ->
+          let l' = matchIVar l (\case x | IS.member x s0 -> I0
+                                        | IS.member x s1 -> I1
+                                        | True           -> l) l
+          in (,,) $$! NCLink is l' $$! s0 $$! s1
+
     NCRep is neqs ->
-      let neqs' | IS.memberIVar (d - 1) ineq = IS.insert j neqs
-                | otherwise                  = neqs
-      in NCRep (belowI (NCof (d - 1) is) ineq j) neqs'
+      let curr = d - 1
+          (!s0', !s1') | IS.member curr s0 = (s0 // (neqs <> s1))
+                       | IS.member curr s1 = ((neqs <> s0) // s1)
+                       | True              = (s0, s1)
+      in case belowI (NCof curr is) s0' s1' of
+        res@(is, s0, s1)
+          | IS.member curr s0 || not (IS.null (IS.intersect neqs s1)) -> updRes curr I0 res
+          | IS.member curr s1 || not (IS.null (IS.intersect neqs s0)) -> updRes curr I1 res
+          | True                                                      -> (NCRep is neqs, s0, s1)
 
-  -- Update:
-  --  - all links to i to j
-  --  - all neq links to i to j
-  downToI :: NCof -> IVar -> IVar -> IS.Set -> I -> NCof#
-  downToI (NCof d is) i topi ineq j = case (is, i) of
-    (NCRep is _, 0) ->
-      NCLink (belowI (NCof (d - 1) is) ineq j) j
-    (NCRep is neqs, i) ->
-      let neqs' | IS.memberIVar topi neqs = IS.insert j $ IS.deleteIVar topi neqs
-                | otherwise               = neqs
-      in NCRep (downToI (NCof (d - 1) is) (i - 1) topi ineq j) neqs'
-    (NCLink is l, i) ->
-      let l' | l == IVar topi = j
-             | otherwise      = l
-      in NCLink (downToI (NCof (d - 1) is) (i - 1) topi ineq j) l'
-    _ ->
+  toI :: NCof -> IVar -> I -> (NCof#, IS.Set, IS.Set)
+  toI (NCof d is) i j = case is of
+    NCNil ->
       impossible
 
-  in NCof d (downToI (NCof d is) (d - i - 1) i ineq j)
+    NCLink is l ->
+      case toI (NCof (d - 1) is) i j of
+        (is, s0, s1) ->
+          let l' = matchIVar l (\case x | IS.member x s0 -> I0
+                                        | IS.member x s1 -> I1
+                                        | True           -> l) l
+          in (,,) $$! NCLink is l' $$! s0 $$! s1
 
--- | Extend a cof with an IVar-IVar equation.
-conjFlexFlexEq# :: NCof -> (IVar, IS.Set) -> (IVar, IS.Set) -> NCof
-conjFlexFlexEq# (NCof d is) (!i, !ineqs) (!j, !jneqs) = let
+    NCRep is neqs
+      | d - 1 == i ->
+        let (!s0, !s1) | j == I0 = (IS.insert i mempty // neqs)
+                       | True    = (neqs // IS.insert i mempty)
+        in case belowI (NCof (d - 1) is) s0 s1 of
+          (is, s0, s1) -> (NCLink is j, s0, s1)
 
-  -- Update
-  --   - The neqset of i is merged with the weakening of the neqset of j
-  --   - every neq link from j to x --> new link from x to i
-  downToI :: NCof -> IVar -> IVar -> IS.Set -> NCof#
-  downToI (NCof d is) i topi jneqs = case (is, i) of
-    (NCRep is neqs, 0) ->
-      NCRep is (neqs <> jneqs)
-    (NCRep is neqs, i) ->
-      let neqs' | IS.memberIVar (d - 1) jneqs = IS.insertIVar topi neqs
-                | otherwise                   = neqs
-      in NCRep (downToI (NCof (d - 1) is) (i - 1) topi (IS.deleteIVar (d - 1) jneqs)) neqs'
-    (NCLink is l, i) ->
-      NCLink (downToI (NCof (d - 1) is) (i - 1) topi (IS.deleteIVar (d - 1) jneqs)) l
-    _ ->
+      | True ->
+        let curr = d - 1
+        in case toI (NCof curr is) i j of
+          res@(is, s0, s1)
+            | not $ IS.null $ IS.intersect neqs s0 -> updRes curr I1 res
+            | not $ IS.null $ IS.intersect neqs s1 -> updRes curr I0 res
+            | True                                 -> (NCRep is neqs, s0, s1)
+
+  in case toI (NCof d is) i j of
+    (is, _, _) -> NCof d is
+
+
+-- | Extend with an IVar-IVar equation
+conjFlexFlexEq# :: NCof -> IVar -> (IVar, IS.Set) -> NCof
+conjFlexFlexEq# (NCof d is) i (!j, !jneq) = let
+
+  toI :: NCof -> IVar -> IS.Set -> NCof#
+  toI (NCof d is) i jneq = case is of
+    NCNil ->
       impossible
+    NCLink is l ->
+      NCLink (toI (NCof (d - 1) is) i jneq) l
+    NCRep is neqs
+      | d - 1 == i ->
+        NCRep is (neqs <> jneq)
+      | True ->
+        let neqs' | IS.member (d - 1) jneq = IS.insert i neqs
+                  | True                   = neqs
+        in NCRep (toI (NCof (d - 1) is) i (IS.delete (d - 1) jneq)) neqs'
 
-  -- Update
-  --   - j to a link to i
-  --   - every link to j to i
-  --   - every neq link to j to a neq link to i
-  downToJ :: NCof -> IVar -> IVar -> IVar -> IVar -> IS.Set -> NCof#
-  downToJ (NCof d is) i topi j topj jneqs = case (is, j) of
-    (NCRep is _, 0) ->
-      NCLink (downToI (NCof (d - 1) is) (i - 1) topi jneqs) (IVar topi)
-    (NCRep is neqs, j) ->
-      let neqs' | IS.memberIVar topj neqs = IS.insertIVar topi $ IS.deleteIVar topj neqs
-                | otherwise               = neqs
-      in NCRep (downToJ (NCof (d - 1) is) (i - 1) topi (j - 1) topj jneqs) neqs'
-    (NCLink is l, j) ->
-      let l' | l == IVar topj = IVar topi
-             | otherwise      = l
-      in NCLink (downToJ (NCof (d - 1) is) (i - 1) topi (j - 1) topj jneqs) l'
-    _ ->
+  toJ :: NCof -> IVar -> IVar -> IS.Set -> NCof#
+  toJ (NCof d is) i j jneq = case is of
+    NCNil ->
       impossible
+    NCLink is l ->
+      let l' | l == IVar j = IVar i
+             | True        = l
+      in NCLink (toJ (NCof (d - 1) is) i j jneq) l'
+    NCRep is neqs
+      | d - 1 == j ->
+        NCLink (toI (NCof (d - 1) is) i jneq) (IVar i)
+      | True ->
+        let neqs' | IS.member j neqs = IS.insert i $ IS.delete j neqs
+                  | True             = neqs
+        in NCRep (toJ (NCof (d - 1) is) i j jneq) neqs'
 
-  in NCof d (downToJ (NCof d is) (d - i - 1) i (d - j - 1) j jneqs)
+  in NCof d (toJ (NCof d is) i j jneq)
 
+
+-- | Extend with an IVar-IVar inequality
+conjFlexFlexNEq# :: NCof -> IVar -> IVar -> NCof
+conjFlexFlexNEq# (NCof d is) i j = NCof d (go (NCof d is) i j) where
+  go :: NCof -> IVar -> IVar -> NCof#
+  go (NCof d is) i j = case is of
+    NCNil         -> impossible
+    NCLink is l   -> NCLink (go (NCof (d - 1) is) i j) l
+    NCRep is neqs -> if d - 1 == j then NCRep is (IS.insert i neqs)
+                                   else NCRep (go (NCof (d - 1) is) i j) neqs
 
 -- | Evaluate an equality of forced I-s.
 eq# :: NCofArg => (I, IS.Set) -> (I, IS.Set) -> VCof
@@ -187,39 +224,25 @@ eq# (!i, !ineq) (!j, !jneq)
     (IVar i, IVar j) ->
       case orient (i,ineq) (j,jneq) of
         ((i,ineq), (j,jneq))
-          | IS.member (IVar i) jneq ->
+          | IS.member i jneq ->
             VCFalse
           | otherwise ->
-            VCNe (NeCof' (conjFlexFlexEq# ?cof (i,ineq) (j,jneq))
+            VCNe (NeCof' (conjFlexFlexEq# ?cof i (j,jneq))
                          (NCEq (IVar i) (IVar j)))
-                 (IS.insertIVar i $ IS.insertIVar j mempty)
+                 (IS.insert i $ IS.insert j mempty)
 
-    (IVar i, j)
-      | IS.member j ineq ->
-        VCFalse
-      | otherwise ->
-        VCNe (NeCof' (conjFlexRigidEq# ?cof (i,ineq) j)
-                     (NCEq (IVar i) j))
-             (IS.insertIVar i mempty)
+    (IVar i, j) ->
+      VCNe (NeCof' (conjFlexRigidEq# ?cof i j)
+                   (NCEq (IVar i) j))
+           (IS.insert i mempty)
 
-    (i, IVar j)
-      | IS.member i jneq ->
-        VCFalse
-      | otherwise ->
-        VCNe (NeCof' (conjFlexRigidEq# ?cof (j,jneq) i)
-                     (NCEq i (IVar j)))
-             (IS.insertIVar j mempty)
+    (i, IVar j) ->
+      VCNe (NeCof' (conjFlexRigidEq# ?cof j i)
+                   (NCEq i (IVar j)))
+           (IS.insert j mempty)
 
-    _ -> VCFalse
-
--- | Extend with an I-IVar inequality.
-conjFlexNEq# :: NCof -> I -> IVar -> NCof
-conjFlexNEq# (NCof d is) i j = NCof d (go is i (d - j - 1)) where
-  go is i j = case (is, j) of
-    (NCRep is neqs, 0) -> NCRep is (IS.insert i neqs)
-    (NCRep is neqs, j) -> NCRep (go is i (j - 1)) neqs
-    (NCLink is l  , j) -> NCLink (go is i (j - 1)) l
-    _                  -> impossible
+    _ ->
+      VCFalse
 
 -- | Evaluate an inequality of forced I-s.
 neq# :: NCofArg => (I, IS.Set) -> (I, IS.Set) -> VCof
@@ -232,27 +255,36 @@ neq# (!i, !ineq) (!j, !jneq)
     (IVar i, IVar j) ->
       case orient (i,ineq)(j,jneq) of
         ((i,ineq), (j,jneq))
-          | IS.member (IVar i) jneq ->
+          | IS.member i jneq ->
             VCTrue
           | otherwise ->
-            VCNe (NeCof' (conjFlexNEq# ?cof (IVar i) j) (NCNEq (IVar i) (IVar j)))
-                 (IS.insertIVar i $ IS.insertIVar j mempty)
+            VCNe (NeCof' (conjFlexFlexNEq# ?cof i j) (NCNEq (IVar i) (IVar j)))
+                 (IS.insert i $ IS.insert j mempty)
 
-    (IVar i, j)
-      | IS.member j ineq ->
-        VCTrue
-      | otherwise ->
-        VCNe (NeCof' (conjFlexNEq# ?cof j i) (NCNEq (IVar i) j))
-             (IS.insertIVar i mempty)
+    (IVar i, j) ->
+      VCNe (NeCof' (conjFlexRigidEq# ?cof i j) (NCEq (IVar i) (flip# j)))
+           (IS.insert i mempty)
 
-    (i, IVar j)
-      | IS.member i jneq ->
-        VCTrue
-      | otherwise ->
-        VCNe (NeCof' (conjFlexNEq# ?cof i j) (NCNEq i (IVar j)))
-             (IS.insertIVar j mempty)
+    (i, IVar j) ->
+      VCNe (NeCof' (conjFlexRigidEq# ?cof j i) (NCEq (flip# i) (IVar j)))
+           (IS.insert j mempty)
 
     _ -> VCTrue
+
+eq :: NCofArg => I -> I -> VCof
+eq i j = eq# (appNCof# ?cof i) (appNCof# ?cof j)
+
+neq :: NCofArg => I -> I -> VCof
+neq i j = neq# (appNCof# ?cof i) (appNCof# ?cof j)
+
+eqS :: SubArg => NCofArg => I -> I -> VCof
+eqS i j = eq# (appNCof# ?cof (sub i)) (appNCof# ?cof (sub j))
+
+neqS :: SubArg => NCofArg => I -> I -> VCof
+neqS i j = neq# (appNCof# ?cof (sub i)) (appNCof# ?cof (sub j))
+
+evalI :: NCofArg => SubArg => I -> I
+evalI i = appNCof ?cof (sub i)
 
 -- | Extend with a forced neutral NeCof. Error if non-neutral.
 conjNeCof :: NCofArg => NeCof -> NCof
@@ -278,7 +310,7 @@ quoteNCof = go CTrue where
   go :: Cof -> NCof -> Cof
   go acc (NCof d is) = case is of
     NCNil -> acc
-    NCRep is neqs -> go (IS.foldl (\c i -> CNEq (IVar (d - 1)) i c) acc neqs)
+    NCRep is neqs -> go (IS.foldl (\c i -> CNEq (IVar (d - 1)) (IVar i) c) acc neqs)
                         (NCof (d - 1) is)
     NCLink is j   -> go (CEq (IVar (d - 1)) j acc) (NCof (d - 1) is)
 
@@ -301,7 +333,7 @@ validNCof = go where
   go (NCof d is) = case is of
     NCNil         -> True
     NCLink is j   -> validI (d - 1) j && go (NCof (d - 1) is)
-    NCRep is neqs -> IS.foldr (\i b -> validI (d - 1) i && b)
+    NCRep is neqs -> IS.foldr (\i b -> validI (d - 1) (IVar i) && b)
                               (go (NCof (d - 1) is)) neqs
 
 -- TODO: additional validation: tripping through quote and evalCof
@@ -318,21 +350,6 @@ wkSub s = setDom (dom ?cof) s
 {-# inline wkSub #-}
 
 ----------------------------------------------------------------------------------------------------
-
-eq :: NCofArg => I -> I -> VCof
-eq i j = eq# (appNCof# ?cof i) (appNCof# ?cof j)
-
-neq :: NCofArg => I -> I -> VCof
-neq i j = neq# (appNCof# ?cof i) (appNCof# ?cof j)
-
-eqS :: SubArg => NCofArg => I -> I -> VCof
-eqS i j = eq# (appNCof# ?cof (sub i)) (appNCof# ?cof (sub j))
-
-neqS :: SubArg => NCofArg => I -> I -> VCof
-neqS i j = neq# (appNCof# ?cof (sub i)) (appNCof# ?cof (sub j))
-
-evalI :: NCofArg => SubArg => I -> I
-evalI i = appNCof ?cof (sub i)
 
 evalCof :: NCofArg => SubArg => Cof -> VCof
 evalCof = \case
@@ -354,14 +371,14 @@ evalCof = \case
                    VCNe c' is' -> VCNe (NeCof' (c'^.extended) (NCAnd (c^.extra) (c'^.extra)))
                                        (is <> is')
 
-----------------------------------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------------------------------
 
 isUnblocked :: NCofArg => IS.Set -> Bool
 isUnblocked is =
   IS.foldrAccum
     (\x hyp (!varset, !cof) ->
-       matchIVar (appNCof cof x)
-         (\x -> IS.memberIVar x varset || hyp (IS.insertIVar x varset // cof))
+       matchIVar (lookupNCof x cof)
+         (\x -> IS.member x varset || hyp (IS.insert x varset // cof))
          True)
     (mempty, ?cof)
     False
@@ -370,24 +387,23 @@ isUnblocked is =
 isUnblockedS :: SubArg => NCofArg => IS.Set -> Bool
 isUnblockedS is = IS.foldrAccum
   (\x hyp (!varset, !sub, !cof) ->
-     matchIVar (appSub sub x)
-       (\x -> matchIVar (lookupNCof cof x)
-         (\x -> IS.memberIVar x varset || hyp ((,,) $$! IS.insertIVar x varset $$! sub $$! cof))
+     matchIVar (lookupSub x sub)
+       (\x -> matchIVar (lookupNCof x cof)
+         (\x -> IS.member x varset || hyp ((,,) $$! IS.insert x varset $$! sub $$! cof))
          True)
        True)
   (mempty, ?sub, ?cof)
   False
   (IS.delete01 is)
 
--- | Insert an *unforced* I to an `IS.Set`.
 insertI :: NCofArg => I -> IS.Set -> IS.Set
-insertI i s = IS.insert (appNCof ?cof i) s
+insertI i s = IS.insertI (appNCof ?cof i) s
 {-# inline insertI #-}
 
 neCofVars :: NeCof -> IS.Set
 neCofVars = \case
-  NCEq i j    -> IS.insert i $ IS.insert j mempty
-  NCNEq i j   -> IS.insert i $ IS.insert j mempty
+  NCEq i j    -> IS.insertI i $ IS.insertI j mempty
+  NCNEq i j   -> IS.insertI i $ IS.insertI j mempty
   NCAnd c1 c2 -> neCofVars c1 <> neCofVars c2
 
 ----------------------------------------------------------------------------------------------------

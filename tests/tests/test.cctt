@@ -1,6 +1,12 @@
 
 import basics;
 
-test (A : U)(x : A)(i : I) := hcom 0 1 [i=0 _. x; i ≠ 0, i ≠ 1 _. x] x;
+-- test  (A : U)(x : A)(i : I) := hcom 0 1 [i=0   _. x;i≠0 _. x] x;
+-- test2 (A : U)(x : A)(i : I) := hcom 0 1 [i ≠ 0 _. test A x i] x;
 
-test2 (A : U)(x : A) := test A x 1;
+test  (A : U)(x : A)(i : I) := hcom 0 1 [i = 0 _. x] x;
+test2 (A : U)(x : A)(i : I) := hcom 0 1 [i ≠ 0 _. test A x i] (hcom 0 1 [] x);
+
+-- test (A : U)(x : A)(i : I) := hcom 0 1 [i=0 _. x; i ≠ 0, i ≠ 1 _. x] x;
+-- test2 (A : U)(x : A) := test A x 1;
+-- foo (A B : U)(i : equiv A B)(x : A) := coe 0 1 (ua A B i) x;
