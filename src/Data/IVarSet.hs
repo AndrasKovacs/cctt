@@ -26,10 +26,6 @@ singleton :: IVar -> Set
 singleton x = insert x mempty
 {-# inline singleton #-}
 
-delete01 :: Set -> Set
-delete01 (Set w) = Set (w .&. 18446744073709551612)
-{-# inline delete01 #-}
-
 -- | Insert an unforced I.
 insert :: IVar -> Set -> Set
 insert (IVar# x) (Set s) = Set (unsafeShiftL 1 (w2i x) .|. s)

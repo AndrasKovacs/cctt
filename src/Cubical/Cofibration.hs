@@ -71,10 +71,10 @@ orient (i, j) | i < j = (i, j)
 solve :: NCof -> IVar -> I -> NCof
 solve (NCof d is) i j = NCof d (go d is i j) where
   go d is i j = case is of
-    ILNil       -> ILNil
-    ILDef is i' -> let i'' | i' == IVar i = j
-                           | True         = i'
-                   in ILDef (go (d - 1) is i j) i''
+    ILNil -> impossible
+    ILDef is i' | d - 1 == i   -> ILDef is j
+                | i' == IVar i -> ILDef (go (d - 1) is i j) j
+                | True         -> ILDef (go (d - 1) is i j) i'
 
 -- | Equate forced I-s.
 eq# :: NCofArg => I -> I -> VCof
@@ -138,7 +138,7 @@ wkSub s = setDom (dom ?cof) s
 evalCof :: NCofArg => SubArg => Cof -> VCof
 evalCof = \case
   CTrue        -> VCTrue
-  CEq i j cof  -> case traceShow (i, j, ?cof, eqS i j) $ eqS i j of
+  CEq i j cof  -> case eqS i j of
     VCTrue    -> evalCof cof
     VCFalse   -> VCFalse
     VCNe c is -> let ?cof = c^.extended in case evalCof cof of
@@ -158,7 +158,7 @@ isUnblocked is =
          True)
     (mempty, ?cof)
     False
-    (IS.delete01 is)
+    is
 
 isUnblockedS :: SubArg => NCofArg => IS.Set -> Bool
 isUnblockedS is = IS.foldrAccum
@@ -170,7 +170,7 @@ isUnblockedS is = IS.foldrAccum
        True)
   (mempty, ?sub, ?cof)
   False
-  (IS.delete01 is)
+  is
 
 insertI :: NCofArg => I -> IS.Set -> IS.Set
 insertI i s = IS.insertI (appNCof ?cof i) s
