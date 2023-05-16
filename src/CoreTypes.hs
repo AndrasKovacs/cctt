@@ -6,7 +6,7 @@ import Common
 import Cubical
 
 import qualified Data.LvlMap as LM
-import qualified Data.ISet as IS
+import qualified Data.IVarSet as IS
 
 -- Syntax
 --------------------------------------------------------------------------------
@@ -474,7 +474,6 @@ instance SubAction NeCof where
   sub = \case
     NCEq i j    -> NCEq (sub i) (sub j)
     NCAnd c1 c2 -> NCAnd (sub c1) (sub c2)
-    NCNEq i j   -> NCNEq (sub i) (sub j)
 
 instance SubAction a => SubAction (BindCofLazy a) where
   sub (BindCofLazy cof a) = BindCofLazy (sub cof) (sub a); {-# inline sub #-}

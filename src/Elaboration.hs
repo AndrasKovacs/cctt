@@ -977,9 +977,8 @@ isConstantU t = bindI "i" \i -> case frc (t ∙ IVar i) of
 
 checkCof :: Elab (P.Cof -> IO Cof)
 checkCof = \case
-  P.CTrue       -> pure CTrue
+  P.CTrue        -> pure CTrue
   P.CEq  i j cof -> CEq  <$!> checkI i <*!> checkI j <*!> checkCof cof
-  P.CNEq i j cof -> CNEq <$!> checkI i <*!> checkI j <*!> checkCof cof
 
 -- Systems
 ----------------------------------------------------------------------------------------------------

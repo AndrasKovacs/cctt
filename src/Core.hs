@@ -7,7 +7,7 @@ import Cubical
 
 import Statistics (bumpHCom, bumpHCom', bumpMaxIVar)
 
-import qualified Data.ISet as IS
+import qualified Data.IVarSet as IS
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -170,7 +170,6 @@ evalSysHCom = \case
 occursInNeCof :: NeCof -> IVar -> Bool
 occursInNeCof cof i' = case cof of
   NCEq i j    -> i == IVar i' || j == IVar i'
-  NCNEq i j   -> i == IVar i' || j == IVar i'
   NCAnd c1 c2 -> occursInNeCof c1 i' || occursInNeCof c2 i'
 
 -- Alternative hcom and com semantics which shortcuts to term instantiation if
@@ -668,7 +667,7 @@ papp ~l ~r ~t i = case frc i of
   I1     -> r
   IVar x -> case frc t of
     VPLam _ _ t -> t ∙ IVar x
-    VNe t is    -> VNe (NPApp l r t (IVar x)) (IS.insertIVar x is)
+    VNe t is    -> VNe (NPApp l r t (IVar x)) (IS.insert x is)
     v@VHole{}   -> v
     _           -> impossible
 {-# inline papp #-}
@@ -729,7 +728,7 @@ coed r r' topA t = case (frc topA) ^. body of
   -- NOTE: deleting the bound var from is
   a@(VNe _ is) ->
     VNe (NCoe r r' (rebind topA a) t)
-        (insertI r $ insertI r' $ IS.deleteIVar (topA^.binds) is)
+        (insertI r $ insertI r' $ IS.delete (topA^.binds) is)
 
 
 {-
@@ -1309,7 +1308,7 @@ projsys conid topSys = \case
             prj
 
       -- NOTE: extend blockers with neutral's ivars BUT DELETE BOUND VAR.
-      VNe n is -> TTPNe (WIS (topSys^.body) (IS.deleteIVar (t^.body.binds) is <> topSys^.ivars))
+      VNe n is -> TTPNe (WIS (topSys^.body) (IS.delete (t^.body.binds) is <> topSys^.ivars))
 
       VHole{}  -> error "TODO: hole in system projection"
       _        -> impossible
@@ -1541,7 +1540,6 @@ instance Force Sub Sub where
 instance Force NeCof VCof where
   frc = \case
     NCEq i j    -> eq i j
-    NCNEq i j   -> neq i j
     NCAnd c1 c2 -> case frc c1 of
       VCTrue -> frc c2
       VCFalse -> VCFalse
@@ -1553,7 +1551,6 @@ instance Force NeCof VCof where
 
   frcS = \case
     NCEq i j    -> eqS i j
-    NCNEq i j   -> neqS i j
     NCAnd c1 c2 -> case frcS c1 of
       VCTrue  -> frcS c2
       VCFalse -> VCFalse

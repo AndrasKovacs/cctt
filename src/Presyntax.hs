@@ -57,7 +57,7 @@ data Tm
   | Ap Tm Tm
   deriving Show
 
-data Cof = CTrue | CEq Tm Tm Cof | CNEq Tm Tm Cof
+data Cof = CTrue | CEq Tm Tm Cof
   deriving Show
 
 data Sys = SEmpty | SCons Cof Tm Sys

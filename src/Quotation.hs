@@ -124,8 +124,7 @@ instance Quote NeCof Cof where
   quote c = go c CTrue where
     go :: NCofArg => NeCof -> Cof -> Cof
     go c acc = case c of
-      NCEq i j    -> CEq  (quote i) (quote j) acc
-      NCNEq i j   -> CNEq (quote i) (quote j) acc
+      NCEq i j    -> CEq (quote i) (quote j) acc
       NCAnd c1 c2 -> go c1 (go c2 acc)
 
 instance (SubAction a, Quote a b) => Quote (BindI a) b where

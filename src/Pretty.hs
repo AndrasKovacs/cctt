@@ -150,13 +150,9 @@ int = \case
 cofEq :: PrettyArgs (I -> I -> Txt)
 cofEq i j = int i <> " = " <> int j
 
-cofNEq :: PrettyArgs (I -> I -> Txt)
-cofNEq i j = int i <> " ≠ " <> int j
-
 necof :: PrettyArgs (NeCof -> Txt)
 necof = \case
   NCEq i j    -> cofEq i j
-  NCNEq i j   -> cofNEq i j
   NCAnd c1 c2 -> necof c1 <> ", " <> necof c2
 
 cof :: PrettyArgs (Cof -> Txt)
@@ -164,8 +160,6 @@ cof = \case
   CTrue          -> "⊤"
   CEq i j CTrue  -> cofEq i j
   CEq i j c      -> cofEq i j <> " , " <> cof c
-  CNEq i j CTrue -> cofNEq i j
-  CNEq i j c     -> cofNEq i j <> " , " <> cof c
 
 goSysH :: PrettyArgs (SysHCom -> Txt)
 goSysH = \case

@@ -132,14 +132,10 @@ int = intLit
 cof :: Parser Cof
 cof = do
   i <- int
-  branch (char '=')
-    (\_ -> do j <- int
-              c <- ((char ',' *> cof) <|> pure CTrue)
-              pure (CEq i j c))
-    (do char '≠'
-        j <- int
-        c <- ((char ',' *> cof) <|> pure CTrue)
-        pure (CNEq i j c))
+  char '='
+  j <- int
+  c <- (char ',' *> cof) <|> pure CTrue
+  pure (CEq i j c)
 
 goSys' :: Parser Sys
 goSys' =
