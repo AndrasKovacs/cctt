@@ -1,12 +1,105 @@
 
 import basics;
 
--- test  (A : U)(x : A)(i : I) := hcom 0 1 [i=0   _. x;i≠0 _. x] x;
--- test2 (A : U)(x : A)(i : I) := hcom 0 1 [i ≠ 0 _. test A x i] x;
 
-test  (A : U)(x : A)(i : I) := hcom 0 1 [i = 0 _. x] x;
-test2 (A : U)(x : A)(i : I) := hcom 0 1 [i ≠ 0 _. test A x i] (hcom 0 1 [] x);
+-- coe01isEquivNf (A : I → U) : isEquiv (A 0) (A 1)  (λ x. coe 0 1 A x) :=
+--   (λ x. coe 1 0 A x
+-- , λ x {coe 1 0 A (coe 0 1 A x)} {x} j. hcom 0 1 (A 0) [j = 0 k. coe k 0 A (coe 0 k A x); j = 1 k. x] x
 
--- test (A : U)(x : A)(i : I) := hcom 0 1 [i=0 _. x; i ≠ 0, i ≠ 1 _. x] x;
--- test2 (A : U)(x : A) := test A x 1;
--- foo (A B : U)(i : equiv A B)(x : A) := coe 0 1 (ua A B i) x;
+
+pathToEquiv (A B : U)(p : A = B) : equiv A B :=
+  ((λ x. coe 0 1 p x), coeIsEquiv (λ i. p i) 0 1);
+
+uaTrip (A B : U)(f : equiv A B) : equiv A B :=
+  pathToEquiv A B (ua A B f);
+
+-- HAS an empty hcom!
+coe0i (A B : U)(f : equiv A B)(i : I)(x : A) := coe 0 i (ua A B f) x;
+
+
+coei0 (A B : U)(f : equiv A B)(i : I)(x : ua A B f i) := coe i 0 (ua A B f) x;
+coe01 (A B : U)(f : equiv A B)(x : A) := coe 0 1 (ua A B f) x;
+coe10 (A B : U)(f : equiv A B)(x : B) := coe 1 0 (ua A B f) x;
+coek00k (A B : U)(f : equiv A B)(x : A)(k : I) := coe k 0 (ua A B f) (coe 0 k (ua A B f) x);
+
+
+-- uaTripNf (A B : U)(f : equiv A B) : equiv A B :=
+-- ( λ x. coe 0 1 (i. B) (f.f x)
+-- , λ x. f.g (coe 1 0 (j. B) x)
+-- , λ x
+--     {f.g (coe 1 0 (j. B) (coe 0 1 (i. B) (f.f x)))}
+-- 		{x} j.
+-- 		hcom 0 1 A [j = 0 k.
+-- 		                hcom 0 1 A [k = 0 i. f.linv x {f.g (f.f x)} {x} i
+-- 										          ; k = 1 l. f.g (coe 1 0 (l. B) (hcom 0 1 B [] (coe 0 1 (l. B) (f.f x))))]
+-- 															(f.g (coe k 0 (l. B) (hcom 1 0 B [0 = k i. f.f
+--                     x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B [j = 0 i. hcom 0 i B [] (coe 0 1 (l. B)
+--                    (f.f x)) ; j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x)))))
+-- 							; j = 1 k. x]
+-- 							x,
+
+-- ?_);
+
+
+
+-- , λ x {f.g (coe 1 0 (j. B) (coe 0 1 (i. B) (f.f x)))}
+--      {x} j.
+-- 		 hcom 0 1 A [
+-- 		   j = 0 k. hcom 0 1 A [k = 0 i. f.linv x {f.g (f.f x)} {x} i]
+--    			                    (f.g (coe k 0 (l. B) (hcom 1 0 B [
+-- 													     0 = k i. f.f x;
+-- 															 k = 0 j. f.f x;
+-- 															 k = 1 j. hcom 0 1 B [
+-- 															               j = 0 i. hcom 0 i B [] (coe 0 1 (l. B) (f.f x))
+-- 																           ; j = 1 i. coe 0 1 (l. B) (f.f x)]
+--         																 (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x)))))
+--      ; j = 1 k. x]
+-- 		 x,
+
+-- ?_);
+
+
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 1) I0)) CFalse                  1 = I0
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 1) I1))          1 = I1
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 1) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 1) I0))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 2) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 2) I0))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 3) I0)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 3) I1))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 2) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 2) I0))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 2) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 2) I0))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 3) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 3) I0))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 2) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 2) I0))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 2) I0)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 2) I1))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 3) I0)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 3) I1))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 2) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 2) I0))
+-- ------------------------------------------------------------
+-- ------------------------------------------------------------
+
+-- Normal form of uaTrip:
+
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 1) I1)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 1) I0))
+-- VALIDIFY
+-- COr (CLeaf (NCEq (IVar 1) I0)) CFalse
+-- CLeaf (NCAnd (NCEq I0 I0) (NCEq (IVar 1) I1))
