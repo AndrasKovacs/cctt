@@ -39,6 +39,10 @@ isContr (A : U) : U := (fst : A) × ((y : A) → fst = y);
 isProp (A : U) : U := (a b : A) → a = b;
 isSet (A : U) : U := (a b : A) → isProp (a = b);
 
+lemPropFam (A : U) (P : A → U) (pP : (x : A) → isProp (P x)) (a0 a1 : A)
+           (p : a0 = a1) (b0 : P a0) (b1 : P a1) : b0 ={ap P p} b1
+  := λ i. pP (p i) (coe 0 i (ap P p) b0) (coe 1 i (ap P p) b1) i;
+
 ua (A B : U)(f : equiv A B) : A = B :=
   λ i. Glue B [i=0. (A, f); i=1. (B, idEquiv B)];
 
@@ -165,170 +169,126 @@ rotLoop : (a : S¹) → a = a := λ[
   loop1 i. λ j. connection-both S¹ (λ i. loop1 i) base1 (λ i. loop1 i) i j
 ];
 
-rot : S¹ → S¹ → S¹ := λ[
-  base1. λ y. y;
-  loop1 i. λ y. rotLoop y i
-];
-
 -- end copy from new_brunerie.cctt
 
 
 
--- Now let's prove isPropIsEquiv ... I am just going to copy theorem
--- 4.2.13 from the book, lol.
+-- isPropIsEquiv (lots of this is copied from basics.cctt)
 
-lemProp (A : U) (h : A → isProp A) : isProp A
-  := λ x y. h x x y;
+hasContrFibers (A B : U) (f : A → B) : U := (b : B) → isContr (fiber A B f b);
 
-contrProp (A : U) (h : isContr A) : isProp A
-  := λ x y. (h.2 x) ⁻¹ ∙ h.2 y;
+connAnd' (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+  :=
+  let sq (l k : I) : A := hcom 0 l [k=0 _. a; k=1. p] a;
+  λ i j. hcom 0 1 [i=0 _. a; i=1. sq j; j=0 _. a; j=1. sq i] a;
 
-lemContrProp (A : U) (h : A → isContr A) : isProp A
-  := lemProp A (λ a. contrProp A (h a));
+connAndRefl (A : U)(a : A) : connAnd' A a a refl = refl
+  :=
+  λ m.
+  let sq (l k : I) : A := hcom 0 l [k=0 _. a; k=1 _. a; m=1 _. a] a;
+  λ i j. hcom 0 1 [i=0 _. a; i=1. sq j; j=0 _. a; j=1. sq i; m=1 _. a] a;
 
-contrPi (A : U) (B : A → U) (c : (x : A) → isContr (B x))
-  : isContr ((x : A) → B x)
-  := ((λ x. (c x).1),
-      (λ f i x. contrProp (B x) (c x) (c x).1 (f x) i));
+isEquivToContrFibers (A B : U) (f : A → B) (e : isEquiv A B f) : hasContrFibers A B f
+  :=
+  λ b.
+  ((e.g b, e.rinv b),
+   λ fib i.
+   let a : A := fib.1;
+   let p : f a = b := fib.2;
+   let domFiller (k : I) : A :=
+     hcom 0 k
+       [i=0 k. e.g (p k);
+        i=1 _. a]
+       (e.linv a i);
+   (domFiller 1,
+    λ j.
+    hcom 0 1
+      [i=0 k. e.rinv (p k) j;
+       i=1. connAnd' B (f a) b p j;
+       j=0 k. f (domFiller k);
+       j=1. p]
+      (e.coh a i j)));
 
-lemPropOver (A : U) (B : A → U) (pr : (x : A) → isProp (B x))
-  (x y : A) (p : x = y) (u : B x) (v : B y)
-  : u ={i. B (p i)} v
-  := J A x
-       (λ y p. (v : B y) → u ={i. B (p i)} v)
-       (pr x u)
-       y p v;
+contrFibersToIsEquiv (A B : U) (f : A → B) (c : hasContrFibers A B f) : isEquiv A B f
+  :=
+  λ b. (c b).1.1,
+  λ a i. ((c (f a)).2 (a, refl) i).1,
+  λ b. (c b).1.2,
+  λ a i. ((c (f a)).2 (a, refl) i).2;
 
-contrSig (A : U) (B : A → U) (ca : isContr A) (cb : (x : A) → isContr (B x))
-  : isContr ((x : A) × B x)
-  := ((ca.1, (cb ca.1).1),
-      (λ y i. (ca.2 y.1 i, lemPropOver A B (λ x. contrProp (B x) (cb x)) ca.1 y.1 (ca.2 y.1) (cb ca.1).1 y.2 i)));
+isEquivRetractContrFibers (A B : U) (f : A → B) (e : isEquiv A B f)
+  : contrFibersToIsEquiv A B f (isEquivToContrFibers A B f e) = e
+  :=
+  λ l.
+  let domFiller (a : A) (i : I) (k : I) : A :=
+    hcom 0 k
+      [i=0 _. e.g (f a);
+       i=1 _. a;
+       l=1 _. e.linv a i]
+      (e.linv a i);
+  (e.g,
+   λ a i. domFiller a i 1,
+   e.rinv,
+   λ a i j.
+   hcom 0 1
+      [i=0 _. e.rinv (f a) j;
+       i=1. connAndRefl B (f a) l j;
+       j=0 k. f (domFiller a i k);
+       j=1 _. f a;
+       l=1 _. e.coh a i j]
+      (e.coh a i j));
 
-lInv (A : U) (x y : A) (p : x = y) : p ⁻¹ ∙ p = refl
-  := J A x
-       (λ y p. p ⁻¹ ∙ p = refl)
-       (λ j i. hcom j 1 [i=0 _. x; i=1 _. x] (hcom j 1 [i=0 j. x; i=1 _. x] x))
-       y p;
+isPropIsContr (A : U) : isProp (isContr A)
+  := λ c d i.
+       (c.2 d.fst i,
+        (λ x j.
+           hcom 0 1
+             [ j=0 _. c.2 d.1 i
+             ; j=1 _. x
+             ; i=0 i. hcom i 1
+                        [ j=0 j. c.2 c.1 j
+                        ; j=1 j. c.2 x j
+                        ]
+                        (c.2 (c.2 x j) i)
+             ; i=1 i. hcom i 1
+                        [ j=0 j. c.2 d.1 j
+                        ; j=1 j. c.2 x j
+                        ]
+                        (c.2 (d.2 x j) i)
+             ]
+             (hcom 0 1
+                [ j=0 j. c.2 (c.2 d.1 i) j
+                ; j=1 j. c.2 x j
+                ]
+                c.1)));
 
-contrPath (A : U) (x y : A) (c : isContr A) : isContr (x = y)
-  := (contrProp A c x y,
-      J A x
-        (λ y p. contrProp A c x y = p)
-        (lInv A c.1 x (c.2 x))
-        y);
+isPropPi (A : U) (B : A → U) (pr : (x : A) → isProp (B x))
+  : isProp ((x : A) → B x)
+  := λ f g i x. pr x (f x) (g x) i;
 
-isCEquiv (A B : U) (f : A → B) : U
-  := (b : B) → isContr (fiber A B f b);
+isPropHasContrFibers (A B : U) (f : A → B) : isProp (hasContrFibers A B f)
+  := isPropPi B (λ b. isContr (fiber A B f b))
+       (λ b. isPropIsContr (fiber A B f b));
 
-toCEquivLemma (A B : U) (f : A → B) (e : isEquiv A B f)
-  (b : B) (a : A) (p : f a = b)
-  : (e.g b, e.rinv b) ={_. fiber A B f b} (a, p)
-  := J B (f a)
-       (λ b p. (e.g b, e.rinv b) ={_. fiber A B f b} (a, p))
-       (λ i. (e.linv a i, e.coh a i))
-       b p;
-
-toCEquiv (A B : U) (f : A → B) (e : isEquiv A B f) : isCEquiv A B f
-  := λ b. ((e.g b, e.rinv b),
-           (λ u. toCEquivLemma A B f e b u.1 u.2));
-
-linv (A B : U) (f : A → B) : U := (g : B → A) × ((a : A) → g (f a) = a);
-rinv (A B : U) (f : A → B) : U := (g : B → A) × ((b : B) → f (g b) = b);
-
-precompIso (A B C : U) (f : A → B) (e : isIso A B f)
-  : isIso (B → C) (A → C) (λ g a. g (f a))
-  := ((λ h b. h (e.g b)),
-      (λ h i b. h (e.rinv b i)),
-      (λ g i a. g (e.linv a i)));
-
-postcomp (A B C : U) (f : A → B) (g : C → A) (c : C) : B := f (g c);
-
-postcompEquiv (A B C : U) (f : A → B) (e : isEquiv A B f)
-  : isEquiv (C → A) (C → B) (postcomp A B C f)
-  := ((λ g c. e.g (g c)),
-      (λ g i c. e.linv (g c) i),
-      (λ g i c. e.rinv (g c) i),
-      (λ g i j c. e.coh (g c) i j));
-
-retract (A B : U) : U := (f : A → B) × rinv A B f;
-
-retractContr (A B : U) (r : retract A B)
-  : isContr A → isContr B
-  := λ c. (r.f c.1, (λ b. (ap r.f (c.2 (r.2.g b))) ∙ r.2.2 b));
-
-postcompFiber (A B : U) (f : A → B) : U
-  := fiber (B → A) (B → B) (λ g c. f (g c)) (λ b. b);
-
-postcompFiberLemma (A B : U) (f : A → B)
-  : retract (postcompFiber A B f) (rinv A B f)
-  := ((λ r. (r.1, (λ b i. r.2 i b))),
-      (λ r. (r.1, (λ i b. r.2 b i))),
-      (λ r. refl));
-
-rinvContr (A B : U) (f : A → B) (e : isEquiv A B f) : isContr (rinv A B f)
-  := retractContr
-       (postcompFiber A B f)
-       (rinv A B f)
-       (postcompFiberLemma A B f)
-       (toCEquiv (B → A) (B → B)
-         (postcomp A B B f)
-         (postcompEquiv A B B f e)
-         (λ b. b));
-
-rcoh1 (A B : U) (f : A → B) (r : rinv A B f) : U
-  := (linv : (a : A) → r.g (f a) = a)
-     × ((x : A) → (r.2 (f x)) ={i. f (linv x i) = f x} refl);
-
-rcoh2 (A B : U) (f : A → B) (r : rinv A B f) : U
-  := ((x : A) → (r.g (f x), r.2 (f x)) ={_. fiber A B f (f x)} (x, refl));
-
-rcohRetract (A B : U) (f : A → B) (r : rinv A B f)
-  : retract (rcoh2 A B f r) (rcoh1 A B f r)
-  := ((λ c. ((λ a i. (c a i).1), (λ a i. (c a i).2))),
-      (λ c. (λ a i. (c.1 a i, c.2 a i))),
-      (λ c. refl));
-
-rcoh2Contr (A B : U) (f : A → B) (e : isEquiv A B f) (r : rinv A B f)
-  : isContr (rcoh2 A B f r)
-  := contrPi A (λ x. (r.g (f x), r.2 (f x)) ={_. fiber A B f (f x)} (x, refl))
-      (λ x. contrPath
-              (fiber A B f (f x))
-              (r.g (f x), r.2 (f x))
-              (x, refl)
-              (toCEquiv A B f e (f x)));
-
-rcoh1Contr (A B : U) (f : A → B) (e : isEquiv A B f) (r : rinv A B f)
-  : isContr (rcoh1 A B f r)
-  := retractContr
-       (rcoh2 A B f r)
-       (rcoh1 A B f r)
-       (rcohRetract A B f r)
-       (rcoh2Contr A B f e r);
-
-rcohEquivRetract (A B : U) (f : A → B)
-  : retract ((r : rinv A B f) × rcoh1 A B f r)
-            (isEquiv A B f)
-  := ((λ r. (r.1.1, r.2.1, r.1.2, r.2.2)),
-      (λ r. ((r.1, r.2.2.1), r.2.1, r.2.2.coh)),
-      (λ r. refl));
-
--- 52MB normal form :D :D :D
 isPropIsEquiv (A B : U) (f : A → B) : isProp (isEquiv A B f)
-  := lemContrProp (isEquiv A B f)
-       (λ e. retractContr
-               ((r : rinv A B f) × rcoh1 A B f r)
-               (isEquiv A B f)
-               (rcohEquivRetract A B f)
-               (contrSig (rinv A B f) (rcoh1 A B f)
-                 (rinvContr A B f e)
-                 (rcoh1Contr A B f e)));
+  := λ e1 e2 i.
+       hcom 0 1
+         [ i=0. isEquivRetractContrFibers A B f e1
+         ; i=1. isEquivRetractContrFibers A B f e2
+         ]
+         (contrFibersToIsEquiv A B f
+           (isPropHasContrFibers A B f
+             (isEquivToContrFibers A B f e1)
+             (isEquivToContrFibers A B f e2)
+             i));
 
+-- local-global looping
 
--- This lets us implement local-global looping:
+Z (A : U) : U := Ω (A → A) (λ x. x);
 
-rotIsEquiv (A : U) (h : Ω (A → A) (λ x. x)) (i : I)
+rotIsEquiv (A : U) (h : Z A) (i : I)
   : isEquiv A A (λ x. h i x)
-  := lemPropOver
+  := lemPropFam
        (A → A)
        (isEquiv A A)
        (isPropIsEquiv A A)
@@ -339,72 +299,35 @@ rotIsEquiv (A : U) (h : Ω (A → A) (λ x. x)) (i : I)
        (idEquiv A).2
        i;
 
-rotEquiv (A : U) (h : Ω (A → A) (λ x. x))
+rotEquiv (A : U) (h : Z A)
   : idEquiv A = idEquiv A
   := λ i. (h i, rotIsEquiv A h i);
 
-global (A : U) (h : Ω (A → A) (λ x. x))
+global (A : U) (h : Z A)
   : Ω² U A
   := λ i j. Glue A [i=0. (A, idEquiv A);
                     i=1. (A, idEquiv A);
-                    j=0. (A, rotEquiv A h i
-                             -- h i,
-                             -- (λ x. h ⁻¹ i x),
-                             -- (λ x. lemma1 A h x i),
-                             -- (λ x. lemma2 A h x i),
-                             -- (λ x. lemma3 A h x i)
-                             );
+                    j=0. (A, rotEquiv A h i);
                     j=1. (A, idEquiv A)];
 
-local (A : U) (H : Ω² U A) : Ω (A → A) (λ x. x)
-  := λ i x. hcom 1 0
-              [i=0 k. coe 0 k (j. A) x;
-               i=1 k. coe 0 k (j. A) x]
-              (coe 0 1 (j. H i j) x);
-
-globalS² (A : U) (h : Ω (A → A) (λ x. x))
+globalS² (A : U) (h : Z A)
   : S² → U
   := λ [ base2. A
        ; loop2 i j. global A h i j
        ];
 
-HopfS² : S² → U := globalS² S¹ (λ i x. rotLoop x i);
+ΩS² : U := Ω S² base2;
+
+recΩS² (A : U) (x : A) (h : Z A) : ΩS² → A
+  := λ p. coe 0 1 (i. globalS² A h (p i)) x;
 
 windingS¹ : Ω S¹ base1 → ℤ :=
   λ p. coe 0 1 (i. helix (p i)) (pos zero);
 
 windingS² : Ω² S² base2 → ℤ :=
-  λ p. windingS¹ (λ i. coe 0 1 (j. HopfS² (p i j)) base1);
+  λ p. windingS¹ (λ i. recΩS² S¹ base1 (λ i x. rotLoop x i) (p i));
 
-higher inductive J₃S¹ :=
-  j3s1-base
-| j3s1-loop1 (i : I)
-    [i=0. j3s1-base
-    ;i=1. j3s1-base]
-| j3s1-loop2 (i j : I)
-    [i=0. j3s1-loop1 j
-    ;i=1. j3s1-loop1 j
-    ;j=0. j3s1-loop1 i
-    ;j=1. j3s1-loop1 i]
-| j3s1-loop3 (i j k : I)
-    [i=0. j3s1-loop2 j k
-    ;i=1. j3s1-loop2 j k
-    ;j=0. j3s1-loop2 i k
-    ;j=1. j3s1-loop2 i k
-    ;k=0. j3s1-loop2 i j
-    ;k=1. j3s1-loop2 i j];
-
--- cheating!
-loopsJ₃S¹ : (x : J₃S¹) → Ω J₃S¹ x := λ[
-  j3s1-base. λ l. j3s1-loop1 l;
-  j3s1-loop1 i. λ l. j3s1-loop2 i l;
-  j3s1-loop2 i j. λ l. j3s1-loop3 i j l;
-  j3s1-loop3 i j k. ?_ -- TODO should 2-truncate
-];
-
-localJ₃S¹ : Ω (J₃S¹ → J₃S¹) (λ x. x) :=
-  λ i x. loopsJ₃S¹ x i;
-
+-- Whitehead product [loop2, loop2] (almost)
 w22' : Ω (Ω² S² base2) (λ a b. loop2 a b) :=
   λ j a b.
     hcom 0 1
@@ -421,53 +344,75 @@ dsqInv (A : U) (x y : A) (p : x = y) (r : p = p) : Ω² A x
        (λ r. r)
        y p r;
 
+-- Whitehead product [loop2, loop2]
 w22 : Ω³ S² base2 :=
-  dsqInv (Ω S² base2) refl refl (λ i j. loop2 i j)
+  dsqInv ΩS² refl refl (λ i j. loop2 i j)
     w22';
 
-toJ₃S¹ : Ω S² base2 → J₃S¹ :=
-  λ p. coe 0 1 (i. globalS² J₃S¹ localJ₃S¹ (p i)) j3s1-base;
+-- cheating!
+tr₂S² : U := S²;
 
-step2 : Ω² J₃S¹ j3s1-base :=
-  λ i j. toJ₃S¹ (λ k. w22 i j k);
+cheating : (y : tr₂S²) → Ω² tr₂S² y
+  := λ[ base2. λ i j. loop2 i j
+      ; loop2 i j. ?_ -- should actually use tr₂S² so that this happens
+      ];
 
--- inspired by connection-both (maybe there is a better way?)
-ccube (A : U) (x : A) (p : Ω² A x) : p ={i. p i ={j. p i j = p i j} p i} p
-  := let pface (m k : I) : Ω A x
-       := λ l. hcom 1 m
-                 [ k=0 _. p 1 l
-                 ; k=1 k. p k l
-                 ; l=0 _. x
-                 ; l=1 _. x
-                 ]
-                 (p 1 l);
-     let qface (m k : I) : Ω A x
-       := λ l. hcom 0 m
-                 [ k=0 _. p 1 l
-                 ; k=1 k. p k l
-                 ; l=0 _. x
-                 ; l=1 _. x
-                 ]
-                 (p 1 l);
-    λ i j k.
-      hcom 0 1 [
-        i=0 l. pface j l k;
-        i=1 l. qface j l k;
-        j=0 l. pface i l k;
-        j=1 l. qface i l k;
-        k=0 _. p i j;
-        k=1 _. p i j]
-        (p i j);
+direct2 : S¹ → (y : tr₂S²) → Ω tr₂S² y
+  := λ[ base1. λ y. refl
+      ; loop1 i. λ y. cheating y i
+      ];
 
-toS² : J₃S¹ → S² := λ[
-  j3s1-base. base2;
-  j3s1-loop1 i. base2;
-  j3s1-loop2 i j. loop2 i j;
-  j3s1-loop3 i j k. ccube S² base2 (λ i j. loop2 i j) i j k
-];
+direct : Z (S¹ × tr₂S²)
+  := λ i x. (rotLoop x.1 i, direct2 x.1 x.2 i);
 
-step3 : Ω² S² base2 :=
-  λ i j. toS² (step2 i j);
+split : ΩS² → S¹ × tr₂S²
+  := recΩS² (S¹ × tr₂S²) (base1, base2) direct;
+
+writhe (p : Ω³ S² base2) : ℤ
+  := windingS² (λ i j. (split (λ k. p i j k)).2);
 
 brunerie : ℤ :=
-  windingS² step3;
+  writhe w22;
+
+
+
+-- hmm
+squareConnAnd (A : U) (x : A) (p : Ω² A x)
+  : refl ={i. refl ={j. x ={k. A} p i j} (λ k. p i k)} refl
+  := λ i. hcom 0 1
+            [ i=0 j. connAndRefl A x j
+            ; i=1 j. connAndRefl A x j
+            ]
+            (connAnd' A (p i 0) (p i 1) (λ j. p i j));
+
+-- Eckmann-Hilton (hmm)
+EH (A : U) (x : A) (p q : Ω² A x) : q ={i. p i = p i} q
+  := λ i j k.
+       hcom 0 1
+         [ i=0 l. squareConnAnd A x q j k l
+         ; i=1 l. squareConnAnd A x q j k l
+         ; j=0 _. p i k
+         ; j=1 _. p i k
+         ; k=0 _. x
+         ; k=1 l. q j l
+         ]
+         (p i k);
+
+-- hmmmm
+csqInv (A : U) (x y z : A) (p : x = y) (q : y = z)
+  (r : p ={i. p i = q i} q)
+  : Ω² A y
+  := J A x
+       (λ y p. (q : y = z) → p ={i. p i = q i} q → Ω² A y)
+       (J A x
+          (λ z q. refl ={i. x = q i} q → Ω² A x)
+          (λ r. r)
+          z)
+       y p q r;
+
+hopf (A : U) (x : A) (p : Ω² A x) : Ω³ A x
+  := csqInv (Ω A x) refl refl refl p p
+       (EH A x p p);
+
+generator : ℤ
+  := writhe (hopf S² base2 (λ i j. loop2 i j));
