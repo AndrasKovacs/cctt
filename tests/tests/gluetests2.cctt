@@ -1,0 +1,461 @@
+
+import basics;
+
+coeIsEquiv' (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
+  let f'    (i : I)(x : A r)        : A i := coe r i A x;
+  let g'    (i : I)(x : A i)        : A r := coe i r A x;
+  let linv' (i : I)(x : A r)(j : I) : A r := hcom r i (A r) [j=0 k. coe k r A (coe r k A x); j=1 k. x] x;
+  let rinv' (i : I)(x : A i)(j : I) : A i := hcom i r (A i) [j=0 k. coe k i A (coe i k A x); j=1 k. x] x;
+
+  ( λ x. g' r' x
+  , λ x j. linv' r' x j
+  , λ x j. rinv' r' x j
+  , λ x l k. hcom r r' (A r')
+                      [k=0 i. coe i r' A (f' i (linv' i x l))
+                      ;k=1 i. coe i r' A (f' i x)
+		      ;l=0 i. coe i r' A (rinv' i (f' i x) k)
+		      ;l=1 i. coe i r' A (f' i x)]
+		      (coe r r' A x)
+  );
+
+
+coeIsEquivNf (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :=
+(λ x. coe r' r A x, λ x {coe r' r A (coe r r' A x)} {x} j. hcom r r' (A r) [j =
+0 k. coe k r A (coe r k A x); j = 1 k. x] x, λ x {coe r r' A (coe r' r A x)} {x}
+j. hcom r' r (A r') [j = 0 k. coe k r' A (coe r' k A x); j = 1 k. x] x, λ x {λ
+{coe r r' A (coe r' r A (coe r r' A x))} {coe r r' A x} j. hcom r' r (A r') [j =
+0 k. coe k r' A (coe r' k A (coe r r' A x)); j = 1 k. coe r r' A x] (coe r r' A
+x)} {λ {coe r r' A x} {coe r r' A x} _. coe r r' A x} l {coe r r' A (hcom r r'
+(A r) [l = 0 k. coe k r A (coe r k A x); l = 1 k. x] x)} {coe r r' A x} k. hcom
+r r' (A r') [k = 0 i. coe i r' A (coe r i A (hcom r i (A r) [l = 0 k. coe k r A
+(coe r k A x); l = 1 k. x] x)); k = 1 i. coe i r' A (coe r i A x); l = 0 i. coe
+i r' A (hcom i r (A i) [k = 0 k. coe k i A (coe i k A (coe r i A x)); k = 1
+k. coe r i A x] (coe r i A x)); l = 1 i. coe i r' A (coe r i A x)] (coe r r' A
+x));
+
+
+coeIsEquivNfOK (A : I → U)(r r' : I) : coeIsEquiv A r r' = coeIsEquivNf A r r' :=
+  refl;
+
+coeIsEquivNf'OK (A : I → U)(r r' : I) : coeIsEquiv' A r r' = coeIsEquivNf A r r' :=
+  refl;
+
+coe01isEquivNf (A : I → U) : isEquiv (A 0) (A 1)  (λ x. coe 0 1 A x) :=
+
+  (λ x. coe 1 0 A x
+
+, λ x {coe 1 0 A (coe 0 1 A x)} {x} j. hcom 0 1 (A 0) [j = 0 k. coe k 0 A (coe 0 k A x); j = 1 k. x] x
+
+, λ x {coe 0 1 A (coe 1 0 A x)} {x} j. hcom 1 0 (A 1) [j = 0 k. coe k 1 A (coe 1 k A x); j = 1 k. x] x
+
+, λ x {λ {coe 0 1 A (coe 1 0 A (coe 0 1 A x))} {coe 0 1 A x} j.
+          hcom 1 0 (A 1) [j = 0 k. coe k 1 A (coe 1 k A (coe 0 1 A x))
+                        ; j = 1 k. coe 0 1 A x] (coe 0 1 A x)}
+         {λ {coe 0 1 A x} {coe 0 1 A x} _. coe 0 1 A x}
+         l
+         {coe 0 1 A (hcom 0 1 (A 0) [l = 0 k. coe k 0 A (coe 0 k A x); l = 1 k. x] x)}
+         {coe 0 1 A x}
+         k.
+         hcom 0 1 (A 1) [k = 0 i. coe i 1 A (coe 0 i A (
+                                      hcom 0 i (A 0) [l = 0 k1. coe k1 0 A (coe 0 k1 A x); l = 1 k1. x] x))
+                       ; k = 1 i. coe i 1 A (coe 0 i A x)
+                       ; l = 0 i. coe i 1 A (
+                                      hcom i 0 (A i) [k = 0 k1. coe k1 i A (coe i k1 A (coe 0 i A x))
+                                                    ; k = 1 k1. coe 0 i A x] (coe 0 i A x))
+                       ; l = 1 i. coe i 1 A (coe 0 i A x)]
+                       (coe 0 1 A x));
+
+coe01isEquivNfOK (A : I → U) : coe01isEquivNf A = coeIsEquiv A 0 1 :=
+  refl;
+
+uabeta (A B : U)(f : equiv A B) : (λ x. coe 0 1 (ua A B f) x) ={_. A → B} f.1 :=
+  λ i x. coe i 1 (i. B) (f.1 x);
+
+pathToEquiv (A B : U)(p : A = B) : equiv A B :=
+  ((λ x. coe 0 1 p x), coeIsEquiv (λ i. p i) 0 1);
+
+uaTrip (A B : U)(f : equiv A B) : equiv A B :=
+  pathToEquiv A B (ua A B f);
+
+uaTripNf (A B : U)(f : equiv A B) : equiv A B :=
+(λ x. coe 0 1 (i. B) (f.f x), λ x. f.g (coe 1 0 (j. B) x), λ x {f.g
+(coe 1 0 (j. B) (coe 0 1 (i. B) (f.f x)))} {x} j. hcom 0 1 A [j = 0 k. hcom 0 1
+A [k = 0 i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1
+(l. B) (f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f
+x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B)
+(f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x))))); j = 1 k. x] x, λ
+x {coe 0 1 (i. B) (f.f (f.g (coe 1 0 (j. B) x)))} {x} j. hcom 1 0 B [j = 0
+k. hcom 0 1 B [k = 1 i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B)
+x)))] (coe k 1 (l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f
+(f.g (coe 1 0 (l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x)
+{f.f (f.g (coe 1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k
+(l. B) x))); j = 1 k. x] x, λ x {λ {coe 0 1 (i. B) (f.f (f.g (coe 1 0 (j. B)
+(coe 0 1 (i. B) (f.f x)))))} {coe 0 1 (i. B) (f.f x)} j. hcom 1 0 B [j = 0
+k. hcom 0 1 B [k = 1 i. coe 0 1 (i. B) (f.f x); k = 0 l. coe 0 1 (l. B) (f.f
+(f.g (coe 1 0 (l. B) (coe 0 1 (i. B) (f.f x)))))] (coe k 1 (l. B) (hcom 1 0 B [k
+= 1 i. coe 0 1 (i. B) (f.f x); k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0
+(l. B) (coe 0 1 (i. B) (f.f x)))); j = 1 i. coe 1 0 (l. B) (coe 0 1 (i. B) (f.f
+x))] (f.rinv (coe 1 0 (l. B) (coe 0 1 (i. B) (f.f x))) {f.f (f.g (coe 1 0 (l. B)
+(coe 0 1 (i. B) (f.f x))))} {coe 1 0 (l. B) (coe 0 1 (i. B) (f.f x))} j); k = 1
+j. coe 0 1 (i. B) (f.f x)] (coe 1 k (l. B) (coe 0 1 (i. B) (f.f x))))); j = 1
+k. coe 0 1 (i. B) (f.f x)] (coe 0 1 (i. B) (f.f x))} {λ {coe 0 1 (i. B) (f.f x)}
+{coe 0 1 (i. B) (f.f x)} _. coe 0 1 (i. B) (f.f x)} l {coe 0 1 (i. B) (f.f (hcom
+0 1 A [l = 0 k. hcom 0 1 A [k = 0 i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g
+(coe 1 0 (l. B) (coe 0 1 (l. B) (f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k =
+0 i. f.f x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f
+x); j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B)
+(f.f x))))); l = 1 k. x] x))} {coe 0 1 (i. B) (f.f x)} k. hcom 0 1 B [k = 0
+i. hcom 0 1 B [i = 1 i. coe 0 1 (j. B) (f.f (hcom 0 1 A [l = 0 k. hcom 0 1 A [k
+= 0 i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1
+(l. B) (f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f
+x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B)
+(f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x))))); l = 1 k. x] x));
+i = 0 l. coe 0 1 (i. B) (f.f x)] (coe i 1 (i. B) (hcom 1 0 B [i = 0 i. f.f x; i
+= 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B) (f.f (hcom 0 1 A [l =
+0 k. hcom 0 1 A [k = 0 i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1 0
+(l. B) (coe 0 1 (l. B) (f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f
+x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1
+i. coe 0 1 (l. B) (f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f
+x))))); l = 1 k. x] x)); j = 1 i. coe 0 1 (j. B) (f.f (hcom 0 1 A [l = 0 k. hcom
+0 1 A [k = 0 i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1 0 (l. B) (coe
+0 1 (l. B) (f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0
+j. f.f x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1
+(l. B) (f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x))))); l = 1
+k. x] x))] (coe 0 1 (j. B) (f.f (hcom 0 1 A [l = 0 k. hcom 0 1 A [k = 0
+i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B)
+(f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f x; k =
+1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B) (f.f
+x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x))))); l = 1 k. x] x)))]
+(coe 0 i (j. B) (f.f (hcom 0 i A [l = 0 k. hcom 0 1 A [k = 0 i. f.linv x {f.g
+(f.f x)} {x} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B) (f.f x)))] (f.g
+(coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B
+[j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0 1
+(l. B) (f.f x))] (coe 0 k (l. B) (f.f x))))); l = 1 k. x] x))))); k = 1 i. hcom
+0 1 B [i = 1 i. coe 0 1 (j. B) (f.f x); i = 0 l. coe 0 1 (i. B) (f.f x)] (coe i
+1 (i. B) (hcom 1 0 B [i = 0 i. f.f x; i = 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0
+i. coe 0 1 (j. B) (f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f
+x))] (coe 0 i (j. B) (f.f x)))); l = 0 i. hcom 0 1 B [i = 1 i. hcom 1 0 B [k = 0
+k. hcom 0 1 B [k = 1 i. coe 0 1 (j. B) (f.f x); k = 0 l. coe 0 1 (l. B) (f.f
+(f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x)))))] (coe k 1 (l. B) (hcom 1 0 B [k
+= 1 i. coe 0 1 (j. B) (f.f x); k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0
+(l. B) (coe 0 1 (j. B) (f.f x)))); j = 1 i. coe 1 0 (l. B) (coe 0 1 (j. B) (f.f
+x))] (f.rinv (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))) {f.f (f.g (coe 1 0 (l. B)
+(coe 0 1 (j. B) (f.f x))))} {coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))} j); k = 1
+j. coe 0 1 (j. B) (f.f x)] (coe 1 k (l. B) (coe 0 1 (j. B) (f.f x))))); k = 1
+k. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x)); i = 0 l. coe 0 1 (i. B)
+(f.f x)] (coe i 1 (i. B) (hcom i 0 B [k = 0 k. hcom 1 0 B [i = k i. hcom 1 0 B
+[@2 = 0 i. f.f x; @2 = 0 j. f.f x; @2 = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B)
+(f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 @2
+(j. B) (f.f x)); i = 0 j. hcom 0 1 B [j = 0 i. f.f (hcom 0 i A [k = 0 i. f.linv
+x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B) (f.f x)))]
+(f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f x; k = 1 j. hcom
+0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0
+1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x)))))); j = 1 i. coe k 0 (l. B) (hcom 1
+0 B [k = 0 i. f.f x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1
+(l. B) (f.f x); j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0 1 (l. B) (f.f x))] (coe
+0 k (l. B) (f.f x))); k = 0 i. f.coh x {f.rinv (f.f x)} {λ {f.f x} {f.f x}
+_. f.f x} i {f.f (f.linv x {f.g (f.f x)} {x} i)} {f.f x} j] (f.rinv (coe k 0
+(l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B [j = 0
+i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0 1 (l. B) (f.f
+x))] (coe 0 k (l. B) (f.f x)))) {f.f (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0
+i. f.f x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x);
+j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f
+x)))))} {coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f x; k = 1
+j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B) (f.f x)]
+(coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x)))} j); i = 1 j. hcom 0 1 B [j
+= 0 i. hcom 0 i B [k = 1 i. coe 0 1 (j. B) (f.f x); k = 0 l. coe 0 1 (l. B) (f.f
+(f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x)))))] (coe k 1 (l. B) (hcom 1 0 B [k
+= 1 i. coe 0 1 (j. B) (f.f x); k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0
+(l. B) (coe 0 1 (j. B) (f.f x)))); j = 1 i. coe 1 0 (l. B) (coe 0 1 (j. B) (f.f
+x))] (f.rinv (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))) {f.f (f.g (coe 1 0 (l. B)
+(coe 0 1 (j. B) (f.f x))))} {coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))} j); k = 1
+j. coe 0 1 (j. B) (f.f x)] (coe 1 k (l. B) (coe 0 1 (j. B) (f.f x))))); j = 1
+i. coe k 1 (l. B) (hcom 1 0 B [k = 1 i. coe 0 1 (j. B) (f.f x); k = 0 j. hcom 0
+1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x)))); j = 1 i. coe
+1 0 (l. B) (coe 0 1 (j. B) (f.f x))] (f.rinv (coe 1 0 (l. B) (coe 0 1 (j. B)
+(f.f x))) {f.f (f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))))} {coe 1 0 (l. B)
+(coe 0 1 (j. B) (f.f x))} j); k = 1 j. coe 0 1 (j. B) (f.f x)] (coe 1 k (l. B)
+(coe 0 1 (j. B) (f.f x)))); k = 1 i. coe 0 1 (j. B) (f.f x)] (coe k 1 (l. B)
+(hcom 1 0 B [k = 1 i. coe 0 1 (j. B) (f.f x); k = 0 j. hcom 0 1 B [j = 0 i. f.f
+(f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x)))); j = 1 i. coe 1 0 (l. B) (coe 0
+1 (j. B) (f.f x))] (f.rinv (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))) {f.f (f.g
+(coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))))} {coe 1 0 (l. B) (coe 0 1 (j. B) (f.f
+x))} j); k = 1 j. coe 0 1 (j. B) (f.f x)] (coe 1 k (l. B) (coe 0 1 (j. B) (f.f
+x)))))] (coe k i (l. B) (hcom 1 0 B [i = k i. hcom 1 0 B [@2 = 0 i. f.f x; @2 =
+0 j. f.f x; @2 = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B) (f.f x); j = 1 i. coe
+0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 @2 (j. B) (f.f x)); k = 0
+j. hcom 0 1 B [j = 0 i. f.f (hcom 0 i A [@2 = 0 i. f.linv x {f.g (f.f x)} {x} i;
+@2 = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x)))] (f.g (coe @2 0 (l. B)
+(hcom 1 0 B [@2 = 0 i. f.f x; @2 = 0 j. f.f x; @2 = 1 j. hcom 0 1 B [j = 0
+i. coe 0 1 (j. B) (f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f
+x))] (coe 0 @2 (j. B) (f.f x)))))); j = 1 i. coe @2 0 (l. B) (hcom 1 0 B [@2 = 0
+i. f.f x; @2 = 0 j. f.f x; @2 = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B) (f.f
+x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 @2 (j. B)
+(f.f x))); i = 0 i. f.coh x {f.rinv (f.f x)} {λ {f.f x} {f.f x} _. f.f x} i {f.f
+(f.linv x {f.g (f.f x)} {x} i)} {f.f x} j] (f.rinv (coe i 0 (l. B) (hcom 1 0 B
+[i = 0 i. f.f x; i = 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B)
+(f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 i
+(j. B) (f.f x)))) {f.f (f.g (coe i 0 (l. B) (hcom 1 0 B [i = 0 i. f.f x; i = 0
+j. f.f x; i = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B) (f.f x); j = 1 i. coe 0 1
+(j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 i (j. B) (f.f x)))))} {coe i 0
+(l. B) (hcom 1 0 B [i = 0 i. f.f x; i = 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0
+i. coe 0 1 (j. B) (f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f
+x))] (coe 0 i (j. B) (f.f x)))} j); k = 1 j. hcom 0 1 B [j = 0 i. hcom 0 i B [@2
+= 1 i. coe 0 1 (j. B) (f.f x); @2 = 0 l. coe 0 1 (l. B) (f.f x)] (coe @2 1
+(l. B) (hcom 1 0 B [@2 = 0 i. f.f x; @2 = 0 j. f.f x; @2 = 1 j. hcom 0 1 B [j =
+0 i. coe 0 1 (j. B) (f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B)
+(f.f x))] (coe 0 @2 (j. B) (f.f x)))); j = 1 i. coe @2 1 (l. B) (hcom 1 0 B [@2
+= 0 i. f.f x; @2 = 0 j. f.f x; @2 = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B)
+(f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 @2
+(j. B) (f.f x))); i = 1 i. coe 0 1 (j. B) (f.f x)] (coe i 1 (l. B) (hcom 1 0 B
+[i = 0 i. f.f x; i = 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B)
+(f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 i
+(j. B) (f.f x))))] (coe i k (l. B) (hcom 1 0 B [i = 0 i. f.f x; i = 0 j. f.f x;
+i = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B) (f.f x); j = 1 i. coe 0 1 (j. B)
+(f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 i (j. B) (f.f x)))))); k = 1 k. hcom 1
+0 B [i = 0 i. f.f x; i = 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0 i. coe 0 1
+(j. B) (f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe
+0 i (j. B) (f.f x)); i = 0 i. f.f (hcom 0 i A [k = 0 k. hcom 0 1 A [k = 0
+i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B)
+(f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f x; k = 0 j. f.f x; k =
+1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x); j = 1 i. coe 0 1 (l. B) (f.f
+x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f x))))); k = 1 k. x] x); i = 1
+i. hcom 1 i B [k = 0 k. hcom 0 1 B [k = 1 i. coe 0 1 (j. B) (f.f x); k = 0
+l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x)))))] (coe k
+1 (l. B) (hcom 1 0 B [k = 1 i. coe 0 1 (j. B) (f.f x); k = 0 j. hcom 0 1 B [j =
+0 i. f.f (f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x)))); j = 1 i. coe 1 0
+(l. B) (coe 0 1 (j. B) (f.f x))] (f.rinv (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f
+x))) {f.f (f.g (coe 1 0 (l. B) (coe 0 1 (j. B) (f.f x))))} {coe 1 0 (l. B) (coe
+0 1 (j. B) (f.f x))} j); k = 1 j. coe 0 1 (j. B) (f.f x)] (coe 1 k (l. B) (coe 0
+1 (j. B) (f.f x))))); k = 1 k. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))]
+(hcom 1 0 B [i = 0 i. f.f x; i = 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0 i. coe 0
+1 (j. B) (f.f x); j = 1 i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))]
+(coe 0 i (j. B) (f.f x))))); l = 1 i. hcom 0 1 B [i = 1 i. coe 0 1 (j. B) (f.f
+x); i = 0 l. coe 0 1 (i. B) (f.f x)] (coe i 1 (i. B) (hcom 1 0 B [i = 0 i. f.f
+x; i = 0 j. f.f x; i = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (j. B) (f.f x); j = 1
+i. coe 0 1 (j. B) (f.f x)] (coe 0 1 (j. B) (f.f x))] (coe 0 i (j. B) (f.f x))))]
+(coe 0 1 (i. B) (f.f x)));
+
+uaTripNfOK (A B : U)(f : equiv A B) : uaTrip A B f ={_. equiv A B} uaTripNf A B f :=
+  refl;
+
+pathToEquiv' (A B : U)(p : A = B) : equiv B A :=
+  (λ x. coe 1 0 p x, coeIsEquiv (λ i. p i) 1 0);
+
+uaTrip' (A B : U)(f : equiv A B) : equiv B A :=
+  pathToEquiv' A B (ua A B f);
+
+uaTripNf' (A B : U)(f : equiv A B) : equiv B A :=
+(λ x. f.g (coe 1 0 (i. B) x), λ x. coe 0 1 (j. B) (f.f x), λ x {coe 0 1
+(j. B) (f.f (f.g (coe 1 0 (i. B) x)))} {x} j. hcom 1 0 B [j = 0 k. hcom 0 1 B [k
+= 1 i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1
+(l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0
+(l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe
+1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); j = 1
+k. x] x, λ x {f.g (coe 1 0 (i. B) (coe 0 1 (j. B) (f.f x)))} {x} j. hcom 0 1 A
+[j = 0 k. hcom 0 1 A [k = 0 i. f.linv x {f.g (f.f x)} {x} i; k = 1 l. f.g (coe 1
+0 (l. B) (coe 0 1 (l. B) (f.f x)))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0
+i. f.f x; k = 0 j. f.f x; k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f x);
+j = 1 i. coe 0 1 (l. B) (f.f x)] (coe 0 1 (l. B) (f.f x))] (coe 0 k (l. B) (f.f
+x))))); j = 1 k. x] x, λ x {λ {f.g (coe 1 0 (i. B) (coe 0 1 (j. B) (f.f (f.g
+(coe 1 0 (i. B) x)))))} {f.g (coe 1 0 (i. B) x)} j. hcom 0 1 A [j = 0 k. hcom 0
+1 A [k = 0 i. f.linv (f.g (coe 1 0 (i. B) x)) {f.g (f.f (f.g (coe 1 0 (i. B)
+x)))} {f.g (coe 1 0 (i. B) x)} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B)
+(f.f (f.g (coe 1 0 (i. B) x)))))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f
+(f.g (coe 1 0 (i. B) x)); k = 0 j. f.f (f.g (coe 1 0 (i. B) x)); k = 1 j. hcom 0
+1 B [j = 0 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (i. B) x))); j = 1 i. coe 0 1
+(l. B) (f.f (f.g (coe 1 0 (i. B) x)))] (coe 0 1 (l. B) (f.f (f.g (coe 1 0 (i. B)
+x))))] (coe 0 k (l. B) (f.f (f.g (coe 1 0 (i. B) x))))))); j = 1 k. f.g (coe 1 0
+(i. B) x)] (f.g (coe 1 0 (i. B) x))} {λ {f.g (coe 1 0 (i. B) x)} {f.g (coe 1 0
+(i. B) x)} _. f.g (coe 1 0 (i. B) x)} l {f.g (coe 1 0 (i. B) (hcom 1 0 B [l = 0
+k. hcom 0 1 B [k = 1 i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B)
+x)))] (coe k 1 (l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f
+(f.g (coe 1 0 (l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x)
+{f.f (f.g (coe 1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k
+(l. B) x))); l = 1 k. x] x))} {f.g (coe 1 0 (i. B) x)} k. hcom 1 0 A [k = 0
+i. hcom 0 1 A [i = 0 i. f.linv (f.g (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k. hcom 0
+1 B [k = 1 i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k
+1 (l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1
+0 (l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g
+(coe 1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); l
+= 1 k. x] x))) {f.g (f.f (f.g (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k. hcom 0 1 B
+[k = 1 i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1
+(l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0
+(l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe
+1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); l = 1
+k. x] x))))} {f.g (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k. hcom 0 1 B [k = 1 i. x;
+k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1 (l. B) (hcom 1
+0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B) x)); j =
+1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0 (l. B) x))}
+{coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); l = 1 k. x] x))} i; i =
+1 l. f.g (coe 1 0 (i. B) x)] (f.g (coe i 0 (i. B) (hcom 1 0 B [i = 1 i. x; i = 0
+j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k. hcom 0 1
+B [k = 1 i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1
+(l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0
+(l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe
+1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); l = 1
+k. x] x))); j = 1 i. coe 1 0 (j. B) (hcom 1 0 B [l = 0 k. hcom 0 1 B [k = 1
+i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1 (l. B)
+(hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B)
+x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0
+(l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); l = 1 k. x]
+x)] (f.rinv (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k. hcom 0 1 B [k = 1 i. x; k = 0
+l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1 (l. B) (hcom 1 0 B [k
+= 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B) x)); j = 1
+i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0 (l. B) x))}
+{coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); l = 1 k. x] x)) {f.f
+(f.g (coe 1 0 (j. B) (hcom 1 0 B [l = 0 k. hcom 0 1 B [k = 1 i. x; k = 0 l. coe
+0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1 (l. B) (hcom 1 0 B [k = 1
+i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B) x)); j = 1 i. coe 1
+0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0 (l. B) x))} {coe 1 0
+(l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); l = 1 k. x] x)))} {coe 1 0
+(j. B) (hcom 1 0 B [l = 0 k. hcom 0 1 B [k = 1 i. x; k = 0 l. coe 0 1 (l. B)
+(f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1 (l. B) (hcom 1 0 B [k = 1 i. x; k = 0
+j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B) x)); j = 1 i. coe 1 0 (l. B) x]
+(f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0 (l. B) x))} {coe 1 0 (l. B) x} j);
+k = 1 j. x] (coe 1 k (l. B) x))); l = 1 k. x] x)} j); i = 1 j. x] (coe 1 i
+(j. B) (hcom 1 i B [l = 0 k. hcom 0 1 B [k = 1 i. x; k = 0 l. coe 0 1 (l. B)
+(f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1 (l. B) (hcom 1 0 B [k = 1 i. x; k = 0
+j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B) x)); j = 1 i. coe 1 0 (l. B) x]
+(f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0 (l. B) x))} {coe 1 0 (l. B) x} j);
+k = 1 j. x] (coe 1 k (l. B) x))); l = 1 k. x] x))))); k = 1 i. hcom 0 1 A [i = 0
+i. f.linv (f.g (coe 1 0 (j. B) x)) {f.g (f.f (f.g (coe 1 0 (j. B) x)))} {f.g
+(coe 1 0 (j. B) x)} i; i = 1 l. f.g (coe 1 0 (i. B) x)] (f.g (coe i 0 (i. B)
+(hcom 1 0 B [i = 1 i. x; i = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B)
+x)); j = 1 i. coe 1 0 (j. B) x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0
+(j. B) x))} {coe 1 0 (j. B) x} j); i = 1 j. x] (coe 1 i (j. B) x)))); l = 0
+i. hcom 0 1 A [i = 0 i. f.linv (hcom 0 1 A [k = 0 k. hcom 0 1 A [k = 0 i. f.linv
+(f.g (coe 1 0 (j. B) x)) {f.g (f.f (f.g (coe 1 0 (j. B) x)))} {f.g (coe 1 0
+(j. B) x)} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B) (f.f (f.g (coe 1 0
+(j. B) x)))))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f (f.g (coe 1 0
+(j. B) x)); k = 0 j. f.f (f.g (coe 1 0 (j. B) x)); k = 1 j. hcom 0 1 B [j = 0
+i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))); j = 1 i. coe 0 1 (l. B) (f.f
+(f.g (coe 1 0 (j. B) x)))] (coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))))] (coe
+0 k (l. B) (f.f (f.g (coe 1 0 (j. B) x))))))); k = 1 k. f.g (coe 1 0 (j. B) x)]
+(f.g (coe 1 0 (j. B) x))) {f.g (f.f (hcom 0 1 A [k = 0 k. hcom 0 1 A [k = 0
+i. f.linv (f.g (coe 1 0 (j. B) x)) {f.g (f.f (f.g (coe 1 0 (j. B) x)))} {f.g
+(coe 1 0 (j. B) x)} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B) (f.f (f.g
+(coe 1 0 (j. B) x)))))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f (f.g (coe
+1 0 (j. B) x)); k = 0 j. f.f (f.g (coe 1 0 (j. B) x)); k = 1 j. hcom 0 1 B [j =
+0 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))); j = 1 i. coe 0 1 (l. B) (f.f
+(f.g (coe 1 0 (j. B) x)))] (coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))))] (coe
+0 k (l. B) (f.f (f.g (coe 1 0 (j. B) x))))))); k = 1 k. f.g (coe 1 0 (j. B) x)]
+(f.g (coe 1 0 (j. B) x))))} {hcom 0 1 A [k = 0 k. hcom 0 1 A [k = 0 i. f.linv
+(f.g (coe 1 0 (j. B) x)) {f.g (f.f (f.g (coe 1 0 (j. B) x)))} {f.g (coe 1 0
+(j. B) x)} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B) (f.f (f.g (coe 1 0
+(j. B) x)))))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f (f.g (coe 1 0
+(j. B) x)); k = 0 j. f.f (f.g (coe 1 0 (j. B) x)); k = 1 j. hcom 0 1 B [j = 0
+i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))); j = 1 i. coe 0 1 (l. B) (f.f
+(f.g (coe 1 0 (j. B) x)))] (coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))))] (coe
+0 k (l. B) (f.f (f.g (coe 1 0 (j. B) x))))))); k = 1 k. f.g (coe 1 0 (j. B) x)]
+(f.g (coe 1 0 (j. B) x))} i; i = 1 l. f.g (coe 1 0 (i. B) x)] (f.g (coe i 0
+(i. B) (hcom i 1 B [k = 0 k. hcom 1 0 B [i = k i. hcom 1 0 B [@2 = 1 i. x; @2 =
+0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B)
+x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x}
+j); @2 = 1 j. x] (coe 1 @2 (j. B) x); i = 0 j. hcom 0 1 B [j = 0 i. f.f (hcom 0
+i A [k = 0 i. f.linv (f.g (coe 1 0 (j. B) x)) {f.g (f.f (f.g (coe 1 0 (j. B)
+x)))} {f.g (coe 1 0 (j. B) x)} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1 (l. B)
+(f.f (f.g (coe 1 0 (j. B) x)))))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f
+(f.g (coe 1 0 (j. B) x)); k = 0 j. f.f (f.g (coe 1 0 (j. B) x)); k = 1 j. hcom 0
+1 B [j = 0 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))); j = 1 i. coe 0 1
+(l. B) (f.f (f.g (coe 1 0 (j. B) x)))] (coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B)
+x))))] (coe 0 k (l. B) (f.f (f.g (coe 1 0 (j. B) x)))))))); j = 1 i. coe k 0
+(l. B) (hcom 1 0 B [k = 0 i. f.f (f.g (coe 1 0 (j. B) x)); k = 0 j. f.f (f.g
+(coe 1 0 (j. B) x)); k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f (f.g (coe
+1 0 (j. B) x))); j = 1 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x)))] (coe 0
+1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))))] (coe 0 k (l. B) (f.f (f.g (coe 1 0
+(j. B) x))))); k = 0 i. f.coh (f.g (coe 1 0 (j. B) x)) {f.rinv (f.f (f.g (coe 1
+0 (j. B) x)))} {λ {f.f (f.g (coe 1 0 (j. B) x))} {f.f (f.g (coe 1 0 (j. B) x))}
+_. f.f (f.g (coe 1 0 (j. B) x))} i {f.f (f.linv (f.g (coe 1 0 (j. B) x)) {f.g
+(f.f (f.g (coe 1 0 (j. B) x)))} {f.g (coe 1 0 (j. B) x)} i)} {f.f (f.g (coe 1 0
+(j. B) x))} j] (f.rinv (coe k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f (f.g (coe 1 0
+(j. B) x)); k = 0 j. f.f (f.g (coe 1 0 (j. B) x)); k = 1 j. hcom 0 1 B [j = 0
+i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))); j = 1 i. coe 0 1 (l. B) (f.f
+(f.g (coe 1 0 (j. B) x)))] (coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))))] (coe
+0 k (l. B) (f.f (f.g (coe 1 0 (j. B) x)))))) {f.f (f.g (coe k 0 (l. B) (hcom 1 0
+B [k = 0 i. f.f (f.g (coe 1 0 (j. B) x)); k = 0 j. f.f (f.g (coe 1 0 (j. B) x));
+k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))); j =
+1 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x)))] (coe 0 1 (l. B) (f.f (f.g
+(coe 1 0 (j. B) x))))] (coe 0 k (l. B) (f.f (f.g (coe 1 0 (j. B) x)))))))} {coe
+k 0 (l. B) (hcom 1 0 B [k = 0 i. f.f (f.g (coe 1 0 (j. B) x)); k = 0 j. f.f (f.g
+(coe 1 0 (j. B) x)); k = 1 j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f (f.g (coe
+1 0 (j. B) x))); j = 1 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x)))] (coe 0
+1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))))] (coe 0 k (l. B) (f.f (f.g (coe 1 0
+(j. B) x)))))} j); i = 1 j. hcom 0 1 B [j = 0 i. hcom 0 i B [k = 1 i. x; k = 0
+l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B) x)))] (coe k 1 (l. B) (hcom 1 0 B [k
+= 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B) x)); j = 1
+i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0 (l. B) x))}
+{coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x))); j = 1 i. coe k 1 (l. B)
+(hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (l. B)
+x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f (f.g (coe 1 0
+(l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B) x)); k = 1 i. x]
+(coe k 1 (l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g
+(coe 1 0 (l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x) {f.f
+(f.g (coe 1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k (l. B)
+x)))] (coe k i (l. B) (hcom 1 0 B [i = k i. hcom 1 0 B [@2 = 1 i. x; @2 = 0
+j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x]
+(f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j);
+@2 = 1 j. x] (coe 1 @2 (j. B) x); k = 0 j. hcom 0 1 B [j = 0 i. f.f (hcom 0 i A
+[@2 = 0 i. f.linv (f.g (coe 1 0 (j. B) x)) {f.g (f.f (f.g (coe 1 0 (j. B) x)))}
+{f.g (coe 1 0 (j. B) x)} i; @2 = 1 l. f.g (coe 1 0 (l. B) x)] (f.g (coe @2 0
+(l. B) (hcom 1 0 B [@2 = 1 i. x; @2 = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1
+0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g
+(coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j); @2 = 1 j. x] (coe 1 @2 (j. B)
+x))))); j = 1 i. coe @2 0 (l. B) (hcom 1 0 B [@2 = 1 i. x; @2 = 0 j. hcom 0 1 B
+[j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x] (f.rinv (coe
+1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j); @2 = 1 j. x]
+(coe 1 @2 (j. B) x)); i = 0 i. f.coh (f.g (coe 1 0 (j. B) x)) {f.rinv (f.f (f.g
+(coe 1 0 (j. B) x)))} {λ {f.f (f.g (coe 1 0 (j. B) x))} {f.f (f.g (coe 1 0
+(j. B) x))} _. f.f (f.g (coe 1 0 (j. B) x))} i {f.f (f.linv (f.g (coe 1 0 (j. B)
+x)) {f.g (f.f (f.g (coe 1 0 (j. B) x)))} {f.g (coe 1 0 (j. B) x)} i)} {f.f (f.g
+(coe 1 0 (j. B) x))} j] (f.rinv (coe i 0 (l. B) (hcom 1 0 B [i = 1 i. x; i = 0
+j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x]
+(f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j);
+i = 1 j. x] (coe 1 i (j. B) x))) {f.f (f.g (coe i 0 (l. B) (hcom 1 0 B [i = 1
+i. x; i = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1
+0 (j. B) x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0
+(j. B) x} j); i = 1 j. x] (coe 1 i (j. B) x))))} {coe i 0 (l. B) (hcom 1 0 B [i
+= 1 i. x; i = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1
+i. coe 1 0 (j. B) x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))}
+{coe 1 0 (j. B) x} j); i = 1 j. x] (coe 1 i (j. B) x))} j); k = 1 j. hcom 0 1 B
+[j = 0 i. hcom 0 i B [@2 = 1 i. x; @2 = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0
+(j. B) x)))] (coe @2 1 (l. B) (hcom 1 0 B [@2 = 1 i. x; @2 = 0 j. hcom 0 1 B [j
+= 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x] (f.rinv (coe 1 0
+(j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j); @2 = 1 j. x]
+(coe 1 @2 (j. B) x))); j = 1 i. coe @2 1 (l. B) (hcom 1 0 B [@2 = 1 i. x; @2 = 0
+j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x]
+(f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j);
+@2 = 1 j. x] (coe 1 @2 (j. B) x)); i = 1 i. x] (coe i 1 (l. B) (hcom 1 0 B [i =
+1 i. x; i = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe
+1 0 (j. B) x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0
+(j. B) x} j); i = 1 j. x] (coe 1 i (j. B) x)))] (coe i k (l. B) (hcom 1 0 B [i =
+1 i. x; i = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe
+1 0 (j. B) x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0
+(j. B) x} j); i = 1 j. x] (coe 1 i (j. B) x))))); k = 1 k. hcom 1 0 B [i = 1
+i. x; i = 0 j. hcom 0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1
+0 (j. B) x] (f.rinv (coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0
+(j. B) x} j); i = 1 j. x] (coe 1 i (j. B) x); i = 0 i. f.f (hcom 0 i A [k = 0
+k. hcom 0 1 A [k = 0 i. f.linv (f.g (coe 1 0 (j. B) x)) {f.g (f.f (f.g (coe 1 0
+(j. B) x)))} {f.g (coe 1 0 (j. B) x)} i; k = 1 l. f.g (coe 1 0 (l. B) (coe 0 1
+(l. B) (f.f (f.g (coe 1 0 (j. B) x)))))] (f.g (coe k 0 (l. B) (hcom 1 0 B [k = 0
+i. f.f (f.g (coe 1 0 (j. B) x)); k = 0 j. f.f (f.g (coe 1 0 (j. B) x)); k = 1
+j. hcom 0 1 B [j = 0 i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x))); j = 1
+i. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (j. B) x)))] (coe 0 1 (l. B) (f.f (f.g (coe
+1 0 (j. B) x))))] (coe 0 k (l. B) (f.f (f.g (coe 1 0 (j. B) x))))))); k = 1
+k. f.g (coe 1 0 (j. B) x)] (f.g (coe 1 0 (j. B) x))); i = 1 i. hcom 1 i B [k = 0
+k. hcom 0 1 B [k = 1 i. x; k = 0 l. coe 0 1 (l. B) (f.f (f.g (coe 1 0 (l. B)
+x)))] (coe k 1 (l. B) (hcom 1 0 B [k = 1 i. x; k = 0 j. hcom 0 1 B [j = 0 i. f.f
+(f.g (coe 1 0 (l. B) x)); j = 1 i. coe 1 0 (l. B) x] (f.rinv (coe 1 0 (l. B) x)
+{f.f (f.g (coe 1 0 (l. B) x))} {coe 1 0 (l. B) x} j); k = 1 j. x] (coe 1 k
+(l. B) x))); k = 1 k. x] x] (hcom 1 0 B [i = 1 i. x; i = 0 j. hcom 0 1 B [j = 0
+i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x] (f.rinv (coe 1 0
+(j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j); i = 1 j. x] (coe
+1 i (j. B) x))))); l = 1 i. hcom 0 1 A [i = 0 i. f.linv (f.g (coe 1 0 (j. B) x))
+{f.g (f.f (f.g (coe 1 0 (j. B) x)))} {f.g (coe 1 0 (j. B) x)} i; i = 1 l. f.g
+(coe 1 0 (i. B) x)] (f.g (coe i 0 (i. B) (hcom 1 0 B [i = 1 i. x; i = 0 j. hcom
+0 1 B [j = 0 i. f.f (f.g (coe 1 0 (j. B) x)); j = 1 i. coe 1 0 (j. B) x] (f.rinv
+(coe 1 0 (j. B) x) {f.f (f.g (coe 1 0 (j. B) x))} {coe 1 0 (j. B) x} j); i = 1
+j. x] (coe 1 i (j. B) x))))] (f.g (coe 1 0 (i. B) x)));
+
+uaTripNfOK' (A B : U)(f : equiv A B) : uaTrip' A B f = uaTripNf' A B f :=
+  refl;

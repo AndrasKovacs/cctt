@@ -84,7 +84,7 @@ eq# i j = case (i, j) of
                         (i, j) -> VCNe (NeCof' (solve ?cof j (IVar i)) (NCEq (IVar i) (IVar j)))
                                        (IS.insert i $ IS.insert j mempty)
   (IVar i, j     ) -> VCNe (NeCof' (solve ?cof i j) (NCEq (IVar i) j)) (IS.insert i mempty)
-  (i     , IVar j) -> VCNe (NeCof' (solve ?cof j i) (NCEq i (IVar j))) (IS.insert j mempty)
+  (i     , IVar j) -> VCNe (NeCof' (solve ?cof j i) (NCEq (IVar j) i)) (IS.insert j mempty)
   _                -> VCFalse
 
 eq :: NCofArg => I -> I -> VCof

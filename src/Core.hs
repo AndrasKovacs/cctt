@@ -796,7 +796,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
   -- ar' : Ar'
   -- ar' := gcom r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
-    ~ar' = hcomdn r r' _Ar'
+    ~ar' = ghcomdn r r' _Ar'
              (mapNeSysHCom'
                 (\i tf -> coe i r' a (  proj1 "f" (proj2 "Ty" (tf ∙ i))
                                       ∙ coe r i (proj1BindIFromLazy "Ty" tf) gr))
@@ -848,12 +848,12 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
       -- fibval* : Tr'
       -- fibval* = ghcom 0 1 Tr' valSys fibval
-      ~fibval' = hcomd I0 I1 tr' valSys fibval
+      ~fibval' = ghcomd I0 I1 tr' valSys fibval
 
       -- fibpath* : fr' fibval = ar'
       -- fibpath* = λ j.
-      --   ghcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
-      --                 ;j=1    i. ar'                                 -- it's independent from j=0
+      --   ghcom 0 1 Ar' [j=0    i. fr' (ghcom 0 i Tr' valSys fibval)    -- no need to force valSys because
+      --                 ;j=1    i. ar'                                  -- it's independent from j=0
       --                 ;r=r'   i. fr'.coh gr i j
       --                 ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
       --                 (fibpath {fr' fibval} {ar'} j)
@@ -861,7 +861,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       fibpath' =
         bindILazy "j" \j ->
         hcomd I0 I1 _Ar'
-          (vshcons (eq j I0) "i" (\i -> fr' ∙ hcom I0 i tr' valSys fibval) $
+          (vshcons (eq j I0) "i" (\i -> fr' ∙ ghcom I0 i tr' valSys fibval) $
            vshcons (eq j I1) "i" (\i -> ar') $
            vshcons (eq r r') "i" (\i -> app_r'coh gr i j) $
            mapVSysHCom (\i tf -> app_r'coh (coe r r' (proj1BindIFromLazy "Ty" tf) gr) i j) $
@@ -1139,9 +1139,14 @@ complNeCof = \case
                    _                -> impossible
   NCAnd c1 c2 -> COr (complNeCof c1) (complNeCof c2)
 
+sysToCompl :: NeSysHCom -> Complete
+sysToCompl = \case
+  NSHEmpty      -> CFalse
+  NSHCons t sys -> COr (CLeaf (t^.binds)) (sysToCompl sys)
+
 complSys :: NeSysHCom -> Complete
 complSys = \case
-  NSHEmpty      -> CFalse
+  NSHEmpty      -> CLeaf (NCEq I0 I0) -- "True"
   NSHCons t sys -> andComplete (complNeCof (t^.binds)) (complSys sys)
 
 complToSys :: IVar -> Complete -> Val -> NeSysHCom
@@ -1153,8 +1158,11 @@ complToSys i c ~base = go c NSHEmpty where
 
 -- | Make a forced neutral system valid.
 validify :: NCofArg => DomArg => NeSysHCom' -> Val -> NeSysHCom'
-validify sys ~base = let
-  completion = frc (complToSys (dom ?cof) (complSys (sys^.body)) base)
+validify sys ~base =
+  -- trace "VALIDIFY" $
+  -- traceShow (sysToCompl $ sys^.body) $
+  -- traceShow (complSys (sys^.body)) $
+  let completion = frc (complToSys (dom ?cof) (complSys (sys^.body)) base)
   in case completion of
     VSHTotal _ -> impossible
     VSHNe sys' -> catNeSysHCom' sys sys'
@@ -1173,6 +1181,12 @@ ghcomd r r' ~a sys ~base = case sys of
   VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
   VSHNe sys  -> ghcomdn r r' a sys base
 {-# inline ghcomd #-}
+
+ghcom :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
+ghcom r r' ~a ~sys ~b
+  | frc r == frc r' = runIO (bumpHCom >> pure b)
+  | True            = ghcomd r r' a sys b
+{-# inline ghcom #-}
 
 --------------------------------------------------------------------------------
 

@@ -14,7 +14,17 @@ fun n x = transport (BoolPathN n) x
 val : ℕ → Bool
 val n = transport (BoolPathN n) true
 
-test : val 350 ≡ false
-test = refl
+-- test : val 350 ≡ false
+-- test = refl
 
 -- all|internal|modules|definitions|sharing|serialize|constraints|metas|interactive|conversion)
+
+
+foo : (A : Set)(x : A) → I → A
+foo A x i = hcomp {φ = ~ (i ∧ ~ i)} (λ _ → λ {(i = i0) → x; (i = i1) → x}) x
+
+bar : (A : Set)(x : A) → I → A
+bar A x i = hcomp {φ = ~ i ∨ i} (λ _ → λ {(i = i0) → x; (i = i1) → x}) x
+
+baz : foo ≡ bar
+baz = refl
