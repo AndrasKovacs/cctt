@@ -4,6 +4,7 @@ module Cubical.Cofibration where
 import Common
 import Cubical.Interval
 import Cubical.Substitution
+import Statistics (bumpMaxIVar)
 
 import qualified Data.IVarSet as IS
 
@@ -53,7 +54,7 @@ instance Show NeCof' where
 deriving instance Show VCof
 
 instance Lift NCof where
-  lift (NCof d is) = NCof (d + 1) (ILDef is (IVar d))
+  lift (NCof d is) = runIO (bumpMaxIVar d >> (pure $! (NCof (d + 1) (ILDef is (IVar d)))))
   {-# inline lift #-}
 
 lookupNCof :: IVar -> NCof -> I

@@ -5,7 +5,7 @@ import Common
 import CoreTypes
 import Cubical
 
-import Statistics (bumpHCom, bumpHCom', bumpMaxIVar)
+import Statistics (bumpHCom, bumpHCom')
 
 import qualified Data.IVarSet as IS
 
@@ -33,7 +33,7 @@ freshIVar :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshIVar act =
   let fresh = dom ?cof in
   -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
-  let ?cof  = runIO (bumpMaxIVar fresh >> (pure $! lift ?cof)) in
+  let ?cof  = lift ?cof in
   seq ?cof (act fresh)
 {-# inline freshIVar #-}
 
@@ -47,7 +47,7 @@ freshIVarS act =
   let fresh = dom ?cof in
   -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
   let ?sub  = lift ?sub in
-  let ?cof  = runIO (bumpMaxIVar fresh >> (pure $! lift ?cof)) in
+  let ?cof  = lift ?cof in
   seq ?sub (seq ?cof (act fresh))
 {-# inline freshIVarS #-}
 
