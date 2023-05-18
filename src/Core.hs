@@ -771,11 +771,11 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
     fibpath* : fr' fibval = ar'
     fibpath* = λ j.
-       ghcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
-                     ;j=1    i. ar'                                 -- it's independent from j=0
-                     ;r=r'   i. fr'.coh gr i j
-                     ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
-                     (fibpath {fr' fibval} {ar'} j)
+       hcom 0 1 Ar' [j=0    i. fr' (ghcom 0 i Tr' valSys fibval)    -- no need to force valSys because
+                    ;j=1    i. ar'                                  -- it's independent from j=0
+                    ;r=r'   i. fr'.coh gr i j
+                    ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
+                    (fibpath {fr' fibval} {ar'} j)
 
     -- one output system is a NeSys containing fibval*
     -- the other is NeSysHCom with fibpath* applied to the binder
