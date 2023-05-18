@@ -216,7 +216,7 @@ done by instantiating it with a fresh variable, which can trigger arbitrarily ex
 evaluation of the closure code. Where we need to peek under binders, we don't use closures:
 
 - In `coe` types.
-- In partial "systems" in `hcom`, `Glue`, `glue` and `unglue`.
+- In partial "systems" in `hcom`.
 
 We represent a "transparent" binder as a value packed together with
 a delayed weakening. This is stored as a value together with the size of the
