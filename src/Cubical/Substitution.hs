@@ -11,9 +11,10 @@ import Cubical.Interval
 ----------------------------------------------------------------------------------------------------
 
 data IList = ILNil | ILDef IList I
-  deriving Show
+  deriving (Eq, Show)
 
 data Sub = Sub# Word32 Word32 IList
+  deriving Eq
 
 instance Show Sub where
   show (Sub d c is) = show (d, c, subToList (Sub d c is))
@@ -38,12 +39,22 @@ mkIdSub i = Sub i i (go 0 ILNil) where
   go j acc | i == j = acc
   go j acc = go (j + 1) (ILDef acc (IVar j))
 
+mkIdSubs :: IVar -> [Sub]
+mkIdSubs i = go i (case mkIdSub i of Sub _ _ is -> is) [] where
+  go i is acc = case is of
+    ILNil      -> acc
+    ILDef is j -> go (i - 1) is (Sub (i-1) (i-1) is:acc)
+
+idCacheSize :: IVar
+idCacheSize = 1000
+
 idSubs :: ALI.Array Sub
-idSubs = ALI.fromList $ map mkIdSub [0..maxIVar]
+idSubs = ALI.fromList $ mkIdSubs idCacheSize
 {-# noinline idSubs #-}
 
 idSub :: IVar -> Sub
-idSub i = idSubs ALI.! fromIntegral i
+idSub i | i <  idCacheSize = idSubs ALI.! fromIntegral i
+        | True             = mkIdSub i
 {-# inline idSub #-}
 
 lookupIList :: IVar -> IList -> I

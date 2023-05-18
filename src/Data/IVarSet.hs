@@ -31,8 +31,14 @@ insert :: IVar -> Set -> Set
 insert (IVar# x) (Set s) = Set (unsafeShiftL 1 (w2i x) .|. s)
 {-# inline insert #-}
 
+insertError :: a
+insertError = error "RAN OUT OF INTERVAL VARIABLES"
+{-# noinline insertError #-}
+
 insertI :: I -> Set -> Set
-insertI i s = matchIVar i (\i -> insert i s) s
+insertI i s = matchIVar i
+  (\i -> if i <= maxIVar then insert i s else insertError)
+  s
 {-# inline insertI #-}
 
 null :: Set -> Bool
