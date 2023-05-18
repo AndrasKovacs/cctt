@@ -55,6 +55,7 @@ deriving instance Show VCof
 
 instance Lift NCof where
   lift (NCof d is) = runIO (bumpMaxIVar d >> (pure $! (NCof (d + 1) (ILDef is (IVar d)))))
+  -- lift (NCof d is) = NCof (d + 1) (ILDef is (IVar d))
   {-# inline lift #-}
 
 lookupNCof :: IVar -> NCof -> I

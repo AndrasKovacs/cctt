@@ -1,4 +1,6 @@
 
+-- NOTE: this file only typechecks when ghcom is not used!
+
 -- Adapted from
 -- https://github.com/agda/cubical/blob/50f0e7b8fb156d14b12be21ec5e529fe3ca497ca/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
 -- https://github.com/agda/cubical/blob/dc5f5005726eb76e4eb5306a2d217a1a49140e4e/Cubical/Foundations/HLevels_temp.agda
