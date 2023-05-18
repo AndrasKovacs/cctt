@@ -1,3 +1,4 @@
+-- NOTE: this file only typechecks when ghcom is not used!
 
 -- Adapted from
 -- https://github.com/agda/cubical/blob/50f0e7b8fb156d14b12be21ec5e529fe3ca497ca/Cubical/Homotopy/Group/Pi4S3/NewBrunerieNumbers.agda
