@@ -1,5 +1,0 @@
-
-Overhaul cofibs, subs, simplify!!
-  - Sub can be a plain list
-  - Interval domain could be separately passed
-  - NCof can be a also plain list, but without codomain stored

@@ -12,9 +12,9 @@ import Data.List
 import qualified Data.List.Split as List
 
 import Common hiding (debug)
-import Core hiding (bindI, bindCof, define, eval, evalCof, evalI, evalSys, evalBoundary)
+import Core hiding (bindI, bindCof, define, eval, evalSys, evalBoundary)
 import CoreTypes
-import Interval
+import Cubical hiding (evalCof, evalI)
 import Quotation
 import ElabState
 import Errors
@@ -23,6 +23,7 @@ import Parser
 import qualified Common
 import qualified Conversion
 import qualified Core
+import qualified Cubical
 import qualified Presyntax as P
 import qualified Data.LvlMap as LM
 
@@ -76,10 +77,10 @@ instantiate t i = let ?sub = idSub (dom ?cof) `ext` i; ?recurse = DontRecurse
                   in Core.eval t
 
 evalCof :: NCofArg => Cof -> VCof
-evalCof cof = let ?sub = idSub (dom ?cof) in Core.evalCof cof
+evalCof cof = let ?sub = idSub (dom ?cof) in Cubical.evalCof cof
 
 evalI :: NCofArg => I -> I
-evalI i = let ?sub = idSub (dom ?cof) in Core.evalI i
+evalI i = let ?sub = idSub (dom ?cof) in Cubical.evalI i
 
 debug :: PrettyArgs [String] -> Elab (IO ())
 debug x = withPrettyArgs (Common.debug x)
@@ -824,7 +825,6 @@ elabCases params b cons cs = case (cons, cs) of
 -- HIT case
 ----------------------------------------------------------------------------------------------------
 
-
 elabHCase' :: Elab (Env -> HDConInfo -> Env -> Sub -> [Name] -> [Name] -> NamedClosure -> P.Tm -> IO Tm)
 elabHCase' params ~inf typarams sub ifields_ xs ~casety body = case (ifields_, xs) of
   ([], []) -> do
@@ -833,7 +833,7 @@ elabHCase' params ~inf typarams sub ifields_ xs ~casety body = case (ifields_, x
     check body rhsty
   (_:ifields, x:xs) -> do
     bindI x \_ ->
-      elabHCase' params inf typarams (liftSub sub) ifields xs casety body
+      elabHCase' params inf typarams (lift sub) ifields xs casety body
   _ -> do
     err $ GenericError "Wrong number of constructor fields"
 
@@ -975,13 +975,10 @@ isConstantU t = bindI "i" \i -> case frc (t ∙ IVar i) of
 
 --------------------------------------------------------------------------------
 
-checkCofEq :: Elab (P.CofEq -> IO CofEq)
-checkCofEq (P.CofEq t u) = CofEq <$!> checkI t <*!> checkI u
-
 checkCof :: Elab (P.Cof -> IO Cof)
 checkCof = \case
-  P.CTrue       -> pure CTrue
-  P.CAnd eq cof -> CAnd <$!> checkCofEq eq <*!> checkCof cof
+  P.CTrue        -> pure CTrue
+  P.CEq  i j cof -> CEq  <$!> checkI i <*!> checkI j <*!> checkCof cof
 
 -- Systems
 ----------------------------------------------------------------------------------------------------
@@ -1106,7 +1103,7 @@ guardTopShadowing x = do
 evalHCaseBoundary :: EvalArgs (Sys -> NamedClosure -> CaseTag -> EvalClosure HCases -> VSys)
 evalHCaseBoundary bnd casety tag casecl = case bnd of
   SEmpty          -> vsempty
-  SCons cof t bnd -> vscons (Core.evalCof cof) (hcase (eval t) casety tag casecl)
+  SCons cof t bnd -> vscons (Cubical.evalCof cof) (hcase (eval t) casety tag casecl)
                             (evalHCaseBoundary bnd casety tag casecl)
 
 neSysCompat :: Elab (Recurse -> Tm -> NeSys -> IO ())
@@ -1131,7 +1128,7 @@ checkHCaseBoundary' ~inf rc params sub is body casety tag casecl = case is of
       VSNe (WIS sys _) -> neSysCompat rc body sys
 
   x:is ->
-    bindI x \_ -> checkHCaseBoundary' inf rc params (liftSub sub) is body casety tag casecl
+    bindI x \_ -> checkHCaseBoundary' inf rc params (lift sub) is body casety tag casecl
 
 checkHCaseBoundary :: Elab (  HDConInfo -> Recurse -> Env -> Sub -> Tel -> [Name] -> [Name]
                            -> Tm -> NamedClosure -> CaseTag -> EvalClosure HCases -> IO ())

@@ -7,9 +7,9 @@ import System.Exit
 
 import Common
 import CoreTypes
+import Cubical
 import ElabState
 import Elaboration
-import Interval
 import Pretty
 import Quotation
 import Statistics
@@ -82,7 +82,7 @@ mainWith getArgs = do
     Just x -> do
       (!nf, !nftime) <- case M.lookup x (st^.top) of
         Just (TEDef i) -> do
-          let ?env = ENil; ?cof = idSub 0; ?dom = 0
+          let ?env = ENil; ?cof = emptyNCof; ?dom = 0
           timedPure (quote (i^.defVal))
         _ -> do
           putStrLn $ "No top-level definition with name: " ++ show x

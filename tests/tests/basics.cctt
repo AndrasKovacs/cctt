@@ -1,4 +1,5 @@
 
+
 inductive Top := tt;
 inductive Bot :=;
 not (A : U) := A → Bot;
@@ -6,38 +7,6 @@ not (A : U) := A → Bot;
 inductive Sum (A B : U) := left A | right B;
 
 Dec (A : U) := Sum A (not A);
-
-Square (A : U) (a0 a1 b0 b1 : A)
-               (u : a0 = a1) (v : b0 = b1)
-               (r0 : a0 = b0) (r1 : a1 = b1) : U
- := r0 ={i. u i = v i} r1;
-
-prop (A : U) : U := (a b : A) → a = b;
-
-set (A : U) : U := (a b : A) → prop (a = b);
-
-discrete (A : U) : U := (a b : A) → Dec (a = b);
-
-stable (A:U) : U := not (not A) → A;
-
-decStable (A : U) : Dec A → stable A := λ[
- left a. λ _. a;
- right b. λ h. case (h b) []];
-
-const (A : U) (f : A → A) : U := (x y : A) → f x = f y;
-
-exConst (A : U) : U := (f:A → A) * const A f;
-
-propBot : prop Bot := λ[];
-
-propNot (A : U) : prop (not A) := λ f g i x. propBot (f x) (g x) i;
-
-dNot (A : U) (a : A) : not (not A) := λ f. f a;
-
-stableConst (A : U) (sA : stable A) : exConst A :=
-  (λ x. sA (dNot A x), λ x y i. sA (propNot (not A) (dNot A x) (dNot A y) i));
-
-
 
 --------------------------------------------------------------------------------
 
@@ -80,8 +49,6 @@ equiv (A B : U) : U :=
 
 iso (A B : U) : U := (f : A → B) × isIso A B f;
 
-idIso (A : U) : iso A A := (λ x. x, λ x. x, λ x _. x, λ x _. x);
-
 idEquiv (A : U) : equiv A A :=
   (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
 
@@ -107,60 +74,111 @@ JEq (A : U) (a : A) (C : (x : A) → a = x → U) (d : C a (λ _. a))
                 k=1 _. d]
                d;
 
-isoToEquiv (A B : U)(iso : iso A B) : equiv A B :=
-    iso.f
-  , iso.g
-  , iso.linv
-  , ?_
-  , ?_
+fiber (A B : U) (f : A → B) (b : B) : U
+  := (x : A) * f x = b;
+
+fiberRefl (A B : U) (f : A → B) (a  : A) : fiber A B f (f a)
+  := (a , refl);
+
+contractIsoFiber (A B : U) (is : iso A B) (a : A)
+  (fib : fiber A B is.f (is.f a))
+  : fib = fiberRefl A B is.f a
+  :=
+  let sq (j k : I) : A :=
+      hcom k j [k=0 j. is.g (fib.2 j); k=1 _. fib.1] (is.linv (fib.1) k);
+  let sq2 (i k : I) : A :=
+      hcom 0 k
+        [i=0. sq 1;
+         i=1. is.linv a]
+        (is.g (is.f a));
+  λ i.
+  (sq2 i 1,
+   λ j.
+   let aux : A :=
+     hcom j 0
+       [i=0. sq j;
+        i=1. is.linv a;
+        j=1. sq2 i]
+       (is.linv (sq2 i 1) j);
+   hcom 0 1
+     [i=0. is.rinv (fib.2 j);
+      i=1. is.rinv (is.f a);
+      j=0. is.rinv (is.f (sq2 i 1));
+      j=1. is.rinv (is.f a)]
+     (is.f aux));
+
+isoToEquiv (A B : U) (is : iso A B) : equiv A B :=
+    is.f
+  , is.g
+  , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).1
+  , is.rinv
+  , λ a i. (contractIsoFiber A B is a (is.g (is.f a), is.rinv (is.f a)) i).2
   ;
 
-isoToPath (A B : U)(i : iso A B) : A = B := ua A B (isoToEquiv A B i);
+isContr (A : U) : U
+  := (x : A) * ((y : A) → x = y);
+
+hasContrFibers (A B : U) (f : A → B) : U := (b : B) → isContr (fiber A B f b);
+
+connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
+  :=
+  let sq (l k : I) : A := hcom 0 l [k=0 _. a; k=1. p] a;
+  λ i j. hcom 0 1 [i=0 _. a; i=1. sq j; j=0 _. a; j=1. sq i] a;
+
+connAndRefl (A : U)(a : A) : connAnd A a a refl = refl
+  :=
+  λ m.
+  let sq (l k : I) : A := hcom 0 l [k=0 _. a; k=1 _. a; m=1 _. a] a;
+  λ i j. hcom 0 1 [i=0 _. a; i=1. sq j; j=0 _. a; j=1. sq i; m=1 _. a] a;
+
+isEquivToContrFibers (A B : U) (f : A → B) (e : isEquiv A B f) : hasContrFibers A B f
+  :=
+  λ b.
+  ((e.g b, e.rinv b),
+   λ fib i.
+   let a : A := fib.1;
+   let p : f a = b := fib.2;
+   let domFiller (k : I) : A :=
+     hcom 0 k
+       [i=0 k. e.g (p k);
+        i=1 _. a]
+       (e.linv a i);
+   (domFiller 1,
+    λ j.
+    hcom 0 1
+      [i=0 k. e.rinv (p k) j;
+       i=1. connAnd B (f a) b p j;
+       j=0 k. f (domFiller k);
+       j=1. p]
+      (e.coh a i j)));
+
+contrFibersToIsEquiv (A B : U) (f : A → B) (c : hasContrFibers A B f) : isEquiv A B f
+  :=
+  λ b. (c b).1.1,
+  λ a i. ((c (f a)).2 (a, refl) i).1,
+  λ b. (c b).1.2,
+  λ a i. ((c (f a)).2 (a, refl) i).2;
+
+isEquivRetractContrFibers (A B : U) (f : A → B) (e : isEquiv A B f)
+  : contrFibersToIsEquiv A B f (isEquivToContrFibers A B f e) = e
+  :=
+  λ l.
+  let domFiller (a : A) (i : I) (k : I) : A :=
+    hcom 0 k
+      [i=0 _. e.g (f a);
+       i=1 _. a;
+       l=1 _. e.linv a i]
+      (e.linv a i);
+  (e.g,
+   λ a i. domFiller a i 1,
+   e.rinv,
+   λ a i j.
+   hcom 0 1
+      [i=0 _. e.rinv (f a) j;
+       i=1. connAndRefl B (f a) l j;
+       j=0 k. f (domFiller a i k);
+       j=1 _. f a;
+       l=1 _. e.coh a i j]
+      (e.coh a i j));
 
 --------------------------------------------------------------------------------
-
-hedbergLemma (A : U)(a : A) (f : (x : A) → a = x → a = x) :
-  (b : A) (p : a = b) → Square A a a a b refl p (f a refl) (f b p) :=
-  J A a
-    (λ b p. Square A a a a b refl p (f a refl) (f b p))
-    refl;
-
-hedbergStable (A : U) (a b : A) (h : (x : A) -> stable (a = x))(p q : a = b) : p = q :=
-
-  let rem1 (x : A) : exConst (a = x) := stableConst (a = x) (h x);
-
-  let f (x : A) : a = x → a = x := (rem1 x).1;
-
-  let fIsConst (x : A) : const (a = x) (f x) := (rem1 x).2;
-
-  let rem4 : Square A a a b b refl refl (f b p) (f b q) := fIsConst b p q;
-
-  let r : a = a := f a refl;
-
-  let rem2 (i j : I) := hedbergLemma A a f b p i j;
-  let rem3 (i j : I) := hedbergLemma A a f b q i j;
-
-  λ j i. hcom 0 1 [j=0. rem2 i
-                 ; j=1. rem3 i
-		 ; i=0. r
-		 ; i=1. rem4 j] a;
-
-hedbergS (A:U) (h : (a x : A) -> stable (a = x)) : set A :=
-  λ a b. hedbergStable A a b (h a);
-
-hedberg (A : U) (h : discrete A) : set A :=
-  λ a b. hedbergStable A a b (λ b. decStable (a = b) (h a b));
-
-
---------------------------------------------------------------------------------
-
-setIsoToEquiv (A B : U)(sb : set B)(iso : iso A B) : equiv A B :=
-  (iso.f
-  ,iso.g
-  ,iso.linv
-  ,iso.rinv
-  ,λ a. ?_
-  );
-
-setIsoToPath (A B : U)(sb : set B)(i : iso A B) : A = B :=
-  ua A B (setIsoToEquiv A B sb i);

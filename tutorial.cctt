@@ -237,13 +237,15 @@ sym'' (A : U)(x y : A) (p : x = y) : y = x
   := λ i. hcom 0 1 [i=0. p; i=1 _. x] x;
 
 -- We can only write systems as arguments to hcom and Glue and glue.
--- Cofibrations are comma-separated lists of atomic equations. The comma means
--- conjunction.
+-- Cofibrations are comma-separated lists of atomic equalities.
+-- The comma means conjunction.
 
 cofTest (A : U)(x : A)(i j : I) : A :=
   hcom 0 1 [i=0,j=0 _. x; i=1,j=0 _. x] x;
 
--- We don't yet support disjunctions in cofibrations.
+-- We don't yet support disjunctions in cofibrations. All use-cases of
+-- disjunctions can be manually expanded in systems: we can rewrite
+-- [(α ∨ β) i. t] to [α i. t; β i. t]
 
 -- Users are not allowed to write true or false cofibrations in the source code,
 -- although of course they can arise during evaluation. This is purely to

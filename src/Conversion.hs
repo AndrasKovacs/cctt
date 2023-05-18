@@ -2,10 +2,9 @@
 module Conversion where
 
 import Common
-import CoreTypes
 import Core
-import Interval
-
+import CoreTypes
+import Cubical
 
 -- Note: neutral inputs (NeSys, Ne, NeSysHCom) are assumed to be forced
 --       other things are not!
@@ -198,7 +197,12 @@ instance Conv I where
   conv r r' = frc r == frc r'; {-# inline conv #-}
 
 instance Conv Sub where
-  conv s s' = frc s == frc s'; {-# inline conv #-}
+  conv (Sub _ _ s) (Sub _ _ s') = go s s' where
+    go :: NCofArg => IList -> IList -> Bool
+    go s s' = case (s, s') of
+      (ILNil     , ILNil       ) -> True
+      (ILDef is i, ILDef is' i') -> go is is' && conv i i'
+      _                          -> False
 
 instance Conv NeSys where
   conv t t' = case (t, t') of

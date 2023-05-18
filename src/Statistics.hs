@@ -90,8 +90,8 @@ renderStats = do
   putStrLn $ "Empty hcom ratio: " ++ show (fromIntegral ehcs / (fromIntegral hcs :: Double))
 #endif
   putStrLn $ "Largest interval scope size: " ++ show maxi
-  putStrLn $ "Total neutral forcings: " ++ show (bs + ubs)
-  putStrLn $ "Of which blocked: " ++ show bs
+  -- putStrLn $ "Total neutral forcings: " ++ show (bs + ubs)
+  -- putStrLn $ "Of which blocked: " ++ show bs
 
 resetStats :: IO ()
 resetStats = do

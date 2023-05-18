@@ -6,6 +6,7 @@ module Common (
   , module Data.IORef
   , module GHC.Exts
   , module GHC.Word
+  , module Text.Show
   , SourcePos(..)
   , sourcePosPretty
   , initialPos
@@ -30,6 +31,7 @@ import Data.Flat
 import IO (runIO)
 import GHC.IO
 import GHC.Word
+import Text.Show
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
@@ -129,6 +131,17 @@ newtype Lvl = Lvl {unLvl :: Word}
 
 newtype IVar = IVar# {unIVar :: Word}
   deriving (Eq, Ord, Show, Num, Enum, Bits, Integral, Real, Flat) via Word
+
+class HasDom s where
+  dom    :: s -> IVar
+  setDom :: IVar -> s -> s
+
+class HasCod s where
+  cod    :: s -> IVar
+  setCod :: IVar -> s -> s
+
+class Lift a where
+  lift :: a -> a
 
 lvlToIx :: Lvl -> Lvl -> Ix
 lvlToIx (Lvl envl) (Lvl x) = Ix (envl - x - 1)

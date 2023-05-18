@@ -3,9 +3,11 @@ module Core where
 
 import Common
 import CoreTypes
-import Interval
-import Statistics (bumpHCom, bumpHCom', bumpMaxIVar)
-import qualified Data.IntIntMap as IIM
+import Cubical
+
+import Statistics (bumpHCom, bumpHCom')
+
+import qualified Data.IVarSet as IS
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -30,8 +32,8 @@ type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
 freshIVar :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshIVar act =
   let fresh = dom ?cof in
-  if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
-  let ?cof  = runIO (bumpMaxIVar fresh >> (pure $! setDom (fresh+1) ?cof `ext` IVar fresh)) in
+  -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
+  let ?cof  = lift ?cof in
   seq ?cof (act fresh)
 {-# inline freshIVar #-}
 
@@ -43,8 +45,9 @@ freshI act = freshIVar \i -> act (IVar i)
 freshIVarS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
 freshIVarS act =
   let fresh = dom ?cof in
-  let ?sub  = setDom (fresh+1) ?sub `ext` IVar fresh in
-  let ?cof  = runIO (bumpMaxIVar fresh >> (pure $! setDom (fresh+1) ?cof `ext` IVar fresh)) in
+  -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
+  let ?sub  = lift ?sub in
+  let ?cof  = lift ?cof in
   seq ?sub (seq ?cof (act fresh))
 {-# inline freshIVarS #-}
 
@@ -75,7 +78,7 @@ wkIS act = let ?sub = setCod (cod ?sub - 1) ?sub in seq ?sub act
 {-# inline wkIS #-}
 
 assumeCof :: NeCof -> (NCofArg => a) -> (NCofArg => a)
-assumeCof cof act = let ?cof = conjNeCof ?cof cof in act
+assumeCof cof act = let ?cof = conjNeCof cof in seq ?cof act
 {-# inline assumeCof #-}
 
 ----------------------------------------------------------------------------------------------------
@@ -111,59 +114,8 @@ bindILazyS x act = freshIVarS \i -> BindILazy x i (act (IVar i))
 {-# inline bindILazyS #-}
 
 
+-- Systems
 ----------------------------------------------------------------------------------------------------
--- Cof and Sys semantics
-----------------------------------------------------------------------------------------------------
-
-conjIVarI :: NCof -> IVar -> I -> NCof
-conjIVarI cof x i = mapSub id go cof where
-  go _ j = matchIVarF j (\y -> if x == y then i else j) j
-
-conjNeCof :: NCof -> NeCof -> NCof
-conjNeCof ncof necof = case necof of
-  NCAnd c1 c2 -> ncof `conjNeCof` c1 `conjNeCof` c2
-  NCEq i j    -> case (i, j) of
-    (IVar x, IVar y) -> let (!x', !i') = if x > y then (x, IVar y)
-                                                  else (y, IVar x) in
-                        conjIVarI ncof x' i'
-    (IVar x, j     ) -> conjIVarI ncof x j
-    (i     , IVar y) -> conjIVarI ncof y i
-    (i     , j     ) -> impossible
-
-vcne :: NCofArg => NeCof -> IVarSet -> VCof
-vcne nc is = VCNe (NeCof' (conjNeCof ?cof nc) nc) is
-{-# inline vcne #-}
-
-ceq :: NCofArg => I -> I -> VCof
-ceq c1 c2 = case (doSub ?cof c1, doSub ?cof c2) of
-  (i, j) | i == j -> VCTrue
-  (i, j) -> matchIVar i
-    (\x -> matchIVar j
-      (\y -> vcne (NCEq i j) (insertIVarF x $ insertIVarF y mempty))
-      (vcne (NCEq i j) (insertIVarF x mempty)))
-    (matchIVar j
-      (\y -> vcne (NCEq i j) (insertIVarF y mempty))
-     VCFalse)
-
-evalI :: SubArg => NCofArg => I -> I
-evalI i = doSub ?cof (doSub ?sub i)
-{-# inline evalI #-}
-
-evalCofEq :: SubArg => NCofArg => CofEq -> VCof
-evalCofEq (CofEq i j) = ceq (doSub ?sub i) (doSub ?sub j)
-{-# inline evalCofEq #-}
-
-evalCof :: SubArg => NCofArg => Cof -> VCof
-evalCof = \case
-  CTrue       -> VCTrue
-  CAnd eq cof -> case evalCofEq eq of
-    VCTrue      -> evalCof cof
-    VCFalse     -> VCFalse
-    VCNe c is -> let ?cof = c^.extended in case evalCof cof of
-      VCTrue      -> VCNe c is
-      VCFalse     -> VCFalse
-      VCNe c' is' -> VCNe (NeCof' (c'^.extended) (NCAnd (c^.extra) (c'^.extra)))
-                          (is <> is')
 
 vsempty :: VSys
 vsempty = VSNe (WIS NSEmpty mempty)
@@ -221,18 +173,12 @@ occursInNeCof cof i' = case cof of
   NCEq i j    -> i == IVar i' || j == IVar i'
   NCAnd c1 c2 -> occursInNeCof c1 i' || occursInNeCof c2 i'
 
-neCofVars :: NeCof -> IVarSet
-neCofVars = \case
-  NCEq i j    -> insertIF i $ insertIF j mempty
-  NCAnd c1 c2 -> neCofVars c1 <> neCofVars c2
-
-
 -- Alternative hcom and com semantics which shortcuts to term instantiation if
 -- the system is total. We make use of the knowledge that the system argument
 -- comes from the syntax.
 ----------------------------------------------------------------------------------------------------
 
-data VSysHCom' = VSHTotal' Name Tm | VSHNe' NeSysHCom IVarSet deriving Show
+data VSysHCom' = VSHTotal' Name Tm | VSHNe' NeSysHCom IS.Set deriving Show
 
 vshempty' :: VSysHCom'
 vshempty' = VSHNe' NSHEmpty mempty
@@ -273,10 +219,12 @@ com' r r' ~a ~sys ~b
 ----------------------------------------------------------------------------------------------------
 
 unBindCof :: NCofArg => BindCof a -> NeCof'
-unBindCof t = NeCof' (conjNeCof ?cof (t^.binds)) (t^.binds)
+unBindCof t = NeCof' (conjNeCof (t^.binds)) (t^.binds)
+{-# inline unBindCof #-}
 
 unBindCofLazy :: NCofArg => BindCofLazy a -> NeCof'
-unBindCofLazy t = NeCof' (conjNeCof ?cof (t^.binds)) (t^.binds)
+unBindCofLazy t = NeCof' (conjNeCof (t^.binds)) (t^.binds)
+{-# inline unBindCofLazy #-}
 
 mapBindCof :: NCofArg => BindCof a -> (NCofArg => a -> b) -> BindCof b
 mapBindCof t f = bindCof (unBindCof t) (f (t^.body))
@@ -287,7 +235,8 @@ mapBindCofLazy t f = bindCofLazy (unBindCofLazy t) (f (t^.body))
 {-# inline mapBindCofLazy #-}
 
 bindIFromLazy :: BindILazy a -> BindI a
-bindIFromLazy (BindILazy x i a) = BindI x i a; {-# inline bindIFromLazy #-}
+bindIFromLazy (BindILazy x i a) = BindI x i a
+{-# inline bindIFromLazy #-}
 
 mapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
 mapBindI t f = bindI (t^.name) (\i -> f i (t ∙ i))
@@ -308,21 +257,15 @@ mapBindIVar t f = bindIVar (t^.name) (\i -> f i (t ∙ IVar i))
 --   `coed` on the type argument is similar.
 umapBindILazy :: NCofArg => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
 umapBindILazy (BindILazy x i a) f =
-  let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
+  let ?cof = lift (setDom i ?cof) in
   seq ?cof (BindILazy x i (f (IVar i) a))
 {-# inline umapBindILazy #-}
 
 umapBindI :: NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
 umapBindI (BindI x i a) f =
-  let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
+  let ?cof = lift (setDom i ?cof) in
   seq ?cof (BindI x i (f (IVar i) a))
 {-# inline umapBindI #-}
-
--- umapBindILazy :: SubAction a => NCofArg => BindILazy a -> (NCofArg => I -> a -> b) -> BindILazy b
--- umapBindILazy = mapBindILazy
-
--- umapBindI :: SubAction a => NCofArg => BindI a -> (NCofArg => I -> a -> b) -> BindI b
--- umapBindI = mapBindI
 
 proj1BindIFromLazy :: NCofArg => DomArg => Name -> BindILazy Val -> BindI Val
 proj1BindIFromLazy x t = umapBindI (bindIFromLazy t) (\_ -> proj1 x)
@@ -421,17 +364,15 @@ instance Apply Val Val Val NCofArg DomArg where
   {-# inline (∙) #-}
 
 instance Apply (BindI a) I a (SubAction a) NCofArg where
-  (∙) (BindI x i a) j | IVar i == j = a
-  (∙) (BindI x i a) j =
-    let s = setCod i (idSub (dom ?cof)) `ext` j
-    in doSub s a
+  (∙) (BindI x i a) j
+    | IVar i == j = a
+    | otherwise   = appSub (wkSub (idSub i) `ext` j) a
   {-# inline (∙) #-}
 
 instance Apply (BindILazy a) I a (SubAction a) NCofArg where
-  (∙) (BindILazy x i a) j | IVar i == j = a
-  (∙) (BindILazy x i a) j =
-    let s = setCod i (idSub (dom ?cof)) `ext` j
-    in doSub s a
+  (∙) (BindILazy x i a) j
+    | IVar i == j = a
+    | otherwise   = appSub (wkSub (idSub i) `ext` j) a
   {-# inline (∙) #-}
 
 instance Apply NamedIClosure I Val NCofArg DomArg where
@@ -456,17 +397,10 @@ localVar x = go ?env x where
   go (EDef e _) x = go e (x - 1)
   go _          _ = impossible
 
-capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
-capp (NCl _ t) ~u =
-  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
-  capp# d# c# m# t u
-{-# inline capp #-}
-
 -- | Apply a closure. Note: *lazy* in argument.
-capp# :: Word32# -> Word32# -> IIM.Map -> DomArg => Closure -> Val -> Val
-capp# d# c# m# t ~u =
- let ?cof = Sub (W32# d#) (W32# c#) m# in
- seq ?cof $ case t of
+capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
+capp (NCl _ t) ~u = case t of
+
   CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = wkSub s; ?recurse = rc in eval t
   CSplit b tag ecs      -> case_ u b tag ecs
   CHSplit b tag ecs     -> hcase u b tag ecs
@@ -574,20 +508,11 @@ capp# d# c# m# t ~u =
 
     in VPLam lhs rhs $ NICl "l" $ ICCoeCoh1 a r r' x
 
-  -- CHInd motive ms t ->
-  --   elim motive ms (t ∙ u)
-
-icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
-icapp (NICl _ t) u =
-  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
-  icapp# d# c# m# t u
-{-# inline icapp #-}
 
 -- | Apply an ivar closure.
-icapp# :: Word32# -> Word32# -> IIM.Map -> DomArg => IClosure -> I -> Val
-icapp# d# c# m# t arg =
- let ?cof = Sub (W32# d#) (W32# c#) m# in
- seq ?cof $ case t of
+icapp :: NCofArg => DomArg => NamedIClosure -> I -> Val
+icapp (NICl _ t) arg = case t of
+
   ICEval s env rc t ->
     let ?env = env; ?sub = ext (wkSub s) arg; ?recurse = rc in eval t
 
@@ -596,8 +521,8 @@ icapp# d# c# m# t arg =
   ICCoePath r r' a lhs rhs p ->
     let j = arg in
     hcom r r' (a ∙ r' ∙ j)
-      (vshcons (ceq j I0) "i" (\i -> coe i r' (bindI "i" \i -> a ∙ i ∙ j) (lhs ∙ i)) $
-       vshcons (ceq j I1) "i" (\i -> coe i r' (bindI "i" \i -> a ∙ i ∙ j) (rhs ∙ i)) $
+      (vshcons (eq j I0) "i" (\i -> coe i r' (bindI "i" \i -> a ∙ i ∙ j) (lhs ∙ i)) $
+       vshcons (eq j I1) "i" (\i -> coe i r' (bindI "i" \i -> a ∙ i ∙ j) (rhs ∙ i)) $
        vshempty)
       (coe r r' (bindI "i" \i -> a ∙ i ∙ j) (papp (lhs ∙ r) (rhs ∙ r) p j))
 
@@ -606,8 +531,8 @@ icapp# d# c# m# t arg =
   ICHComPath r r' a lhs rhs sys p ->
     let j = arg in
     hcom r r' (a ∙ j)
-      (vshcons (ceq j I0) "i" (\_ -> lhs) $
-       vshcons (ceq j I1) "i" (\_ -> rhs) $
+      (vshcons (eq j I0) "i" (\_ -> lhs) $
+       vshcons (eq j I1) "i" (\_ -> rhs) $
        mapVSysHCom (\i t -> papp lhs rhs (t ∙ i) j) (frc sys))
       (papp lhs rhs p j)
 
@@ -689,8 +614,8 @@ icapp# d# c# m# t arg =
   ICSym a x y p ->
     let i = frc arg in
     hcomd I0 I1 a
-          (vshcons (ceq i I0) "j" (\j -> papp x y p j) $
-           vshcons (ceq i I1) "_" (\_ -> x) $
+          (vshcons (eq i I0) "j" (\j -> papp x y p j) $
+           vshcons (eq i I1) "_" (\_ -> x) $
            vshempty)
           x
 
@@ -699,8 +624,8 @@ icapp# d# c# m# t arg =
   ICTrans a x y z p q ->
     let i = arg in
     hcomd I0 I1 a
-      (vshcons (ceq i I0) "_" (\_ -> x) $
-       vshcons (ceq i I1) "j" (\j -> papp y z q j) $
+      (vshcons (eq i I0) "_" (\_ -> x) $
+       vshcons (eq i I1) "j" (\j -> papp y z q j) $
        vshempty)
       (papp x y p i)
 
@@ -743,7 +668,7 @@ papp ~l ~r ~t i = case frc i of
   I1     -> r
   IVar x -> case frc t of
     VPLam _ _ t -> t ∙ IVar x
-    VNe t is    -> VNe (NPApp l r t (IVar x)) (insertIVarF x is)
+    VNe t is    -> VNe (NPApp l r t (IVar x)) (IS.insert x is)
     v@VHole{}   -> v
     _           -> impossible
 {-# inline papp #-}
@@ -757,15 +682,7 @@ lapp t i = case frc t of
 {-# inline lapp #-}
 
 coed :: I -> I -> BindI Val -> Val -> NCofArg => DomArg => Val
-coed (I (W# r)) (I (W# r')) topA t =
-  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
-  coed# r r' topA t d# c# m#; {-# inline coed #-}
-
-coed# :: Word# -> Word# -> BindI Val -> Val -> Word32# -> Word32# -> IIM.Map -> DomArg => Val
-coed# r# r'# topA t d# c# m# =
- let r = I (W# r#); r' = I (W# r'#) in
- let ?cof = Sub (W32# d#) (W32# c#) m# in
- seq ?cof $ case (frc topA) ^. body of
+coed r r' topA t = case (frc topA) ^. body of
 
   VPi (rebind topA -> a) (rebind topA -> b) ->
     VLam $ NCl (b^.body.name) $ CCoePi r r' a b t
@@ -812,7 +729,7 @@ coed# r# r'# topA t d# c# m# =
   -- NOTE: deleting the bound var from is
   a@(VNe _ is) ->
     VNe (NCoe r r' (rebind topA a) t)
-        (insertI r $ insertI r' (deleteIS (topA^.binds) is))
+        (insertI r $ insertI r' $ IS.delete (topA^.binds) is)
 
 
 {-
@@ -825,7 +742,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
   sysr = [(α r). (T r, f r)]    -- instantiate system to r
 
   ar' : Ar'
-  ar' := com r r' (i. A i) [(∀i.α) i. f i (coe r i (i.T i) gr)] (unglue gr sysr)
+  ar' := gcom r r' (i. A i) [(∀i.α) i. f i (coe r i (i.T i) gr)] (unglue gr sysr)
 
   working under (α r'), mapping over the [(α r'). (T r', f r')] system, producing two output systems:
 
@@ -847,18 +764,18 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
             ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
 
     fibval* : Tr'
-    fibval* = hcom 0 1 Tr' valSys fibval
+    fibval* = ghcom 0 1 Tr' valSys fibval
 
     -- this should be a metatheoretic (I → Ar') function, because we only need it applied
-    -- to the "i" variable in the end result. For clarity though, it's good to write it as a path here.
+    -- to the "j" variable in the end result. For clarity though, it's good to write it as a path here.
 
     fibpath* : fr' fibval = ar'
     fibpath* = λ j.
-       hcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
-                    ;j=1    i. ar'                                 -- it's independent from j=0
-                    ;r=r'   i. fr'.coh gr i j
-                    ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
-                    (fibpath {fr' fibval} {ar'} j)
+       ghcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
+                     ;j=1    i. ar'                                 -- it's independent from j=0
+                     ;r=r'   i. fr'.coh gr i j
+                     ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
+                     (fibpath {fr' fibval} {ar'} j)
 
     -- one output system is a NeSys containing fibval*
     -- the other is NeSysHCom with fibpath* applied to the binder
@@ -879,8 +796,8 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     topSysr'f    = frc topSysr'
 
   -- ar' : Ar'
-  -- ar' := comp r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
-    ~ar' = hcomdn r r' _Ar'
+  -- ar' := gcom r r' (i. A i) [(∀i.α) i. f i (coe r i (j. T j) gr)] (unglue gr sysr)
+    ~ar' = ghcomdn r r' _Ar'
              (mapNeSysHCom'
                 (\i tf -> coe i r' a (  proj1 "f" (proj2 "Ty" (tf ∙ i))
                                       ∙ coe r i (proj1BindIFromLazy "Ty" tf) gr))
@@ -925,19 +842,19 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       -- valSys = [r=r'  i. fr'.linv gr i
       --         ;(∀i.α) i. fr'.linv (coe r r' (i. T i) gr) i]
       ~valSys =
-          vshcons (ceq r r') "i" (\i -> app_r'linv gr i) $
+          vshcons (eq r r') "i" (\i -> app_r'linv gr i) $
           mapVSysHCom (\i tf -> app_r'linv (coe r r' (proj1BindIFromLazy "Ty" tf) gr) i) $
           forallTopSysf
 
 
       -- fibval* : Tr'
-      -- fibval* = hcom 0 1 Tr' valSys fibval
-      ~fibval' = hcomd I0 I1 tr' valSys fibval
+      -- fibval* = ghcom 0 1 Tr' valSys fibval
+      ~fibval' = ghcomd I0 I1 tr' valSys fibval
 
       -- fibpath* : fr' fibval = ar'
       -- fibpath* = λ j.
-      --    hcom 0 1 Ar' [j=0    i. fr' (hcom 0 i Tr' valSys fibval)    -- no need to force valSys because
-      --                 ;j=1    i. ar'                                 -- it's independent from j=0
+      --   ghcom 0 1 Ar' [j=0    i. fr' (ghcom 0 i Tr' valSys fibval)    -- no need to force valSys because
+      --                 ;j=1    i. ar'                                  -- it's independent from j=0
       --                 ;r=r'   i. fr'.coh gr i j
       --                 ;(∀i.α) i. fr'.coh (coe r r' (i. T i) gr) i j]
       --                 (fibpath {fr' fibval} {ar'} j)
@@ -945,9 +862,9 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       fibpath' =
         bindILazy "j" \j ->
         hcomd I0 I1 _Ar'
-          (vshcons (ceq j I0) "i" (\i -> fr' ∙ hcom I0 i tr' valSys fibval) $
-           vshcons (ceq j I1) "i" (\i -> ar') $
-           vshcons (ceq r r') "i" (\i -> app_r'coh gr i j) $
+          (vshcons (eq j I0) "i" (\i -> fr' ∙ ghcom I0 i tr' valSys fibval) $
+           vshcons (eq j I1) "i" (\i -> ar') $
+           vshcons (eq r r') "i" (\i -> app_r'coh gr i j) $
            mapVSysHCom (\i tf -> app_r'coh (coe r r' (proj1BindIFromLazy "Ty" tf) gr) i j) $
            forallTopSysf
           )
@@ -975,7 +892,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     -- glue (hcom 1 0 Ar' [r=r' j. unglue gr sysr; αr' j. fibpath* j] ar')
     --      [αr'. fibval*]
     in glue
-         (hcomd I1 I0 _Ar' (vshcons (ceq r r') "i" (\i -> unglue gr (frc topSysr)) fibpaths) ar')
+         (hcomd I1 I0 _Ar' (vshcons (eq r r') "i" (\i -> unglue gr (frc topSysr)) fibpaths) ar')
          topSysr'f
          fibvals
 
@@ -1030,17 +947,10 @@ coe r r' ~a t
   | True            = coed r r' a t
 {-# inline coe #-}
 
-hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
-hcomdn r r' topA ts base =
-  let !(Sub (W32# d#) (W32# c#) m#) = ?cof in
-  hcomdn# r r' topA ts base d# c# m#
-{-# inline hcomdn #-}
-
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
-hcomdn# :: I -> I -> Val -> NeSysHCom' -> Val -> Word32# -> Word32# -> IIM.Map -> DomArg => Val
-hcomdn# r r' topA ts@(WIS nts is) base d# c# m# =
- let ?cof = Sub (W32# d#) (W32# c#) m# in
- seq ?cof $ case runIO (do{bumpHCom' (isEmptyNSH nts); pure $! frc topA}) of
+hcomdn :: I -> I -> Val -> NeSysHCom' -> Val -> NCofArg => DomArg => Val
+hcomdn r r' topA ts@(WIS nts is) base =
+ case runIO (do{bumpHCom' (isEmptyNSH nts); pure $! frc topA}) of
   VPi a b ->
     VLam $ NCl (b^.name) $ CHComPi r r' a b nts base
 
@@ -1090,13 +1000,12 @@ hcomdn# r r' topA ts@(WIS nts is) base d# c# m# =
   VU -> let
 
     -- NOTE: r = r' can be false or neutral
-    sys = nscons (ceq r r') (VPair "Ty" base (theIdEquiv base)) $
+    sys = nscons (eq r r') (VPair "Ty" base (theIdEquiv base)) $
           mapNeSysFromH
             (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindIFromLazy t) r' r))
-            -- (\t -> VPair "Ty" (t ∙ r') (theCoeEquiv (bindI (t^.name) \i -> t ∙ i) r' r))
             nts
 
-    in vgluety base (WIS sys (insertI r (insertI r' is)))
+    in vgluety base (WIS sys (insertI r $ insertI r' is))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -1188,16 +1097,104 @@ hcomn r r' ~a ~sys ~b
 
 -- | Off-diagonal HCom.
 hcomd :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
-hcomd r r' ~a ~sys ~b = case sys of
+hcomd r r' ~a sys ~b = case sys of
   VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
   VSHNe sys  -> hcomdn r r' a sys b
 {-# inline hcomd #-}
 
 
--- EVIL CORNER (don't use the evil versions, they're bogus)
+-- ghcom
+----------------------------------------------------------------------------------------------------
+
+data Complete
+  = CFalse
+  | CLeaf NeCof
+  | COr Complete Complete
+  deriving Show
+
+complToList :: Complete -> [NeCof]
+complToList c = go c [] where
+  go CFalse acc = acc
+  go (CLeaf c) acc = c : acc
+  go (COr l r) acc = go l $ go r acc
+
+andNCComplete :: Complete -> NeCof -> Complete
+andNCComplete c1 c2 = case c1 of
+  CFalse      -> CFalse
+  CLeaf c1    -> CLeaf (NCAnd c1 c2)
+  COr c1a c1b -> COr (andNCComplete c1a c2) (andNCComplete c1b c2)
+
+andComplete :: Complete -> Complete -> Complete
+andComplete c1 c2 = case c1 of
+  CFalse      -> CFalse
+  CLeaf c     -> andNCComplete c2 c
+  COr c1a c1b -> COr (andComplete c1a c2) (andComplete c1b c2)
+
+complNeCof :: NeCof -> Complete
+complNeCof = \case
+  NCEq i j    -> case (i, j) of
+                   (IVar _, IVar _) -> COr (CLeaf (NCEq i I0 `NCAnd` NCEq j I1))
+                                           (CLeaf (NCEq i I1 `NCAnd` NCEq j I0))
+                   (IVar _, _     ) -> CLeaf (NCEq i (flip# j))
+                   (_     , IVar _) -> CLeaf (NCEq (flip# i) j)
+                   _                -> impossible
+  NCAnd c1 c2 ->
+    trace "WARNING: unstable ghcom" $
+    traceShow (c1, c2) $
+    COr (complNeCof c1) (complNeCof c2)
+
+sysToCompl :: NeSysHCom -> Complete
+sysToCompl = \case
+  NSHEmpty      -> CFalse
+  NSHCons t sys -> COr (CLeaf (t^.binds)) (sysToCompl sys)
+
+complSys :: NeSysHCom -> Complete
+complSys = \case
+  NSHEmpty      -> CLeaf (NCEq I0 I0) -- "True"
+  NSHCons t sys -> andComplete (complNeCof (t^.binds)) (complSys sys)
+
+complToSys :: IVar -> Complete -> Val -> NeSysHCom
+complToSys i c ~base = go c NSHEmpty where
+  go c acc = case c of
+    CFalse  -> acc
+    CLeaf c -> NSHCons (BindCof c (BindILazy "l" i base)) acc
+    COr l r -> go l $! go r acc
+
+-- | Make a forced neutral system valid.
+validify :: NCofArg => DomArg => NeSysHCom' -> Val -> NeSysHCom'
+validify sys ~base =
+  -- trace "VALIDIFY" $
+  -- traceShow (sysToCompl $ sys^.body) $
+  -- traceShow (complSys (sys^.body)) $
+  let completion = frc (complToSys (dom ?cof) (complSys (sys^.body)) base)
+  in case completion of
+    VSHTotal _ -> impossible
+    VSHNe sys' -> catNeSysHCom' sys sys'
+
+
+-- | Off-diagonal ghcom with neutral system input.
+ghcomdn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val
+ghcomdn r r' ~a sys base = case sys^.body of
+  NSHEmpty -> runIO (bumpHCom >> pure base)
+  _        -> hcomdn r r' a (validify sys base) base
+{-# inline ghcomdn #-}
+
+-- | Off-diagonal ghcom.
+ghcomd :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
+ghcomd r r' ~a sys ~base = case sys of
+  VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
+  VSHNe sys  -> ghcomdn r r' a sys base
+{-# inline ghcomd #-}
+
+ghcom :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
+ghcom r r' ~a ~sys ~b
+  | frc r == frc r' = runIO (bumpHCom >> pure b)
+  | True            = ghcomd r r' a sys b
+{-# inline ghcom #-}
+
 --------------------------------------------------------------------------------
 
-vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
+vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IS.Set -> Val
 vhcom = VHCom
 {-# inline vhcom #-}
 
@@ -1205,38 +1202,13 @@ vgluety :: VTy -> NeSys' -> Val
 vgluety = VGlueTy
 {-# inline vgluety #-}
 
-vglue :: Val -> NeSys' -> NeSys -> IVarSet -> Val
+vglue :: Val -> NeSys' -> NeSys -> IS.Set -> Val
 vglue = VGlue
 {-# inline vglue #-}
 
 nunglue :: Ne -> NeSys -> Ne
 nunglue = NUnglue
 {-# inline nunglue #-}
-
--- vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IVarSet -> Val
--- vhcom r r' a sys base ~is = case sys^.body of
---   NSHEmpty -> base
---   _        -> VHCom r r' a sys base is
--- {-# inline vhcom #-}
-
--- vgluety :: VTy -> NeSys' -> Val
--- vgluety ~a sys = case sys^.body of
---   NSEmpty -> a
---   _       -> VGlueTy a sys
--- {-# inline vgluety #-}
-
--- vglue :: Val -> NeSys' -> NeSys -> IVarSet -> Val
--- vglue t eqs fibs is = case eqs^.body of
---   NSEmpty -> t
---   _       -> VGlue t eqs fibs is
--- {-# inline vglue #-}
-
--- nunglue :: Ne -> NeSys -> Ne
--- nunglue t sys = case sys of
---   NSEmpty -> t
---   _       -> NUnglue t sys
--- {-# inline nunglue #-}
-
 
 --------------------------------------------------------------------------------
 
@@ -1405,7 +1377,7 @@ projsys conid topSys = \case
             prj
 
       -- NOTE: extend blockers with neutral's ivars BUT DELETE BOUND VAR.
-      VNe n is -> TTPNe (WIS (topSys^.body) (deleteIS (t^.body.binds) is <> topSys^.ivars))
+      VNe n is -> TTPNe (WIS (topSys^.body) (IS.delete (t^.body.binds) is <> topSys^.ivars))
 
       VHole{}  -> error "TODO: hole in system projection"
       _        -> impossible
@@ -1449,7 +1421,7 @@ coeindsp r r' params sp fieldtypes = case (sp, fieldtypes) of
 ----------------------------------------------------------------------------------------------------
 
 -- TODO: unbox
-data VBoundary = VBTotal Val | VBNe IVarSet deriving Show
+data VBoundary = VBTotal Val | VBNe IS.Set deriving Show
 
 vbempty :: VBoundary
 vbempty = VBNe mempty
@@ -1548,12 +1520,8 @@ evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 {-# inline evalIClosure #-}
 
 eval :: EvalArgs (Tm -> Val)
-eval t = let !(Sub (W32# d#) (W32# c#) m) = ?cof in eval# d# c# m t; {-# inline eval #-}
+eval = \case
 
-eval# :: SubArg => DomArg => EnvArg => RecurseArg => Word32# -> Word32# -> IIM.Map -> Tm -> Val
-eval# d# c# m# t =
- let ?cof = Sub (W32# d#) (W32# c#) m# in
- seq ?cof $ case t of
   TopVar inf         -> inf^.defVal
   RecursiveCall inf  -> recursiveCall inf
   LocalVar x         -> localVar x
@@ -1631,28 +1599,16 @@ class Force a b | a -> b where
 
 
 instance Force I I where
-  frc  i = doSub ?cof i;              {-# inline frc #-}
-  frcS i = doSub ?cof (doSub ?sub i); {-# inline frcS #-}
+  frc  i = appNCof ?cof i; {-# inline frc #-}
+  frcS i = appNCof ?cof (sub i); {-# inline frcS #-}
 
 instance Force Sub Sub where
-  frc  s = doSub ?cof s; {-# inline frc #-}
-  frcS s = doSub ?cof (doSub ?sub s); {-# inline frcS #-}
-
-frcVal# :: Word32# -> Word32# -> IIM.Map -> DomArg => Val -> Val
-frcVal# d# c# m# t =
-  let ?cof = (Sub (W32# d#) (W32# c#) m#)
-  in seq ?cof $ case t of
-    VSub v s                                -> let ?sub = wkSub s in frcS v
-    VNe t is               | isUnblocked is -> frc t
-    VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
-    VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
-    VHCom r r' a sys t is  | isUnblocked is -> frc (hcom r r' a (frc sys) t)
-    VGlue t eqs sys is     | isUnblocked is -> frc (glue t (frc eqs) (frc sys))
-    v                                       -> v
+  frc  s = appNCofToSub ?cof s; {-# inline frc #-}
+  frcS s = appNCofToSub ?cof (sub s); {-# inline frcS #-}
 
 instance Force NeCof VCof where
   frc = \case
-    NCEq i j    -> ceq (frc i) (frc j)
+    NCEq i j    -> eq i j
     NCAnd c1 c2 -> case frc c1 of
       VCTrue -> frc c2
       VCFalse -> VCFalse
@@ -1663,7 +1619,7 @@ instance Force NeCof VCof where
                               (is <> is')
 
   frcS = \case
-    NCEq i j    -> ceq (frcS i) (frcS j)
+    NCEq i j    -> eqS i j
     NCAnd c1 c2 -> case frcS c1 of
       VCTrue  -> frcS c2
       VCFalse -> VCFalse
@@ -1674,8 +1630,14 @@ instance Force NeCof VCof where
                               (is <> is')
 
 instance Force Val Val where
-  frc t = let !(Sub (W32# d#) (W32# c#) m#) = ?cof in frcVal# d# c# m# t
-  {-# inline frc #-}
+  frc = \case
+    VSub v s                                -> let ?sub = wkSub s in frcS v
+    VNe t is               | isUnblocked is -> frc t
+    VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
+    VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
+    VHCom r r' a sys t is  | isUnblocked is -> frc (hcom r r' a (frc sys) t)
+    VGlue t eqs sys is     | isUnblocked is -> frc (glue t (frc eqs) (frc sys))
+    v                                       -> v
 
   frcS = \case
     VSub v s                                 -> let ?sub = sub s in frcS v
@@ -1780,41 +1742,40 @@ instance Force NeSysHCom VSysHCom where
         VSHNe (WIS sys is') ->
           VSHNe (WIS (NSHCons (bindCof cof (frcS (t^.body))) sys) (is <> is'))
 
--- TODO: check IVarSet
+-- TODO: check IS.Set
 instance Force NeSysHCom' VSysHCom where
   frc sys = frc (sys^.body); {-# inline frc #-}
   frcS sys = frcS (sys^.body); {-# inline frcS #-}
 
--- TODO: check IVarSet
+-- TODO: check IS.Set
 instance Force NeSys' VSys where
   frc sys = frc (sys^.body); {-# inline frc #-}
   frcS sys = frcS (sys^.body); {-# inline frcS #-}
 
 instance Force a fa => Force (BindI a) (BindI fa) where
-
   frc (BindI x i a) =
-    let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
+    let ?cof = lift (setDom i ?cof) in
     seq ?cof (BindI x i (frc a))
   {-# inline frc #-}
 
   frcS (BindI x i a) =
     let fresh = dom ?cof in
-    let ?sub  = setDomCod (fresh+1) i ?sub `ext` IVar fresh in
-    let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
+    let ?cof  = lift ?cof in
+    let ?sub  = lift (setCod i ?sub) in
     seq ?sub $ seq ?cof $ BindI x fresh (frcS a)
   {-# inline frcS #-}
 
 instance Force a fa => Force (BindILazy a) (BindILazy fa) where
 
   frc (BindILazy x i a) =
-    let ?cof = setDomCod (i + 1) i ?cof `ext` IVar i in
+    let ?cof = lift (setDom i ?cof) in
     seq ?cof (BindILazy x i (frc a))
   {-# inline frc #-}
 
   frcS (BindILazy x i a) =
     let fresh = dom ?cof in
-    let ?sub  = setDomCod (fresh+1) i ?sub `ext` IVar fresh in
-    let ?cof  = setDom (fresh+1) ?cof `ext` IVar fresh in
+    let ?cof  = lift ?cof in
+    let ?sub  = lift (setCod i ?sub) in
     seq ?sub $ seq ?cof $ BindILazy x fresh (frcS a)
   {-# inline frcS #-}
 
@@ -1933,26 +1894,26 @@ gfill a r i x = coe i r a x; {-# inline gfill #-}
 linvfill :: NCofArg => DomArg => BindI Val -> I -> I -> Val -> I -> Val
 linvfill a r i x j =
   hcom r i (a ∙ r)
-    (vshcons (ceq j I0) "k" (\k -> coe k r a (coe r k a x)) $
-     vshcons (ceq j I1) "k" (\_ -> x) $
+    (vshcons (eq j I0) "k" (\k -> coe k r a (coe r k a x)) $
+     vshcons (eq j I1) "k" (\_ -> x) $
      vshempty)
     x
 
 rinvfill :: NCofArg => DomArg => BindI Val -> I -> I -> Val -> I -> Val
 rinvfill a r i x j =
   hcom i r (a ∙ i)
-    (vshcons (ceq j I0) "k" (\k -> coe k i a (coe i k a x)) $
-     vshcons (ceq j I1) "k" (\_ -> x) $
+    (vshcons (eq j I0) "k" (\k -> coe k i a (coe i k a x)) $
+     vshcons (eq j I1) "k" (\_ -> x) $
      vshempty)
     x
 
 coeCoherence :: NCofArg => DomArg => BindI Val -> I -> I -> Val -> I -> I -> Val
 coeCoherence a r r' x l k =
   hcom r r' (a ∙ r')
-    (vshcons (ceq k I0) "i" (\i -> coe i r' a (ffill a r i (linvfill a r i x l))) $
-     vshcons (ceq k I1) "i" (\i -> coe i r' a (ffill a r i x)) $
-     vshcons (ceq l I0) "i" (\i -> coe i r' a (rinvfill a r i (ffill a r i x) k)) $
-     vshcons (ceq l I1) "i" (\i -> coe i r' a (ffill a r i x)) $
+    (vshcons (eq k I0) "i" (\i -> coe i r' a (ffill a r i (linvfill a r i x l))) $
+     vshcons (eq k I1) "i" (\i -> coe i r' a (ffill a r i x)) $
+     vshcons (eq l I0) "i" (\i -> coe i r' a (rinvfill a r i (ffill a r i x) k)) $
+     vshcons (eq l I1) "i" (\i -> coe i r' a (ffill a r i x)) $
      vshempty)
     (coe r r' a x)
 
