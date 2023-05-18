@@ -1,28 +1,24 @@
 
 ## cctt
 
-Installation: install [Haskell stack](https://docs.haskellstack.org/en/stable/),
+- Installation: install [Haskell stack](https://docs.haskellstack.org/en/stable/),
 then run `stack install` in the source directory.
-
-Usage and current features: see [tutorial.cctt](tutorial.cctt).
+- Usage and current features: see [tutorial.cctt](tutorial.cctt).
+- Syntax highlighting in emacs: add [cctt.el](cctt.el) to the emacs load path and `(require 'cctt)`
+  the emacs configuration.
 
 A small implementation of a cartesian cubical type theory, designed from
-ground-up with performance in mind. WIP. The immediate project goal is to get
-the implementation in a testable state and then port over a bunch of existing
-cubical benchmarks.
-
-Existing code was written by me (András Kovács), but Anders Mörtberg and Evan
-Cavallo have provided significant design input, code review and benchmark code.
+ground-up with performance in mind. WIP. 
 
 There are numerous examples which can't be checked in any existing cubical type
 theory implementation, like the infamous original definition of Brunerie's
-number. The hope is that we'll be able to check more of these in this
-implementation.
+number. The goal of this implementation is to compute more of these. Benchmarks are currently very disorganized 
+but there are several definitions already which can't be computed in other cubical type theory
+implementations (as far as we know). For example, [here](tests/new_brunerie.cctt#L981) we
+have four variations of the Brunerie number. These can be all computed here but only one
+out of the four can be computed in Agda.
 
-I'm publishing this repo and README because people have been asking for
-it. However, this repo will be a lot more interesting when it actually works. I
-summarize below the design. I assume that readers of this README are familiar
-with rules of cubical TTs.
+In the following I assume that readers of this README are familiar with rules of cubical TTs.
 
 ### 1. Normalization by evaluation
 
