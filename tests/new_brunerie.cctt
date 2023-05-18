@@ -977,6 +977,7 @@ g10 : sTrunc ℤ → ℤ :=
   push a b i. ((σ (S¹xS¹toS² a b)) ∙ (σ (S¹xS¹toS² a b))⁻¹) i
 ];
 
+
 brunerie : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
 
@@ -989,7 +990,10 @@ brunerieLsym : ℤ :=
 brunerieRsym : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃Rsym (push (loop1 i) (loop1 j) k)))));
 
+-- Computes in Agda:
 brunerie-spec     : brunerie     = neg (suc zero)       := refl;   -- 0.5 ms
+
+-- Doesn't:
 brunerie2sym-spec : brunerie2sym = pos (suc (suc zero)) := refl;   -- 18.6 ms
 brunerieLsym-spec : brunerieLsym = pos zero             := refl;   -- 10.1 ms
 brunerieRsym-spec : brunerieRsym = pos zero             := refl;   -- 9.2 ms

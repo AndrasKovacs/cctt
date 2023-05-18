@@ -46,8 +46,6 @@ ncomp (p : Bool = Bool) (n : Nat) : Bool = Bool := case n [
   zero. p;
   suc n. p ∙ ncomp p n];
 
--- works up to 11, then we run out of ivars
--- each compositions needs an extra ivar!
 bigpath := negEq ∙ negEq ∙ negEq ∙
            negEq ∙ negEq ∙ negEq ∙
 	   negEq ∙ negEq ∙ negEq ∙

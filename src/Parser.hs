@@ -41,7 +41,7 @@ prod       = char '*' <|> char '×'
 branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
 branch p t f = (t =<< p) <|> f
 
--- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "inductive", "higher", "elim", "glue", "module"
+-- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "inductive", "higher", "glue", "module"
 --             "hcom", "import", "let", "refl", "unglue", "λ"]
 
 isKeyword :: String -> Bool
@@ -53,8 +53,6 @@ isKeyword = \case
   'c':'a':'s':'e':[]         -> True
   'c':'o':'e':[]             -> True
   'c':'o':'m':[]             -> True
-  'd':'a':'t':'a':[]         -> True
-  'e':'l':'i':'m':[]         -> True
   'g':'l':'u':'e':[]         -> True
   'h':'c':'o':'m':[]         -> True
   'h':'i':'g':'h':'e':'r':[] -> True
@@ -71,7 +69,7 @@ ident :: Parser Name
 ident = try do
   o <- getOffset
   c <- satisfy isAlphaNum
-  x <- takeWhileP Nothing (\c -> isAlphaNum c || c == '\'' || c == '-' || c == '\\')
+  x <- takeWhileP Nothing (\c -> isAlphaNum c || c == '\'' || c == '-')
   x <- pure (c:x)
   if isKeyword x
     then do {setOffset o; fail $ "unexpected keyword: " ++ x}
