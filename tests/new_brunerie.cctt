@@ -950,23 +950,46 @@ g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
 g10 : sTrunc ℤ → ℤ :=
   rec0 ℤ ℤ isSetℤ (λ x. x);
 
+
+--------------------------------------------------------------------------------
+
 η₃ : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
   push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
 ];
 
--- Having any of the extra sym-s below makes the computation too big (same as in Agda)!
-η₃' : join S¹ S¹ → Susp S² := λ[
+η₃2sym : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
   push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
 ];
 
-----------------------------------------------------------------------------------------------------
+η₃Lsym : join S¹ S¹ → Susp S² := λ[
+  inl x. north;
+  inr x. north;
+  push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))) i
+];
+
+η₃Rsym : join S¹ S¹ → Susp S² := λ[
+  inl x. north;
+  inr x. north;
+  push a b i. ((σ (S¹xS¹toS² a b)) ∙ (σ (S¹xS¹toS² a b))⁻¹) i
+];
 
 brunerie : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
 
-brunerie2 : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));
+brunerie2sym : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃2sym (push (loop1 i) (loop1 j) k)))));
+
+brunerieLsym : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Lsym (push (loop1 i) (loop1 j) k)))));
+
+brunerieRsym : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Rsym (push (loop1 i) (loop1 j) k)))));
+
+brunerie-spec     : brunerie     = neg (suc zero) := refl;         -- 0.5 ms
+brunerie2sym-spec : brunerie2sym = pos (suc (suc zero)) := refl;   -- 18.6 ms
+brunerieLsym-spec : brunerieLsym = pos zero := refl;               -- 10.1 ms
+brunerieRsym-spec : brunerieRsym = pos zero := refl;               -- 9.2 ms

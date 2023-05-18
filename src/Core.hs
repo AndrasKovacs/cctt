@@ -1137,7 +1137,10 @@ complNeCof = \case
                    (IVar _, _     ) -> CLeaf (NCEq i (flip# j))
                    (_     , IVar _) -> CLeaf (NCEq (flip# i) j)
                    _                -> impossible
-  NCAnd c1 c2 -> COr (complNeCof c1) (complNeCof c2)
+  NCAnd c1 c2 ->
+    trace "WARNING: unstable ghcom" $
+    traceShow (c1, c2) $
+    COr (complNeCof c1) (complNeCof c2)
 
 sysToCompl :: NeSysHCom -> Complete
 sysToCompl = \case
