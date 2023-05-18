@@ -5,7 +5,7 @@
 then run `stack install` in the source directory.
 - Usage and current features: see [tutorial.cctt](tutorial.cctt).
 - Syntax highlighting in emacs: add [cctt.el](cctt.el) to the emacs load path and `(require 'cctt)`
-  the emacs configuration.
+  to the emacs configuration.
 
 A small implementation of a cartesian cubical type theory, designed from
 ground-up with performance in mind. WIP. 
