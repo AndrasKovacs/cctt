@@ -8,7 +8,7 @@
 #      --ghci-options="-prof"
 #      --ghci-options="-fprof-auto-calls"
 
-resolver: nightly-2023-01-18
+resolver: nightly-2023-05-17
 
 packages:
 - .
