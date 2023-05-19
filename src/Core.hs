@@ -32,7 +32,6 @@ type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
 freshIVar :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshIVar act =
   let fresh = dom ?cof in
-  -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
   let ?cof  = lift ?cof in
   seq ?cof (act fresh)
 {-# inline freshIVar #-}
@@ -45,7 +44,6 @@ freshI act = freshIVar \i -> act (IVar i)
 freshIVarS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
 freshIVarS act =
   let fresh = dom ?cof in
-  -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
   let ?sub  = lift ?sub in
   let ?cof  = lift ?cof in
   seq ?sub (seq ?cof (act fresh))
@@ -170,8 +168,7 @@ evalSysHCom = \case
 
 occursInNeCof :: NeCof -> IVar -> Bool
 occursInNeCof cof i' = case cof of
-  NCEq i j    -> i == IVar i' || j == IVar i'
-  NCAnd c1 c2 -> occursInNeCof c1 i' || occursInNeCof c2 i'
+  NCEq i j -> i == IVar i' || j == IVar i'
 
 -- Alternative hcom and com semantics which shortcuts to term instantiation if
 -- the system is total. We make use of the knowledge that the system argument
@@ -1106,78 +1103,33 @@ hcomd r r' ~a sys ~b = case sys of
 -- ghcom
 ----------------------------------------------------------------------------------------------------
 
-data Complete
-  = CFalse
-  | CLeaf NeCof
-  | COr Complete Complete
-  deriving Show
-
-complToList :: Complete -> [NeCof]
-complToList c = go c [] where
-  go CFalse acc = acc
-  go (CLeaf c) acc = c : acc
-  go (COr l r) acc = go l $ go r acc
-
-andNCComplete :: Complete -> NeCof -> Complete
-andNCComplete c1 c2 = case c1 of
-  CFalse      -> CFalse
-  CLeaf c1    -> CLeaf (NCAnd c1 c2)
-  COr c1a c1b -> COr (andNCComplete c1a c2) (andNCComplete c1b c2)
-
-andComplete :: Complete -> Complete -> Complete
-andComplete c1 c2 = case c1 of
-  CFalse      -> CFalse
-  CLeaf c     -> andNCComplete c2 c
-  COr c1a c1b -> COr (andComplete c1a c2) (andComplete c1b c2)
-
-complNeCof :: NeCof -> Complete
-complNeCof = \case
-  NCEq i j    -> case (i, j) of
-                   (IVar _, IVar _) -> COr (CLeaf (NCEq i I0 `NCAnd` NCEq j I1))
-                                           (CLeaf (NCEq i I1 `NCAnd` NCEq j I0))
-                   (IVar _, _     ) -> CLeaf (NCEq i (flip# j))
-                   (_     , IVar _) -> CLeaf (NCEq (flip# i) j)
-                   _                -> impossible
-  NCAnd c1 c2 ->
-    trace "WARNING: unstable ghcom" $
-    traceShow (c1, c2) $
-    COr (complNeCof c1) (complNeCof c2)
-
-sysToCompl :: NeSysHCom -> Complete
-sysToCompl = \case
-  NSHEmpty      -> CFalse
-  NSHCons t sys -> COr (CLeaf (t^.binds)) (sysToCompl sys)
-
-complSys :: NeSysHCom -> Complete
-complSys = \case
-  NSHEmpty      -> CLeaf (NCEq I0 I0) -- "True"
-  NSHCons t sys -> andComplete (complNeCof (t^.binds)) (complSys sys)
-
-complToSys :: IVar -> Complete -> Val -> NeSysHCom
-complToSys i c ~base = go c NSHEmpty where
-  go c acc = case c of
-    CFalse  -> acc
-    CLeaf c -> NSHCons (BindCof c (BindILazy "l" i base)) acc
-    COr l r -> go l $! go r acc
-
--- | Make a forced neutral system valid.
-validify :: NCofArg => DomArg => NeSysHCom' -> Val -> NeSysHCom'
-validify sys ~base =
-  -- trace "VALIDIFY" $
-  -- traceShow (sysToCompl $ sys^.body) $
-  -- traceShow (complSys (sys^.body)) $
-  let completion = frc (complToSys (dom ?cof) (complSys (sys^.body)) base)
-  in case completion of
-    VSHTotal _ -> impossible
-    VSHNe sys' -> catNeSysHCom' sys sys'
-
-
 -- | Off-diagonal ghcom with neutral system input.
+--   See: https://www.cs.cmu.edu/~cangiuli/thesis/thesis.pdf  Figure 4.2
 ghcomdn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val
-ghcomdn r r' ~a sys base = case sys^.body of
-  NSHEmpty -> runIO (bumpHCom >> pure base)
-  _        -> hcomdn r r' a (validify sys base) base
-{-# inline ghcomdn #-}
+ghcomdn r r' a topSys base = case topSys^.body of
+
+  NSHEmpty ->
+    runIO (bumpHCom >> pure base)
+
+  NSHCons t sys -> case t^.binds of
+    NCEq i j ->
+      hcomd r r' a
+        (vshcons (eq i I0) "z" (\z ->
+           hcom r z a (vshcons (eq j I0) (t^.body.name) (\y ->
+                          (t^.body) ∙ y) $
+                       vshcons (eq j I1) (t^.body.name) (\y ->
+                          ghcom r y a (frc sys) base) $
+                       frc sys)
+                      base) $
+         vshcons (eq i I1) "z" (\z ->
+           hcom r z a (vshcons (eq j I1) (t^.body.name) (\y ->
+                         (t^.body) ∙ y) $
+                       vshcons (eq j I0) (t^.body.name) (\y ->
+                         ghcom r y a (frc sys) base) $
+                       frc sys)
+                      base) $
+         VSHNe topSys)
+        base
 
 -- | Off-diagonal ghcom.
 ghcomd :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
@@ -1237,8 +1189,7 @@ ungluen t (WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
   VNe n is'               -> VNe (nunglue n sys) (is <> is')
   v@VHole{}               -> v
-  v                       -> error ("ungluen:  " ++ take 1000 (show v))
-  -- v                       -> impossible
+  v                       -> impossible
 {-# inline ungluen #-}
 
 
@@ -1482,7 +1433,7 @@ hcase t b tag ecs@(EC sub env rc cs) = case frc t of
 
   n@(VNe _ is) -> VNe (NHCase n b tag ecs) is
   v@VHole{}    -> v
-  v            -> error $ take 1000 $ show v
+  v            -> impossible
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
@@ -1607,27 +1558,8 @@ instance Force Sub Sub where
   frcS s = appNCofToSub ?cof (sub s); {-# inline frcS #-}
 
 instance Force NeCof VCof where
-  frc = \case
-    NCEq i j    -> eq i j
-    NCAnd c1 c2 -> case frc c1 of
-      VCTrue -> frc c2
-      VCFalse -> VCFalse
-      VCNe cof is -> let ?cof = cof^.extended in case frc c2 of
-        VCTrue        -> VCNe cof is
-        VCFalse       -> VCFalse
-        VCNe cof' is' -> VCNe (NeCof' (cof'^.extended) (NCAnd (cof^.extra) (cof'^.extra)))
-                              (is <> is')
-
-  frcS = \case
-    NCEq i j    -> eqS i j
-    NCAnd c1 c2 -> case frcS c1 of
-      VCTrue  -> frcS c2
-      VCFalse -> VCFalse
-      VCNe cof is -> let ?cof = cof^.extended in case frcS c2 of
-        VCTrue        -> VCNe cof is
-        VCFalse       -> VCFalse
-        VCNe cof' is' -> VCNe (NeCof' (cof'^.extended) (NCAnd (cof^.extra) (cof'^.extra)))
-                              (is <> is')
+  frc  (NCEq i j) = eq i j
+  frcS (NCEq i j) = eqS i j
 
 instance Force Val Val where
   frc = \case

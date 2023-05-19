@@ -126,14 +126,12 @@ int = intLit
   <|> (ILvl <$!> (C.char '@' *> (coerce decimal)))
   <|> (Ident <$!> ident)
 
--- TODO: do we even need CTrue anywhere?
 cof :: Parser Cof
 cof = do
   i <- int
   char '='
   j <- int
-  c <- (char ',' *> cof) <|> pure CTrue
-  pure (CEq i j c)
+  pure (CEq i j)
 
 goSys' :: Parser Sys
 goSys' =

@@ -991,9 +991,9 @@ brunerieRsym : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃Rsym (push (loop1 i) (loop1 j) k)))));
 
 -- Computes in Agda:
-brunerie-spec     : brunerie     = neg (suc zero)       := refl;   -- 0.5 ms
+brunerie-spec     : brunerie     = neg (suc zero)       := refl;   -- 0.56 ms
 
 -- Doesn't:
-brunerie2sym-spec : brunerie2sym = pos (suc (suc zero)) := refl;   -- 18.6 ms
-brunerieLsym-spec : brunerieLsym = pos zero             := refl;   -- 10.1 ms
-brunerieRsym-spec : brunerieRsym = pos zero             := refl;   -- 9.2 ms
+brunerie2sym-spec : brunerie2sym = pos (suc (suc zero)) := refl;   -- 21 ms
+brunerieLsym-spec : brunerieLsym = pos zero             := refl;   -- 11.4 ms
+brunerieRsym-spec : brunerieRsym = pos zero             := refl;   -- 10 ms

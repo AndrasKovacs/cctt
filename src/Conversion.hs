@@ -159,10 +159,7 @@ convHCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') = case (wkSub sub, wk
      in convHCases' sub env cs sub' env' cs')
 
 instance Conv NeCof where
-  conv c c' = case (c, c') of
-    (NCEq i j   , NCEq i' j'   ) -> conv i i' && conv j j'
-    (NCAnd c1 c2, NCAnd c1' c2') -> conv c1 c1' && conv c2 c2'
-    _                            -> False
+  conv (NCEq i j) (NCEq i' j') = conv i i' && conv j j'
 
 instance Conv VDSpine where
   conv sp sp' = case (sp, sp') of
