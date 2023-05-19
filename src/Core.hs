@@ -32,7 +32,6 @@ type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
 freshIVar :: (NCofArg => IVar -> a) -> (NCofArg => a)
 freshIVar act =
   let fresh = dom ?cof in
-  -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
   let ?cof  = lift ?cof in
   seq ?cof (act fresh)
 {-# inline freshIVar #-}
@@ -45,7 +44,6 @@ freshI act = freshIVar \i -> act (IVar i)
 freshIVarS :: (SubArg => NCofArg => IVar -> a) -> (SubArg => NCofArg => a)
 freshIVarS act =
   let fresh = dom ?cof in
-  -- if  fresh == maxIVar then error "RAN OUT OF IVARS IN EVAL" else
   let ?sub  = lift ?sub in
   let ?cof  = lift ?cof in
   seq ?sub (seq ?cof (act fresh))
@@ -1106,11 +1104,32 @@ hcomd r r' ~a sys ~b = case sys of
 ----------------------------------------------------------------------------------------------------
 
 -- | Off-diagonal ghcom with neutral system input.
+--   See: https://www.cs.cmu.edu/~cangiuli/thesis/thesis.pdf  Figure 4.2
 ghcomdn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Val -> Val
-ghcomdn r r' ~a sys base = case sys^.body of
-  NSHEmpty -> runIO (bumpHCom >> pure base)
-  _        -> uf -- hcomdn r r' a (validify sys base) base
-{-# inline ghcomdn #-}
+ghcomdn r r' a topSys base = case topSys^.body of
+
+  NSHEmpty ->
+    runIO (bumpHCom >> pure base)
+
+  NSHCons t sys -> case t^.binds of
+    NCEq i j ->
+      hcomd r r' a
+        (vshcons (eq i I0) "z" (\z ->
+           hcom r z a (vshcons (eq j I0) (t^.body.name) (\y ->
+                          (t^.body) ∙ y) $
+                       vshcons (eq j I1) (t^.body.name) (\y ->
+                          ghcom r y a (frc sys) base) $
+                       frc sys)
+                      base) $
+         vshcons (eq i I1) "z" (\z ->
+           hcom r z a (vshcons (eq j I1) (t^.body.name) (\y ->
+                         (t^.body) ∙ y) $
+                       vshcons (eq j I0) (t^.body.name) (\y ->
+                         ghcom r y a (frc sys) base) $
+                       frc sys)
+                      base) $
+         VSHNe topSys)
+        base
 
 -- | Off-diagonal ghcom.
 ghcomd :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
@@ -1170,8 +1189,7 @@ ungluen t (WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
   VNe n is'               -> VNe (nunglue n sys) (is <> is')
   v@VHole{}               -> v
-  v                       -> error ("ungluen:  " ++ take 1000 (show v))
-  -- v                       -> impossible
+  v                       -> impossible
 {-# inline ungluen #-}
 
 
@@ -1415,7 +1433,7 @@ hcase t b tag ecs@(EC sub env rc cs) = case frc t of
 
   n@(VNe _ is) -> VNe (NHCase n b tag ecs) is
   v@VHole{}    -> v
-  v            -> error $ take 1000 $ show v
+  v            -> impossible
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
