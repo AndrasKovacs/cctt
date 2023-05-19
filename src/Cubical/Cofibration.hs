@@ -10,13 +10,8 @@ import qualified Data.IVarSet as IS
 
 ----------------------------------------------------------------------------------------------------
 
-data Cof = CTrue | CEq I I Cof
-  deriving Show
-
-data NeCof
-  = NCEq I I
-  | NCAnd NeCof NeCof
-  deriving Show
+data Cof = CEq I I deriving Show
+data NeCof = NCEq I I deriving Show
 
 -- | Substitution which maps each ivar to its smallest
 --   representative ivar in the equivalence class.
@@ -26,13 +21,13 @@ type NCofArg = (?cof :: NCof)
 
 data NeCof' = NeCof' {
     neCof'Extended :: NCof
-  , neCof'Extra    :: NeCof}
+  , neCof'Extra    :: {-# unpack #-} NeCof}
 
 -- TODO: unbox
 data VCof
   = VCTrue
   | VCFalse
-  | VCNe NeCof' IS.Set
+  | VCNe {-# unpack #-} NeCof' IS.Set
 
 makeFields ''NeCof'
 
@@ -83,8 +78,8 @@ eq# :: NCofArg => I -> I -> VCof
 eq# i j = case (i, j) of
   (i, j) | i == j  -> VCTrue
   (IVar i, IVar j) -> case orient (i, j) of
-                        (i, j) -> VCNe (NeCof' (solve ?cof j (IVar i)) (NCEq (IVar i) (IVar j)))
-                                       (IS.insert i $ IS.insert j mempty)
+                        (i', j') -> VCNe (NeCof' (solve ?cof j' (IVar i')) (NCEq (IVar i) (IVar j)))
+                                         (IS.insert i $ IS.insert j mempty)
   (IVar i, j     ) -> VCNe (NeCof' (solve ?cof i j) (NCEq (IVar i) j)) (IS.insert i mempty)
   (i     , IVar j) -> VCNe (NeCof' (solve ?cof j i) (NCEq (IVar j) i)) (IS.insert j mempty)
   _                -> VCFalse
@@ -104,7 +99,6 @@ eqS i j = eq# (evalI i) (evalI j)
 -- | Extend with a forced neutral NeCof. Error if non-neutral.
 conjNeCof :: NCofArg => NeCof -> NCof
 conjNeCof = \case
-  NCAnd c1 c2 -> let ?cof = conjNeCof c1 in conjNeCof c2
   NCEq i j    -> case (i, j) of
     (i     , j     ) | i == j -> impossible
     (IVar i, IVar j)          -> case orient (i, j) of (i, j) -> solve ?cof j (IVar i)
@@ -138,16 +132,8 @@ wkSub s = setDom (dom ?cof) s
 ----------------------------------------------------------------------------------------------------
 
 evalCof :: NCofArg => SubArg => Cof -> VCof
-evalCof = \case
-  CTrue        -> VCTrue
-  CEq i j cof  -> case eqS i j of
-    VCTrue    -> evalCof cof
-    VCFalse   -> VCFalse
-    VCNe c is -> let ?cof = c^.extended in case evalCof cof of
-                   VCTrue      -> VCNe c is
-                   VCFalse     -> VCFalse
-                   VCNe c' is' -> VCNe (NeCof' (c'^.extended) (NCAnd (c^.extra) (c'^.extra)))
-                                       (is <> is')
+evalCof (CEq i j) = eqS i j
+{-# inline evalCof #-}
 
 ----------------------------------------------------------------------------------------------------
 
@@ -179,6 +165,5 @@ insertI i s = IS.insertI (appNCof ?cof i) s
 {-# inline insertI #-}
 
 neCofVars :: NeCof -> IS.Set
-neCofVars = \case
-  NCEq i j    -> IS.insertI i $ IS.insertI j mempty
-  NCAnd c1 c2 -> neCofVars c1 <> neCofVars c2
+neCofVars (NCEq i j) = IS.insertI i $ IS.insertI j mempty
+{-# inline neCofVars #-}

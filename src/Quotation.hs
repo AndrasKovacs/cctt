@@ -121,11 +121,7 @@ instance Quote a b => Quote (WithIS a) b where
   {-# inline quote #-}
 
 instance Quote NeCof Cof where
-  quote c = go c CTrue where
-    go :: NCofArg => NeCof -> Cof -> Cof
-    go c acc = case c of
-      NCEq i j    -> CEq (quote i) (quote j) acc
-      NCAnd c1 c2 -> go c1 (go c2 acc)
+  quote (NCEq i j) = CEq (quote i) (quote j)
 
 instance (SubAction a, Quote a b) => Quote (BindI a) b where
   quote t = freshI \i -> quote (t ∙ i); {-# inline quote #-}
