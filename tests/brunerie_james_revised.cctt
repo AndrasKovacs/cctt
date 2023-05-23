@@ -17,6 +17,7 @@ connAnd (A : U)(a b : A)(p : a = b) : (λ _. a) ={i. a = p i} p
 Ω (A : U) (x : A) : U := x = x;
 Ω² (A : U) (x : A) : U := Ω (Ω A x) refl;
 Ω³ (A : U) (x : A) : U := Ω (Ω² A x) refl;
+Ω⁴ (A : U) (x : A) : U := Ω (Ω³ A x) refl;
 
 higher inductive S¹ :=
     base1
@@ -398,8 +399,7 @@ EH (A : U) (x : A) (p q : Ω² A x) : q ={i. p i = p i} q
          ]
          (p i k);
 
--- hmmmm
-csqInv (A : U) (x y z : A) (p : x = y) (q : y = z)
+csqInvOld (A : U) (x y z : A) (p : x = y) (q : y = z)
   (r : p ={i. p i = q i} q)
   : Ω² A y
   := J A x
@@ -410,9 +410,168 @@ csqInv (A : U) (x y z : A) (p : x = y) (q : y = z)
           z)
        y p q r;
 
+-- hmm, this "optimized" version of csqInvOld has a much smaller
+-- normal form, but leads to worse performance below (both time and
+-- memory.) this was adapted from connection-both.
+csqInv (A : U) (x y z : A) (p : x = y) (q : y = z)
+  (r : (λ j. p j) ={i. p i = q i} q)
+  : Ω² A y :=
+  λ i j.
+  let pface (m k : I) : A := hcom 1 m [k=0. p; k=1 _. y] y;
+  let qface (m k : I) : A := hcom 0 m [k=0. q; k=1 _. y] y;
+  hcom 0 1 [
+    i=0. pface j;
+    i=1. qface j;
+    j=0. pface i;
+    j=1. qface i]
+    (r i j);
+
 hopf (A : U) (x : A) (p : Ω² A x) : Ω³ A x
   := csqInv (Ω A x) refl refl refl p p
        (EH A x p p);
 
+generatorS² : Ω³ S² base2 := hopf S² base2 (λ i j. loop2 i j);
+
 generator : ℤ
   := writhe (hopf S² base2 (λ i j. loop2 i j));
+
+generatorflip : ℤ
+  := writhe (hopf S² base2 (λ i j. loop2 j i));
+
+
+
+-- on to pi4s3
+
+-- first, need to fill squares over isEquiv :(
+
+-- stolen from yaccttprelude.cctt
+connOr (A : U) (a b : A) (p : a = b) : p ={i. p i = b} (λ _. b)
+  := let connOrWeak (l k : I) : A := hcom 0 l [k=0. p; k=1 _. b] (p k);
+     λ i j. hcom 1 0 [ i=0. connOrWeak j ; i=1. connOrWeak 1
+                     ; j=0. connOrWeak i ; j=1. connOrWeak 1
+                     ; i=j. connOrWeak i ] b;
+
+-- stolen from pathd/hlevel in redtt/library/prelude/hlevel.red
+fromPathPPath (A : I → U) (a0 : A 0) (a1 : A 1) :
+  (a0 ={i. A i} a1) = (coe 0 1 (i. A i) a0 = a1) :=
+  λ i. (coe 0 i (j. A j) a0 ={j. connOr U (A 0) (A 1) (λ i. A i) i j} a1);
+
+isPropSquareSet (A : I → I → U) (A-set : (i j : I) → isSet (A i j))
+  (p0- : (j : I) → A 0 j)
+  (p1- : (j : I) → A 1 j)
+  (p-0 : p0- 0 ={i. A i 0} p1- 0)
+  (p-1 : p0- 1 ={i. A i 1} p1- 1)
+  (i : I) : isProp (p-0 i ={j. A i j} p-1 i) :=
+  coe 1 0 (t. isProp (fromPathPPath (λ j. A i j) (p-0 i) (p-1 i) t))
+    (A-set i 1 (coe 0 1 (j. A i j) (p-0 i)) (p-1 i));
+
+lemPropFam' (A : I → U) (A-prop : (i : I) → isProp (A i))
+  (a0 : A 0) (a1 : A 1) : a0 ={i. A i} a1 :=
+  λ i. A-prop i (coe 0 i (i. A i) a0) (coe 1 i (i. A i) a1) i;
+
+-- there must be a better way...
+lemSetFam (A : I → I → U) (A-set : (i j : I) → isSet (A i j))
+  (p0- : (j : I) → A 0 j)
+  (p1- : (j : I) → A 1 j)
+  (p-0 : p0- 0 ={i. A i 0} p1- 0)
+  (p-1 : p0- 1 ={i. A i 1} p1- 1)
+  : (λ j. p0- j) ={i. p-0 i ={j. A i j} p-1 i} (λ j. p1- j) :=
+  lemPropFam'
+    (λ i. p-0 i ={j. A i j} p-1 i)
+    (λ i. isPropSquareSet A A-set p0- p1- p-0 p-1 i)
+    (λ j. p0- j)
+    (λ j. p1- j);
+
+-- from new_brunerie.cctt
+isProp-isSet : (A : U) → isProp A → isSet A :=
+  λ A h a b p q j i.
+    hcom 0 1 [i = 0. h a a
+             ;i = 1. h a b
+             ;j = 0. h a (p i)
+             ;j = 1. h a (q i)] a;
+
+Z2 (A : U) : U := Ω² (A → A) (λ x. x);
+
+rot2IsEquiv (A : U) (h : Z2 A) (i j : I)
+  : isEquiv A A (λ x. h i j x)
+  := lemSetFam
+       (λ i j. isEquiv A A (h i j))
+       (λ i j. isProp-isSet (isEquiv A A (λ x. h i j x)) (isPropIsEquiv A A (λ x. h i j x)))
+       (λ j. (idEquiv A).2)
+       (λ j. (idEquiv A).2)
+       (λ i. (idEquiv A).2)
+       (λ i. (idEquiv A).2)
+       i j;
+
+rot2Equiv (A : U) (h : Z2 A) (i j : I) : equiv A A
+  := ((λ x. h i j x), rot2IsEquiv A h i j);
+
+-- next level of local-global looping
+global3 (A : U) (h : Z2 A)
+  : Ω³ U A
+  := λ i j k. Glue A [i=0. (A, idEquiv A);
+                      i=1. (A, idEquiv A);
+                      j=0. (A, idEquiv A);
+                      j=1. (A, idEquiv A);
+                      k=0. (A, rot2Equiv A h i j);
+                      k=1. (A, idEquiv A)];
+
+higher inductive S³ :=
+  base3
+| loop3 (i j k : I)
+    [i=0. base3;
+     i=1. base3;
+     j=0. base3;
+     j=1. base3;
+     k=0. base3;
+     k=1. base3];
+
+higher inductive J₂S² :=
+  j2s2-base
+| j2s2-surf (i j : I)
+    [i=0. j2s2-base;
+     i=1. j2s2-base;
+     j=0. j2s2-base;
+     j=1. j2s2-base]
+| j2s2-surfsurf (i j a b : I)
+    [i=0. j2s2-surf a b;
+     i=1. j2s2-surf a b;
+     j=0. j2s2-surf a b;
+     j=1. j2s2-surf a b;
+     a=0. j2s2-surf i j;
+     a=1. j2s2-surf i j;
+     b=0. j2s2-surf i j;
+     b=1. j2s2-surf i j];
+
+-- cheating again, should 3-truncate J₂S² -- actually 4-truncation
+-- suffices, but we only care up to 3-truncation here -- so that this
+-- actually happens
+surfsJ₂S² : (x : J₂S²) → Ω² J₂S² x :=
+  λ [j2s2-base. λ k l. j2s2-surf k l;
+     j2s2-surf i j. λ k l. j2s2-surfsurf i j k l;
+     j2s2-surfsurf i j a b. ?_];
+
+toJ₂S² : Ω S³ base3 → J₂S² :=
+  let F : S³ → U :=
+    λ [base3. J₂S²;
+       loop3 i j k. global3 J₂S² (λ i j x. surfsJ₂S² x i j) i j k];
+  λ p. coe 0 1 (i. F (p i)) j2s2-base;
+
+gen-π₄S³ : Ω⁴ S³ base3 :=
+  hopf (Ω S³ base3) refl (λ i j k. loop3 i j k);
+
+-- normal form: 193KB :(
+-- better than 35MB before with csqInvOld!
+-- but observe that it does not contain j2s2-surfsurf!!!
+ouch : Ω³ J₂S² j2s2-base :=
+  λ i j k. toJ₂S² (gen-π₄S³ i j k);
+
+-- this cheat is not justified, but, I expect the resulting
+-- computation is quite similar (no harder at least) than the real one
+-- I want to do
+terrible-cheat : J₂S² → S² :=
+  λ[j2s2-base. base2;
+    j2s2-surf i j. loop2 i j;
+    j2s2-surfsurf i j a b. ?_];
+
+hope : ℤ := writhe (λ i j k. terrible-cheat (ouch i j k));
