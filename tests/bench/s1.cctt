@@ -39,6 +39,6 @@ toℕ : ℤ → ℕ := λ[
   neg n. n
 ];
 
-test1 := forceℤ (winding (intLoop' (pos n100k)));
+test1 := forceℤ (winding (intLoop' (pos n1m)));
 test2 := forceℤ (winding (intLoop' (neg n100k)));
 test3 := winding (intLoop (pos n100k) ∙ intLoop (neg n100k));

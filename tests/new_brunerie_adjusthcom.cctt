@@ -1010,10 +1010,11 @@ BIGGLUEZ :=
   []) []) []) []) []) []) []) []) []) []) []) []) []) [];
 
 spos0 : BIGGLUEZ :=
-  glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
-  (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
-  ((sinc (pos zero))) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
-  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
+  glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue
+  (glue (glue (glue (glue (glue (glue (glue (glue (glue (glue ((sinc (pos
+  zero))) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [])
+  []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) []) [];
 
 codeTruncS¹' : BIGGLUE → hSet :=
   λ x. rec1 S¹ hSet isGroupoid-hSet (λ s. (sTrunc (helix s), strunc' (helix s)))
@@ -1026,7 +1027,6 @@ g9' : gbase1'' = gbase1'' → sTrunc ℤ :=
     unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
     unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (unglue (
     unglue (unglue (unglue (unglue (unglue (unglue (
-
     (coe 0 1 (i. (codeTruncS¹' (p i)).1) spos0)
     ))))))))))))))))))))))))))))))))))));
 

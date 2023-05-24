@@ -977,23 +977,28 @@ g10 : sTrunc ℤ → ℤ :=
   push a b i. ((σ (S¹xS¹toS² a b)) ∙ (σ (S¹xS¹toS² a b))⁻¹) i
 ];
 
-
+-- Actual Brunerie numbers
 brunerie : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
 
 brunerie2sym : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃2sym (push (loop1 i) (loop1 j) k)))));
 
-brunerieLsym : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Lsym (push (loop1 i) (loop1 j) k)))));
 
-brunerieRsym : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Rsym (push (loop1 i) (loop1 j) k)))));
+------------------------------------------------------------
 
 -- Computes in Agda:
 brunerie-spec     : brunerie     = neg (suc zero)       := refl;   -- 0.56 ms
 
 -- Doesn't:
 brunerie2sym-spec : brunerie2sym = pos (suc (suc zero)) := refl;   -- 21 ms
-brunerieLsym-spec : brunerieLsym = pos zero             := refl;   -- 11.4 ms
-brunerieRsym-spec : brunerieRsym = pos zero             := refl;   -- 10 ms
+
+-- Having one sym also works
+left-sym : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Lsym (push (loop1 i) (loop1 j) k)))));
+
+right-sym : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Rsym (push (loop1 i) (loop1 j) k)))));
+
+left-sym-spec : brunerieLsym = pos zero             := refl;   -- 11.4 ms
+left-sym-spec : brunerieRsym = pos zero             := refl;   -- 10 ms
