@@ -15,8 +15,7 @@ theory implementation, like the infamous original definition of Brunerie's
 number. The goal of this implementation is to compute more of these. Benchmarks are currently very disorganized 
 but there are several definitions already which can't be computed in other cubical type theory
 implementations (as far as we know). For example, [here](tests/new_brunerie.cctt#L981) we
-have four variations of the Brunerie number. These can be all computed here but only one
-out of the four can be computed in Agda.
+have two variations of the Brunerie number. These can be both computed here but only one can be computed in Agda.
 
 In the following I assume that readers of this README are familiar with rules of cubical TTs.
 
