@@ -697,6 +697,8 @@ higher inductive S¹ :=
     base1
   | loop1 (i : I) [i=0. base1; i=1. base1];
 
+loop1' : base1 = base1 := λ i. loop1 i;
+
 helix : S¹ → U := λ[
   base1. ℤ;
   loop1 i. sucPathℤ i
@@ -752,6 +754,9 @@ higher inductive join (A B : U) :=
 | inr B
 | push (a : A) (b : B) (i : I) [ i = 0. inl a
                                ; i = 1. inr b ];
+
+push' (A B : U) (a : A) (b : B) : inl a ={_. join A B} inr b :=
+  λ i. push a b i;
 
 higher inductive sTrunc (A : U) :=
     sinc (a : A)
@@ -950,16 +955,47 @@ g9 : (Ω (gdot S¹dot)).1 → sTrunc ℤ :=
 g10 : sTrunc ℤ → ℤ :=
   rec0 ℤ ℤ isSetℤ (λ x. x);
 
+--------------------------------------------------------------------------------
+
+invLooper : S¹ → S¹ := λ[
+  base1. base1;
+	loop1 i. loop1'⁻¹ i
+];
+
+SuspS¹ToS² : Susp S¹ → S² := λ[
+  north. base2;
+	south. base2;
+	merid x i. ?_
+];
+
+-- σ : S² → (Ω (Suspdot S²)).₁ :=
+--   λ x. merid' S² x ∙ (merid' S² base2)⁻¹;
+σ₁ (x : S¹) : base2 = base2 := ?_;
+
+
+η₁ : join S¹ S¹ → S² := λ[
+  inl x. base2;
+	inr x. base2;
+	push a b i. (σ₁ b ∙ σ₁ a) i
+];
+
+η₂ : join S¹ S¹ → join S¹ S¹ := λ[
+  inl x. inr (invLooper x);
+	inr x. inr x;
+	push a b i.
+     ((push' S¹ S¹ (rot b (invLooper a)) (invLooper a))⁻¹
+		 ∙ push' S¹ S¹ (rot b (invLooper a)) b) i
+];
 
 --------------------------------------------------------------------------------
 
-η₃ : join S¹ S¹ → Susp S² := λ[
+η₃' : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
   push a b i. (σ (S¹xS¹toS² a b) ∙ σ (S¹xS¹toS² a b)) i
 ];
 
-η₃2sym : join S¹ S¹ → Susp S² := λ[
+η₃ : join S¹ S¹ → Susp S² := λ[
   inl x. north;
   inr x. north;
   push a b i. ((σ (S¹xS¹toS² a b))⁻¹ ∙ (σ (S¹xS¹toS² a b))⁻¹) i
@@ -978,27 +1014,27 @@ g10 : sTrunc ℤ → ℤ :=
 ];
 
 -- Actual Brunerie numbers
-brunerie : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
+β₃' : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));
 
-brunerie2sym : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃2sym (push (loop1 i) (loop1 j) k)))));
+β₃ : ℤ :=
+  g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
 
 
 ------------------------------------------------------------
 
--- Computes in Agda:
-brunerie-spec     : brunerie     = neg (suc zero)       := refl;   -- 0.56 ms
+-- -- Computes in Agda:
+-- β₃'-spec     : β₃'     = neg (suc zero)       := refl;   -- 0.56 ms
 
--- Doesn't:
-brunerie2sym-spec : brunerie2sym = pos (suc (suc zero)) := refl;   -- 21 ms
+-- -- Doesn't:
+-- β₃-spec : β₃ = pos (suc (suc zero)) := refl;   -- 21 ms
 
--- Having one sym also works
-left-sym : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Lsym (push (loop1 i) (loop1 j) k)))));
+-- -- Having one sym also works
+-- left-sym : ℤ :=
+--   g10 (g9 (g8 (λ i j. f7 (λ k. η₃Lsym (push (loop1 i) (loop1 j) k)))));
 
-right-sym : ℤ :=
-  g10 (g9 (g8 (λ i j. f7 (λ k. η₃Rsym (push (loop1 i) (loop1 j) k)))));
+-- right-sym : ℤ :=
+--   g10 (g9 (g8 (λ i j. f7 (λ k. η₃Rsym (push (loop1 i) (loop1 j) k)))));
 
-left-sym-spec : brunerieLsym = pos zero             := refl;   -- 11.4 ms
-left-sym-spec : brunerieRsym = pos zero             := refl;   -- 10 ms
+-- left-sym-spec  : left-sym  = pos zero             := refl;   -- 11.4 ms
+-- right-sym-spec : right-sym = pos zero             := refl;   -- 10 ms
