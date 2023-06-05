@@ -199,7 +199,7 @@ displayErrInCxt (ErrInCxt e) = withPrettyArgs do
 
   putStrLn ("\nERROR " ++ path ++ ":" ++ lnum ++ ":" ++ show colnum)
   putStrLn (lpad ++ " |")
-  putStrLn (lnum ++ " | " ++ (lines file !! (linum - 1)))
-  putStrLn (lpad ++ " | " ++ replicate (colnum - 1) ' ' ++ "^")
+  putStrLn (lnum ++ " | " ++ (lines file !! linum))
+  putStrLn (lpad ++ " | " ++ replicate colnum ' ' ++ "^")
   putStrLn (showError e)
   putStrLn ""

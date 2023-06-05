@@ -23,7 +23,7 @@ import Lexer
 
 atomErr   = ["an identifier", "a parenthesized expression", "refl", "interval constant", "hole"]
 projErr   = "a projection expression" : atomErr
--- appErr    = "an application expression" : projErr
+appErr    = "an application expression" : projErr
 -- pathErr   = "a path type" : appErr
 -- sigmaErr  = "a sigma type" : pathErr
 -- piErr     = "a function type" : sigmaErr
@@ -100,7 +100,7 @@ goProj t =
      <|> do {p <- rightPos <$> $(sym "₂"); goProj (Proj2 t p)}
      <|> do {x <- ident; goProj (ProjField t x)}
     )
-    (do {p <- rightPos <$> $(sym' "⁻¹"); goProj (Sym t p)} <|> pure t)
+    (do {p <- rightPos <$> $(sym "⁻¹"); goProj (Sym t p)} <|> pure t)
 
 proj' :: Parser Tm
 proj' = (goProj =<< atom') `cut` projErr
@@ -265,12 +265,15 @@ appBase = getPos >>= \p -> $(switch [| case _ of
 app :: Parser Tm
 app = appBase <|> (goApp =<< proj)
 
-trans :: Parser Tm
-trans = FP.chainl Trans app ($(sym "∙") *> app)
+app' :: Parser Tm
+app' = (appBase <|> (goApp =<< proj')) `cut` appErr
+
+trans' :: Parser Tm
+trans' = FP.chainl Trans app ($(sym "∙") *> app')
 
 eq' :: Parser Tm
 eq' = do
-  t <- trans
+  t <- trans'
   FP.branch $(sym "=")
     (do FP.branch braceL
           (do a <- FP.withOption bind
@@ -278,12 +281,12 @@ eq' = do
                       (BMDontBind <$> tm')
               braceR'
               DepPath a t <$> tm')
-          (Path t <$> trans))
+          (Path t <$> trans'))
     (pure t)
 
 sigma' :: Parser Tm
 sigma' = getPos >>= \p ->
-  FP.withOption (parL *> bind <* colon')
+  FP.withOption (parL *> bind <* colon)
     (\x -> do a <- tm'
               p' <- rightPos <$> parR'
               FP.branch prod

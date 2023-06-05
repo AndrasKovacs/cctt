@@ -1,1 +1,10 @@
 
+inductive Top := tt;
+
+
+-- inductive Bot :=;
+-- not (A : U) := A → Bot;
+
+-- inductive Sum (A B : U) := left A | right B;
+
+-- Dec (A : U) := Sum A (not A);

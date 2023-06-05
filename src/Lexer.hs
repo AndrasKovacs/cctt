@@ -35,9 +35,10 @@ data Error
   deriving Show
 
 merge :: Error -> Error -> Error
-merge ~err@(Error p e) ~err'@(Error p' e')
+merge err@(Error p e) err'@(Error p' e')
   | p == p', Imprecise ss <- e, Imprecise ss' <- e' = err'
   | otherwise = err
+merge _ _ = impossible
 {-# noinline merge #-}
 
 type Parser = FP.Parser Src Error
@@ -107,6 +108,10 @@ testParser p str = case SrcFile "(interactive)" (strToUtf8 str) of
     OK a _ _ -> print a
     Fail     -> putStrLn "parse error"
 
+dummy :: Parser ()
+dummy = pure ()
+{-# inline dummy #-}
+
 -- | Consume whitespace. We track the number of whitespace characters read since the start of the
 --   current line. We don't need to track column numbers precisely! Relevant indentation consists of
 --   only whitespace at the start of a line. For simplicity, whitespace parsing counts characters
@@ -114,12 +119,12 @@ testParser p str = case SrcFile "(interactive)" (strToUtf8 str) of
 --   start of a newline.
 ws :: Parser ()
 ws = $(switch [| case _ of
-  " "  -> ws
-  "\n" -> ws
+  " "  -> dummy >> ws
+  "\n" -> dummy >> ws
   "\t" -> err $ Precise $ Msg "tabs are not allowed"
-  "\r" -> ws
-  "--" -> lineComment
-  "{-" -> multilineComment
+  "\r" -> dummy >> ws
+  "--" -> dummy >> lineComment
+  "{-" -> dummy >> multilineComment
   _    -> pure () |])
 
 -- | Parse a line comment.
@@ -135,9 +140,9 @@ multilineComment :: Parser ()
 multilineComment = go (1 :: Int) where
   go 0 = ws
   go n = $(switch [| case _ of
-    "\n" -> go n
-    "-}" -> go (n - 1)
-    "{-" -> go (n + 1)
+    "\n" -> dummy >> go n
+    "-}" -> dummy >> go (n - 1)
+    "{-" -> dummy >> go (n + 1)
     _    -> FP.branch anyChar (go n) (pure ()) |])
 
 -- | We check indentation first, then read the token, then read trailing whitespace.
