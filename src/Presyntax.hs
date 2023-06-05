@@ -201,3 +201,7 @@ instance Spanned a => Spanned [a] where
   rightPos []     = impossible
   rightPos [x]    = rightPos x
   rightPos (_:xs) = rightPos xs
+
+unParens :: Tm -> Tm
+unParens (Parens _ t _) = unParens t
+unParens t              = t

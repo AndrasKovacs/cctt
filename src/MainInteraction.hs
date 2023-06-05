@@ -101,7 +101,7 @@ mainWith getArgs = do
       case M.lookup x (st^.top) of
         Just (TEDef i) -> do
           putStrLn ""
-          putStrLn $ sourcePosPretty (i^.pos)
+          putStrLn $ show (i^.pos)
           putStrLn $ x ++ " : " ++ pretty0 (i^.defTy)
         _ -> do
           putStrLn $ "No top-level definition with name: " ++ show x

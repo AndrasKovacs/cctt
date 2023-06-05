@@ -13,7 +13,7 @@ import Pretty
 import qualified FlatParse.Stateful as FP
 
 data Error
-  = NameNotInScope Name
+  = NameNotInScope Span
   | LocalLvlNotInScope
   | TopLvlNotInScope
   | UnexpectedI

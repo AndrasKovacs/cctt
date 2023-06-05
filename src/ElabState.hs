@@ -10,6 +10,8 @@ import Common
 import CoreTypes
 import Cubical
 
+import qualified Presyntax as P
+
 import qualified Data.LvlMap as LM
 import qualified Data.ByteString.Char8 as B
 
@@ -79,7 +81,7 @@ data HCaseBoundaryCheck where
   deriving Show via DontShow HCaseBoundaryCheck
 
 data State = State {
-    stateTop                 :: M.Map Name TopEntry
+    stateTop                 :: M.Map Span TopEntry
   , stateTop'                :: LM.Map TopEntry
   , stateLvl                 :: Lvl
   , stateLoadState           :: LoadState
@@ -158,6 +160,11 @@ define x ~a ~qa ~v act =
   let _ = ?env; _ = ?dom in
   act
 {-# inline define #-}
+
+bindToName :: P.Bind -> Name
+bindToName = \case
+  P.BName x     -> NSpan x
+  P.BDontBind _ -> N_
 
 -- | Bind an ivar.
 bindI :: Name -> Elab (IVar -> a) -> Elab a

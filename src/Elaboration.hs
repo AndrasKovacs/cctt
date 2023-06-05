@@ -10,6 +10,7 @@ import System.Directory
 import System.Exit
 import Data.List
 import qualified Data.List.Split as List
+import qualified Data.ByteString.Char8 as B
 
 import Common hiding (debug)
 import Core hiding (bindI, bindCof, define, eval, evalSys, evalBoundary)
@@ -85,14 +86,14 @@ evalI i = let ?sub = idSub (dom ?cof) in Cubical.evalI i
 debug :: PrettyArgs [String] -> Elab (IO ())
 debug x = withPrettyArgs (Common.debug x)
 
-setPos :: DontShow SourcePos -> (PosArg => a) -> a
-setPos pos act = let ?srcPos = coerce pos in act; {-# inline setPos #-}
+setPos :: forall a b. P.Spanned a => a -> (PosArg => b) -> b
+setPos a act = let ?srcPos = Box (P.leftPos a) in act; {-# inline setPos #-}
 
-frcPos :: P.Tm -> (PosArg => P.Tm -> a) -> PosArg => a
-frcPos t act = case t of
-  P.Pos p t -> setPos p (act t)
-  t         -> act t
-{-# inline frcPos #-}
+frcParens :: P.Tm -> (PosArg => P.Tm -> a) -> PosArg => a
+frcParens t act = case t of
+  P.Parens p t _ -> setPos p (act t)
+  t              -> act t
+{-# inline frcParens #-}
 
 -- | Create fibrant closure from term in extended context.
 makeNCl :: Elab (Name -> Tm -> NamedClosure)
@@ -113,9 +114,9 @@ data Split
   deriving Show
 
 check :: Elab (P.Tm -> VTy -> IO Tm)
-check t topA = frcPos t \case
+check t topA = frcParens t \case
 
-  P.Let x ma t u -> do
+  P.Let p (NSpan -> x) ma t u -> setPos p do
     (a, va, t) <- case ma of
       Nothing -> do
         Infer t va <- infer t
@@ -129,7 +130,7 @@ check t topA = frcPos t \case
     u <- define x va a vt $ check u topA
     pure $! Let x a t u
 
-  P.HCom r r' Nothing sys t -> do
+  P.HCom p r r' Nothing sys t -> setPos p do
     r  <- checkI r
     r' <- checkI r'
     t  <- check t topA
@@ -138,7 +139,7 @@ check t topA = frcPos t \case
 
   t -> case (t, frc topA) of
 
-    (P.Lam x ann t, VPi a b) -> do
+    (P.Lam p (bindToName -> x) ann t, VPi a b) -> setPos p do
       ~qa <- case ann of
         P.LANone         -> pure (quote a)
         P.LAAnn a'       -> do a' <- check a' VU
@@ -147,7 +148,7 @@ check t topA = frcPos t \case
         P.LADesugared a' -> check a' VU
       Lam x <$!> bind x a qa (\v -> check t (b ∙ v))
 
-    (P.Split cs, VPi a b) -> case frc a of
+    (P.Split p cs _, VPi a b) -> setPos p $ case frc a of
       VTyCon tyinfo params -> do
         frz <- readIORef (tyinfo^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
@@ -165,17 +166,17 @@ check t topA = frcPos t \case
       _ ->
         err $ ExpectedInductiveType (quote a)
 
-    (P.Lam x ann t, VPath a l r) -> do
-      case ann of P.LANone                 -> pure ()
-                  P.LAAnn (P.unPos -> P.I) -> pure ()
-                  P.LADesugared{}          -> pure ()
-                  _                        -> err $ GenericError "Expected an interval binder"
+    (P.Lam p (bindToName -> x) ann t, VPath a l r) -> setPos p do
+      case ann of P.LANone                      -> pure ()
+                  P.LAAnn (P.unParens -> P.I _) -> pure ()
+                  P.LADesugared{}               -> pure ()
+                  _                             -> err $ GenericError "Expected an interval binder"
       t <- bindI x \i -> check t (a ∙ IVar i)
       convEndpoints (instantiate t I0) l
       convEndpoints (instantiate t I1) r
       pure $! PLam (quote l) (quote r) x t
 
-    (P.PLam l r x t, VPath a l' r') -> do
+    (P.PLam p l r (bindToName -> x) t, VPath a l' r') -> setPos p do
       t <- bindI x \i -> check t (a ∙ IVar i)
       convEndpoints (instantiate t I0) l'
       convEndpoints (instantiate t I1) r'
@@ -185,17 +186,17 @@ check t topA = frcPos t \case
       convEndpoints (eval r) r'
       pure $! PLam l r x t
 
-    (P.Refl, VPath a l r) -> do
+    (P.Refl p _, VPath a l r) -> setPos p do
       constantICl a
       convReflEndpoints l r
       pure $! Refl (quote l)
 
-    (P.Sym p, VPath a y x) -> do
+    (P.Sym p _, VPath a y x) -> setPos p do
       constantICl a
       p <- check p (VPath a x y)
       pure $! Sym (quote a) (quote x) (quote y) p
 
-    (P.Ap f p, VPath b fx fy) -> do
+    (P.Ap pos f p, VPath b fx fy) -> setPos pos do
       constantICl b
       Infer p pty <- infer p
       (a, x, y) <- nonDepPath pty
@@ -212,11 +213,11 @@ check t topA = frcPos t \case
       q <- check q (VPath a y z)
       pure $! Trans (quote a) (quote x) (quote y) (quote z) p q
 
-    (P.Lam x ann t, VLine a) -> do
-      case ann of P.LANone                 -> pure ()
-                  P.LAAnn (P.unPos -> P.I) -> pure ()
-                  P.LADesugared{}          -> pure ()
-                  _                        -> err $ GenericError "Expected an interval binder"
+    (P.Lam p (bindToName -> x) ann t, VLine a) -> setPos p do
+      case ann of P.LANone                      -> pure ()
+                  P.LAAnn (P.unParens -> P.I _) -> pure ()
+                  P.LADesugared{}               -> pure ()
+                  _                             -> err $ GenericError "Expected an interval binder"
       t <- bindI x \r -> check t (a ∙ IVar r)
       pure $ LLam x t
 
@@ -225,7 +226,7 @@ check t topA = frcPos t \case
       u <- check u (b ∙ eval t)
       pure $! Pair (b^.name) t u
 
-    (P.GlueTm base eqs ts, VGlueTy a equivs) -> do
+    (P.GlueTm p base eqs ts _, VGlueTy a equivs) -> setPos p do
       ~eqs <- case eqs of
         Nothing -> pure (quote equivs)
         Just eqs -> do
@@ -236,46 +237,46 @@ check t topA = frcPos t \case
       pure $ Glue base eqs ts
 
     -- inferring non-dependent motive for case
-    (P.Case t Nothing cs, b) -> do
+    (P.Case p t Nothing cs _, b) -> setPos p do
       Infer t a <- infer t
       case frc a of
         VTyCon typeinfo params -> do
-          let qb = bind "_" a (quote a) \_ -> quote b
-          let bv = NCl "_" $ CConst b
+          let qb = bind N_ a (quote a) \_ -> quote b
+          let bv = NCl N_ $ CConst b
           frz <- readIORef $ typeinfo^.frozen
           unless frz $ err $ GenericError "Can't case split on the type that's being defined"
           cons <- readIORef $ typeinfo^.constructors
           cs <- elabCases params bv (LM.elems cons) cs
           tag <- newCaseTag
-          pure $ Case t "_" qb tag cs
+          pure $ Case t N_ qb tag cs
         VHTyCon inf params -> do
-          let qb = bind "_" a (quote a) \_ -> quote b
-          let bv = NCl "_" $ CConst b
+          let qb = bind N_ a (quote a) \_ -> quote b
+          let bv = NCl N_ $ CConst b
           frz <- readIORef (inf^.frozen)
           unless frz $ err $ GenericError "Can't case split on the type that's being defined"
           cons <- LM.elems <$!> readIORef (inf^.constructors)
           tag <- newCaseTag
           cs <- elabHCases params bv tag cons cs
-          pure $ HCase t "_" qb tag cs
+          pure $ HCase t N_ qb tag cs
         _ ->
           err $ ExpectedInductiveType (quote a)
 
-    (P.Hole (Just "_") p, a) -> do
-      putStrLn ("HOLE ?" ++ sourcePosPretty (coerce p))
-      pure (Hole (SrcHole Nothing p))
+    (P.Hole pos P.BDontBind{}, a) -> do
+      putStrLn ("HOLE ?" ++ show pos)
+      pure (Hole (SrcHole Nothing pos))
 
-    (P.Hole i p, a) -> do
-      putStrLn ("HOLE ?" ++ maybe (sourcePosPretty (coerce p)) id i)
+    (P.Hole pos (P.BName holename), a) -> do
+      putStrLn ("HOLE ?" ++ show holename)
       showcxt <- getState <&> (^.printingOpts.showHoleCxts)
       let qa = quote a
 
       let showBinder :: PrettyArgs (Name -> String)
-          showBinder "_" = '@':show ?dom
-          showBinder x   = x
+          showBinder N_ = '@':show ?dom
+          showBinder x  = show x
 
       let showIBinder :: PrettyArgs (Name -> String)
-          showIBinder "_" = '@':show ?idom
-          showIBinder x   = x
+          showIBinder N_  = '@':show ?idom
+          showIBinder x   = show x
 
       let go :: PrettyArgs (RevLocals -> IO Tm)
           go = \case
@@ -283,7 +284,7 @@ check t topA = frcPos t \case
               when showcxt $ do
                 putStrLn ("────────────────────────────────────────────────────────────")
               putStrLn (" : " ++ pretty qa ++ "\n")
-              pure (Hole (SrcHole i p))
+              pure (Hole (SrcHole (Just (NSpan holename)) pos))
             RLBind x _ a ls -> do
               when showcxt $ putStrLn (showBinder x ++ " : " ++ pretty a)
               Pretty.bind x \_ -> go ls
@@ -363,16 +364,16 @@ check t topA = frcPos t \case
       convExInf a topA
       pure t
 
-splitIdent :: Elab (Name -> Ix -> Locals -> [P.Tm] -> IO Split)
+splitIdent :: Elab (Span -> Ix -> Locals -> [P.Tm] -> IO Split)
 splitIdent x ix ls sp = case ls of
 
   LNil -> do
     st <- getState
     case M.lookup x (st^.top) of
-      Nothing                 -> err $ NameNotInScope x
+      Nothing                 -> setPos x $ err $ NameNotInScope x
       Just (TEDef inf)        -> SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
       Just (TETyCon inf)      -> pure $ TyConHead inf sp
-      Just (TERec Nothing)    -> err $ GenericError $
+      Just (TERec Nothing)    -> setPos x $ err $ GenericError $
                                        "Can't infer type for recursive call. "++
                                        "Hint: put a type annotation on the recursive definition."
       Just (TERec (Just inf)) -> SplitInfer <$!> inferSp (RecursiveCall inf) (inf^.recTyVal) sp
@@ -380,14 +381,14 @@ splitIdent x ix ls sp = case ls of
       Just (TEHDCon inf)      -> pure $ HDConHead inf sp
       Just (TEHTyCon inf)     -> pure $ HTyConHead inf sp
 
-  LBind ls x' a qa | x == x' -> SplitInfer <$!> inferSp (LocalVar ix) a sp
-                   | True    -> splitIdent x (ix + 1) ls sp
-  LBindI ls x'     | x == x' -> err UnexpectedI
-                   | True    -> splitIdent x ix ls sp
-  LCof ls _                  -> splitIdent x ix ls sp
+  LBind ls x' a qa | NSpan x == x' -> SplitInfer <$!> inferSp (LocalVar ix) a sp
+                   | True          -> splitIdent x (ix + 1) ls sp
+  LBindI ls x'     | NSpan x == x' -> setPos x $ err UnexpectedI
+                   | True          -> splitIdent x ix ls sp
+  LCof ls _                        -> splitIdent x ix ls sp
 
 goSplit :: Elab (P.Tm -> [P.Tm] -> P.Tm -> IO Split)
-goSplit t sp topT = frcPos t \case
+goSplit t sp topT = frcParens t \case
 
   P.Ident x -> do
     splitIdent x 0 ?locals sp
@@ -395,7 +396,7 @@ goSplit t sp topT = frcPos t \case
   P.App t u -> do
     goSplit t (u:sp) topT
 
-  P.TopLvl x Nothing -> do
+  P.TopLvl p x Nothing _ -> setPos p do
     st <- getState
     case LM.lookup x (st^.top') of
       Nothing ->
@@ -417,7 +418,7 @@ goSplit t sp topT = frcPos t \case
       Just (TEHDCon{}) ->
         impossible
 
-  P.TopLvl x (Just y) -> do
+  P.TopLvl p x (Just y) _ -> setPos p do
     st <- getState
     case LM.lookup x (st^.top') of
       Nothing ->
@@ -539,22 +540,22 @@ infer t = split t >>= \case
     pure inf
 
 inferNonSplit :: Elab (P.Tm -> IO Infer)
-inferNonSplit t = frcPos t \case
-  P.Pos{}    -> impossible
+inferNonSplit t = frcParens t \case
+  P.Parens{} -> impossible
   P.Ident{}  -> impossible
   P.TopLvl{} -> impossible
   P.App{}    -> impossible
 
-  P.LocalLvl x -> do
+  P.LocalLvl p x _ -> setPos p do
     unless (0 <= x && x < ?dom) (err LocalLvlNotInScope)
     let ix = lvlToIx ?dom x
     let Box a = lookupLocalType ix ?locals
     pure $! Infer (LocalVar ix) a
 
-  P.ILvl{} -> err UnexpectedI
-  P.I0     -> err UnexpectedI
-  P.I1     -> err UnexpectedI
-  P.I      -> err UnexpectedIType
+  P.ILvl p _ _ -> setPos p $ err UnexpectedI
+  P.I0 p       -> setPos p $ err UnexpectedI
+  P.I1 p       -> setPos p $ err UnexpectedI
+  P.I p        -> setPos p $ err UnexpectedIType
 
   P.DepPath a t u -> do
     (x, a, _, src, tgt) <- elabBindMaybe a I0 I1
@@ -562,7 +563,7 @@ inferNonSplit t = frcPos t \case
     u <- check u tgt
     pure $! Infer (Path x a t u) VU
 
-  P.Let x ma t u -> do
+  P.Let p (NSpan -> x) ma t u -> setPos p do
     (a, va, t) <- case ma of
       Nothing -> do
         Infer t va <- infer t
@@ -576,16 +577,16 @@ inferNonSplit t = frcPos t \case
     Infer u b <- define x va a vt $ infer u
     pure $! Infer (Let x a t u) b
 
-  P.Pi x (P.unPos -> P.I) b -> do
+  P.Pi p (bindToName -> x) (P.unParens -> P.I _) b -> setPos p do
     b <- bindI x \_ -> check b VU
     pure $ Infer (Line x b) VU
 
-  P.Pi x a b -> do
+  P.Pi p (bindToName -> x) a b -> setPos p do
     a <- check a VU
     b <- bind x (eval a) a \_ -> check b VU
     pure $ Infer (Pi x a b) VU
 
-  P.PApp l r t u -> do
+  P.PApp p l r t u -> setPos p do
     Infer t a <- infer t
     case frc a of
       VPath a l' r' -> do
@@ -598,15 +599,15 @@ inferNonSplit t = frcPos t \case
       a ->
         err $! ExpectedPath (quote a)
 
-  P.Lam x P.LANone t ->
+  P.Lam p x P.LANone t -> setPos p $
     err CantInferLam
 
-  P.Lam x P.LADesugared{} t ->
+  P.Lam p x P.LADesugared{} t -> setPos p $
     impossible
 
-  P.Lam x (P.LAAnn a) t -> case P.unPos a of
+  P.Lam p (bindToName -> x) (P.LAAnn a) t -> setPos p $ case P.unParens a of
     -- line type
-    P.I -> bindI x \i -> do
+    P.I _ -> bindI x \i -> do
       Infer t a <- infer t
       pure $! Infer (LLam x t) (VLine $ NICl x $ ICBindI (BindI x i a))
 
@@ -619,7 +620,7 @@ inferNonSplit t = frcPos t \case
       pure $! Infer (Lam x t) (VPi a (makeNCl x qb))
 
   -- we infer non-dependent path types to explicit path lambdas.
-  P.PLam l r x t -> do
+  P.PLam p l r (bindToName -> x) t -> setPos p do
     Infer l a <- infer l
     r <- check r a
     t <- bindI x \i -> check t a
@@ -629,7 +630,7 @@ inferNonSplit t = frcPos t \case
     convEndpoints vr (instantiate t I1)
     pure $! Infer (PLam l r x t) (VPath (NICl x (ICConst a)) vl vr)
 
-  P.Sg x a b -> do
+  P.Sg p (bindToName -> x) a b -> setPos p do
     a <- check a VU
     b <- bind x (eval a) a \_ -> check b VU
     pure $ Infer (Sg x a b) VU
@@ -637,49 +638,49 @@ inferNonSplit t = frcPos t \case
   P.Pair{} ->
     err CantInferPair
 
-  P.Proj1 t -> do
-    Infer t a <- infer t
+  P.Proj1 pt _ -> do
+    Infer t a <- infer pt
     case frc a of
       VSg a b -> pure $ Infer (Proj1 t (b^.name)) a
-      a       -> err $! ExpectedSg (quote a)
+      a       -> setPos pt $ err $! ExpectedSg (quote a)
 
-  P.Proj2 t -> do
-    Infer t a <- infer t
+  P.Proj2 pt _ -> do
+    Infer t a <- infer pt
     case frc a of
       VSg a b -> pure $! Infer (Proj2 t (b^.name)) (b ∙ proj1 (b^.name) (eval t))
-      a       -> err $! ExpectedSg (quote a)
+      a       -> setPos pt $ err $! ExpectedSg (quote a)
 
-  P.Wrap x a -> do
+  P.Wrap p (bindToName -> x) a _ -> do
     a <- check a VU
     pure $! Infer (Wrap x a) VU
 
-  P.ProjField t x -> do
+  P.ProjField t (NSpan -> x) -> do
     Infer t a <- infer t
     elabProjField x t (eval t) a
 
-  P.U ->
+  P.U p -> setPos p $
     pure $ Infer U VU
 
   P.Path t u -> do
     Infer t a <- infer t
     u <- check u a
-    pure $! Infer (Path "_" (Core.freshI \_ -> quote a) t u) VU
+    pure $! Infer (Path N_ (Core.freshI \_ -> quote a) t u) VU
 
-  P.Coe r r' a t -> do --
+  P.Coe _ r r' a t -> do --
     r  <- checkI r
     r' <- checkI r'
     (x, a, va, src, tgt) <- elabBindMaybe a (evalI r) (evalI r')
     t <- check t src
     pure $! Infer (Coe r r' x a t) tgt
 
-  P.HCom r r' Nothing sys t -> do
+  P.HCom _ r r' Nothing sys t -> do
     r  <- checkI r
     r' <- checkI r'
     Infer t a <- infer t
     sys <- elabSysHCom a r t sys
     pure $! Infer (HCom r r' (quote a) sys t) a
 
-  P.HCom r r' (Just a) sys t -> do
+  P.HCom _ r r' (Just a) sys t -> do
     r   <- checkI r
     r'  <- checkI r'
     a   <- check a VU
@@ -688,13 +689,12 @@ inferNonSplit t = frcPos t \case
     sys <- elabSysHCom va r t sys
     pure $! Infer (HCom r r' a sys t) va
 
-  P.GlueTy a sys -> do
+  P.GlueTy _ a sys _ -> do
     a   <- check a VU
     sys <- elabSys (equivInto (eval a)) sys
-
     pure $! Infer (GlueTy a sys) VU
 
-  P.GlueTm base (Just eqs) sys -> do
+  P.GlueTm _ base (Just eqs) sys _ -> do
     Infer base a <- infer base
     eqs <- elabSys (equivInto a) eqs
     case evalSys eqs of
@@ -703,18 +703,18 @@ inferNonSplit t = frcPos t \case
         sys <- elabGlueTmSys base sys a (veqs^.body)
         pure $! Infer (Glue base eqs sys) (VGlueTy a veqs)
 
-  P.GlueTm _ Nothing _ -> do
+  P.GlueTm p _ Nothing _ _ -> setPos p do
     err CantInferGlueTm
 
-  P.Unglue t -> do
+  P.Unglue p t -> do
     Infer t a <- infer t
     case frc a of
       VGlueTy a sys -> do
         pure $! Infer (Unglue t (quote sys)) a
       a ->
-        err $! ExpectedGlueTy (quote a)
+        setPos p $ err $! ExpectedGlueTy (quote a)
 
-  P.Com r r' a sys t -> do
+  P.Com _ r r' a sys t -> do
     r  <- checkI r
     r' <- checkI r'
     (i, a, va, src, tgt) <- elabBindMaybe a (evalI r) (evalI r')
@@ -727,9 +727,9 @@ inferNonSplit t = frcPos t \case
     sys <- elabSysHCom va r t sys
     pure $! Infer (Com r r' i a sys t) tgt
 
-  P.Refl -> err CantInfer
+  P.Refl p _  -> setPos p $ err CantInfer
 
-  P.Sym p -> do
+  P.Sym p _ -> do
     Infer p axy <- infer p
     (a, x, y)   <- nonDepPath axy
     pure $! Infer (Sym (quote a) (quote x) (quote y) p) (VPath a y x)
@@ -743,19 +743,19 @@ inferNonSplit t = frcPos t \case
     conv y' y
     pure $! Infer (Trans (quote a) (quote x) (quote y) (quote z) p q) (VPath a x z)
 
-  P.Ap f p -> do
+  P.Ap pos f p -> setPos p do
     Infer f ab <- infer f
     (a, b) <- nonDepFun ab
     Infer p axy <- infer p
     (a', x, y) <- nonDepPath axy
-    bindI "i" \(IVar -> i) -> conv (a' ∙ i) a
+    bindI i_ \(IVar -> i) -> conv (a' ∙ i) a
     let vf = eval f
     pure $ Infer (Ap f (quote x) (quote y) p) (path (b ∙ x) (vf ∙ x) (vf ∙ y))
 
   P.Hole i p -> setPos p do
     err CantInferHole
 
-  P.Case t (Just (x, b)) cs -> do
+  P.Case pos t (Just (bindToName -> x, b)) cs _ -> setPos pos do
     Infer t a <- infer t
     case frc a of
       VTyCon tyinfo params -> do
@@ -780,10 +780,10 @@ inferNonSplit t = frcPos t \case
       a ->
         err $ ExpectedInductiveType (quote a)
 
-  P.Case _ Nothing _ ->
+  P.Case p _ Nothing _ _ -> setPos p $
     err $ GenericError "Can't infer type for case expression"
 
-  P.Split _ ->
+  P.Split p _ _ -> setPos p $
     err $ GenericError "Can't infer type for case splitting function"
 
 
@@ -814,7 +814,7 @@ elabCases :: Elab (Env -> NamedClosure -> [DConInfo] -> [P.CaseItem] -> IO Cases
 elabCases params b cons cs = case (cons, cs) of
   ([], []) ->
     pure CSNil
-  (dci:cons, (pos, x', xs, body):cs) | dci^.name == x' -> setPos pos do
+  (dci:cons, (bindToName -> x', map bindToName -> xs, body):cs) | dci^.name == x' -> do
     t  <- elabCase params dci b (dci^.fieldTypes) xs body
     cs <- elabCases params b cons cs
     pure $ CSCons (dci^.name) xs t cs
@@ -854,7 +854,7 @@ elabHCases' :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> IO HC
 elabHCases' params b cons cs = case (cons, cs) of
   ([], []) ->
     pure HCSNil
-  (dci:cons, (pos, x', xs, body):cs) | dci^.name == x' -> setPos pos do
+  (dci:cons, (bindToName -> x', map bindToName -> xs, body):cs) | dci^.name == x' -> do
     (xs, is, t) <- elabHCase params dci (dci^.fieldTypes) (dci^.ifields) xs b body
     cs <- elabHCases' params b cons cs
     pure (HCSCons x' xs is t cs)
@@ -885,11 +885,11 @@ elabProjField x t ~tv a = case frc a of
 
 -- | Ensure that an IClosure is constant.
 constantICl :: Elab (NamedIClosure -> IO ())
-constantICl a = bindI "i" \(IVar -> i) -> bindI "j" \(IVar -> j) -> conv (a ∙ i) (a ∙ j)
+constantICl a = bindI i_ \(IVar -> i) -> bindI j_ \(IVar -> j) -> conv (a ∙ i) (a ∙ j)
 
 -- | Ensure that a Closure is constant.
 constantCl :: Elab (VTy -> NamedClosure -> IO ())
-constantCl a cl = bind "x" a (quote a) \x -> bind "y" a (quote a) \y -> conv (cl ∙ x) (cl ∙ y)
+constantCl a cl = bind x_ a (quote a) \x -> bind y_ a (quote a) \y -> conv (cl ∙ x) (cl ∙ y)
 
 -- | Ensure that a type is a non-dependent function.
 nonDepFun :: Elab (Val -> IO (Val, NamedClosure))
@@ -907,7 +907,7 @@ nonDepPath a = case frc a of
 --   , source type val, target type val
 elabBindMaybe :: Elab (P.BindMaybe -> I -> I -> IO (Name, Tm, Val, Val, Val))
 elabBindMaybe b r r' = case b of
-  P.DontBind a -> do
+  P.BMDontBind a -> do
     Infer a aty <- infer a
     case frc aty of
       VPath aty lhs rhs -> do
@@ -931,7 +931,7 @@ elabBindMaybe b r r' = case b of
       a -> do
         err $! ExpectedPathLine (quote a)
 
-  P.Bind x a -> do
+  P.BMBind (bindToName -> x) a -> do
     (a, va) <- bindI x \_ -> do {a <- check a VU; pure (a, eval a)}
     let src = instantiate a r
         tgt = instantiate a r'
@@ -947,29 +947,29 @@ identI x idom = \case
   LCof ls _                 -> identI x idom ls
 
 checkI :: Elab (P.Tm -> IO I)
-checkI t = frcPos t \case
-  P.Pos{} -> impossible
-  P.I0    -> pure I0
-  P.I1    -> pure I1
+checkI t = frcParens t \case
+  P.Parens{} -> impossible
+  P.I0 _     -> pure I0
+  P.I1 _     -> pure I1
 
   P.Ident x -> do
-    identI x (dom ?cof) ?locals
+    identI (NSpan x) (dom ?cof) ?locals
 
-  P.ILvl x -> do
+  P.ILvl p x _ -> do
     unless (0 <= x && x < dom ?cof)
-           (err $ GenericError "Interval level not in scope")
+           (setPos p $ err $ GenericError "Interval level not in scope")
     pure $ IVar x
 
-  P.LocalLvl (coerce -> x) -> do
+  P.LocalLvl p (coerce -> x) _ -> do
     unless (0 <= x && x < dom ?cof)
-           (err $ GenericError "Interval level not in scope")
+           (setPos p $ err $ GenericError "Interval level not in scope")
     pure $ IVar x
 
   t -> do
     err ExpectedI
 
 isConstantU :: Elab (NamedIClosure -> IO ())
-isConstantU t = bindI "i" \i -> case frc (t ∙ IVar i) of
+isConstantU t = bindI i_ \i -> case frc (t ∙ IVar i) of
   VU -> pure ()
   a  -> err $ ExpectedPathULineU (quote a)
 
@@ -995,7 +995,7 @@ elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
 elabSysHCom a r base = \case
   P.SHEmpty ->
     pure SHEmpty
-  P.SHCons cof t sys -> do
+  P.SHCons _ cof t sys -> do
     cof <- checkCof cof
     case evalCof cof of
       VCTrue  -> err NonNeutralCofInSystem
@@ -1006,10 +1006,10 @@ elabSysHCom a r base = \case
 
           -- desugar binders
           (x, t) <- case t of
-            P.Bind x t -> do
+            P.BMBind (bindToName -> x) t -> do
               t <- bindI x \_ -> check t a -- "a" is weakened under vcof
               pure (x, t)
-            P.DontBind t -> do
+            P.BMDontBind t -> do
               Infer t tty <- infer t
               case frc tty of
                 VPath pty lhs rhs -> do
@@ -1056,8 +1056,8 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
         ts <- elabGlueTmSys base ts a equivs
         bindCof ncof do
           let fequiv = frc equiv
-          t <- check t (proj1 "Ty" fequiv)
-          conv (proj1 "f" (proj2 "Ty" fequiv) ∙ eval t) (eval base)
+          t <- check t (proj1 ty_ fequiv)
+          conv (proj1 f_ (proj2 ty_ fequiv) ∙ eval t) (eval base)
           sysCompat t ts
           pure $ SCons cof t ts
   (ts, equivs) ->
@@ -1082,7 +1082,7 @@ elabSys componentTy = \case
 
 ----------------------------------------------------------------------------------------------------
 
-guardTopShadowing :: Elab (Name -> IO ())
+guardTopShadowing :: Elab (Span -> IO ())
 guardTopShadowing x = do
   st <- getState
   case M.lookup x (st^.top) of
@@ -1165,6 +1165,7 @@ elabTop = \case
 
   P.TDef pos x ma t ptop -> withTopElab $ setPos pos do
     guardTopShadowing x
+    xn <- pure $ NSpan x
 
     l <- getState <&> (^.lvl)
 
@@ -1174,7 +1175,7 @@ elabTop = \case
       Just a  -> do
         a <- check a VU
         let ~va = eval a
-        pure $ Just $ RI l a va x (coerce pos)
+        pure $ Just $ RI l a va xn (coerce pos)
 
     let recEntry = TERec recInf
 
@@ -1192,7 +1193,7 @@ elabTop = \case
     let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse (coerce tv)
                in Core.eval t)
 
-    let defEntry = TEDef $ DI l t tv a va x (coerce pos)
+    let defEntry = TEDef $ DI l t tv a va xn (coerce pos)
 
     modState $
         (top  %~ M.insert x defEntry)
@@ -1215,13 +1216,14 @@ elabTop = \case
 
   P.TData pos tyname ps cs ptop -> withTopElab $ setPos pos do
     guardTopShadowing tyname
+    tynamen <- pure $ NSpan tyname
 
     l       <- getState <&> (^.lvl)
     ps      <- elabTelescope ps
     consRef <- newIORef (mempty @(LM.Map DConInfo))
     frzRef  <- newIORef False
 
-    let inf   = TCI l ps consRef frzRef tyname (coerce pos)
+    let inf   = TCI l ps consRef frzRef tynamen (coerce pos)
     let entry = TETyCon inf
 
     modState $
@@ -1236,13 +1238,14 @@ elabTop = \case
 
   P.THData pos tyname ps cs ptop -> withTopElab $ setPos pos do
     guardTopShadowing tyname
+    tynamen <- pure $ NSpan tyname
 
     l       <- getState <&> (^.lvl)
     ps      <- elabTelescope ps
     consRef <- newIORef (mempty @(LM.Map HDConInfo))
     frzRef  <- newIORef False
 
-    let inf   = HTCI l ps consRef frzRef tyname (coerce pos)
+    let inf   = HTCI l ps consRef frzRef tynamen (coerce pos)
     let entry = TEHTyCon inf
 
     modState $
@@ -1333,8 +1336,9 @@ elabHConstructors :: Elab (HTyConInfo -> Val -> Lvl -> [P.HConstructor] -> IO ()
 elabHConstructors tyinf tyConVal conid = \case
   [] ->
     pure ()
-  (pos, x, fs, bnd):cs -> setPos pos do
+  (x, fs, bnd):cs -> do
     guardTopShadowing x
+    let xn = NSpan x
     (fs, is) <- elabHTelescope fs
     (!bnd, !coh) <- bindTelescope fs $ bindIVars is do
       case bnd of
@@ -1348,7 +1352,7 @@ elabHConstructors tyinf tyConVal conid = \case
               let coh = isCoh (quote nsys)
               pure (sys, coh)
 
-    let dinf = HDCI conid fs coh is bnd x tyinf (coerce pos)
+    let dinf = HDCI conid fs coh is bnd xn tyinf (P.leftPos x)
     modState (top %~ M.insert x (TEHDCon dinf))
     modifyIORef' (tyinf^.constructors) (LM.insert conid dinf)
     elabHConstructors tyinf tyConVal (conid + 1) cs
@@ -1357,27 +1361,28 @@ elabConstructors :: Elab (TyConInfo -> Lvl -> [P.Constructor] -> IO ())
 elabConstructors tyinf conid = \case
   [] ->
     pure ()
-  (pos, x, fs):cs -> setPos pos do
+  (x, fs):cs -> do
     guardTopShadowing x
+    let xn = NSpan x
     fs <- elabTelescope fs
-    let dinf = DCI conid fs x tyinf (coerce pos)
+    let dinf = DCI conid fs xn tyinf (P.leftPos x)
     modState (top %~ M.insert x (TEDCon dinf))
     modifyIORef' (tyinf^.constructors) (LM.insert conid dinf)
     elabConstructors tyinf (conid + 1) cs
 
-elabHConIVars :: Elab ([(Name, P.Ty)] -> IO [Name])
+elabHConIVars :: Elab ([(P.Bind, P.Ty)] -> IO [Name])
 elabHConIVars = \case
   []        -> pure []
-  (x, a):ps -> frcPos a \case
-    P.I -> (x:) <$!> elabHConIVars ps
-    _   -> err $ GenericError "Expected an interval binder"
+  (bindToName -> x, a):ps -> frcParens a \case
+    P.I _ -> (x:) <$!> elabHConIVars ps
+    _     -> err $ GenericError "Expected an interval binder"
 
-elabHTelescope :: Elab ([(Name, P.Ty)] -> IO (Tel, [Name]))
+elabHTelescope :: Elab ([(P.Bind, P.Ty)] -> IO (Tel, [Name]))
 elabHTelescope = \case
   [] ->
     pure (TNil, [])
-  (x, a):ps -> frcPos a \case
-    P.I -> do
+  (bindToName -> x, a):ps -> frcParens a \case
+    P.I _ -> do
       is <- elabHConIVars ps
       pure (TNil, x:is)
     a -> do
@@ -1386,10 +1391,10 @@ elabHTelescope = \case
         (ps, is) <- elabHTelescope ps
         pure (TCons x a ps, is)
 
-elabTelescope :: Elab ([(Name, P.Ty)] -> IO Tel)
+elabTelescope :: Elab ([(P.Bind, P.Ty)] -> IO Tel)
 elabTelescope = \case
   [] -> pure TNil
-  (x, a):ps -> do
+  (bindToName -> x, a):ps -> do
     a <- check a VU
     bind x (eval a) a \_ -> do
       ps <- elabTelescope ps
@@ -1412,7 +1417,7 @@ bindIVars is act = case is of
 dotsToSlashes :: String -> String
 dotsToSlashes str = foldr (</>) "" (List.wordsBy (=='.') str)
 
-elabPath :: Maybe (DontShow SourcePos) -> FilePath -> IO ()
+elabPath :: Maybe Pos -> FilePath -> IO ()
 elabPath pos path = do
   path <- makeAbsolute path
 
@@ -1421,7 +1426,7 @@ elabPath pos path = do
   let oldCycle = loadSt^.loadCycle
   let oldSrc   = loadSt^.currentSrc
 
-  file <- readFile path `catch` \(e :: IOError) -> do
+  file <- B.readFile path `catch` \(e :: IOError) -> do
     case pos of
       Nothing -> do
         putStrLn $ "Can't open file: " ++ path
@@ -1429,7 +1434,7 @@ elabPath pos path = do
       Just pos -> withTopElab $ setPos pos do
         err $ CantOpenFile path
 
-  ((!moddecl, !top), !tparse) <- timed (parseString path file)
+  ((!moddecl, !top), !tparse) <- timed (parseByteString path file)
 
   base <- case moddecl of
     Nothing  -> pure $ takeDirectory path
