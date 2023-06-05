@@ -10,6 +10,8 @@ import ElabState
 import Cubical
 import Pretty
 
+import qualified FlatParse.Stateful as FP
+
 data Error
   = NameNotInScope Name
   | LocalLvlNotInScope
@@ -34,7 +36,7 @@ data Error
   | CantConvertReflEndpoints ~Tm ~Tm
   | CantConvertExInf ~Tm ~Tm
   | GlueTmSystemMismatch Sys
-  | TopShadowing SourcePos
+  | TopShadowing Pos
   | NonNeutralCofInSystem
   | NoSuchField Name ~Tm
   | CantInferHole
@@ -99,7 +101,7 @@ showError = \case
     "  " ++ pretty c2
 
   NameNotInScope x ->
-    "Name not in scope: " ++ x
+    "Name not in scope: " ++ show x
 
   LocalLvlNotInScope ->
     "Local De Bruijn level not in scope"
@@ -109,7 +111,7 @@ showError = \case
 
   TopShadowing pos ->
        "Duplicate top-level name\n"
-    ++ "Previously defined at: " ++ sourcePosPretty pos
+    ++ "Previously defined at: " ++ uf
 
   UnexpectedI ->
     "Unexpected interval expression"
@@ -184,10 +186,14 @@ showError = \case
 
 displayErrInCxt :: ErrInCxt -> IO ()
 displayErrInCxt (ErrInCxt e) = withPrettyArgs do
-  file <- getState <&> (^.loadState.currentSrc)
   modState (printingOpts.errPrinting .~ True)
 
-  let SourcePos path (unPos -> linum) (unPos -> colnum) = ?srcPos
+  let Box (Pos src p) = ?srcPos
+      (path, file, linum, colnum) = case src of
+         SrcImpossible    -> impossible
+         SrcFile path src -> case FP.posLineCols src [p] of
+           [(l, c)] -> let f = FP.utf8ToStr src in (path, f, l, c)
+           _        -> impossible
       lnum = show linum
       lpad = map (const ' ') lnum
 

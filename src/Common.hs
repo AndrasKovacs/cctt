@@ -77,16 +77,19 @@ noinlineRunIO (IO f) = runRW# (\s -> case f s of (# _, a #) -> a)
 data Name
   = NSpan {-# unpack #-} Span
   | NGeneric B.ByteString
+  | N_
   deriving (Eq, Ord)
 
 instance Show Name where
   show (NSpan x)    = show x
   show (NGeneric x) = B.unpack x
+  show N_           = "_"
 
 nameToBs :: Name -> B.ByteString
 nameToBs = \case
   NSpan x    -> spanToBs x
   NGeneric x -> x
+  N_         -> "_"
 
 a_ = NGeneric "a"
 b_ = NGeneric "b"
@@ -112,6 +115,10 @@ u_ = NGeneric "u"
 x_ = NGeneric "x"
 y_ = NGeneric "y"
 z_ = NGeneric "z"
+linv_ = NGeneric "linv"
+rinv_ = NGeneric "rinv"
+coh_ = NGeneric "coh"
+ty_ = NGeneric "Ty_"
 
 ----------------------------------------------------------------------------------------------------
 

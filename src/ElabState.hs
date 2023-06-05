@@ -51,7 +51,7 @@ lookupLocalType x ls = case (x, ls) of
   (x, LCof ls _     ) -> lookupLocalType x ls
   _                   -> impossible
 
-type PosArg     = (?srcPos  :: Pos)
+type PosArg     = (?srcPos  :: Box Pos)
 type LocalsArg  = (?locals  :: Locals)
 type Elab a     = LocalsArg => NCofArg => DomArg => EnvArg => PosArg => a
 
@@ -134,7 +134,7 @@ withTopElab act = do
       ?cof    = emptyNCof
       ?dom    = 0
       ?env    = ENil
-      ?srcPos = initialPos (SrcFile (ls^.currentPath) (ls^.currentSrc))
+      ?srcPos = Box $! initialPos (SrcFile (ls^.currentPath) (ls^.currentSrc))
   act
 {-# inline withTopElab #-}
 
