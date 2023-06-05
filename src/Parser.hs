@@ -1,326 +1,367 @@
 
-module Parser (parseString, parseStdin) where
-
-import Common
-import Presyntax
+module Parser (parseString, parseByteString, parseStdin) where
 
 import Prelude hiding (pi)
-import Text.Megaparsec
+
 import Data.Char
-import Data.Void
 import Data.Foldable
 import System.Exit
 
-import qualified Text.Megaparsec.Char       as C
-import qualified Text.Megaparsec.Char.Lexer as L
+import FlatParse.Stateful
+  hiding (Parser, runParser, string, char, cut, err,
+          Pos, getPos, Span, spanOf, branch, withSpan)
+
+import qualified FlatParse.Stateful as FP
+import qualified Data.ByteString.Char8 as B
+
+
+import Common
+import Presyntax
+import Lexer
 
 --------------------------------------------------------------------------------
 
-type Parser = Parsec Void String
+atomErr   = ["an identifier", "a parenthesized expression", "refl", "interval constant", "hole"]
+projErr   = "a projection expression" : atomErr
+-- appErr    = "an application expression" : projErr
+-- pathErr   = "a path type" : appErr
+-- sigmaErr  = "a sigma type" : pathErr
+-- piErr     = "a function type" : sigmaErr
+-- lamLetErr = "a let-definition" : "a lambda expression" : piErr
+-- tmErr     = ["a term"] :: [String]
 
-ws :: Parser ()
-ws = L.space C.space1 (L.skipLineComment "--") (L.skipBlockCommentNested "{-" "-}")
+--------------------------------------------------------------------------------
 
-withPos :: Parser Tm -> Parser Tm
-withPos p = do
-  pos <- getSourcePos
-  p >>= \case
-    t@Pos{} -> pure t
-    t       -> pure $ Pos (coerce pos) t
+assign'   = $(sym' ":=")
+colon     = token  ($(FP.string ":") `notFollowedBy` $(FP.string "="))
+colon'    = token' ($(FP.string ":") `notFollowedBy` $(FP.string "="))
+semi      = $(sym  ";")
+semi'     = $(sym' ";")
+comma     = $(sym  ",")
+braceL    = $(sym  "{")
+braceL'   = $(sym' "{")
+parL      = $(sym  "(")
+parR'     = $(sym' ")")
+dot       = $(sym  ".")
+dot'      = $(sym'  ".")
+arrow     = token  $(switch [| case _ of "->" -> pure (); "→" -> pure () |])
+arrow'    = token' $(switch [| case _ of "->" -> pure (); "→" -> pure () |])
+prod      = token  $(switch [| case _ of "*"  -> pure (); "×" -> pure () |])
+braceR'   = $(sym' "}")
+sqL       = $(sym  "[")
+sqL'      = $(sym' "[")
+sqR'      = $(sym' "]")
+bind      = (BName <$> ident) <|> do {p <- getPos; $(sym "_"); pure $ BDontBind p}
+bind'     = bind `pcut` Lit "a binder"
+decimal'  = token' FP.anyAsciiDecimalWord
+hash      = $(sym "#")
 
-lexeme     = L.lexeme ws
-decimal    = lexeme (L.decimal :: Parser Lvl)
-symbol s   = lexeme (C.string s)
-char c     = lexeme (C.char c)
-parens p   = char '(' *> p <* char ')'
-arrow      = symbol "→" <|> symbol "->"
-bind       = ident <|> symbol "_"
-lambda     = char '\\' <|> char 'λ'
-prod       = char '*' <|> char '×'
+sepBy :: Parser a -> Parser sep -> Parser [a]
+sepBy pa psep = sepBy1 pa psep <|> pure []
 
-branch :: Parser a -> (a -> Parser b) -> Parser b -> Parser b
-branch p t f = (t =<< p) <|> f
+sepBy1 :: Parser a -> Parser sep -> Parser [a]
+sepBy1 pa psep = (:) <$> pa <*> FP.many (psep *> pa)
 
--- keywords = ["Glue", "I", "U", "ap", "case, "coe", "com", "inductive", "higher", "glue", "module"
---             "hcom", "import", "let", "refl", "unglue", "λ"]
-
-isKeyword :: String -> Bool
-isKeyword = \case
-  'G':'l':'u':'e':[]         -> True
-  'I':[]                     -> True
-  'U':[]                     -> True
-  'a':'p':[]                 -> True
-  'c':'a':'s':'e':[]         -> True
-  'c':'o':'e':[]             -> True
-  'c':'o':'m':[]             -> True
-  'g':'l':'u':'e':[]         -> True
-  'h':'c':'o':'m':[]         -> True
-  'h':'i':'g':'h':'e':'r':[] -> True
-  'i':'m':'p':'o':'r':'t':[] -> True
-  'l':'e':'t':[]             -> True
-  'm':'o':'d':'u':'l':'e':[] -> True
-  'r':'e':'f':'l':[]         -> True
-  'u':'n':'g':'l':'u':'e':[] -> True
-  'λ':[]                     -> True
-  _                          -> False
-
-
-ident :: Parser Name
-ident = try do
-  o <- getOffset
-  c <- satisfy isAlphaNum
-  x <- takeWhileP Nothing (\c -> isAlphaNum c || c == '\'' || c == '-')
-  x <- pure (c:x)
-  if isKeyword x
-    then do {setOffset o; fail $ "unexpected keyword: " ++ x}
-    else x <$ ws
-
-keyword :: String -> Parser ()
-keyword kw = try do
-  C.string kw
-  (takeWhile1P Nothing (\c -> isAlphaNum c || c == '\'' || c == '-' || c == '\\') *> empty) <|> ws
-
-goSplit :: Parser Tm
-goSplit = do
-  let case_ = do
-        pos <- getSourcePos
-        x:xs <- some bind
-        char '.'
-        body <- tm
-        pure (coerce pos, x, xs, body)
-  cases <- sepBy case_ (char ';')
-  char ']'
-  goApp $ Split cases
+noIdent :: Parser ()
+noIdent = FP.fails identChar
 
 atom :: Parser Tm
-atom =
-      parens tm
-  <|> withPos (    (U     <$  keyword "U"   )
-               <|> (I0    <$  keyword  "0"  )
-               <|> (I1    <$  keyword  "1"  )
-               <|> (I     <$  keyword  "I"  )
-               <|> (Refl  <$  keyword "refl")
-               <|> (TopLvl   <$!> (C.string "@@" *> decimal) <*!> try (optional (char '#' *> decimal)))
-               <|> (LocalLvl <$!> (C.char '@'    *> decimal))
-               <|> (do {p <- getSourcePos; char '?'; id <- optional bind; pure (Hole id (coerce p))})
-               <|> (Ident <$!> ident))
+atom = getPos >>= \p -> $(FP.switch [| case _ of
+  "("    -> do {ws; t <- tm'; parR'; pure t}
+  "U"    -> do {noIdent; ws; pure $ U p}
+  "0"    -> do {ws; pure $ I0 p}
+  "1"    -> do {ws; pure $ I1 p}
+  "I"    -> do {ws; pure $ I p}
+  "refl" -> do {p' <- getPos; noIdent; ws; pure $ Refl p p'}
+  "@@"   -> do {ws;
+                n  <- decimal';
+                n' <- FP.optional
+                        (hash *> (Lvl <$> (FP.anyAsciiDecimalWord `pcut` Lit "a level expression")));
+                p' <- getPos;
+                ws;
+                pure $ TopLvl p (Lvl n) n' p'}
+  "@"    -> do {ws;
+                n <- FP.anyAsciiDecimalWord `pcut` Lit "level";
+                p' <- getPos;
+                pure $ LocalLvl p (Lvl n) p'}
+  "?"    -> do {ws; b <- bind `pcut` Lit "hole name"; pure $ Hole p b}
+  _      -> do {ws; Ident <$> ident}
+  |])
+
+atom' :: Parser Tm
+atom' = atom `cut` atomErr
 
 goProj :: Tm -> Parser Tm
 goProj t =
-  branch (char '.')
-    (\_ -> (char '1' *> goProj (Proj1 t))
-       <|> (char '₁' *> goProj (Proj1 t))
-       <|> (char '2' *> goProj (Proj2 t))
-       <|> (char '₂' *> goProj (Proj2 t))
-       <|> (do {x <- ident; goProj (ProjField t x)}))
-    ((symbol "⁻¹" *> goProj (Sym t)) <|> pure t)
+  FP.branch dot
+    (    do {p <- rightPos <$> $(sym "1"); goProj (Proj1 t p)}
+     <|> do {p <- rightPos <$> $(sym "₁"); goProj (Proj1 t p)}
+     <|> do {p <- rightPos <$> $(sym "2"); goProj (Proj2 t p)}
+     <|> do {p <- rightPos <$> $(sym "₂"); goProj (Proj2 t p)}
+     <|> do {x <- ident; goProj (ProjField t x)}
+    )
+    (do {p <- rightPos <$> $(sym' "⁻¹"); goProj (Sym t p)} <|> pure t)
+
+proj' :: Parser Tm
+proj' = (goProj =<< atom') `cut` projErr
 
 proj :: Parser Tm
 proj = goProj =<< atom
 
-intLit :: Parser Tm
-intLit = (I0 <$ keyword "0") <|> (I1 <$ keyword "1")
+int' :: Parser Tm
+int' = (getPos >>= \p -> $(switch [| case _ of
+  "0" -> do {ws; pure (I0 p)}
+  "1" -> do {ws; pure (I1 p)}
+  "@" -> do {n <- FP.anyAsciiDecimalWord; p' <- getPos; ws; pure $ ILvl p (coerce n) p'}
+  _   -> do {ws; Ident <$> ident}
+  |]))
+  `pcut` Lit "interval expression"
 
-int :: Parser Tm
-int = intLit
-  <|> (ILvl <$!> (C.char '@' *> (coerce decimal)))
-  <|> (Ident <$!> ident)
-
-cof :: Parser Cof
-cof = do
-  i <- int
-  char '='
-  j <- int
+cof' :: Parser Cof
+cof' = do
+  i <- int'
+  $(sym "=") `pcut` Lit ("\"=\"")
+  j <- int'
   pure (CEq i j)
 
-goSys' :: Parser Sys
-goSys' =
-      (SCons <$!> (char ';' *> cof <* char '.') <*!> tm <*!> goSys')
+goSys1 :: Parser Sys
+goSys1 =
+      (SCons <$> (semi *> cof' <* dot') <*> tm' <*> goSys1)
   <|> pure SEmpty
 
 goSys :: Parser Sys
 goSys =
-      (SCons <$!> (cof <* char '.') <*!> tm <*!> goSys')
+      (SCons <$> (FP.try cof' <* dot') <*> tm' <*> goSys1)
   <|> pure SEmpty
 
 sysBindMaybe :: Parser BindMaybe
-sysBindMaybe =
-  branch bind
-    (\x -> Bind x <$!> (char '.' *> tm))
-    (DontBind <$!> (char '.' *> tm))
+sysBindMaybe = getPos >>= \p ->
+  FP.withOption bind
+    (\x -> do {t <- dot' *> tm'; pure $ BMBind x t})
+    (BMDontBind <$> (dot' *> tm'))
 
-goSysHCom' :: Parser SysHCom
-goSysHCom' =
-      (SHCons <$!> (char ';' *> cof) <*!> sysBindMaybe <*!> goSysHCom')
+goSysHCom1 :: Parser SysHCom
+goSysHCom1 =
+      (SHCons <$> getPos <*> (semi *> cof') <*> sysBindMaybe <*> goSysHCom1)
   <|> pure SHEmpty
 
 goSysHCom :: Parser SysHCom
 goSysHCom =
-      (SHCons <$!> cof <*!> sysBindMaybe <*!> goSysHCom')
+      (SHCons <$> getPos <*> cof' <*> sysBindMaybe <*> goSysHCom1)
   <|> pure SHEmpty
 
-sys :: Parser Sys
-sys = char '[' *> goSys <* char ']'
+sys :: Parser (Sys, Pos)
+sys = do
+  sqL
+  s <- goSys
+  p <- rightPos <$> sqR'
+  pure (s, p)
 
-sysHCom :: Parser SysHCom
-sysHCom = char '[' *> goSysHCom <* char ']'
+sys' :: Parser (Sys, Pos)
+sys' = do
+  sqL'
+  s <- goSys
+  p <- rightPos <$> sqR'
+  pure (s, p)
+
+sysHCom' :: Parser (SysHCom, Pos)
+sysHCom' = do
+  sqL'
+  s <- goSysHCom
+  p <- rightPos <$> sqR'
+  pure (s, p)
 
 goApp :: Tm -> Parser Tm
 goApp t =
-      do {l <- char '{' *> tm <* char '}'; r <- char '{' *> tm <* char '}'; u <- proj;
-          goApp (PApp l r t u)}
+      do {p <- getPos; l <- braceL *> tm' <* braceR'; r <- braceL' *> tm' <* braceR'; u <- proj';
+          goApp (PApp p l r t u)}
   <|> do {u <- proj; goApp (App t u)}
   <|> pure t
 
-bindMaybe :: Parser BindMaybe
-bindMaybe = branch (try (char '(' *> bind <* char '.'))
-  (\x -> Bind x <$!> (tm <* char ')'))
-  (DontBind <$!> proj)
+bindMaybe' :: Parser BindMaybe
+bindMaybe' =
+  FP.withOption (parL *> bind <* dot)
+    (\x -> BMBind x <$> (tm' <* parR'))
+    (BMDontBind <$> proj')
 
-goCoe :: Parser Tm
-goCoe = do
-  r  <- int
-  r' <- int
-  a  <- bindMaybe
-  t  <- proj
-  goApp $ Coe r r' a t
+goCoe :: Pos -> Parser Tm
+goCoe p = do
+  r  <- int'
+  r' <- int'
+  a  <- bindMaybe'
+  t  <- proj'
+  goApp $ Coe p r r' a t
 
-goCom :: Parser Tm
-goCom = do
-  r   <- int
-  r'  <- int
-  a   <- bindMaybe
-  sys <- sysHCom
-  t   <- proj
-  goApp $ Com r r' a sys t
+goCom :: Pos -> Parser Tm
+goCom p = do
+  r   <- int'
+  r'  <- int'
+  a   <- bindMaybe'
+  sys <- fst <$> sysHCom'
+  t   <- proj'
+  goApp $ Com p r r' a sys t
 
-goGlue :: Parser Tm
-goGlue = do
-  base <- proj
-  sys1 <- sys
-  sys2 <- optional sys
+goGlue :: Pos -> Parser Tm
+goGlue p = do
+  base         <- proj'
+  (!sys1, !p') <- sys'
+  sys2         <- optional sys
   case sys2 of
-    Nothing   -> pure $ GlueTm base Nothing sys1
-    Just sys2 -> pure $ GlueTm base (Just sys1) sys2
+    Nothing         -> pure $ GlueTm p base Nothing sys1 p'
+    Just (sys2, p') -> pure $ GlueTm p base (Just sys1) sys2 p'
 
-goCase :: Parser Tm
-goCase = do
-  t <- proj
-  b <- optional ((//) <$!> (char '(' *> bind) <*!> (char '.' *> tm <* char ')'))
-  char '['
+goCase :: Pos -> Parser Tm
+goCase p = do
+  t <- proj'
+  b <- optional ((//) <$!> (parL *> bind) <*!> (dot' *> tm' <* parR'))
+  sqL'
   let case_ = do
-        pos <- getSourcePos
-        x:xs <- some bind
-        char '.'
-        body <- tm
-        pure (coerce pos, x, xs, body)
-  cases <- sepBy case_ (char ';')
-  char ']'
-  goApp $ Case t b cases
+        some bind >>= \case
+          [] -> impossible
+          x:xs -> do
+            dot'
+            body <- tm'
+            pure (x, xs, body)
+  cases <- sepBy case_ semi
+  p' <- rightPos <$> sqR'
+  goApp $ Case p t b cases p'
+
+goSplit :: Pos -> Parser Tm
+goSplit p = do
+  let case_ = do
+        some bind >>= \case
+          [] -> impossible
+          x:xs -> do
+            dot'
+            body <- tm'
+            pure (x, xs, body)
+  cases <- sepBy case_ semi
+  p' <- rightPos <$> sqR'
+  goApp $ Split p cases p'
+
+goHCom :: Pos -> Parser Tm
+goHCom p = do
+  t <- HCom p <$> int' <*> int' <*> optional proj <*> (fst <$> sysHCom') <*> proj'
+  goApp t
+
+goGlueTy :: Pos -> Parser Tm
+goGlueTy p = do
+  a <- proj'
+  (s, p') <- sys'
+  goApp (GlueTy p a s p')
+
+appBase :: Parser Tm
+appBase = getPos >>= \p -> $(switch [| case _ of
+  "λ"      -> do {noIdent; ws; sqL'; goSplit p}
+  "coe"    -> do {noIdent; ws; goCoe p}
+  "case"   -> do {noIdent; ws; goCase p}
+  "hcom"   -> do {noIdent; ws; goHCom p}
+  "com"    -> do {noIdent; ws; goCom p}
+  "unglue" -> do {noIdent; ws; goApp =<< (Unglue p <$> proj')}
+  "ap"     -> do {noIdent; ws; goApp =<< (App <$> proj' <*> proj')}
+  "Glue"   -> do {noIdent; ws; goGlueTy p}
+  "glue"   -> do {noIdent; ws; goGlue p} |])
 
 app :: Parser Tm
-app = withPos (
-       (do {try (keyword "λ" *> char '['); goSplit})
-  <|>  (keyword "coe"     *> goCoe)
-  <|>  (keyword "case"    *> goCase)
-  <|>  (keyword "hcom"    *> (goApp =<< (HCom <$!> int <*!> int <*!> optional proj <*!> sysHCom <*!> proj)))
-  <|>  (keyword "unglue"  *> (goApp =<< (Unglue <$!> proj)))
-  <|>  (keyword "com"     *> goCom)
-  <|>  (keyword "ap"      *> (goApp =<< (Ap <$!> proj <*!> proj)))
-
-  <|>  (keyword "Glue"    *> (GlueTy <$!> proj <*!> sys))
-  <|>  (keyword "glue"    *> goGlue)
-  <|>  (goApp =<< proj))
+app = appBase <|> (goApp =<< proj)
 
 trans :: Parser Tm
-trans = foldl1 Trans <$!> sepBy1 app (char '∙')
+trans = FP.chainl Trans app ($(sym "∙") *> app)
 
-eq :: Parser Tm
-eq = do
+eq' :: Parser Tm
+eq' = do
   t <- trans
-  branch (char '=')
-    (\_ -> do
-        branch (char '{')
-          (\_ -> do
-              a <- branch (try (bind <* char '.'))
-                     (\x -> Bind x <$!> tm)
-                     (DontBind <$!> tm)
-              char '}'
-              u <- trans
-              pure $ DepPath a t u)
-          (Path t <$!> trans))
+  FP.branch $(sym "=")
+    (do FP.branch braceL
+          (do a <- FP.withOption bind
+                      (\x -> BMBind x <$> tm')
+                      (BMDontBind <$> tm')
+              braceR'
+              DepPath a t <$> tm')
+          (Path t <$> trans))
     (pure t)
 
-sigma :: Parser Tm
-sigma =
-  branch (try (char '(' *> bind <* char ':'))
-    (\x -> do
-        a <- tm
-        char ')'
-        branch prod
-          (\_ -> do
-             b <- sigma
-             pure $ Sg x a b)
-          (pure (Wrap x a)))
-    (do t <- eq
-        branch prod
-          (\_ -> Sg "_" t <$!> sigma)
+sigma' :: Parser Tm
+sigma' = getPos >>= \p ->
+  FP.withOption (parL *> bind <* colon')
+    (\x -> do a <- tm'
+              p' <- rightPos <$> parR'
+              FP.branch prod
+                (Sg p x a <$> sigma')
+                (pure $ Wrap p x a p'))
+    (do p' <- getPos
+        t <- eq'
+        FP.branch prod
+          (Sg p (BDontBind p') t <$> sigma')
           (pure t))
 
-piBinder :: Parser ([Name], Ty)
-piBinder =
-  (//) <$!> (char '(' *> some bind) <*!> (char ':' *> tm <* char ')')
+piBinder :: Parser ([Bind], Ty, Pos)
+piBinder = do
+  parL
+  bs <- some bind
+  colon'
+  a <- tm'
+  p <- rightPos <$> parR'
+  pure (bs, a, p)
 
-pi :: Parser Tm
-pi =
-  branch (try (some piBinder))
+pi' :: Parser Tm
+pi' = getPos >>= \p ->
+  FP.withOption (some piBinder)
+
     (\case
-        [([x], a)] -> branch arrow
-          (\_ -> Pi x a <$!> pi)
-          (branch prod
-            (\_ -> do
-              dom <- Sg x a <$!> sigma
-              branch arrow
-                (\_ -> Pi "_" dom <$!> pi)
-                (pure dom))
-            (pure (Wrap x a)))
-        bs -> do
-          arrow
-          b <- pi
-          pure $! foldr' (\(xs, a) t -> foldr' (\x b -> Pi x a b) t xs) b bs)
+        [([x], a, p')] ->
+          FP.branch arrow
+            (Pi p x a <$> pi') $
+            FP.branch prod
+              (do p' <- getPos
+                  dom <- Sg p x a <$> sigma'
+                  FP.branch arrow
+                    (Pi p (BDontBind p') a <$> pi')
+                    (pure dom)
+              )
+              (pure (Wrap p x a p'))
 
-    (do t <- sigma
-        branch arrow
-          (\_ -> Pi "_" t <$!> pi)
+        bs -> do
+          arrow'
+          b <- pi'
+          pure $! foldr'
+            (\(!xs, !a, !p') t -> foldr' (\x b -> Pi p' x a b) t xs)
+            b bs
+    )
+
+    (do p' <- getPos
+        t <- sigma'
+        FP.branch arrow
+          (Pi p (BDontBind p') t <$> pi')
           (pure t))
 
-data LamBind = LBind Name LamAnnot | LPLam Tm Tm Name
+data LamBind = LBind Bind LamAnnot | LPLam Tm Tm Bind
 
 lamBind :: Parser LamBind
 lamBind =
-      do {l <- char '{' *> tm <* char '}'; r <- char '{' *> tm <* char '}';
-          x <- bind; pure $ LPLam l r x}
-  <|> do {char '('; x <- bind; char ':'; a <- tm; char ')'; pure (LBind x (LAAnn a))}
-  <|> (LBind <$!> bind <*!> pure LANone)
+      do {l <- braceL *> tm' <* braceR'; r <- braceL' *> tm' <* braceR';
+          x <- bind'; pure $ LPLam l r x}
+  <|> do {parL; x <- bind'; colon'; a <- tm'; parR'; pure (LBind x (LAAnn a))}
+  <|> (LBind <$> bind <*> pure LANone)
 
-lam :: Parser Tm
-lam = do
-  lambda
-  bs <- some ((//) <$!> getSourcePos <*!> lamBind)
-  char '.'
-  t <- lamlet
+goLam :: Pos -> Parser Tm
+goLam p = do
+  bs <- some lamBind
+  dot'
+  t <- lamlet'
   pure $! foldr'
-    (\(pos,b) t -> case b of
-        LBind x ma  -> Pos (coerce pos) (Lam x ma t)
-        LPLam l r x -> Pos (coerce pos) (PLam l r x t))
+    (\b t -> case b of
+        LBind x ma  -> Lam p x ma t
+        LPLam l r x -> PLam p l r x t)
     t bs
 
 -- | Desugar Coq-style definition args.
-desugarIdentArgs :: [([Name], Ty)] -> Maybe Ty -> Tm -> (Tm, Maybe Ty)
+desugarIdentArgs :: [([Bind], Ty, Pos)] -> Maybe Ty -> Tm -> (Tm, Maybe Ty)
 desugarIdentArgs args mty rhs = case mty of
+
   -- if there's no return type annotation, we desugar to annotated lambdas
   Nothing -> let
-    tm = foldr' (\(xs, a) t -> foldr' (\x t -> Lam x (LAAnn a) t) t xs) rhs args
+    tm = foldr' (\(xs, a, p) t -> foldr' (\x t -> Lam p x (LAAnn a) t) t xs) rhs args
     in tm // Nothing
 
   -- if there's a return type, we annotate the let with a Pi *and* annotate the
@@ -329,109 +370,112 @@ desugarIdentArgs args mty rhs = case mty of
   -- elaborated twice.
   -- TODO: avoid the extra cost.
   Just a  -> let
-    tm = foldr' (\(xs, a) t -> foldr' (\x t -> Lam x (LADesugared a) t) t xs) rhs args
-    ty = foldr' (\(xs, a) b -> foldr' (\x -> Pi x a) b xs) a args
+    tm = foldr' (\(xs, a, p) t -> foldr' (\x t -> Lam p x (LADesugared a) t) t xs) rhs args
+    ty = foldr' (\(xs, a, p) b -> foldr' (\x -> Pi p x a) b xs) a args
     in tm // Just ty
 
-pLet :: Parser Tm
-pLet = do
-  keyword "let"
-  x <- ident
+goLet :: Pos -> Parser Tm
+goLet p = do
+  x <- ident'
   args <- many piBinder
-  ma   <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
-  symbol ":="
-  t <- tm
+  ma   <- optional (colon *> tm')
+  assign'
+  t <- tm'
   (t, ma) <- pure $! desugarIdentArgs args ma t
-  char ';'
-  u <- lamlet
-  pure $ Let x ma t u
+  semi'
+  u <- lamlet'
+  pure $ Let p x ma t u
 
-lamlet :: Parser Tm
-lamlet = try lam <|> pLet <|> pi
+lamlet' :: Parser Tm
+lamlet' = getPos >>= \p -> $(switch [| case _ of
+  "λ"   -> noIdent >> ws >> goLam p
+  "\\"  -> ws >> goLam p
+  "let" -> noIdent >> ws >> goLet p
+  _     -> pi' |])
 
-tm :: Parser Tm
-tm = withPos do
-  t <- lamlet
-  branch (char ',')
-    (\_ -> Pair t <$!> tm)
-    (pure t)
+tm' :: Parser Tm
+tm' = do
+  t <- lamlet'
+  FP.branch comma (Pair t <$> tm') (pure t)
 
-telBinder :: Parser ([Name], Ty)
+telBinder :: Parser ([Bind], Ty)
 telBinder =
-       ((//) <$!> try (char '(' *> some bind <* char ':') <*!> (tm <* char ')'))
-  <|>  do {t <- proj; pure (["_"], t)}
+      do {parL; bs <- some bind; colon; t <- tm'; parR'; pure (bs, t)}
+  <|> do {p <- getPos; t <- proj'; pure ([BDontBind p], t)}
 
-telescope :: Parser [(Name, Ty)]
+telescope :: Parser [(Bind, Ty)]
 telescope = do
   bs <- many telBinder
-  pure $! foldr' (\(xs, a) acc -> foldr' (\x acc -> (x, a):acc) acc xs) [] bs
+  pure $! foldr' (\(!xs, !a) acc -> foldr' (\x acc -> (x, a):acc) acc xs) [] bs
 
-top :: Parser Top
-top =
-  branch ((//) <$!> getSourcePos <*> (keyword "higher" *> keyword "inductive" *> ident))
+pPath :: Parser String
+pPath =
+  FP.withByteString (FP.skipSome (FP.satisfy \c -> isAlphaNum c || c == '.') <* ws) \_ bstr ->
+  pure $! FP.utf8ToStr bstr
+
+top' :: Parser Top
+top' =
+  FP.withOption ((//) <$!> getPos <*> ($(kw "higher") *> $(kw' "inductive") *> ident'))
     (\(pos, x) -> do
         params <- telescope
-        symbol ":="
+        assign'
         constructors <-
-          sepBy ((,,,) <$!> (DontShow <$> getSourcePos) <*!> ident <*!> telescope <*!> optional sys)
-                (char '|')
-        char ';'
-        u <- top
+          sepBy ((,,) <$!> ident <*!> telescope <*!> optional (fst <$> sys))
+                ($(sym "|"))
+        semi'
+        u <- top'
         pure $! THData (coerce pos) x params constructors u
     )
-    (branch ((//) <$!> getSourcePos <*> (keyword "inductive" *> ident))
 
+    (FP.withOption ((//) <$!> getPos <*> ($(kw "inductive") *> ident'))
       (\(pos, x) -> do
           params <- telescope
-          symbol ":="
-          constructors <- sepBy ((,,) <$!> (DontShow <$> getSourcePos) <*!> ident <*!> telescope)
-                                (char '|')
-          char ';'
-          u <- top
+          assign'
+          constructors <- sepBy ((,) <$!> ident' <*!> telescope) $(sym "|")
+          semi'
+          u <- top'
           pure $! TData (coerce pos) x params constructors u
       )
 
-      (branch ((//) <$!> getSourcePos <*!> ident)
+      (FP.withOption ((//) <$!> getPos <*!> ident)
         (\(pos, x) -> do
           args <- many piBinder
-          ma   <- optional (try (char ':' *> notFollowedBy (char '=')) *> tm)
-          symbol ":="
-          t <- tm
+          ma   <- optional (colon *> tm')
+          assign'
+          t <- tm'
           (t, ma) <- pure $! desugarIdentArgs args ma t
-          char ';'
-          u <- top
+          semi'
+          u <- top'
           pure $! TDef (coerce pos) x ma t u)
-
-        (branch ((//) <$!> getSourcePos <*!> (keyword "import" *> pPath))
+        (FP.withOption ((//) <$!> getPos <*!> ( $(kw "import") *> pPath))
           (\(pos, file) -> do
-              char ';'
-              u <- top
+              semi'
+              u <- top'
               pure $ TImport (coerce pos) file u)
-
           (pure TEmpty))))
-
-pPath :: Parser String
-pPath = takeWhileP Nothing (\c -> isAlphaNum c || c == '.') <* ws
 
 src :: Parser (Maybe String, Top)
 src = do
   ws
-  mod <- optional (keyword "module" *> pPath <* char ';')
-  t   <- top
-  eof
+  mod <- optional ($(kw "module") *> pPath <* semi')
+  t   <- top'
+  eof `pcut` Lit "end of file"
   pure (mod, t)
 
-parseString :: FilePath -> String -> IO (Maybe String, Top)
-parseString path s =
-  case parse src path s of
-    Left e -> do
-      putStrLn $ errorBundlePretty e
-      exitFailure
-    Right t ->
-      pure t
+parseByteString :: FilePath -> B.ByteString -> IO (Maybe String, Top)
+parseByteString path s = do
+  let env = SrcFile path s
+  case FP.runParser src env 0 s of
+    OK t _ _ -> pure t
+    Fail     -> impossible
+    Err e    -> do putStrLn $ prettyError env e
+                   exitFailure
 
-parseStdin :: IO (Maybe String, Top, String)
+parseString :: FilePath -> String -> IO (Maybe String, Top)
+parseString path s = parseByteString path (FP.strToUtf8 s)
+
+parseStdin :: IO (Maybe String, Top, B.ByteString)
 parseStdin = do
-  s <- getContents
-  (m, t) <- parseString "(stdin)" s
+  s        <- B.getContents
+  (!m, !t) <- parseByteString "(stdin)" s
   pure (m, t, s)

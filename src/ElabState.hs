@@ -11,6 +11,7 @@ import CoreTypes
 import Cubical
 
 import qualified Data.LvlMap as LM
+import qualified Data.ByteString.Char8 as B
 
 data TopEntry
   = TEDef DefInfo
@@ -50,7 +51,7 @@ lookupLocalType x ls = case (x, ls) of
   (x, LCof ls _     ) -> lookupLocalType x ls
   _                   -> impossible
 
-type PosArg     = (?srcPos  :: SourcePos)
+type PosArg     = (?srcPos  :: Pos)
 type LocalsArg  = (?locals  :: Locals)
 type Elab a     = LocalsArg => NCofArg => DomArg => EnvArg => PosArg => a
 
@@ -69,7 +70,7 @@ data LoadState = LoadState {
 
   , loadStateLoadCycle   :: [FilePath]      -- Chain of imports going back to original input file to cctt.
                                             -- We check for import cycles on this.
-  , loadStateCurrentSrc  :: String
+  , loadStateCurrentSrc  :: B.ByteString
   } deriving Show
 
 data HCaseBoundaryCheck where
@@ -128,11 +129,12 @@ resetElabState = putState initState
 withTopElab :: Elab (IO a) -> IO a
 withTopElab act = do
   st <- getState
+  let ls = st^.loadState
   let ?locals = LNil
       ?cof    = emptyNCof
       ?dom    = 0
       ?env    = ENil
-      ?srcPos = initialPos (st^.loadState.currentPath)
+      ?srcPos = initialPos (SrcFile (ls^.currentPath) (ls^.currentSrc))
   act
 {-# inline withTopElab #-}
 
@@ -173,19 +175,20 @@ bindCof (NeCof' cof c) act =
       ?locals = LCof ?locals c in
   act; {-# inline bindCof #-}
 
-isNameUsed :: Elab (Name -> Bool)
+isNameUsed :: Elab (B.ByteString -> Bool)
 isNameUsed x = go ?locals x where
+  go :: Locals -> B.ByteString -> Bool
   go LNil              _ = False
-  go (LBind ls x' _ _) x = x == x' || go ls x
-  go (LBindI ls x')    x = x == x' || go ls x
+  go (LBind ls x' _ _) x = x == nameToBs x' || go ls x
+  go (LBindI ls x')    x = x == nameToBs x' || go ls x
   go (LCof ls _)       x = go ls x
 
 -- | Try to pick an informative fresh ivar name.
 pickIVarName :: Elab Name
 pickIVarName
-  | not (isNameUsed "i") = "i"
-  | not (isNameUsed "j") = "j"
-  | not (isNameUsed "k") = "k"
-  | not (isNameUsed "l") = "l"
-  | not (isNameUsed "m") = "m"
-  | True                 = "i"
+  | not (isNameUsed "i") = i_
+  | not (isNameUsed "j") = j_
+  | not (isNameUsed "k") = k_
+  | not (isNameUsed "l") = l_
+  | not (isNameUsed "m") = m_
+  | True                 = i_

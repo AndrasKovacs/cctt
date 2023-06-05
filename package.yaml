@@ -108,15 +108,17 @@ ghc-options:
 
 dependencies:
 - base >= 4.7 && < 5
+- bytestring
 - containers
 - directory
 - filepath
+- flatparse
 - ghc-prim
-- megaparsec
 - microlens-platform
 - primdata
 - split
 - strict-impl-params
+- template-haskell
 - time
 
 source-dirs: src

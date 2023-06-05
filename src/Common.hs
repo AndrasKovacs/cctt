@@ -7,11 +7,6 @@ module Common (
   , module GHC.Exts
   , module GHC.Word
   , module Text.Show
-  , SourcePos(..)
-  , sourcePosPretty
-  , initialPos
-  , Pos
-  , unPos
   , runIO
   , trace
   , traceM
@@ -24,7 +19,6 @@ import Data.List
 import Data.Time.Clock
 import GHC.Exts hiding (lazy, fromList)
 import Lens.Micro.Platform
-import Text.Megaparsec (SourcePos(..), sourcePosPretty, initialPos, Pos, unPos)
 import Data.IORef
 import Debug.Trace (trace, traceM, traceShow, traceShowM)
 import Data.Flat
@@ -32,6 +26,10 @@ import IO (runIO)
 import GHC.IO
 import GHC.Word
 import Text.Show
+
+import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Internal as B
+import qualified FlatParse.Stateful as FP
 
 -- Debug printing, toggled by "debug" cabal flag
 --------------------------------------------------------------------------------
@@ -76,7 +74,46 @@ noinlineRunIO :: IO a -> a
 noinlineRunIO (IO f) = runRW# (\s -> case f s of (# _, a #) -> a)
 {-# noinline noinlineRunIO #-}
 
-type Name = String
+data Name
+  = NSpan {-# unpack #-} Span
+  | NGeneric B.ByteString
+  deriving (Eq, Ord)
+
+instance Show Name where
+  show (NSpan x)    = show x
+  show (NGeneric x) = B.unpack x
+
+nameToBs :: Name -> B.ByteString
+nameToBs = \case
+  NSpan x    -> spanToBs x
+  NGeneric x -> x
+
+a_ = NGeneric "a"
+b_ = NGeneric "b"
+c_ = NGeneric "c"
+d_ = NGeneric "d"
+e_ = NGeneric "e"
+f_ = NGeneric "f"
+g_ = NGeneric "g"
+h_ = NGeneric "h"
+i_ = NGeneric "i"
+j_ = NGeneric "j"
+k_ = NGeneric "k"
+l_ = NGeneric "l"
+m_ = NGeneric "m"
+n_ = NGeneric "n"
+o_ = NGeneric "o"
+p_ = NGeneric "p"
+q_ = NGeneric "q"
+r_ = NGeneric "r"
+s_ = NGeneric "s"
+t_ = NGeneric "t"
+u_ = NGeneric "u"
+x_ = NGeneric "x"
+y_ = NGeneric "y"
+z_ = NGeneric "z"
+
+----------------------------------------------------------------------------------------------------
 
 uf :: Dbg => a
 uf = undefined
@@ -198,3 +235,87 @@ timedPure_ ~a = do
     let diff = diffUTCTime t2 t1
     pure diff
 {-# noinline timedPure_ #-}
+
+
+-- Source descriptors, positions, spans
+--------------------------------------------------------------------------------
+
+-- | Describes a source bytestring such that a position can point into it.
+data Src
+  = SrcFile FilePath B.ByteString -- ^ Concrete source file.
+  | SrcImpossible                 -- ^ Impossible case just for killing unboxing.
+
+instance Show Src where
+  show (SrcFile fp _) = "File " ++ fp
+  show  SrcImpossible = impossible
+
+srcToBs :: Src -> B.ByteString
+srcToBs (SrcFile _ bs)   = bs
+srcToBs SrcImpossible    = impossible
+
+-- | Equality of bytestrings by reference, used for sanity checks.
+samePtr :: B.ByteString -> B.ByteString -> Bool
+samePtr x y = case B.toForeignPtr x of
+  (x, _, _) -> case B.toForeignPtr y of
+    (y, _, _) -> x == y
+{-# inline samePtr #-}
+
+-- | Equality of sources only checks that underlying bytestrings have the same
+--   underlying data.
+instance Eq Src where
+  SrcFile _ s   == SrcFile _ s'   = samePtr s s'
+  _             == _              = impossible
+
+-- | Source position. We decorate raw terms with this.
+data Pos = Pos Src FP.Pos
+  deriving Show via DontShow Pos
+  deriving Eq
+
+rawPos :: Pos -> FP.Pos
+rawPos (Pos _ p) = p
+
+initialPos :: Src -> Pos
+initialPos src = Pos src (FP.Pos 0)
+
+instance Ord Pos where
+  compare (Pos src i) (Pos src' i')
+    | src == src' = compare i i'
+    | otherwise   = impossible
+
+  (<) (Pos src i) (Pos src' i')
+    | src == src' = i < i'
+    | otherwise   = impossible
+
+  (<=) (Pos src i) (Pos src' i')
+    | src == src' = i <= i'
+    | otherwise   = impossible
+
+-- | Source span. The left position must not be larger than the right one.
+data Span = Span# Src FP.Pos FP.Pos
+  -- deriving Show via DontShow Span
+
+instance Show Span where
+  show = spanToString
+
+pattern Span :: Pos -> Pos -> Span
+pattern Span x y <- ((\(Span# src x y) -> (Pos src x, Pos src y)) -> (x, y)) where
+  Span (Pos src x) (Pos src' y)
+    | src == src' && x <= y = Span# src x y
+    | otherwise             = impossible
+{-# complete Span #-}
+
+spanToBs :: Span -> B.ByteString
+spanToBs (Span (Pos src i) (Pos _ j)) =
+  let bstr = srcToBs src
+      i'   = B.length bstr - coerce i   -- Pos counts backwards from the end of the string
+      j'   = B.length bstr - coerce j
+  in B.take (j' - i') (B.drop i' bstr)
+
+instance Eq Span where
+  x == y = spanToBs x == spanToBs y
+
+instance Ord Span where
+  compare x y = compare (spanToBs x) (spanToBs y)
+
+spanToString :: Span -> String
+spanToString s = FP.utf8ToStr (spanToBs s)
