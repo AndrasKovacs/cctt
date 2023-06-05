@@ -58,8 +58,7 @@ type LocalsArg  = (?locals  :: Locals)
 type Elab a     = LocalsArg => NCofArg => DomArg => EnvArg => PosArg => a
 
 data PrintingOpts = PrintingOpts {
-    printingOptsPrintNf      :: Maybe Name
-  , printingOptsVerbose      :: Bool
+    printingOptsVerbose      :: Bool
   , printingOptsErrPrinting  :: Bool
   , printingOptsShowHoleCxts :: Bool }
   deriving Show
@@ -81,7 +80,7 @@ data HCaseBoundaryCheck where
   deriving Show via DontShow HCaseBoundaryCheck
 
 data State = State {
-    stateTop                 :: M.Map Span TopEntry
+    stateTop                 :: M.Map B.ByteString TopEntry
   , stateTop'                :: LM.Map TopEntry
   , stateLvl                 :: Lvl
   , stateLoadState           :: LoadState
@@ -96,7 +95,7 @@ makeFields ''State
 makeFields ''PrintingOpts
 
 defaultPrintingOpts :: PrintingOpts
-defaultPrintingOpts = PrintingOpts Nothing False False True
+defaultPrintingOpts = PrintingOpts False False True
 
 newCaseTag :: IO Int
 newCaseTag = do

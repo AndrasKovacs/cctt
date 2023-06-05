@@ -4,6 +4,7 @@ module MainInteraction where
 import qualified Data.Map.Strict as M
 import System.Environment
 import System.Exit
+import qualified FlatParse.Stateful as FP
 
 import Common
 import CoreTypes
@@ -31,7 +32,7 @@ elabPath path args = mainWith (pure $ path : words args)
 mainInteraction :: IO ()
 mainInteraction = mainWith getArgs
 
-parseArgs :: [String] -> IO (FilePath, Maybe Name, Maybe Name, Bool, Bool, Bool)
+parseArgs :: [String] -> IO (FilePath, Maybe String, Maybe String, Bool, Bool, Bool)
 parseArgs args = do
   let exit = putStrLn helpMsg >> exitSuccess
   (path, args) <- case args of
@@ -63,7 +64,6 @@ mainWith getArgs = do
 
   modState $ printingOpts %~
       (verbose .~ verbosity)
-    . (printNf .~ printnf)
     . (showHoleCxts .~ holeCxts)
 
   (_, !totaltime) <- timed (elaborate path)
@@ -80,7 +80,7 @@ mainWith getArgs = do
 
   case printnf of
     Just x -> do
-      (!nf, !nftime) <- case M.lookup x (st^.top) of
+      (!nf, !nftime) <- case M.lookup (FP.strToUtf8 x) (st^.top) of
         Just (TEDef i) -> do
           let ?env = ENil; ?cof = emptyNCof; ?dom = 0
           timedPure (quote (i^.defVal))
@@ -98,7 +98,7 @@ mainWith getArgs = do
 
   case printty of
     Just x -> do
-      case M.lookup x (st^.top) of
+      case M.lookup (FP.strToUtf8 x) (st^.top) of
         Just (TEDef i) -> do
           putStrLn ""
           putStrLn $ show (i^.pos)

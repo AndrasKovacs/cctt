@@ -369,7 +369,7 @@ splitIdent x ix ls sp = case ls of
 
   LNil -> do
     st <- getState
-    case M.lookup x (st^.top) of
+    case M.lookup (spanToBs x) (st^.top) of
       Nothing                 -> setPos x $ err $ NameNotInScope x
       Just (TEDef inf)        -> SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
       Just (TETyCon inf)      -> pure $ TyConHead inf sp
@@ -1085,7 +1085,7 @@ elabSys componentTy = \case
 guardTopShadowing :: Elab (Span -> IO ())
 guardTopShadowing x = do
   st <- getState
-  case M.lookup x (st^.top) of
+  case M.lookup (spanToBs x) (st^.top) of
     Nothing             -> pure ()
     Just (TEDef inf  )  -> err $ TopShadowing (inf^.pos)
     Just (TETyCon inf)  -> err $ TopShadowing (inf^.pos)
@@ -1180,7 +1180,7 @@ elabTop = \case
     let recEntry = TERec recInf
 
     modState $
-        (top  %~ M.insert x recEntry)
+        (top  %~ M.insert (spanToBs x) recEntry)
       . (top' %~ LM.insert l recEntry)
       . (lvl  +~ 1)
 
@@ -1196,7 +1196,7 @@ elabTop = \case
     let defEntry = TEDef $ DI l t tv a va xn (coerce pos)
 
     modState $
-        (top  %~ M.insert x defEntry)
+        (top  %~ M.insert (spanToBs x) defEntry)
       . (top' %~ LM.insert l defEntry)
 
     checkHCaseBoundaries (Recurse (coerce tv))
@@ -1227,7 +1227,7 @@ elabTop = \case
     let entry = TETyCon inf
 
     modState $
-         (top  %~ M.insert tyname entry)
+         (top  %~ M.insert (spanToBs tyname) entry)
       .  (top' %~ LM.insert l entry)
       .  (lvl  +~ 1)
 
@@ -1249,7 +1249,7 @@ elabTop = \case
     let entry = TEHTyCon inf
 
     modState $
-         (top  %~ M.insert tyname entry)
+         (top  %~ M.insert (spanToBs tyname) entry)
       .  (top' %~ LM.insert l entry)
       .  (lvl  +~ 1)
 
@@ -1353,7 +1353,7 @@ elabHConstructors tyinf tyConVal conid = \case
               pure (sys, coh)
 
     let dinf = HDCI conid fs coh is bnd xn tyinf (P.leftPos x)
-    modState (top %~ M.insert x (TEHDCon dinf))
+    modState (top %~ M.insert (spanToBs x) (TEHDCon dinf))
     modifyIORef' (tyinf^.constructors) (LM.insert conid dinf)
     elabHConstructors tyinf tyConVal (conid + 1) cs
 
@@ -1366,7 +1366,7 @@ elabConstructors tyinf conid = \case
     let xn = NSpan x
     fs <- elabTelescope fs
     let dinf = DCI conid fs xn tyinf (P.leftPos x)
-    modState (top %~ M.insert x (TEDCon dinf))
+    modState (top %~ M.insert (spanToBs x) (TEDCon dinf))
     modifyIORef' (tyinf^.constructors) (LM.insert conid dinf)
     elabConstructors tyinf (conid + 1) cs
 
