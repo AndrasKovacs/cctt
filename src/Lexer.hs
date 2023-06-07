@@ -121,7 +121,7 @@ ws :: Parser ()
 ws = $(switch [| case _ of
   " "  -> dummy >> ws
   "\n" -> dummy >> ws
-  "\t" -> err $ Precise $ Msg "tabs are not allowed"
+  "\t" -> dummy >> ws
   "\r" -> dummy >> ws
   "--" -> dummy >> lineComment
   "{-" -> dummy >> multilineComment

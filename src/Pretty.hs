@@ -17,6 +17,7 @@ import CoreTypes
 import Cubical hiding (eq)
 import ElabState hiding (bind, bindI, isNameUsed)
 import qualified Data.LvlMap as LM
+import qualified Data.ByteString.Char8 as B
 
 --------------------------------------------------------------------------------
 
@@ -52,7 +53,7 @@ instance Monoid Txt where
   mempty = Txt id; {-# inline mempty #-}
 
 instance IsString Txt where
-  fromString s = Txt (s++); {-# inline fromString #-}
+  fromString s = Txt \acc -> foldr' (:) acc s
 
 instance Show Txt where
   show (Txt s) = s mempty
@@ -60,8 +61,14 @@ instance Show Txt where
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
 
+utf8 :: B.ByteString -> Txt
+utf8 s = Txt \acc -> B.foldr' (:) acc s
+
 nm :: Name -> Txt
-nm x = uf
+nm = \case
+  NSpan x    -> utf8 (spanToBs x)
+  NGeneric x -> utf8 x
+  N_         -> Txt ('_':)
 
 data Names = NNil | NBind Names Name | NBindI Names Name deriving Show
 

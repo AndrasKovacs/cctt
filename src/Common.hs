@@ -7,6 +7,9 @@ module Common (
   , module GHC.Exts
   , module GHC.Word
   , module Text.Show
+  , module Data.Foldable
+  , FP.utf8ToStr
+  , FP.strToUtf8
   , runIO
   , trace
   , traceM
@@ -17,9 +20,10 @@ import Control.Monad
 import Data.Bits
 import Data.List
 import Data.Time.Clock
-import GHC.Exts hiding (lazy, fromList)
+import GHC.Exts hiding (lazy, fromList, toList)
 import Lens.Micro.Platform
 import Data.IORef
+import Data.Foldable
 import Debug.Trace (trace, traceM, traceShow, traceShowM)
 import Data.Flat
 import IO (runIO)

@@ -21,9 +21,9 @@ import Lexer
 
 --------------------------------------------------------------------------------
 
-atomErr   = ["an identifier", "a parenthesized expression", "refl", "interval constant", "hole"]
-projErr   = "a projection expression" : atomErr
-appErr    = "an application expression" : projErr
+atomErr   = ["identifier", "parenthesized expression", "refl", "interval constant", "hole"]
+projErr   = "projection expression" : atomErr
+appErr    = "application expression" : projErr
 -- pathErr   = "a path type" : appErr
 -- sigmaErr  = "a sigma type" : pathErr
 -- piErr     = "a function type" : sigmaErr
@@ -52,7 +52,7 @@ sqL       = $(sym  "[")
 sqL'      = $(sym' "[")
 sqR'      = $(sym' "]")
 bind      = (BName <$> ident) <|> do {p <- getPos; $(sym "_"); pure $ BDontBind p}
-bind'     = bind `pcut` Lit "a binder"
+bind'     = bind `pcut` Lit "binder"
 decimal'  = token' FP.anyAsciiDecimalWord
 hash      = $(sym "#")
 
@@ -276,7 +276,7 @@ eq' = do
   t <- trans'
   FP.branch $(sym "=")
     (do FP.branch braceL
-          (do a <- FP.withOption bind
+          (do a <- FP.withOption (bind <* dot)
                       (\x -> BMBind x <$> tm')
                       (BMDontBind <$> tm')
               braceR'
@@ -404,17 +404,20 @@ tm' = do
 telBinder :: Parser ([Bind], Ty)
 telBinder =
       do {parL; bs <- some bind; colon; t <- tm'; parR'; pure (bs, t)}
-  <|> do {p <- getPos; t <- proj'; pure ([BDontBind p], t)}
+  <|> do {p <- getPos; t <- proj; pure ([BDontBind p], t)}
 
 telescope :: Parser [(Bind, Ty)]
 telescope = do
   bs <- many telBinder
   pure $! foldr' (\(!xs, !a) acc -> foldr' (\x acc -> (x, a):acc) acc xs) [] bs
 
-pPath :: Parser String
-pPath =
+modulePath :: Parser String
+modulePath =
   FP.withByteString (FP.skipSome (FP.satisfy \c -> isAlphaNum c || c == '.') <* ws) \_ bstr ->
   pure $! FP.utf8ToStr bstr
+
+modulePath' :: Parser String
+modulePath' = modulePath `pcut` Lit "a module path"
 
 top' :: Parser Top
 top' =
@@ -427,17 +430,17 @@ top' =
                 ($(sym "|"))
         semi'
         u <- top'
-        pure $! THData (coerce pos) x params constructors u
+        pure $! THData pos x params constructors u
     )
 
     (FP.withOption ((//) <$!> getPos <*> ($(kw "inductive") *> ident'))
       (\(pos, x) -> do
           params <- telescope
           assign'
-          constructors <- sepBy ((,) <$!> ident' <*!> telescope) $(sym "|")
+          constructors <- sepBy ((,) <$!> ident <*!> telescope) $(sym "|")
           semi'
           u <- top'
-          pure $! TData (coerce pos) x params constructors u
+          pure $! TData pos x params constructors u
       )
 
       (FP.withOption ((//) <$!> getPos <*!> ident)
@@ -449,18 +452,19 @@ top' =
           (t, ma) <- pure $! desugarIdentArgs args ma t
           semi'
           u <- top'
-          pure $! TDef (coerce pos) x ma t u)
-        (FP.withOption ((//) <$!> getPos <*!> ( $(kw "import") *> pPath))
+          pure $! TDef pos x ma t u)
+
+        (FP.withOption ((//) <$!> getPos <*!> ( $(kw "import") *> modulePath'))
           (\(pos, file) -> do
               semi'
               u <- top'
-              pure $ TImport (coerce pos) file u)
+              pure $ TImport pos file u)
           (pure TEmpty))))
 
 src :: Parser (Maybe String, Top)
 src = do
   ws
-  mod <- optional ($(kw "module") *> pPath <* semi')
+  mod <- optional ($(kw "module") *> modulePath' <* semi')
   t   <- top'
   eof `pcut` Lit "end of file"
   pure (mod, t)
