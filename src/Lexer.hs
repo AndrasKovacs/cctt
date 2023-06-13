@@ -233,6 +233,9 @@ anyKw = $(switch [| case _ of
   "unglue"    -> eof
   "λ"         -> eof |])
 
+manyIdentChars :: Parser ()
+manyIdentChars = skipMany identChar
+
 scanIdent :: Parser ()
 scanIdent = identStartChar >> skipMany inlineIdentChar
 

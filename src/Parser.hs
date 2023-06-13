@@ -62,17 +62,20 @@ sepBy pa psep = sepBy1 pa psep <|> pure []
 sepBy1 :: Parser a -> Parser sep -> Parser [a]
 sepBy1 pa psep = (:) <$> pa <*> FP.many (psep *> pa)
 
-noIdent :: Parser ()
-noIdent = FP.fails identChar
+skipToVar :: Pos -> Parser Tm -> Parser Tm
+skipToVar l k = FP.branch identChar
+  (do {manyIdentChars; r <- getPos; ws; pure $ Ident (Span l r)})
+  (do {r <- getPos; ws; k})
+{-# inline skipToVar #-}
 
 atom :: Parser Tm
 atom = getPos >>= \p -> $(FP.switch [| case _ of
   "("    -> do {ws; t <- tm'; parR'; pure t}
-  "U"    -> do {noIdent; ws; pure $ U p}
+  "U"    -> skipToVar p do {ws; pure $ U p}
   "0"    -> do {ws; pure $ I0 p}
   "1"    -> do {ws; pure $ I1 p}
   "I"    -> do {ws; pure $ I p}
-  "refl" -> do {p' <- getPos; noIdent; ws; pure $ Refl p p'}
+  "refl" -> skipToVar p do {p' <- getPos; ws; pure $ Refl p p'}
   "@@"   -> do {ws;
                 n  <- decimal';
                 n' <- FP.optional
@@ -230,7 +233,8 @@ goSplit :: Pos -> Parser Tm
 goSplit p = do
   let case_ = do
         some bind >>= \case
-          [] -> impossible
+          [] ->
+            impossible
           x:xs -> do
             dot'
             body <- tm'
@@ -250,17 +254,23 @@ goGlueTy p = do
   (s, p') <- sys'
   goApp (GlueTy p a s p')
 
+skipToApp :: Pos -> Parser Tm -> Parser Tm
+skipToApp l k = FP.branch identChar
+  (do {manyIdentChars; r <- getPos; ws; goApp =<< goProj (Ident (Span l r))})
+  (do {r <- getPos; ws; k})
+{-# inline skipToApp #-}
+
 appBase :: Parser Tm
 appBase = getPos >>= \p -> $(switch [| case _ of
-  "λ"      -> do {noIdent; ws; sqL'; goSplit p}
-  "coe"    -> do {noIdent; ws; goCoe p}
-  "case"   -> do {noIdent; ws; goCase p}
-  "hcom"   -> do {noIdent; ws; goHCom p}
-  "com"    -> do {noIdent; ws; goCom p}
-  "unglue" -> do {noIdent; ws; goApp =<< (Unglue p <$> proj')}
-  "ap"     -> do {noIdent; ws; goApp =<< (App <$> proj' <*> proj')}
-  "Glue"   -> do {noIdent; ws; goGlueTy p}
-  "glue"   -> do {noIdent; ws; goGlue p} |])
+  "λ"      -> skipToApp p do {ws; sqL'; goSplit p}
+  "coe"    -> skipToApp p do {ws; goCoe p}
+  "case"   -> skipToApp p do {ws; goCase p}
+  "hcom"   -> skipToApp p do {ws; goHCom p}
+  "com"    -> skipToApp p do {ws; goCom p}
+  "unglue" -> skipToApp p do {ws; goApp =<< (Unglue p <$> proj')}
+  "ap"     -> skipToApp p do {ws; goApp =<< (Ap p <$> proj' <*> proj')}
+  "Glue"   -> skipToApp p do {ws; goGlueTy p}
+  "glue"   -> skipToApp p do {ws; goGlue p} |])
 
 app :: Parser Tm
 app = appBase <|> (goApp =<< proj)
@@ -391,9 +401,9 @@ goLet p = do
 
 lamlet' :: Parser Tm
 lamlet' = getPos >>= \p -> $(switch [| case _ of
-  "λ"   -> noIdent >> ws >> goLam p
-  "\\"  -> ws >> goLam p
-  "let" -> noIdent >> ws >> goLet p
+  "λ"   -> skipToApp p do {ws; FP.branch sqL (goSplit p) (goLam p)}
+  "\\"  -> ws >> FP.branch sqL (goSplit p) (goLam p)
+  "let" -> skipToApp p do {ws; goLet p}
   _     -> pi' |])
 
 tm' :: Parser Tm
