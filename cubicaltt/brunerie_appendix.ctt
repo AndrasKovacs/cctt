@@ -1,0 +1,2012 @@
+{-
+
+The file starts with some preliminaries, then the rest of the file
+follows Appendix B in Brunerie's thesis:
+
+B.3 Suspension and spheres
+
+B.4 Pointed types, pointed maps and loop spaces
+
+B.5 Loop space of a suspension
+
+B.6 The 3-sphere and the join of two circles
+
+B.7 The main map
+
+B.8 The map defining pi3(S2)
+
+B.9 Going back to pi2(S2)
+
+B.10 Loop space of truncations
+
+B.11 Down one more dimension
+
+B.2 The definition
+
+-}
+module brunerie_appendix where
+
+--------------------------------------------------------------------------------
+-- Preliminaries
+
+data bool = false | true
+data nat = zero | suc (n : nat)
+
+one : nat = suc zero
+two : nat = suc one
+three : nat = suc two
+
+idfun (A : U) (a : A) : A = a
+
+{- Z is represented as:
+
+  +2 = pos (suc (suc zero))
+  +1 = pos (suc zero)
+   0 = pos zero
+  -1 = neg zero
+  -2 = neg (suc zero)
+
+-}
+data Z = pos (n : nat) | neg (n : nat)
+
+twoZ : Z = pos (suc (suc zero))
+oneZ : Z = pos (suc zero)
+zeroZ : Z = pos zero
+moneZ : Z = neg zero
+mtwoZ : Z = neg (suc zero)
+
+Path (A : U) (a0 a1 : A) : U = PathP (<i> A) a0 a1
+
+Sigma (A : U) (B : A -> U) : U = (x : A) * B x
+refl (A : U) (a : A) : Path A a a = <i> a
+
+Square (A : U) (a0 a1 b0 b1 : A)
+               (u : Path A a0 a1) (v : Path A b0 b1)
+               (r0 : Path A a0 b0) (r1 : Path A a1 b1) : U
+  = PathP (<i> (PathP (<j> A) (u @ i) (v @ i))) r0 r1
+
+constSquare (A : U) (a : A) (p : Path A a a) : Square A a a a a p p p p =
+  <i j> hcomp A a [ (i = 0) -> <k> p @ (j \/ - k)
+                  , (i = 1) -> <k> p @ (j /\ k)
+                  , (j = 0) -> <k> p @ (i \/ - k)
+                  , (j = 1) -> <k> p @ (i /\ k)]
+
+compPath (A : U) (a b c : A) (p : Path A a b) (q : Path A b c) : Path A a c =
+  <i> hcomp A (p @ i) [ (i =0) -> <j> a, (i = 1) -> q ]
+
+-- p ; p^-1 = 1
+compPathInv (A : U) (a b : A) (p : Path A a b) :
+  Path (Path A a a) (compPath A a b a p (<i> p @ -i)) (<_> a) =
+    <k j> hcomp A (p @ j /\ -k)
+                  [ (j = 0) -> <_> a
+                  , (j = 1) -> <i> p @ -i /\ -k
+                  , (k = 1) -> <_> a ]
+
+-- p^-1 ; p = 1
+compInvPath (A : U) (a b : A) (p : Path A a b) :
+  Path (Path A b b) (compPath A b a b (<i> p @ -i) p)  (<_> b) =
+   <j i> hcomp A (p @ -i \/ j)
+                 [ (i = 0) -> <_> b
+                 , (j = 1) -> <_> b
+                 , (i = 1) -> <k> p @ j \/ k ]
+
+
+-- p ; 1 = p
+compPath1 (A : U) (a b : A) (p : Path A a b) :
+  Path (Path A a b) (compPath A a b b p (<_> b)) p =
+  <j i> hcomp A (p @ i /\ -j) [ (i = 0) -> <_> a
+                              , (i = 1) -> <k> p @ -j \/ k
+                              , (j = 1) -> <k> p @ i /\ k ]
+-- 1 ; p = p
+comp1Path (A : U) (a b : A) (p : Path A a b) :
+  Path (Path A a b) (compPath A a a b (<_> a) p) p =
+  <j i> hcomp A a [ (i = 0) -> <k> a
+                  , (i = 1) -> p
+                  , (j = 1) -> <k> p @ i /\ k ]
+
+-- This would make a nice exercise
+helper (A : U) (a b c : A) (p : Path A a b) (q : Path A b c) :
+  Square A a b b c p q p q =
+  <i j> hcomp A b [ (i = 0) -> <k> p @ j \/ -k
+                  , (i = 1) -> <k> q @ j /\ k
+                  , (j = 0) -> <k> p @ i \/ -k
+                  , (j = 1) -> <k> q @ i /\ k ]
+
+comp3 (A : U) (a b c d : A) (p : Path A a b) (q : Path A b c) (r : Path A c d) : Path A a d =
+  <i> hcomp A (q @ i) [ (i = 0) -> <j> p @ -j, (i = 1) -> r ]
+
+comp3eq (A : U) (a b c d : A) (p : Path A a b) (q : Path A b c) (r : Path A c d) :
+  Path (Path A a d) (compPath A a b d p (compPath A b c d q r)) (comp3 A a b c d p q r) =
+  let sq : Square A b c d d q (<_> d) (compPath A b c d q r) r =
+        <i j> hcomp A (q @ j) [ (i = 1) -> helper A b c d q r @ j
+                              , (j = 0) -> <k> q @ i /\ k
+                              , (j = 1) -> r ]
+      goal : Path (Path A a d) (compPath A a b d p (compPath A b c d q r)) (comp3 A a b c d p q r) =
+        <j i> hcomp A (helper A a b c p q @ i @ j) [ (i = 0) -> <k> p @ j /\ -k
+                                                   , (i = 1) -> sq @ j ]
+
+  in goal
+
+
+-- Basic results about equivalences and lower h-levels:
+
+isContr (A : U) : U = (x : A) * ((y : A) -> Path A x y)
+
+prop (A : U) : U = (a b : A) -> Path A a b
+set (A : U) : U = (a b : A) -> prop (Path A a b)
+groupoid (A : U) : U = (a b : A) -> set (Path A a b)
+twogroupoid (A : U) : U = (a b : A) -> groupoid (Path A a b)
+threegroupoid (A : U) : U = (a b : A) -> twogroupoid (Path A a b)
+
+SET : U = (A : U) * set A
+GROUPOID : U = (A : U) * groupoid A
+
+fiber (A B : U) (f : A -> B) (y : B) : U =
+  (x : A) * Path B y (f x)
+
+isEquiv (A B : U) (f : A -> B) : U = (y : B) -> isContr (fiber A B f y)
+
+equiv (A B : U) : U = (f : A -> B) * isEquiv A B f
+
+-- This can be proved in many ways, not sure which is the most efficient
+propIsContr (A : U) (z0 z1 : isContr A) : Path (isContr A) z0 z1 =
+ <j> (p0 a1 @ j
+     ,\(x : A) -> <i> hcomp A (lem1 x@i@j)
+                              [ (i=0) -> <k> p0 a1 @ j
+                              , (i=1) -> <k> p0 x @ j \/ k
+                              , (j=0) -> <k> p0 x @ i/\ k
+                              , (j=1) -> <k> p1 x @ i ])
+ where
+  a0 : A = z0.1
+  p0 : (x : A) -> Path A a0 x = z0.2
+  a1 : A = z1.1
+  p1 : (x : A) -> Path A a1 x = z1.2
+  lem1 (x : A) : PathP (<i> Path A a0 (p1 x @ i)) (p0 a1) (p0 x) =
+    <i j> p0 (p1 x @ i) @ j
+
+propSet (A : U) (h : prop A) : set A =
+ \(a b : A) (p q : Path A a b) ->
+   <j i> hcomp A a [ (i=0) -> h a a
+                       , (i=1) -> h a b
+                       , (j=0) -> h a (p @ i)
+                       , (j=1) -> h a (q @ i)]
+
+setGroupoid (A : U) (h : set A) : groupoid A =
+  \(a b : A) -> propSet (Path A a b) (h a b)
+
+groupoidTwoGroupoid (A : U) (h : groupoid A) : twogroupoid A =
+  \(a b : A) -> setGroupoid (Path A a b) (h a b)
+
+twogroupoidThreeGroupoid (A : U) (h : twogroupoid A) : threegroupoid A =
+  \(a b : A) -> groupoidTwoGroupoid (Path A a b) (h a b)
+
+propIsProp (A : U) : prop (prop A) =
+  \(f g : prop A) -> <i> \(a b : A) ->
+    propSet A f a b (f a b) (g a b) @ i
+
+setIsProp (A : U) : prop (set A) =
+ \(f g : set A) -> <i> \(a b :A) ->
+   propIsProp (Path A a b) (f a b) (g a b) @ i
+
+groupoidIsProp (A : U) : prop (groupoid A) =
+ \(f g : groupoid A) -> <i> \(a b :A) ->
+   setIsProp (Path A a b) (f a b) (g a b) @ i
+
+propPi (A : U) (B : A -> U) (h : (x : A) -> prop (B x))
+       (f0 f1 : (x : A) -> B x) : Path ((x : A) -> B x) f0 f1
+  = <i> \ (x:A) -> (h x (f0 x) (f1 x)) @ i
+
+propIsEquiv (A B : U) (f : A -> B) : prop (isEquiv A B f) =
+  \(u0 u1 : isEquiv A B f) -> <i> \(y : B) -> propIsContr (fiber A B f y) (u0 y) (u1 y) @ i
+
+lemPropF (A : U) (P : A -> U) (pP : (x : A) -> prop (P x)) (a0 a1 :A)
+         (p : Path A a0 a1) (b0 : P a0) (b1 : P a1) : PathP (<i> P (p @ i)) b0 b1 =
+  <i> pP (p @ i) (comp (<j> P (p @ i/\ j)) b0 [ (i=0) -> <_> b0])
+                 (comp (<j> P (p @ i\/ -j)) b1 [ (i=1) -> <_> b1]) @ i
+
+contrSingl (A : U) (a b : A) (p : Path A a b) :
+  Path ((x : A) * Path A a x) (a,<_>a) (b,p) = <i> (p @ i,<j> p @ i/\j)
+
+idIsEquiv (A : U) : isEquiv A A (idfun A) =
+  \(a : A) -> ((a,<_>a),\(z : (x : A) * Path A a x) -> contrSingl A a z.1 z.2)
+
+idEquiv (A : U) : equiv A A = (idfun A,idIsEquiv A)
+
+ua (A B : U) (e : equiv A B) : Path U A B =
+  <i> Glue B [ (i = 0) -> (A,e)
+             , (i = 1) -> (B,idEquiv B) ]
+
+subst (A : U) (P : A -> U) (a b : A) (p : Path A a b) (e : P a) : P b =
+  transGen (<i> P (p @ i)) 0 e
+
+substInv (A : U) (P : A -> U) (a b : A) (p : Path A a b) : P b -> P a =
+  subst A P b a (<i> p @ -i)
+
+J (A : U) (a : A) (C : (x : A) -> Path A a x -> U)
+  (d : C a (<_> a)) (x : A) (p : Path A a x) : C x p =
+    subst ((x : A) * Path A a x) T (a,<_> a) (x, p) (contrSingl A a x p) d
+      where T (z : (x : A) * Path A a x) : U = C (z.1) (z.2)
+
+PathS (A : U) (P : A -> U) (a0 a1 : A) (p : Path A a0 a1) (u0 : P a0) (u1 : P a1) : U =
+  PathP (<i> P (p @ i)) u0 u1
+
+transGen0 (A : U) (a : A) : A = transGen (<_> A) 0 a
+
+funExt1 (C B : U) (P : C -> U) (a : C) :
+  (b : C) (p : Path C a b) (f : P a -> B) (g : P b -> B)
+  (h : (x : P a) -> Path B (f x) (g (subst C P a b p x))) ->
+  PathP (<i> P (p @ i) -> B) f g =
+  let rem2 (f g : P a -> B) (h : (x : P a) -> Path B (f x) (g (transGen0 (P a) x))) (x : P a) : Path B (f x) (g x) =
+        <i> hcomp B (g (hfill (P a) (transGen0 (P a) x) [] @ i))
+                  [ (i = 0) -> <j> h x @ -j
+                  , (i = 1) -> <j> g (fill (<_> P a) x [] @ -j) ]
+      rem1 (f g : P a -> B) (h : (x : P a) -> Path B (f x) (g (transGen0 (P a) x))) : Path (P a -> B) f g =
+        <i> \(x : P a) -> rem2 f g h x @ i
+  in J C a (\(b : C) (p : Path C a b) -> (f : P a -> B) (g : P b -> B)
+           (h : (x : P a) -> Path B (f x) (g (subst C P a b p x))) -> PathP (<i> P (p @ i) -> B) f g) rem1
+
+funDepTr (A : U) (P : A -> U) (a0 a1 : A) (p : Path A a0 a1) (u0 : P a0) (u1 : P a1) :
+         Path U (PathP (<i> P (p @ i)) u0 u1)
+                (Path (P a1) (subst A P a0 a1 p u0) u1) =
+  <j> PathP (<i> P (p @ j \/ i)) (transGen (<i> P (p @ j /\ i)) (-j) u0) u1
+
+
+-------
+-- We now need that S1 is a groupoid
+
+-- The circle
+data S1 = base
+        | loop <i> [ (i=0) -> base
+                   , (i=1) -> base]
+
+loopS1 : U = Path S1 base base
+loopP : loopS1 = <i> loop{S1} @ i
+invLoop : loopS1 = <i> loopP @ -i
+compS1 : loopS1 -> loopS1 -> loopS1 = compPath S1 base base base
+
+triv : loopS1 = <i> base
+oneTurn (l : loopS1) : loopS1 = compS1 l loopP
+backTurn (l : loopS1) : loopS1 = compS1 l invLoop
+
+itLoop : nat -> loopS1 = split
+ zero -> triv
+ suc n -> oneTurn (itLoop n)
+
+itLoopNeg : nat -> loopS1 = split
+ zero -> invLoop
+ suc n -> backTurn (itLoopNeg n)
+
+loopIt : Z -> loopS1 = split
+ pos n -> itLoop n
+ neg n -> itLoopNeg n
+
+-- I now do this by proving that loopS1 is a retract of Z, as Z is a
+-- set this is also set. Previously the proof transported the proof
+-- that Z is a set to loopS1 along the equivalence loopS1 ~= Z,
+-- hopefully this proof will compute faster.
+
+retract (A B : U) (f : A -> B) (g : B -> A) : U =
+  (a : A) -> Path A (g (f a)) a
+
+compUp (A : U) (a a' b b' : A) (p : Path A a a') (q : Path A b b')
+  (r : Path A a b) : Path A a' b' =
+    <i> hcomp A (r @ i) [(i = 0) -> p, (i = 1) -> q]
+
+lemRetract (A B : U) (f : A -> B) (g : B -> A) (rfg : retract A B f g)
+  (x y : A) : Path A (g (f x)) (g (f y)) -> Path A x y =
+    compUp A (g (f x)) x (g (f y)) y (rfg x) (rfg y)
+
+retractProp (A B : U) (f : A -> B) (g : B -> A) (rfg : retract A B f g)
+  (pB : prop B) (x y : A) : Path A x y =
+    lemRetract A B f g rfg x y (<i> g (pB (f x) (f y) @ i))
+
+retractInv (A B : U)  (f : A -> B) (g : B -> A) (rfg : retract A B f g)
+  (x y : A) (q : Path B (f x) (f y)) : Path A x y =
+    <i> hcomp A (g (q @ i)) [(i = 0) -> rfg x, (i = 1) -> rfg y]
+
+lemRSquare (A B : U) (f : A -> B) (g : B -> A)
+           (rfg : (a : A) -> Path A (g (f a)) a)
+           (x y : A) (p : Path A x y) :
+  Square A (g (f x)) (g (f y)) x y
+           (<i> g (f (p @ i)))
+           (<i> hcomp A (g (f (p @ i))) [(i = 0) -> rfg x, (i = 1) -> rfg y])
+           (rfg x)
+           (rfg y) =
+           <i j> hcomp A (g (f (p @ i))) [ (i = 0) -> <k> rfg x @ j /\ k
+                                         , (i = 1) -> <k> rfg y @ j /\ k
+                                         , (j = 0) -> <k> g (f (p @ i)) ]
+
+retractPath (A B : U)(f : A -> B) (g : B -> A) (rfg : retract A B f g) (x y :A) (p:Path A x y) :
+  Path (Path A x y) (retractInv A B f g rfg x y (<i> f (p@ i))) p =
+    <i j> hcomp A (g (f (p @ j)))
+                  [ (j=0) -> rfg x
+                  , (j=1) -> rfg y
+                  , (i=0) -> lemRSquare A B f g rfg x y p @ j
+                  , (i=1) -> rfg (p @ j) ]
+
+
+retractSet (A B : U) (f : A -> B) (g : B -> A) (rfg : retract A B f g)
+           (sB : set B) (x y : A) : prop (Path A x y) =
+  retractProp (Path A x y) (Path B (f x) (f y)) (\(p : Path A x y) -> <i> f (p @ i))
+              (retractInv A B f g rfg x y) (retractPath A B f g rfg x y) (sB (f x) (f y))
+
+-- This not needed!
+-- loopS1equalsZ : Path U loopS1 Z =
+--   isoPath loopS1 Z (encode base) (decode base) decodeEncodeBase (encodeDecode base)
+
+-- Z is a set
+data N0 =
+
+efq (A : U) : N0 -> A = split {}
+not (A : U) : U = A -> N0
+
+data or (A B : U) = inl (a : A)
+                  | inr (b : B)
+
+data Unit = tt
+
+stable (A : U) : U = not (not A) -> A
+const (A : U) (f : A -> A) : U = (x y : A) -> Path A (f x) (f y)
+
+exConst (A : U) : U = (f:A -> A) * const A f
+propN0 : prop N0 = \ (x y:N0) -> efq (Path N0 x y) x
+
+propNot (A : U) : prop (not A) = \ (f g:not A) -> <i>\(x:A) -> (propN0 (f x) (g x))@i
+
+dNot (A : U) (a : A) : not (not A) = \ (h : not A) -> h a
+
+stableConst (A : U) (sA : stable A) : exConst A =
+ (\ (x:A) -> sA (dNot A x),\ (x y:A) -> <i>sA (propNot (not A) (dNot A x) (dNot A y) @ i))
+
+dec (A : U) : U = or A (not A)
+
+decEqCong (A B : U) (f : A -> B) (g : B -> A) : dec A -> dec B = split
+  inl a -> inl (f a)
+  inr h -> inr (\ (b:B) -> h (g b))
+
+decStable (A : U) : dec A -> stable A = split
+ inl a -> \ (h :not (not A)) -> a
+ inr b -> \ (h :not (not A)) -> efq A (h b)
+
+discrete (A : U) : U = (a b : A) -> dec (Path A a b)
+
+hedbergLemma (A: U) (a b:A) (f : (x : A) -> Path A a x -> Path A a x) (p : Path A a b) :
+            Square A a a a b (<_> a) p (f a (<_> a)) (f b p) =
+ comp (<i> Square A a a a (p @ i) (<_> a) (<j> p @ i /\ j)
+                 (f a (<_> a)) (f (p @ i) (<j> p @ i /\ j)))
+      (<i> f a (<_> a)) []
+
+hedbergStable (A : U) (a b : A) (h : (x : A) -> stable (Path A a x))
+        (p q : Path A a b) : Path (Path A a b) p q =
+ <j i> comp (<_> A) a [ (j = 0) -> rem2 @ i
+                      , (j = 1) -> rem3 @ i
+                      , (i = 0) -> r
+                      , (i = 1) -> rem4 @ j]
+ where
+   rem1 (x : A) : exConst (Path A a x) = stableConst (Path A a x) (h x)
+   f (x : A) : Path A a x -> Path A a x  = (rem1 x).1
+   fIsConst (x : A) : const (Path A a x) (f x) = (rem1 x).2
+   rem4 : Square A a a b b (<_> a) (<_> b) (f b p) (f b q)  = fIsConst b p q
+   r : Path A a a = f a (<_> a)
+   rem2 : Square A a a a b (<_> a) p r (f b p) = hedbergLemma A a b f p
+   rem3 : Square A a a a b (<_> a) q r (f b q) = hedbergLemma A a b f q
+
+hedbergS (A : U) (h : (a x : A) -> stable (Path A a x)) : set A =
+ \(a b : A) -> hedbergStable A a b (h a)
+
+hedberg (A : U) (h : discrete A) : set A =
+ \(a b : A) -> hedbergStable A a b (\(b : A) -> decStable (Path A a b) (h a b))
+
+caseNat (A : U) (a0 aS : A) : nat -> A = split
+ zero -> a0
+ suc n -> aS
+
+caseDNat (P:nat -> U) (a0 :P zero) (aS : (n:nat) -> P (suc n))
+            : (n:nat) -> P n = split
+ zero -> a0
+ suc n -> aS n
+
+znots (n : nat) : not (Path nat zero (suc n)) =
+  \(h : Path nat zero (suc n)) -> subst nat (caseNat U nat N0) zero (suc n) h zero
+
+snotz (n : nat) : not (Path nat (suc n) zero) =
+  \(h : Path nat (suc n) zero) -> znots n (<i> h @ -i)
+
+pred : nat -> nat = split
+  zero -> zero
+  suc n -> n
+
+sucInj (n m : nat) (p : Path nat (suc n) (suc m)) : Path nat n m =
+ <i> pred (p @ i)
+
+discreteNat : discrete nat = split
+ zero -> caseDNat (\(m : nat) -> dec (Path nat zero m)) (inl (<_> zero)) (\(m : nat) -> inr (znots m))
+ suc n -> caseDNat (\(m : nat) -> dec (Path nat (suc n) m)) (inr (snotz n))
+   (\(m : nat) -> decEqCong (Path nat n m) (Path nat (suc n) (suc m)) (\(p : Path nat n m) -> <i> suc (p @ i))
+                  (sucInj n m) (discreteNat n m))
+
+posNotneg (a b : nat) (h : Path Z (pos a) (neg b)) : N0 = subst Z T (pos a) (neg b) h tt
+  where
+  T : Z -> U = split
+       pos _ -> Unit
+       neg _ -> N0
+
+negNotpos (a b : nat) (h : Path Z (neg b) (pos a)) : N0 = subst Z T (neg b) (pos a) h tt
+  where
+  T : Z -> U = split
+       pos _ -> N0
+       neg _ -> Unit
+
+injPos (a b : nat) (h : Path Z (pos a) (pos b)) : Path nat a b =
+ subst Z T (pos a) (pos b) h (<_> a)
+ where
+   T : Z -> U = split
+        pos c -> Path nat a c
+        neg _ -> N0
+
+injNeg (a b : nat) (h : Path Z (neg a) (neg b)) : Path nat a b =
+  subst Z T (neg a) (neg b) h (<_> a)
+  where
+    T : Z -> U = split
+         pos _ -> N0
+         neg c -> Path nat a c
+
+discreteZ : discrete Z = split
+  pos a -> split@((z1 : Z) -> dec (Path Z (pos a) z1)) with
+             pos a1 -> let rem : dec (Path nat a a1) -> dec (Path Z (pos a) (pos a1)) = split
+                             inl p -> inl (<i> pos (p @ i))
+                             inr h -> inr (\(p : Path Z (pos a) (pos a1)) -> h (injPos a a1 p))
+                       in rem (discreteNat a a1)
+             neg b -> inr (posNotneg a b)
+  neg b -> split@((z1 : Z) -> dec (Path Z (neg b) z1)) with
+             pos a -> inr (negNotpos a b)
+             neg b1 -> let rem : dec (Path nat b b1) -> dec (Path Z (neg b) (neg b1)) = split
+                             inl p -> inl (<i> neg (p @ i))
+                             inr h -> inr (\(p : Path Z (neg b) (neg b1)) -> h (injNeg b b1 p))
+                       in rem (discreteNat b b1)
+
+ZSet : set Z = hedberg Z discreteZ
+
+predZ : Z -> Z = split
+  pos u -> auxpredZ u
+    where
+    auxpredZ : nat -> Z = split
+      zero  -> neg zero
+      suc n -> pos n
+  neg v -> neg (suc v)
+
+sucZ : Z -> Z = split
+  pos u -> pos (suc u)
+  neg v -> auxsucZ v
+    where
+    auxsucZ : nat -> Z = split
+      zero  -> pos zero
+      suc n -> neg n
+
+predsucZ : (x : Z) -> Path Z (predZ (sucZ x)) x = split
+  pos u -> <_> pos u
+  neg v -> lem v
+   where
+    lem : (u : nat) -> Path Z (predZ (sucZ (neg u))) (neg u) = split
+      zero  -> <_> neg zero
+      suc n -> <_> neg (suc n)
+
+sucpredZ : (x : Z) -> Path Z (sucZ (predZ x)) x = split
+  pos u -> lem u
+   where
+    lem : (u : nat) -> Path Z (sucZ (predZ (pos u))) (pos u) = split
+      zero  -> <_> pos zero
+      suc n -> <_> pos (suc n)
+  neg v -> <_> neg v
+
+lemIso (A B : U) (f : A -> B) (g : B -> A)
+       (s : (y : B) -> Path B (f (g y)) y)
+       (t : (x : A) -> Path A (g (f x)) x)
+       (y : B) (x0 x1 : A) (p0 : Path B y (f x0)) (p1 : Path B y (f x1)) :
+       Path (fiber A B f y) (x0,p0) (x1,p1) = <i> (p @ i,sq1 @ i)
+  where
+    rem0 : Path A (g y) x0 =
+      <i> hcomp A (g (p0 @ i)) [ (i = 1) -> t x0, (i = 0) -> <k> g y ]
+
+    rem1 : Path A (g y) x1 =
+      <i> hcomp A (g (p1 @ i)) [ (i = 1) -> t x1, (i = 0) -> <k> g y ]
+
+    p : Path A x0 x1 =
+     <i> hcomp A (g y) [ (i = 0) -> rem0
+                            , (i = 1) -> rem1 ]
+
+    fill0 : Square A (g y) (g (f x0)) (g y) x0
+                     (<i> g (p0 @ i)) rem0 (<i> g y) (t x0)  =
+      <i j> hcomp A (g (p0 @ i)) [ (i = 1) -> <k> t x0 @ j /\ k
+                                      , (i = 0) -> <k> g y
+                                      , (j = 0) -> <k> g (p0 @ i) ]
+
+    fill1 : Square A (g y) (g (f x1)) (g y) x1
+                     (<i> g (p1 @ i)) rem1 (<i> g y) (t x1) =
+      <i j> hcomp A (g (p1 @ i)) [ (i = 1) -> <k> t x1 @ j /\ k
+                                      , (i = 0) -> <k> g y
+                                      , (j = 0) -> <k> g (p1 @ i) ]
+
+    fill2 : Square A (g y) (g y) x0 x1
+                     (<k> g y) p rem0 rem1 =
+      <i j> hcomp A (g y) [ (i = 0) -> <k> rem0 @ j /\ k
+                               , (i = 1) -> <k> rem1 @ j /\ k
+                               , (j = 0) -> <k> g y ]
+
+    sq : Square A (g y) (g y) (g (f x0)) (g (f x1))
+                  (<i> g y) (<i> g (f (p @ i)))
+                  (<j> g (p0 @ j)) (<j> g (p1 @ j)) =
+      <i j> hcomp A (fill2 @ i @ j) [ (i = 0) -> <k> fill0 @ j @ -k
+                                         , (i = 1) -> <k> fill1 @ j @ -k
+                                         , (j = 0) -> <k> g y
+                                         , (j = 1) -> <k> t (p @ i) @ -k ]
+
+    sq1 : Square B y y (f x0) (f x1)
+                   (<k>y) (<i> f (p @ i)) p0 p1 =
+      <i j> hcomp B (f (sq @ i @j)) [ (i = 0) -> s (p0 @ j)
+                                         , (i = 1) -> s (p1 @ j)
+                                         , (j = 1) -> s (f (p @ i))
+                                         , (j = 0) -> s y ]
+
+gradLemma (A B : U) (f : A -> B) (g : B -> A)
+       (s : (y : B) -> Path B (f (g y)) y)
+       (t : (x : A) -> Path A (g (f x)) x) : isEquiv A B f =
+  \(y:B) -> ((g y,<i>s y@-i),\ (z:fiber A B f y) ->
+    lemIso A B f g s t y (g y) z.1 (<i>s y@-i) z.2)
+
+isoPath (A B : U) (f : A -> B) (g : B -> A)
+      (s : (y : B) -> Path B (f (g y)) y)
+      (t : (x : A) -> Path A (g (f x)) x) : Path U A B =
+       <i> Glue B [ (i = 0) -> (A,f,gradLemma A B f g s t)
+                  , (i = 1) -> (B,idfun B,idIsEquiv B) ]
+
+sucPathZ : Path U Z Z = isoPath Z Z sucZ predZ sucpredZ predsucZ
+
+helix : S1 -> U = split
+  base -> Z
+  loop @ i -> sucPathZ @ i
+
+encode (x : S1) (p : Path S1 base x) : helix x = subst S1 helix base x p zeroZ
+
+lem1ItPos : (n:nat) -> Path loopS1 (loopIt (sucZ (pos n))) (oneTurn ((loopIt (pos n)))) = split
+ zero -> <_> oneTurn (<_> base)
+ suc p -> <i> oneTurn (lem1ItPos p @ i)
+
+-- todo: clean
+compInv (A:U) (a:A) : (x:A) (p:Path A a x) -> Path (Path A x x) (<_>x) (compPath A x a x (<i>p@-i) p) =
+ J A a (\  (x:A) (p:Path A a x) -> Path (Path A x x) (<_>x) (compPath A x a x (<i>p@-i) p)) rem
+ where rem : Path (Path A a a) (<_>a) (<i>hcomp A a [(i=0) -> <_>a,(i=1) -> <_>a]) =
+        <j i>hcomp A a [(j=0) -> <_>a,(i=0) -> <_>a,(i=1) -> <_>a]
+
+compInvS1 : Path loopS1 (<_> base) (compS1 invLoop loopP) = compInv S1 base base loopP
+
+-- todo: why this one with the same name? clean!
+compInv (A:U) (a b:A) (q:Path A a b) : (x:A) (p:Path A b x) -> Path (Path A a b) q (compPath A a x b (compPath A a b x q p) (<i>p@-i)) =
+ J A b (\ (x:A) (p:Path A b x) -> Path (Path A a b) q (compPath A a x b (compPath A a b x q p) (<i>p@-i))) rem
+ where rem : Path (Path A a b) q
+                           (<i>hcomp A (hcomp A (q@i) [(i=0) -> <_>a,(i=1) -> <_>b]) [(i=0) -> <_>a,(i=1) -> <_>b]) =
+          <j i>hcomp A (hcomp A (q@i) [(j=0) -> <_>q@i,(i=0) -> <_>a,(i=1) -> <_>b]) [(j=0) -> <_>q@i,(i=0) -> <_>a,(i=1) -> <_>b]
+
+lem1ItNeg : (n:nat) -> Path loopS1 (loopIt (sucZ (neg n))) (oneTurn (loopIt (neg n))) = split
+ zero -> compInvS1
+ suc p -> compInv S1 base base (loopIt (neg p)) base invLoop
+
+lem1It : (n:Z) -> Path loopS1 (loopIt (sucZ n)) (oneTurn (loopIt n)) = split
+  pos n -> lem1ItPos n
+  neg n -> lem1ItNeg n
+
+-- this could use comp3
+lemTransGen0 (A : U) (a : A) : Path A (transGen0 A a) a =
+-- let rem1 : Path A a (hcomp A (transGen (<_> A) 0 a) []) = fill (<_> A) a []
+--     rem2 : Path A (transGen (<_> A) 0 a) (hcomp A (transGen (<_> A) 0 a) []) =
+--       hfill A (transGen (<_> A) 0 a) []
+-- in compPath A (transGen0 A a) (hcomp A (transGen (<_> A) 0 a) []) a rem2 (<i> rem1 @ -i)
+  <i> hcomp A (hfill A (transGen (<_> A) 0 a) [] @ i)
+           [ (i = 0) -> <_> transGen0 A a
+           , (i = 1) -> <j> fill (<_> A) a [] @ -j ]
+
+lemFib1 (A:U) (F G : A -> U) (a:A) (fa : F a -> G a) :
+   (x:A) (p : Path A a x) -> (fx : F x -> G x) ->
+     Path U (Path (F a -> G x) (\(u : F a) -> subst A G a x p (fa u))
+                               (\(u : F a) -> fx (subst A F a x p u)))
+            (PathP (<i> F (p @ i) -> G (p @ i)) fa fx) =
+  J A a (\(x : A) (p : Path A a x) -> (fx : F x -> G x) ->
+     Path U (Path (F a -> G x) (\(u : F a) -> subst A G a x p (fa u))
+                               (\(u : F a) -> fx (subst A F a x p u)))
+            (PathP (<i>F (p@i) -> G (p@i)) fa fx)) rem
+  where
+  rem (ga : F a -> G a) :
+    Path U (Path (F a -> G a) (\(u : F a) -> transGen (<_> G a) 0 (fa u))
+                              (\(u : F a) -> ga (transGen (<_> F a) 0 u)))
+           (PathP (<_> F a -> G a) fa ga) =
+      <j> Path (F a -> G a) (\(u : F a) -> lemTransGen0 (G a) (fa u) @ j)
+                            (\(u : F a) -> ga (lemTransGen0 (F a) u @ j))
+
+corFib1 (A:U) (F G : A -> U) (a:A) (fa ga : F a -> G a) (p:Path A a a)
+  (h : (u:F a) -> Path (G a) (subst A G a a p (fa u)) (ga (subst A F a a p u))) :
+  PathP (<i> F (p @ i) -> G (p @ i)) fa ga =
+    comp (lemFib1 A F G a fa a p ga) (<i> \(u : F a) -> h u @ i) []
+
+testHelix : Path (Z->Z) sucZ (subst S1 helix base base loopP) =
+  let rem (x : Z) : Path Z (sucZ x) (hcomp Z (hcomp Z (transGen (<!0> Z) 0 (sucZ x)) []) []) =
+        compPath Z (sucZ x)
+                   (hcomp Z (transGen (<!0> Z) 0 (sucZ x)) [])
+                   (hcomp Z (hcomp Z (transGen (<!0> Z) 0 (sucZ x)) []) [])
+                   (fill (<_> Z) (sucZ x) [])
+                   (hfill Z (hcomp Z (transGen (<!0> Z) 0 (sucZ x)) []) [])
+  in <i> \(x : Z) -> rem x @ i
+
+decode : (x:S1) -> helix x -> Path S1 base x = split
+  base -> loopIt
+  loop @ i -> rem @ i
+   where
+   T : U = Z -> loopS1
+   G (x:S1) : U =  Path S1 base x
+   p : Path U T T = <j> helix (loopP @ j) -> Path S1 base (loopP@j)
+   rem2 (x:Z) :
+      Path loopS1 (oneTurn (loopIt x))
+                  (loopIt (sucZ x)) = <i> lem1It x @ -i
+   rem4 (x : Z) : Path (Path S1 base base)
+        (<i> hcomp S1 (transGen0 S1 (loopIt x @ i))
+                       [ (i = 0) -> <_> base
+                       , (i = 1) -> loopP ])
+        (<i> hcomp S1 (loopIt x @ i)
+                       [ (i = 0) -> <_> base
+                       , (i = 1) -> loopP ]) = <j i> hcomp S1 (transGen (<_> S1) j (loopIt x @ i)) [ (i = 0) -> <_> base, (i = 1) -> loopP ]
+   rem3 (x : Z) :
+     Path loopS1 (subst S1 G base base loopP (loopIt x))
+                 (loopIt (sucZ x)) =
+       compPath loopS1 (subst S1 G base base loopP (loopIt x))
+         (oneTurn (loopIt x)) (loopIt (sucZ x))
+         (rem4 x) (rem2 x)
+   rem1 (x:Z) : Path loopS1 (subst S1 G base base loopP (loopIt x))
+                           (loopIt (subst S1 helix base base loopP x)) =
+    comp (<i> Path loopS1 (subst S1 G base base loopP (loopIt x))
+                          (loopIt (testHelix @ i x))) (rem3 x) []
+   rem : PathP p loopIt loopIt = corFib1 S1 helix G base loopIt loopIt loopP rem1
+
+encodeDecode (x : S1) (p : Path S1 base x) : Path (Path S1 base x) (decode x (encode x p)) p =
+  transGen (<i> Path (Path S1 base (p @ i))
+            (decode (p @ i) (encode (p @ i) (<j> p @ i /\ j))) (<j> p @ i /\ j)) 0
+            (<_> triv)
+
+setLoop : set loopS1 = retractSet loopS1 Z (encode base) (decode base) (encodeDecode base) ZSet
+
+lemPropFib (P : S1 -> U) (pP : (x : S1) -> prop (P x)) (bP : P base) : (x : S1) -> P x = split
+ base -> bP
+ loop @ i -> lemPropF S1 P pP base base loopP bP bP @ i
+
+isGroupoidS1 : groupoid S1 = lem
+ where
+  lem2 : (y : S1) -> set (Path S1 base y)
+    = lemPropFib (\(y : S1) -> set (Path S1 base y)) (\(y : S1) -> setIsProp (Path S1 base y)) setLoop
+
+  lem : (x y : S1) -> set (Path S1 x y)
+   = lemPropFib (\(x : S1) -> (y : S1) -> set (Path S1 x y)) pP lem2
+     where
+       pP (x : S1) : prop ((y : S1) -> set (Path S1 x y)) =
+        propPi S1 (\(y : S1) -> set (Path S1 x y)) (\(y : S1) -> setIsProp (Path S1 x y))
+
+-- We now need full univalence to prove "groupoidSET : groupoid SET"
+-- TODO: isn't there a more direct proof of this? We only need the retract part?
+
+univalenceAlt (B : U) : isContr ((X : U) * equiv X B) =
+ ((B,idEquiv B)
+ ,\(w : (X : U) * equiv X B)
+    -> <i> let GlueB : U = Glue B [(i=0) -> (B,idEquiv B), (i=1) -> w]
+               unglueB (g : GlueB) : B =
+                 unglue g B [(i=0) -> (B,idEquiv B)
+                            ,(i=1) -> w]
+           in (GlueB
+              ,unglueB
+              ,\(b : B)
+               -> let center : fiber GlueB B unglueB b
+                             = (glue (hcomp B b [(i=0) -> <j> b
+                                                     ,(i=1) -> (w.2.2 b).1.2])
+                                         [(i=0) -> b
+                                         ,(i=1) -> (w.2.2 b).1.1]
+                               ,hfill B b [(i=0) -> <j> b
+                                               ,(i=1) -> (w.2.2 b).1.2])
+                      contr (v : fiber GlueB B unglueB b)
+                            : Path (fiber GlueB B unglueB b) center v
+                            = <j> (glue (hcomp B b [(i=0) -> <k> v.2 @ (j /\ k)
+                                                        ,(i=1) -> ((w.2.2 b).2 v @ j).2
+                                                        ,(j=0) -> hfill B b [(i=0) -> <j> b
+                                                                                     ,(i=1) -> (w.2.2 b).1.2]
+                                                        ,(j=1) -> v.2])
+                                            [(i=0) -> v.2 @ j
+                                            ,(i=1) -> ((w.2.2 b).2 v @ j).1]
+                                  ,hfill B b [(i=0) -> <l> v.2 @ (j /\ l)
+                                                  ,(i=1) -> ((w.2.2 b).2 v @ j).2
+                                                  ,(j=0) -> hfill B b [(i=0) -> <j> b
+                                                                      ,(i=1) -> (w.2.2 b).1.2]
+                                                  ,(j=1) -> v.2])
+                  in (center,contr)))
+
+retIsContr (A B : U) (f : A -> B) (g : B -> A)
+           (h : (x : A) -> Path A (g (f x)) x) (v : isContr B)
+           : isContr A = (g b,p)
+ where
+  b : B = v.1
+  q : (y:B) -> Path B b y = v.2
+  p (x:A) : Path A (g b) x =
+    <i> hcomp A (g (q (f x) @ i)) [(i=0) -> <j>g b,(i=1) -> h x]
+
+sigIsContr (A : U) (B : A -> U) (u : isContr A)
+  (q : (x : A) -> isContr (B x)) : isContr ((x:A) * B x) = ((a,g a),r)
+ where
+  a : A = u.1
+  p : (x:A) -> Path A a x = u.2
+  g (x:A) : B x = (q x).1
+  h (x:A) : (y:B x) -> Path (B x) (g x) y = (q x).2
+  C : U = (x:A) * B x
+  r (z:C) : Path C (a,g a) z =
+   <i>(p z.1@i,h (p z.1@i) (comp (<j>B (p z.1@i\/-j)) z.2 [(i=1)-><j>z.2])@i)
+
+isPathContr (A:U) (cA:isContr A) (x y:A) : isContr (Path A x y) =  (p0,q)
+ where
+  a : A = cA.1
+  f : (x:A) -> Path A a x = cA.2
+  p0 : Path A x y = <i> hcomp A a [(i=0) -> f x,(i=1) -> f y]
+  q (p:Path A x y) : Path (Path A x y) p0 p =
+   <j i> hcomp A a [(i=0) -> f x,(i=1) -> f y,
+                       (j=0) -> <k> hcomp A a [(k=0) -> <l>a,(i=0) -> <l>f x@k/\l,(i=1) -> <l>f y@k/\l],
+                       (j=1) -> f (p@i)]
+
+isEquivContr (A B:U) (cA:isContr A) (cB:isContr B) (f:A->B) : isEquiv A B f =
+ \ (y:B) -> sigIsContr A (\ (x:A) -> Path B y (f x)) cA (\ (x:A) -> isPathContr B cB y (f x))
+
+totalFun (A:U) (B C : A->U) (f : (x:A) -> B x -> C x) (w:Sigma A B) : Sigma A C =
+ (w.1,f (w.1) (w.2))
+
+funFib1  (A:U) (B C : A->U) (f : (x:A) -> B x -> C x) (x0:A) (z0:C x0) (u:fiber (B x0) (C x0) (f x0) z0) :
+ fiber (Sigma A B) (Sigma A C) (totalFun A B C f) (x0,z0) =  ((x0,u.1),<i>(x0,u.2@i))
+
+funFib2  (A:U) (B C : A->U) (f : (x:A) -> B x -> C x) (x0:A) (z0:C x0)
+         (w : fiber (Sigma A B) (Sigma A C) (totalFun A B C f) (x0,z0)) : fiber (B x0) (C x0) (f x0) z0 = (b0,s)
+ where
+  x : A = w.1.1
+  b : B x = w.1.2
+  p : Path A x0 x = <i>(w.2@i).1
+  q : PathP (<i>C (p@i)) z0 (f x b) = <i>(w.2@i).2
+  b0 : B x0 = comp (<i>B (p@-i)) b []
+  r : PathP (<i>B (p@-i)) b b0 = <i>comp (<j>B (p@-j\/-i)) b [(i=0) -> <k>b]
+  s : Path (C x0) z0 (f x0 b0) = <i>comp (<j>C (p@(i/\-j))) (q@i) [(i=0) -> <k>z0,(i=1) -> <k>f (p@-k) (r@k)]
+
+compFunFib (A:U) (B C : A->U) (f : (x:A) -> B x -> C x) (x0:A) (z0:C x0) (u:fiber (B x0) (C x0) (f x0) z0) :
+    fiber (B x0) (C x0) (f x0) z0 = funFib2 A B C f x0 z0 (funFib1 A B C f x0 z0 u)
+
+retFunFib (A:U) (B C : A->U) (f : (x:A) -> B x -> C x) (x0:A) (z0:C x0) (u:fiber (B x0) (C x0) (f x0) z0) :
+   Path (fiber (B x0) (C x0) (f x0) z0) (funFib2 A B C f x0 z0 (funFib1 A B C f x0 z0 u)) u =
+ <l> (comp (<i> B x0) u.1 [(l=1) -> <j>u.1],
+      <i> comp (<j> C x0) (u.2 @ i) [ (l=1) -> <j> u.2 @ i,
+                                      (i = 0) -> <j> z0,
+                                      (i = 1) -> <j> f x0 (comp (<k> B x0) u.1 [ (j = 0) -> <k> u.1, (l=1) -> <k>u.1 ]) ])
+
+equivFunFib (A:U) (B C : A->U) (f : (x:A) -> B x -> C x) (cB : isContr (Sigma A B)) (cC : isContr (Sigma A C)) (x:A)
+  : isEquiv (B x) (C x) (f x) =
+ \ (z:C x) -> retIsContr (fiber (B x) (C x) (f x) z) (fiber (Sigma A B) (Sigma A C) (totalFun A B C f) (x,z))
+                         (funFib1 A B C f x z)
+                         (funFib2 A B C f x z)
+                         (retFunFib A B C f x z)
+                         (isEquivContr (Sigma A B) (Sigma A C) cB cC (totalFun A B C f) (x,z))
+
+contrSingl' (A : U) (a b : A) (p : Path A a b) :
+  Path ((x:A) * Path A x b) (b,<_>b) (a,p) = <i> (p @ -i,<j> p @ -i\/j)
+
+lemSinglContr' (A:U) (a:A) : isContr ((x:A) * Path A x a) =
+ ((a,<_>a),\ (z:(x:A) * Path A x a) -> contrSingl' A z.1 a z.2)
+
+thmUniv (t : (A X : U) -> Path U X A -> equiv X A) (A : U) :
+  (X : U) -> isEquiv (Path U X A) (equiv X A) (t A X) =
+    equivFunFib U (\(X : U) -> Path U X A) (\(X : U) -> equiv X A)
+      (t A) (lemSinglContr' U A) (univalenceAlt A)
+
+substTrans (A : U) (P : A -> U) (a b : A) (p : Path A a b) (e : P a) : P b =
+  transGen (<i> P (p @ i)) 0 e
+
+transEquiv' (A X : U) (p : Path U X A) : equiv X A =
+  substTrans U (\(Y : U) -> equiv Y A) A X (<i> p @ -i) (idEquiv A)
+
+univalence (A X : U) : isEquiv (Path U X A) (equiv X A) (transEquiv' A X) =
+  thmUniv transEquiv' A X
+
+corrUniv (A B : U) : Path U (Path U A B) (equiv A B) =
+  ua (Path U A B) (equiv A B) (transEquiv' B A,univalence B A)
+
+pi (A:U) (P:A->U) : U = (x:A) -> P x
+
+idPi (A:U) (B:A->U) (f g : pi A B) : Path U (Path (pi A B) f g) ((x:A) -> Path (B x) (f x) (g x)) =
+ isoPath  (Path (pi A B) f g) ((x:A) -> Path (B x) (f x) (g x)) F G S T
+ where T0 : U = Path (pi A B) f g
+       T1 : U = (x:A) -> Path (B x) (f x) (g x)
+       F (p:T0) : T1 = \ (x:A) -> <i>p@i x
+       G (p:T1) : T0 = <i>\ (x:A) -> p x @ i
+       S (p:T1) : Path T1 (F (G p)) p = refl T1 p
+       T (p:T0) : Path T0 (G (F p)) p = refl T0 p
+
+setPi (A:U) (B:A -> U) (h:(x:A) -> set (B x)) (f g:pi A B) : prop (Path (pi A B) f g) =
+ rem
+ where
+  T : U = (x:A) -> Path (B x) (f x) (g x)
+  rem1 : prop T = \ (p q : T) -> <i> \ (x:A) -> h x (f x) (g x) (p x) (q x)@i
+
+  rem : prop (Path (pi A B) f g) =
+    subst U prop T (Path (pi A B) f g) (<i>idPi A B f g@-i) rem1
+
+
+lemPathSig (A:U) (B : A -> U) (t u : Sigma A B) :
+ Path U (Path (Sigma A B) t u) ((p : Path A t.1 u.1) * PathP (<i> B (p @ i)) t.2 u.2) =
+  isoPath T0 T1 f g s t where
+   T0 : U = Path (Sigma A B) t u
+   T1 : U = (p:Path A t.1 u.1) * PathP (<i> B (p@i)) t.2 u.2
+   f (q:T0) : T1 = (<i> (q@i).1,<i> (q@i).2)
+   g (z:T1) : T0 = <i>(z.1 @i,z.2 @i)
+   s (z:T1) : Path T1 (f (g z)) z = refl T1 z
+   t (q:T0) : Path T0 (g (f q)) q = refl T0 q
+
+lemContr (A:U) (pA:prop A) (a:A) : isContr A = (a,rem)
+ where rem (y:A) : Path A a y = pA a y
+
+lem2 (A:U) (B:A-> U) (t u : Sigma A B) (p:Path A t.1 u.1) :
+  Path U  (PathP (<i>B (p@i)) t.2 u.2) (Path (B u.1) (transGen (<i>B (p@i)) 0 t.2) u.2) =
+    funDepTr A B t.1 u.1 p  t.2 u.2
+
+lem3 (A:U) (B:A-> U) (pB : (x:A) -> prop (B x)) (t u : Sigma A B) (p:Path A t.1 u.1) :
+  isContr (PathP (<i>B (p@i)) t.2 u.2) = lemContr T0 (substInv U prop T0 T1 rem rem1) rem2
+ where P : Path U (B t.1) (B u.1) = <i>B (p@i)
+       T0 : U = PathP P t.2 u.2
+       T1 : U = Path (B u.1) (transGen P 0 t.2) u.2
+       rem : Path U T0 T1 = lem2 A B t u p
+       v2 : B u.1 = transGen P 0 t.2
+       rem1 : prop T1 = propSet (B u.1) (pB u.1) v2 u.2
+       rem2 : T0 = transGen (<i>rem@-i) 0 (pB u.1 v2 u.2)
+
+lem6 (A:U) (P:A-> U) (cA:(x:A) -> isContr (P x)) : Path U ((x:A)*P x) A = isoPath T A f g t s
+ where
+   T : U = (x:A) * P x
+   f (z:T) : A = z.1
+   g (x:A) : T = (x,(cA x).1)
+   s (z:T) : Path T (g (f z)) z = <i>(z.1,((cA z.1).2 z.2)@ i)
+   t (x:A) : Path A (f (g x)) x = refl A x
+
+lemSigProp (A:U) (B:A-> U) (pB : (x:A) -> prop (B x)) (t u : Sigma A B) : Path U (Path (Sigma A B) t u) (Path A t.1 u.1) =
+ compPath U (Path (Sigma A B) t u) ((p:Path A t.1 u.1) * PathP (<i> B (p@i)) t.2 u.2) (Path A t.1 u.1) rem2 rem1
+ where
+   T : U = Path A t.1 u.1
+   C (p:T) : U = PathP (<i> B (p@i)) t.2 u.2
+   rem (p : T) : isContr (C p) = lem3 A B pB t u p
+   rem1 : Path U ((p:T) * C p) T = lem6 T C rem
+   rem2 : Path U (Path (Sigma A B) t u) ((p:T) * C p) = lemPathSig A B t u
+
+eqEquivFst (A B : U) : (t u : equiv A B) ->
+     Path U (Path (equiv A B) t u) (Path (A -> B) t.1 u.1)
+   = lemSigProp (A -> B) (isEquiv A B) (propIsEquiv A B)
+
+groupoidPi (A : U) (B : A -> U) (h : (x : A) -> groupoid (B x)) (f g : pi A B) :
+  set (Path (pi A B) f g) = subst U set T (Path (pi A B) f g) (<i> idPi A B f g @ -i) rem1
+ where
+  T : U = (x : A) -> Path (B x) (f x) (g x)
+  rem1 : set T = setPi A (\(x : A) -> Path (B x) (f x) (g x)) (\(x : A) -> h x (f x) (g x))
+
+groupoidFun (A B : U) (sB : groupoid B) : groupoid (A -> B) =
+  groupoidPi A (\(x : A) -> B) (\(x : A) -> sB)
+
+groupoidPath (A B : U) (sB : groupoid B) : groupoid (Path U A B) =
+ substInv U groupoid (Path U A B) (equiv A B) (corrUniv A B) (rem A B sB)
+  where
+  rem (A B : U) (sB : groupoid B) (t u : equiv A B) : set (Path (equiv A B) t u) =
+    substInv U set (Path (equiv A B) t u) (Path (A -> B) t.1 u.1)
+             (eqEquivFst A B t u) (groupoidFun A B sB t.1 u.1)
+
+twogroupoidGROUPOID : twogroupoid GROUPOID = \(A B : GROUPOID) ->
+  let rem : groupoid (Path U A.1 B.1) = groupoidPath A.1 B.1 B.2
+      rem1 : Path U (Path GROUPOID A B) (Path U A.1 B.1) =
+        lemSigProp U groupoid groupoidIsProp A B
+  in substInv U groupoid (Path GROUPOID A B) (Path U A.1 B.1) rem1 rem
+
+
+--------------------------------------------------------------------------------
+-- B.3 Suspension and spheres
+
+-- Circle moved earlier
+
+-- Suspension
+data susp (A : U) = north
+                  | south
+                  | merid (a : A) <i> [ (i=0) -> north
+                                      , (i=1) -> south ]
+
+meridP (A : U) (a : A) : Path (susp A) north south =
+  <i> merid{susp A} a @ i
+
+
+-- The 2 and 3 spheres. Maybe define directly instead?
+S2 : U = susp S1
+S3 : U = susp S2
+
+
+--------------------------------------------------------------------------------
+-- B.4 Pointed types, pointed maps and loop spaces
+
+-- Pointed types
+ptType : U = (A : U) * A
+pt (A : ptType) : A.1 = A.2
+
+boolpt : ptType = (bool,true)
+susppt (A : U) : ptType = (susp A,north)
+S1pt : ptType = (S1,base)
+S2pt : ptType = susppt S1
+S3pt : ptType = susppt S2
+
+ptMap (A B : ptType) : U = (f : A.1 -> B.1) * (Path B.1 (f (pt A)) (pt B))
+
+-- The first 3 loop spaces of a pointed type.
+Omega (A : ptType) : ptType = (Path A.1 (pt A) (pt A),<_> pt A)
+Omega2 (A : ptType) : ptType = Omega (Omega A)
+Omega3 (A : ptType) : ptType = Omega2 (Omega A)
+
+kanOp (A : U) (a : A) (p : Path A a a) (b : A) (q : Path A a b) : Path A b b =
+ <i> hcomp A (p @ i) [ (i = 0) -> q, (i = 1) -> q ]
+
+kanOpRefl (A : U) (a b : A) (q : Path A a b) :
+  Path (Path A b b) (kanOp A a (<i> a) b q) (<_> b) =
+    <j i> hcomp A (q @ j) [ (i = 0) -> <k> q @ j \/ k
+                          , (i = 1) -> <k> q @ j \/ k
+                          , (j = 1) -> <k> b ]
+
+mapOmega (A B : ptType) (f : ptMap A B) : ptMap (Omega A) (Omega B) = (g,pg)
+  where
+  g (p : (Omega A).1) : (Omega B).1 =
+   kanOp B.1 (f.1 (pt A)) (<i>f.1 (p@i)) (pt B) f.2
+  pg : Path (Omega B).1 (g (pt (Omega A))) (pt (Omega B)) =
+    kanOpRefl B.1 (f.1 (pt A)) (pt B) f.2
+
+mapOmega2 (A B : ptType) (f : ptMap A B) : ptMap (Omega2 A) (Omega2 B) =
+  mapOmega (Omega A) (Omega B) (mapOmega A B f)
+
+mapOmega3 (A B : ptType) (f : ptMap A B) : ptMap (Omega3 A) (Omega3 B) =
+  mapOmega (Omega2 A) (Omega2 B) (mapOmega2 A B f)
+
+-- Simplified mapOmega when the function is pointed by reflexivity
+mapOmegaRefl (A : ptType) (B : U) (h : A.1 -> B) (p : (Omega A).1) :
+  (Omega (B, h (pt A))).1 = <i> h (p @ i)
+
+mapOmegaRefl2 (A : ptType) (B : U) (h : A.1 -> B) (p : (Omega2 A).1) :
+  (Omega2 (B, h (pt A))).1 = <i j> h (p @ i @ j)
+
+mapOmegaRefl3 (A : ptType) (B : U) (h : A.1 -> B) (p : (Omega3 A).1) :
+  (Omega3 (B, h (pt A))).1 = <i j k> h (p @ i @ j @ k)
+
+--------------------------------------------------------------------------------
+-- B.5 Loop space of a suspension
+
+phi (A : ptType) : ptMap A (Omega (susppt A.1)) = (g,pg)
+  where
+  g (a : A.1) : (Omega (susppt A.1)).1 =
+    let p1 : Path (susp A.1) north south = meridP A.1 a
+        p2 : Path (susp A.1) south north = <i> meridP A.1 (pt A) @ -i
+    in compPath (susp A.1) north south north p1 p2
+  pg : Path (Omega (susppt A.1)).1 (g (pt A)) (pt (Omega (susppt A.1))) =
+    let p : Path (Path (susp A.1) north north) (g (pt A)) (<_> north) =
+            compPathInv (susp A.1) north south (meridP A.1 (pt A))
+    in p
+
+
+--------------------------------------------------------------------------------
+-- B.6 The 3-sphere and the join of two circles
+
+data join (A B : U) = inl (a : A)
+                    | inr (b : B)
+                    | push (a : A) (b : B) <i> [ (i = 0) -> inl a
+                                               , (i = 1) -> inr b ]
+
+pushP (A B : U) (a : A) (b : B) : Path (join A B) (inl a) (inr b) =
+  <i> push {join A B} a b @ i
+
+joinpt (A : ptType) (B : U) : ptType = (join A.1 B,inl (pt A))
+
+
+-- B.6.1 Join and associativity
+
+r2lInr (A B C : U) : join B C -> join (join A B) C = split
+  inl b -> inl (inr b)
+  inr c -> inr c
+  push b c @ i -> pushP (join A B) C (inr b) c @ i
+
+r2lPushInl (A B C : U) (a : A) (b : B) :
+  Path (join (join A B) C) (inl (inl a)) (inl (inr b)) = <i> inl (pushP A B a b @ i)
+
+r2lSquare (A B C : U) (a : A) (b : B) (c : C) :
+        PathP (<i> Path (join (join A B) C) (inl (pushP A B a b @ i)) (inr c))
+            (pushP (join A B) C (inl a) c) (pushP (join A B) C (inr b) c)
+ = <i j> pushP (join A B) C (pushP A B a b @ i) c @ j
+
+opr2l (A : U) (a b c : A) (p : Path A a c) (q : Path A a b) (r : Path A b c)
+      (sq : Square A a b c c q (<_> c) p r) :
+      Square A a a b c (<_> a) r q p =
+         <i j> hcomp A (p @ i) [ (i = 0) -> <k> q @ j /\ k
+                               , (i = 1) -> <k> p @ j \/ -k
+                               , (j = 0) -> <k> p @ i /\ -k
+                               , (j = 1) -> <k> sq @ k @ i ]
+
+r2lPushPush (A B C : U) (a : A) (b : B) (c : C) :
+  Square (join (join A B) C) (inl (inl a)) (inl (inl a)) (inl (inr b)) (inr c)
+         (<_> inl (inl a)) (pushP (join A B) C (inr b) c)
+         (r2lPushInl A B C a b) (pushP (join A B) C (inl a) c) =
+  opr2l (join (join A B) C) (inl (inl a)) (inl (inr b)) (inr c)
+        (pushP (join A B) C (inl a) c) (r2lPushInl A B C a b)
+        (pushP (join A B) C (inr b) c) (r2lSquare A B C a b c)
+
+r2lPush (A B C : U) (a : A) :
+  (bc : join B C) -> Path (join (join A B) C) (inl (inl a)) (r2lInr A B C bc) = split
+    inl b -> r2lPushInl A B C a b
+    inr c -> pushP (join A B) C (inl a) c
+    push b c @ i -> r2lPushPush A B C a b c @ i
+
+joinassoc1 (A B C : U) : join A (join B C) -> join (join A B) C = split
+  inl a  -> inl (inl a)
+  inr bc -> r2lInr A B C bc
+  push a bc @ i -> r2lPush A B C a bc @ i
+
+
+-- Map from [join (join A B) C] to [join A (join B C)]
+
+l2rInl (A B C : U) : join A B -> join A (join B C) = split
+  inl a    -> inl a
+  inr b    -> inr (inl b)
+  push a b @ i -> pushP A (join B C) a (inl b) @ i
+
+l2rPushInr (A B C : U) (b : B) (c : C) :
+  Path (join A (join B C)) (inr (inl b)) (inr (inr c)) = <i> inr (pushP B C b c @ i)
+
+l2rSquare (A B C : U) (a : A) (b : B) (c : C) :
+  PathP (<i> Path (join A (join B C)) (inl a) (inr (pushP B C b c @ i)))
+        (<i> pushP A (join B C) a (inl b) @ i) (<i> pushP A (join B C) a (inr c) @ i) =
+        <i j> pushP A (join B C) a (pushP B C b c @ i) @ j
+
+opl2r (A : U) (a b c : A) (p : Path A a c) (q : Path A a b) (r : Path A b c)
+      (sq : Square A a a b c (<_> a) r q p) :
+      Square A a b c c q (<_> c) p r =
+        <i j> hcomp A (q @ i \/ j)
+                        [ (i = 0) -> <k> sq @ k @ j
+                        , (i = 1) -> <k> r @ j /\ k
+                        , (j = 0) -> <k> q @ i
+                        , (j = 1) -> <k> r @ k ]
+
+l2rPushPush (A B C : U) (a : A) (b : B) (c : C) :
+  Square (join A (join B C)) (inl a) (inr (inl b)) (inr (inr c)) (inr (inr c))
+         (pushP A (join B C) a (inl b)) (<_> inr (inr c))
+         (pushP A (join B C) a (inr c)) (l2rPushInr A B C b c) =
+  opl2r (join A (join B C)) (inl a) (inr (inl b)) (inr (inr c))
+        (pushP A (join B C) a (inr c)) (pushP A (join B C) a (inl b)) (l2rPushInr A B C b c)
+        (l2rSquare A B C a b c)
+
+l2rPush (A B C : U) (c : C) : (u : join A B) ->
+            Path (join A (join B C)) (l2rInl A B C u) (inr (inr c)) = split
+  inl a -> pushP A (join B C) a (inr c)
+  inr b -> l2rPushInr A B C b c
+  push a b @ i -> l2rPushPush A B C a b c @ i
+
+joinassoc2 (A B C : U) : join (join A B) C -> join A (join B C) = split
+  inl jab -> l2rInl A B C jab
+  inr c   -> inr (inr c)
+  push p q @ i -> l2rPush A B C q p @ i
+
+mapJoin (A A' B B' : U) (f : A -> A') (g : B -> B') : join A B -> join A' B' = split
+  inl a -> inl (f a)
+  inr b -> inr (g b)
+  push a b @ i -> pushP A' B' (f a) (g b) @ i
+
+-- B.6.2 Suspension and join with the booleans
+-- It is not necessary that the maps here are pointed yet, we fix it
+-- in the end after composing them
+
+psi (A : U) : susp A -> join bool A = split
+  north -> inl true
+  south -> inl false
+  merid a @ i -> compPath (join bool A) (inl true) (inr a) (inl false)
+                          (pushP bool A true a) (<i> pushP bool A false a @ -i) @ i
+
+psiinv (A : U) : join bool A -> susp A = split
+  inl b ->
+    let case : (b : bool) -> susp A = split
+          false -> south
+          true  -> north
+    in case b
+  inr _ -> south
+  push b a @ i ->
+    let case : (b : bool) -> Path (susp A) (psiinv A (inl b)) south = split
+          false -> <_> south
+          true  -> meridP A a
+    in case b @ i
+
+-- Direct definition of c as in Appendix B:
+
+andBool : bool -> bool -> bool = split
+  false -> \(_ : bool) -> false
+  true -> idfun bool
+
+c : join bool bool -> S1 = split
+  inl _ -> base
+  inr _ -> base
+  push b b' @ i ->
+    let case : bool -> Path S1 base base = split
+          false -> <_> base
+          true -> loopP
+    in case (andBool b b') @ i -- if both b and b' are true then return loopP
+
+cinv : S1 -> join bool bool = split
+  base -> inl true
+  loop @ i -> let p0 : Path (join bool bool) (inl true) (inr true) =
+                    pushP bool bool true true
+                  p1 : Path (join bool bool) (inr true) (inl false) =
+                    <i> pushP bool bool false true @ -i
+                  p2 : Path (join bool bool) (inl false) (inr false) =
+                    pushP bool bool false false
+                  p3 : Path (join bool bool) (inr false) (inl true) =
+                    <i> pushP bool bool true false @ -i
+                  -- By using comp3 we should hopefully get some hcomp's less
+                  p123 : Path (join bool bool) (inr true) (inl true) =
+                    comp3 (join bool bool) (inr true) (inl false) (inr false) (inl true) p1 p2 p3
+              in compPath (join bool bool) (inl true) (inr true) (inl true) p0 p123 @ i
+
+-- B.6.3 Equivalence between S3 and join S1 S1
+
+-- The map e
+e (x : S3) : join S1 S1 =
+  let x1 : join bool S2 = psi S2 x
+      x2 : join bool (join bool S1) =
+        mapJoin bool bool S2 (join bool S1) (idfun bool) (psi S1) x1
+      x3 : join (join bool bool) S1 = joinassoc1 bool bool S1 x2
+      res : join S1 S1 = mapJoin (join bool bool) S1 S1 S1 c (idfun S1) x3
+  in res
+
+einv (x : join S1 S1) : S3 =
+  let x1 : join (join bool bool) S1 =
+        mapJoin S1 (join bool bool) S1 S1 cinv (idfun S1) x
+      x2 : join bool (join bool S1) = joinassoc2 bool bool S1 x1
+      x3 : join bool S2 =
+        mapJoin bool bool (join bool S1) S2 (idfun bool) (psiinv S1) x2
+      res : S3 = psiinv S2 x3
+  in res
+
+--------------------------------------------------------------------------------
+-- B.7 The main map
+
+-- Is this really the same as the one in the thesis?
+prealpha : join S1 S1 -> S2 = split
+  inl x -> north
+  inr y -> north
+  push x y @ i ->
+    compPath S2 north south north (meridP S1 x) (<i> meridP S1 y @ -i) @ i
+
+alpha : ptMap (joinpt S1pt S1) S2pt = (prealpha, <_> north)
+
+
+--------------------------------------------------------------------------------
+-- B.8 The map defining pi3(S2)
+
+-- B.8.1 The Hopf fibration
+
+rotLoop : (a : S1) -> Path S1 a a = split
+  base -> loopP
+  loop @ i -> constSquare S1 base loopP @ i
+
+rot : S1 -> S1 -> S1 = split
+  base -> \(y : S1) -> y
+  loop @ i -> \(y : S1) -> rotLoop y @ i
+  
+rot_unit_r : (a : S1) -> Path S1 (rot a base) a = split
+   base -> <_> base
+   loop @ i -> <_> loopP @ i
+
+rotIsEquiv_loop : PathP (<i> isEquiv S1 S1 (rot (loopP @ i))) (idIsEquiv S1) (idIsEquiv S1) =
+  lemPropF S1 (\(a : S1) -> isEquiv S1 S1 (rot a))
+           (\(a : S1) -> propIsEquiv S1 S1 (rot a)) base base loopP
+           (idIsEquiv S1) (idIsEquiv S1)
+
+rotIsEquiv : (a : S1) -> isEquiv S1 S1 (rot a) = split
+   base -> idIsEquiv S1
+   loop @ i -> rotIsEquiv_loop @ i
+
+rotpath (x : S1) : Path U S1 S1 = ua S1 S1 (rot x, rotIsEquiv x)
+
+Hopf : S2 -> U = split
+  north -> S1
+  south -> S1
+  merid x @ i -> rotpath x @ i
+
+
+
+t : (x : S2) -> (Hopf x -> join S1 S1) = split
+  north -> \(x : S1) -> inl x
+  south -> \(x : S1) -> inr x
+  merid x @ i ->
+    let eq (y : S1) : Path (join S1 S1) (inl y) (inr (subst S2 Hopf north south (meridP S1 x) y)) =
+          pushP S1 S1 y (subst S2 Hopf north south (meridP S1 x) y)
+    in funExt1 S2 (join S1 S1) Hopf north south (meridP S1 x)
+                  (\(y : S1) -> inl y) (\(y : S1) -> inr y) eq @ i
+
+-- B.8.2 Looping a fibration
+
+fibOmega (B : ptType) (P : B.1 -> U) (f : P (pt B)) (p : (Omega B).1) : U =
+  PathS B.1 P (pt B) (pt B) p f f
+itFibOmega1 (B : ptType) (P : B.1 -> U) (f : P (pt B)) (p : (Omega B).1) : U =
+  PathP (<i> P (p @ i)) f f
+itFibOmega2 (B : ptType) (P : B.1 -> U) (f : P (pt B)) : (Omega2 B).1 -> U =
+  itFibOmega1 (Omega B) (fibOmega B P f) (<_> f)
+itFibOmega3 (B : ptType) (P : B.1 -> U) (f : P (pt B)) : (Omega3 B).1 -> U =
+  itFibOmega2 (Omega B) (fibOmega B P f) (<_> f)
+
+itTotalFibOmega3 (B : ptType) (P : B.1 -> U) (f : P (pt B))
+  (x : Sigma (Omega3 B).1 (itFibOmega3 B P f)) : (Omega3 (Sigma B.1 P, (pt B, f))).1 =
+  <i j k> (x.1 @ i @ j @ k,x.2 @ i @ j @ k)
+
+-- B.8.3 Looping the Hopf fibration
+
+HopfOne : (Omega S2pt).1 -> U = itFibOmega1 S2pt Hopf base
+
+HopfTwo : (Omega2 S2pt).1 -> U = itFibOmega2 S2pt Hopf base
+
+HopfThree : (Omega3 S2pt).1 -> U = itFibOmega3 S2pt Hopf base
+
+inhOrTrunc (A : U) : nat -> U = split
+  zero  -> A
+  suc n -> (x y : A) -> inhOrTrunc (Path A x y) n
+
+truncFibOmega (n : nat) (B : ptType) (P : B.1 -> U) (f : P (pt B))
+  (tr : inhOrTrunc (P (pt B)) (suc n)) (p : (Omega B).1) : inhOrTrunc (fibOmega B P f p) n =
+  let trf : inhOrTrunc (Path (P B.2) (subst B.1 P (pt B) (pt B) p f) f) n =
+        tr (subst B.1 P (pt B) (pt B) p f) f
+      eq : Path U (Path (P (pt B)) (subst B.1 P (pt B) (pt B) p f) f)
+                  (PathP (<i> P (p @ i)) f f) =
+                    <i> funDepTr B.1 P (pt B) (pt B) p f f @ -i
+  in subst U (\(X : U) -> inhOrTrunc X n)
+             (Path (P (pt B)) (subst B.1 P (pt B) (pt B) p f) f)
+             (PathP (<i> P (p @ i)) f f)
+             eq trf
+
+fibContrHopfThree (p : (Omega3 S2pt).1) : HopfThree p =
+  truncFibOmega zero (Omega2 S2pt) HopfTwo (<_ _> base)
+    (truncFibOmega one (Omega S2pt) HopfOne (<_> base)
+      (truncFibOmega two S2pt Hopf base isGroupoidS1 (<_> north)) (<_ _> north)) p
+
+-- The map h from 9.3
+h (p : (Omega3 S2pt).1) : (Omega3 (joinpt S1pt S1)).1 =
+  <i j k> t (p @ i @ j @ k) (fibContrHopfThree p @ i @ j @ k)
+
+-- This is all that is needed for test0To5
+
+--------------------------------------------------------------------------------
+-- B.9 Going back to pi2(S2)
+
+-- B.9.1 Truncations
+
+-- Hub and spoke approach (can also be done directly)
+
+-- n-spheres
+sphere : nat -> U = split
+  zero  -> bool
+  suc n -> susp (sphere n)
+
+data trunc (n : nat) (A : U) =
+    inc (a : A)
+  | hub (f : sphere n -> trunc n A)
+  | spoke (f : sphere n -> trunc n A) (t : sphere n) <i> [ (i=0) -> hub f, (i=1) -> f t ]
+
+spokeC (n : nat) (A : U) (f : sphere n -> trunc n A) (t : sphere n) : Path (trunc n A) (hub f) (f t) =
+  <i> spoke{trunc n A} f t @ i
+
+g2Trunc (A : U) : U = trunc three A
+g2Truncpt (A : ptType) : ptType = (g2Trunc A.1,inc (pt A))
+gTrunc (A : U) : U = trunc two A
+gTruncpt (A : ptType) : ptType = (gTrunc A.1,inc (pt A))
+sTrunc (A : U) : U = trunc one A
+
+filler (B : U) (n : nat) (f : sphere n -> B) : U =
+  (hubf : B) * (t : sphere n) -> Path B hubf (f t)
+
+truncated : nat -> U -> U = split
+ zero -> prop
+ suc n -> \(A : U) -> (x y : A) -> truncated n (Path A x y)
+
+lift (B : U) (x y : B) (n : nat) (f : sphere n -> Path B x y) : sphere (suc n) -> B = split
+  north -> x
+  south -> y
+  merid t @ i -> f t @ i
+
+-- TODO: clean
+compInv (A : U) (a b c : A) (p : Path A a b) (q : Path A a c) : Path A b c =
+  compPath A b a c (<i> p @ -i) q
+
+compInvLemma (A : U) (a b : A) (p : Path A a b) :
+  Path (Path A b b) (compInv A a b b p p) (<_> b) =
+    compInvPath A a b p
+
+lem1Trunc : (n : nat) (A : U) -> ((f : sphere n -> A) -> filler A n f) -> truncated n A = split
+  zero -> rem
+    where rem (A : U) (h : (f : bool -> A) -> filler A zero f) (x y : A) : Path A x y =
+            let f : bool -> A = split
+                  false -> y
+                  true -> x
+                hubf : A = (h f).1
+                spokef : (t : bool) -> Path A hubf (f t) = (h f).2
+            in compPath A x hubf y (<i> spokef true @ -i) (spokef false)
+  suc n -> rem
+    where lem (A : U) (h : (f : sphere (suc n) -> A) -> filler A (suc n) f)
+              (x y : A) (g : sphere n -> Path A x y) : filler (Path A x y) n g =
+              (hub',spoke')
+            where
+            lg : sphere (suc n) -> A = lift A x y n g
+
+            hub' : Path A x y =
+              compInv A (h lg).1 (lg north) (lg south)
+                        ((h lg).2 north) ((h lg).2 south)
+
+            -- TODO: prove this without J?
+            spokeLemma (t t':sphere (suc n)) (p: Path (sphere (suc n)) t t') :
+              Path (Path A (lg t) (lg t'))
+                (compInv A (h lg).1 (lg t) (lg t') ((h lg).2 t) ((h lg).2 t'))
+                (<i> lg (p @ i)) =
+                  J (sphere (suc n)) t
+                    (\(t' : sphere (suc n)) (p : Path (sphere (suc n)) t t') ->
+                       Path (Path A (lg t) (lg t'))
+                            (compInv A (h lg).1 (lg t) (lg t') ((h lg).2 t) ((h lg).2 t'))
+                            (<i> lg (p @ i))) rem1 t' p
+                  where
+                    rem1 : Path (Path A (lg t) (lg t))
+                             (compInv A (h lg).1 (lg t) (lg t) ((h lg).2 t) ((h lg).2 t))
+                             (<_> lg t) = compInvLemma A (h lg).1 (lg t) ((h lg).2 t)
+
+            spoke' (t : sphere n) : Path (Path A x y) hub' (g t) =
+              spokeLemma north south (meridP (sphere n) t)
+
+          rem (A : U) (h : (f : sphere (suc n) -> A) -> filler A (suc n) f) (x y : A) :
+            truncated n (Path A x y) = lem1Trunc n (Path A x y) (lem A h x y)
+
+-- The n-truncation is n-truncated.
+truncIsTrunc (n : nat) (A : U) : truncated n (trunc n A) =
+  lem1Trunc n (trunc n A) (\(f : (sphere n) -> (trunc n A)) -> (hub f,spokeC n A f))
+
+g2TruncTwoGroupoid (A : U) : twogroupoid (g2Trunc A) = truncIsTrunc three A
+gTruncGroupoid (A : U) : groupoid (gTrunc A) = truncIsTrunc two A
+setTruncSet (A : U) : set (sTrunc A) = truncIsTrunc one A
+
+-- The recursion principle comes now:
+
+elemSp : (n : nat) -> sphere n = split
+  zero -> true
+  suc n -> north
+
+substPathPi (A B : U) (f g : A -> B) (a : A) : (a' : A) (p : Path A a a')
+  (qa : Path B (f a) (g a)) (qa' : Path B (f a') (g a')) ->
+  Path (Path B (f a) (g a'))
+       (compPath B (f a) (g a) (g a') qa (<i> g (p @ i)))
+       (compPath B (f a) (f a') (g a') (<i> f (p @ i)) qa') ->
+  PathS A (\(x : A) -> Path B (f x) (g x)) a a' p qa qa' =
+   J A a
+    (\(a' : A) (p : Path A a a') ->
+      (qa : Path B (f a) (g a)) (qa' : Path B (f a') (g a')) ->
+      Path (Path B (f a) (g a'))
+           (compPath B (f a) (g a) (g a') qa (<i> g (p @ i)))
+           (compPath B (f a) (f a') (g a') (<i> f (p @ i)) qa') ->
+      PathS A (\(x : A) -> Path B (f x) (g x)) a a' p qa qa')
+    rem
+    where rem (qa : Path B (f a) (g a)) (qa' : Path B (f a) (g a))
+              (pp : Path (Path B (f a) (g a))
+                         (compPath B (f a) (g a) (g a) qa (<_> g a))
+                         (compPath B (f a) (f a) (g a) (<_> f a) qa')) :
+              Path (Path B (f a) (g a)) qa qa' =
+               let p1 : Path (Path B (f a) (g a))
+                          (compPath B (f a) (g a) (g a) qa (<_> g a)) qa =
+                          compPath1 B (f a) (g a) qa
+                   p2 : Path (Path B (f a) (g a))
+                          (compPath B (f a) (f a) (g a) (<_> f a) qa') qa' =
+                          comp1Path B (f a) (g a) qa'
+               in <i> hcomp (Path B (f a) (g a)) (pp @ i)
+                          [ (i = 0) -> p1
+                          , (i = 1) -> p2 ]
+
+-- special case of substPathPi
+substPathPiConst (A B : U) (b : B) : (g : A -> B) (a a' : A) (p : Path A a a')
+  (qa : Path B b (g a)) (qa' : Path B b (g a')) ->
+  Path (Path B b (g a'))
+     (compPath B b (g a) (g a') qa (<i> g (p @ i)))
+     (compPath B b b (g a') (<_> b) qa') ->
+  PathS A (\(x : A) -> Path B b (g x)) a a' p qa qa' = substPathPi A B (\(x : A) -> b)
+
+
+-- This is a nice use of mapOnPaths
+compPathlLemma (A : U) (b c : A) (q q' : Path A b c) (h : Path (Path A b c) q q') :
+   Path (Path A b c) (compPath A b b c (<_> b) q) (compPath A b b c (<_> b) q') =
+   <i> compPath A b b c (<_> b) (h @ i)
+
+substPathPiTrunc (A B : U) (g : A -> B) (a a' : A) (p : Path A a a')
+  (qa' : Path B (g a) (g a')) (h : Path (Path B (g a) (g a')) (<i> g (p @ i)) qa') :
+  PathS A (\(x : A) -> Path B (g a) (g x)) a a' p (<_> g a) qa' =
+    substPathPiConst A B (g a) g a a' p (<_> g a) qa' rem
+     where
+     b : B = g a
+     rem : Path (Path B b (g a'))
+                (compPath B b b (g a') (<_> b) (<i> g (p @ i)))
+                (compPath B b b (g a') (<_> b) qa') =
+       compPathlLemma B b (g a') (<i> g (p @ i)) qa' h
+
+
+lem2Trunc : (n : nat) (A : U) -> truncated n A -> (f : sphere n -> A) -> filler A n f = split
+  zero -> rem
+    where
+    rem (A : U) (pA : prop A) (f : bool -> A) : filler A zero f =
+      (f true,\(t : bool) -> pA (f true) (f t))
+  suc n -> rem
+    where
+    indh : (A:U) -> truncated n A -> (f : sphere n -> A) -> filler A n f = lem2Trunc n
+
+    rem (A : U) (h : truncated (suc n) A) (f : sphere (suc n) -> A) : filler A (suc n) f =
+      (f north,spoke)
+      where
+        rem1 (x y : A) : (g : sphere n -> Path A x y) -> filler (Path A x y) n g =
+           indh (Path A x y) (h x y)
+
+        hubInd (x y : A) (g : sphere n -> Path A x y) : Path A x y = (rem1 x y g).1
+
+        spokeInd (x y : A) (g : sphere n -> Path A x y) :
+          (t : sphere n) -> Path (Path A x y) (hubInd x y g) (g t) = (rem1 x y g).2
+
+        spoke : (t : sphere (suc n)) -> Path A (f north) (f t) = split
+                 north -> <_> f north
+                 south -> <i> f (meridP (sphere n) (elemSp n) @ i)
+                 merid u @ i -> lem4 @ i
+                   where
+                     F (t : sphere (suc n)) : U = Path A (f north) (f t)
+
+                     T : U = Path A (f north) (f south)
+
+                     mp (w : sphere n) : T = <i> f (meridP (sphere n) w @ i)
+
+                     hubMp : T = hubInd (f north) (f south) mp
+
+                     spokeMp : (t : sphere n) -> Path T hubMp (mp t) =
+                       spokeInd  (f north) (f south) mp
+
+                     qa : Path A (f north) (f north) = <_> f north
+
+                     qa' : T = mp (elemSp n)
+
+                     lem1 : Path T hubMp (mp u) = spokeMp u
+
+                     lem2 : Path T hubMp (mp (elemSp n)) = spokeMp (elemSp n)
+
+                     lem3 : Path T (mp u) (mp (elemSp n)) =
+                       compInv T hubMp (mp u) (mp (elemSp n)) lem1 lem2
+
+                     lem4 : PathS (sphere (suc n)) F north south (meridP (sphere n) u) qa qa' = substPathPiTrunc (sphere (suc n)) A f north south (meridP (sphere n) u) qa' lem3
+
+
+truncRec (n : nat) (A B : U) (tr : truncated n B) (g : A -> B) : trunc n A -> B = split
+  inc a -> g a
+  hub f -> (lem2Trunc n B tr (\(x : sphere n) -> truncRec n A B tr g (f x))).1
+  spoke f t @ i -> (lem2Trunc n B tr (\(x : sphere n) -> truncRec n A B tr g (f x))).2 t @ i
+
+g2TruncRec : (A B : U) -> twogroupoid B -> (A -> B) -> g2Trunc A -> B = truncRec three
+gTruncRec : (A B : U) -> groupoid B -> (A -> B) -> gTrunc A -> B = truncRec two
+sTruncRec : (A B : U) -> set B -> (A -> B) -> sTrunc A -> B = truncRec one
+
+eqSubstSig (A : U) (F : A -> U) (x : A) : (y : A) (p : Path A x y) (u : F x) (v : F y) ->
+             Path U (PathS A F x y p u v) (Path (F y) (subst A F x y p u) v) =
+   J A x (\(y : A) (p : Path A x y) -> (u : F x) (v : F y) ->
+          Path U (PathS A F x y p u v) (Path (F y) (subst A F x y p u) v))
+          rem
+     where
+     rem (u v : F x) :
+           Path U (PathS A F x x (<_> x) u v)
+                  (Path (F x) (subst A F x x (<_> x) u) v) =
+                  let goal : Path U
+                                (Path (F x) u v)
+                                (Path (F x) (transGen (<_> F x) 0 u) v) =
+                                <i> Path (F x) (transGen (<_> F x) (-i) u) v
+                  in goal
+
+pathSIntro (A : U) (F : A -> U) (x y : A) (p : Path A x y) (u : F x) (v : F y)
+           (w : Path (F y) (subst A F x y p u) v) : PathS A F x y p u v =
+             transGen (<i> eqSubstSig A F x y p u v @ -i) 0 w
+
+
+eqSubstSigInv (A : U) (F : A -> U) (x : A) : (y : A) (p : Path A x y) (u : F x) (v : F y) ->
+             Path U (Path (F x) u (subst A F y x (<i> p @ -i) v)) (PathS A F x y p u v) =
+  J A x (\(y : A) (p : Path A x y) -> (u : F x) (v : F y) ->
+         Path U (Path (F x) u (subst A F y x (<i> p @ -i) v)) (PathS A F x y p u v))
+         rem
+    where
+    rem (u v : F x) : Path U (Path (F x) u (subst A F x x (<_> x) v))
+                             (PathS A F x x (<_> x) u v) =
+                             <i> Path (F x) u (transGen (<_> F x) i v)
+  
+pathSIntroInv (A : U) (F : A -> U) (x y : A) (p : Path A x y) (u : F x) (v : F y)
+  (w : Path (F x) u (subst A F y x (<i> p @ -i) v)) : PathS A F x y p u v =
+  transGen (eqSubstSigInv A F x y p u v) 0 w
+
+elimTrunc (A : U) (n : nat) (P : trunc n A -> U)
+  (tP : (x : trunc n A) -> truncated n (P x)) (g : (a : A) -> P (inc a)) :
+  (x : trunc n A) -> P x = rem
+ where
+  t (r : sphere n -> trunc n A) (r' : (x : sphere n) -> P (r x))
+    (x : sphere n) : P (hub r) = substInv (trunc n A) P (hub r) (r x) (spokeC n A r x) (r' x)
+
+  h' (r : sphere n -> trunc n A) (r' : (x : sphere n) -> P (r x)) : P (hub r) = 
+    (lem2Trunc n (P (hub r)) (tP (hub r)) (t r r')).1
+
+  v (r : sphere n -> trunc n A) (r' : (x : sphere n) -> P (r x))
+    (x : sphere n) : PathS (trunc n A) P (hub r) (r x) (spokeC n A r x) (h' r r') (r' x) = 
+    pathSIntroInv (trunc n A) P (hub r) (r x) (spokeC n A r x) (h' r r') (r' x)
+                  ((lem2Trunc n (P (hub r)) (tP (hub r)) (t r r')).2 x)
+
+  rem : (x : trunc n A) -> P x = split
+    inc a -> g a
+    hub f -> h' f (\(x : sphere n) -> rem (f x))
+    spoke f t @ i -> v f (\(x : sphere n) -> rem (f x)) t @ i
+
+g2TruncElim (A : U) :
+              (B : (g2Trunc A) -> U)
+              (bG : (x : g2Trunc A) -> twogroupoid (B x))
+              (f : (x : A) -> B (inc x)) (x : g2Trunc A) -> B x = elimTrunc A three
+
+-- B.9.2 Truncated higher Hopf fibration
+
+-- See https://github.com/simhu/cubical/blob/connections/examples/truncHopf.cub
+
+g2inc (a : S2) : g2Trunc S2 = inc a
+
+trS2 : U = g2Trunc S2
+trS2Trunc : twogroupoid trS2 = g2TruncTwoGroupoid S2
+idIncNS : U = Path trS2 (g2inc north) (g2inc south)
+
+incSouthPath (x : S1) : Path trS2 (g2inc south) (g2inc south) =
+  compPath trS2 (g2inc south) (g2inc north) (g2inc south)
+           (<i> g2inc (meridP S1 base @ -i)) (<i> g2inc (meridP S1 x @ i))
+
+multTwoSouth : S2 -> trS2 = split
+  north -> g2inc south
+  south -> g2inc south
+  merid x @ i -> incSouthPath x @ i
+
+meridIncSouth (x y : S1) : Path trS2 (g2inc north) (g2inc south) =
+  compPath trS2 (g2inc north) (g2inc south) (g2inc south)
+           (<i> g2inc (meridP S1 x @ i)) (incSouthPath y)
+
+-- a general Lemma about set-valued family of type over S1 x S1
+lemSetTorus (E : S1 -> S1 -> U) (sE : set (E base base))
+            (f : (y:S1) -> E base y) (g : (x:S1) -> E x base)
+            (efg : Path (E base base) (f base) (g base)) : (x y : S1) -> E x y = split
+  base -> f
+  loop @ i -> lem2 @ i
+    where
+    F (x : S1) : U = (y : S1) -> E x y
+
+    sbE : (y : S1) -> set (E base y) = lemPropFib (\(y : S1) -> set (E base y)) pP sE
+      where pP (y : S1) : prop (set (E base y)) = setIsProp (E base y)
+
+    lem1 : (y : S1) -> PathS S1 (\(x : S1) -> E x y) base base loopP (f y) (f y) =
+      let P (y : S1) : U = PathS S1 (\(x : S1) -> E x y) base base loopP (f y) (f y)
+          pP (y : S1) : prop (P y) =
+            let rem1 : Path U (P y) (Path (E base y) (subst S1 (\(x : S1) -> E x y) base base loopP (f y)) (f y)) = eqSubstSig S1 (\(x : S1) -> E x y) base base loopP (f y) (f y)
+
+                rem2 : prop (Path (E base y) (subst S1 (\(x : S1) -> E x y) base base loopP (f y)) (f y)) = sbE y (subst S1 (\(x : S1) -> E x y) base base loopP (f y)) (f y)
+
+            in substInv U prop (P y) (Path (E base y) (subst S1 (\(x : S1) -> E x y) base base loopP (f y)) (f y)) rem1 rem2
+
+          lem2 : PathS S1 (\(x : S1) -> E x base) base base loopP (g base) (g base) =
+            <i> g (loopP @ i)
+
+          bP : P base = substInv (E base base) (\(u : E base base) -> PathS S1 (\(x : S1) -> E x base) base base loopP u u) (f base) (g base) efg lem2
+      in lemPropFib P pP bP
+
+    lem2 : PathS S1 F base base loopP f f =
+      <i> \(y : S1) -> lem1 y @ i
+
+meridIncSouth' (x y : S1) : idIncNS =
+  comp3 trS2 (g2inc north) (g2inc south) (g2inc north) (g2inc south)
+    (<i> g2inc (meridP S1 x @ i))     -- p
+    (<i> g2inc (meridP S1 base @ -i)) -- q
+    (<j> g2inc (meridP S1 y @ j))     -- r
+
+
+meridIncSouthEq (x y : S1) : Path idIncNS (meridIncSouth x y) (meridIncSouth' x y) =
+  comp3eq trS2 (g2inc north) (g2inc south) (g2inc north) (g2inc south)
+    (<i> g2inc (meridP S1 x @ i))     -- p
+    (<i> g2inc (meridP S1 base @ -i)) -- q
+    (<j> g2inc (meridP S1 y @ j))     -- r
+
+-- |p| . | !p0 | . |q|
+auxComp' (a b : S2) (p p0 q : Path S2 a b) : Path trS2 (g2inc a) (g2inc b) =
+  <i> hcomp trS2 (g2inc (p0 @ -i))
+         [ (i = 0) -> <j> g2inc (p @ -j)
+         , (i = 1) -> <j> g2inc (q @ j) ]
+
+-- |p| . | !p0 | . |q| = |q| . | !p0 | . |p|
+auxCompId' (a b : S2) (p p0 q : Path S2 a b) : U =
+  Path (Path trS2 (g2inc a) (g2inc b)) (auxComp' a b p p0 q) (auxComp' a b q p0 p)
+
+-- |p0| . | !p0 | . |q| = |q| . | !p0 | . |p0|
+alphaAuxCompId' (a : S2) (b : S2) (p0 q : Path S2 a b) : auxCompId' a b p0 p0 q =
+  let a' : trS2 = g2inc a
+      b' : trS2 = g2inc b
+      p0' : Path trS2 a' b' = <i> g2inc (p0 @ i)
+      p0inv : Path trS2 b' a' = <i> p0' @ -i
+      q' : Path trS2 a' b' = <i> g2inc (q @ i)
+      qinv : Path trS2 b' a' = <i> q' @ -i
+
+      bottom : Square trS2 b' a' b' a' p0inv p0inv
+                 (compPath trS2 b' a' b' p0inv q')
+                 (compPath trS2 a' b' a' q' p0inv) =
+        <i j> hcomp trS2 (helper trS2 b' a' b' p0inv q' @ i @ j)
+                 [ (j = 0) -> <k> p0inv @ i
+                 , (j = 1) -> <k> helper trS2 a' b' a' q' p0inv @ i @ k ]
+
+      right : Square trS2 a' a' b' b'
+                (compPath trS2 a' b' a' q' p0inv) (<_> b') q' p0' =
+        <j k> hcomp trS2 (q' @ j \/ k)
+                 [ (j = 0) -> <l> q' @ k
+                 , (j = 1) -> <l> p0' @ k \/ -l
+                 , (k = 1) -> <l> b' ]
+
+      left : Square trS2 b' b' a' a'
+               (compPath trS2 b' a' b' p0inv q') (<_> a') p0inv qinv =
+        <j k> hcomp trS2 (p0inv @ j \/ k)
+                 [ (j = 0) -> <l> p0inv @ k
+                 , (j = 1) -> <l> qinv @ k \/ -l
+                 , (k = 1) -> <l> a' ]
+
+      goal : Square trS2 a' b' a' b'
+               (auxComp' a b p0 p0 q) (auxComp' a b q p0 p0) (<_> a') (<_> b') =
+        <i j> hcomp trS2 (bottom @ i @ j)
+                         [ (i = 0) -> left @ j
+                         , (i = 1) -> right @ j ]
+  in <i j> goal @ j @ i
+
+-- |p| . | !p0 | . |p0| = |p0| . | !p0 | . |p|
+betaAuxCompId' (a : S2) (b : S2) (p0 p : Path S2 a b) : auxCompId' a b p p0 p0 =
+  <i> alphaAuxCompId' a b p0 p @ -i
+
+alphaEqBetaDiag' (a : S2) : (b : S2) (p0 : Path S2 a b) ->
+  Path (auxCompId' a b p0 p0 p0) (alphaAuxCompId' a b p0 p0) (betaAuxCompId' a b p0 p0) =
+    J S2 a (\(b : S2)  (p0 : Path S2 a b) ->
+         Path (auxCompId' a b p0 p0 p0) (alphaAuxCompId' a b p0 p0) (betaAuxCompId' a b p0 p0))
+    rem
+  where
+  rem : Path (auxCompId' a a (<_> a) (<_> a) (<_> a))
+             (alphaAuxCompId' a a (<_> a) (<_> a))
+             (betaAuxCompId' a a (<_> a) (<_> a)) =
+    let foo : Square trS2 (g2inc a) (g2inc a) (g2inc a) (g2inc a)
+                     (<_> g2inc a) (<_> g2inc a) (<_> g2inc a) (<_> g2inc a) =
+                     <i j> hcomp trS2 (g2inc a)
+                                 [ (i = 0) -> <_> g2inc a, (i = 1) -> <_> g2inc a
+                                 , (j = 0) -> <_> g2inc a, (j = 1) -> <_> g2inc a ]
+
+        bar : Square trS2 (g2inc a) (g2inc a) (g2inc a) (g2inc a)
+                (compPath trS2 (g2inc a) (g2inc a) (g2inc a) (<_> g2inc a) (<_> g2inc a))
+                (<_> g2inc a) (<_> g2inc a) (<_> g2inc a) =
+                <i k> hcomp trS2 (g2inc a)
+                            [ (i = 0) -> <_> g2inc a
+                            , (i = 1) -> <_> g2inc a
+                            , (k = 1) -> <_> g2inc a ]
+
+        T : Path trS2 (g2inc a) (g2inc a) =
+            <i> hcomp trS2 (g2inc a) [ (i = 0) -> <_> g2inc a, (i = 1) -> <_> g2inc a ]
+
+        T0 : Path (Path trS2 (g2inc a) (g2inc a)) T T =
+                <j i> hcomp trS2 (foo @ i @ j)
+                                      [ (i = 0) -> <_> g2inc a
+                                      , (i = 1) -> foo @ j ]
+        T1 : Path (Path trS2 (g2inc a) (g2inc a)) T T =
+               <j i> hcomp trS2 (foo @ i @ j)
+                                [ (i = 0) -> foo @ j
+                                , (i = 1) -> <_> g2inc a ]
+
+        test : Path (Square trS2 (g2inc a) (g2inc a) (g2inc a) (g2inc a)
+                     (<_> g2inc a) (<_> g2inc a) (<_> g2inc a) (<_> g2inc a))
+                     foo (<_ _> g2inc a) =
+                     <k j i> hcomp trS2 (g2inc a) [ (i = 0) -> <_> g2inc a
+                                                  , (i = 1) -> <_> g2inc a
+                                                  , (j = 0) -> <_> g2inc a
+                                                  , (j = 1) -> <_> g2inc a
+                                                  , (k = 1) -> <_> g2inc a]
+
+        key0 : Path (Path (Path trS2 (g2inc a) (g2inc a)) T T)
+                    T0 (<j i> hcomp trS2 (g2inc a)
+                                      [ (i = 0) -> <_> g2inc a
+                                      , (i = 1) -> <_> g2inc a ]) =
+                                      <k j i> hcomp trS2 (test @ k @ i @ j)
+                                                    [ (i = 0) -> <_> g2inc a
+                                                    , (i = 1) -> test @ k @ j ]
+        key1 : Path (Path (Path trS2 (g2inc a) (g2inc a)) T T)
+                    T1 (<j i> hcomp trS2 (g2inc a)
+                                      [ (i = 0) -> <_> g2inc a
+                                      , (i = 1) -> <_> g2inc a ]) =
+                                      <k j i> hcomp trS2 (test @ k @ i @ j)
+                                                    [ (i = 0) -> test @ k @ j
+                                                    , (i = 1) -> <_> g2inc a ]
+
+        key : Path (Path (Path trS2 (g2inc a) (g2inc a)) T T) T0 T1 =
+          compPath (Path (Path trS2 (g2inc a) (g2inc a)) T T) T0  (<j i> hcomp trS2 (g2inc a)
+                                      [ (i = 0) -> <_> g2inc a
+                                      , (i = 1) -> <_> g2inc a ]) T1 key0 (<i> key1 @ -i)
+
+        goal : Path (Path (Path trS2 (g2inc a) (g2inc a)) T T)
+              (<i j> hcomp trS2 (T0 @ j @ i)
+                          [ (j = 0) -> bar @ i, (j = 1) -> bar @ i ])
+              (<i j> hcomp trS2 (T1 @ j @ i)
+                          [ (j = 0) -> bar @ i, (j = 1) -> bar @ i ] ) =
+                    <k i j> hcomp trS2
+                              (key @ k @ j @ i)
+                              [ (j = 0) -> bar @ i, (j = 1) -> bar @ i ]
+    in goal
+
+
+multTwoMeridMerid' : (x y : S1) -> Path idIncNS (meridIncSouth' x y) (meridIncSouth' y x) =
+  lemSetTorus E sE
+    (\(x : S1) -> alphaAuxCompId' north south (meridP S1 base) (meridP S1 x))
+    (\(x : S1) -> betaAuxCompId' north south (meridP S1 base) (meridP S1 x))
+    (alphaEqBetaDiag' north south (meridP S1 base))
+  where E (x y : S1) : U = Path idIncNS (meridIncSouth' x y) (meridIncSouth' y x)
+
+        sE : set (E base base) =
+          g2TruncTwoGroupoid S2 (g2inc north) (g2inc south)
+                             (meridIncSouth' base base) (meridIncSouth' base base)
+
+multTwoMeridMerid (x y : S1) : Path idIncNS (meridIncSouth x y) (meridIncSouth y x) =
+  <i> hcomp idIncNS (multTwoMeridMerid' x y @ i)
+            [ (i = 0) -> <j> meridIncSouthEq x y @ -j
+            , (i = 1) -> <j> meridIncSouthEq y x @ -j ]
+
+multTwoMerid (x : S1) : (y : S2) -> Path trS2 (g2inc y) (multTwoSouth y) = split
+  north -> <i> g2inc (meridP S1 x @ i)
+  south -> incSouthPath x
+  merid y @ i -> substPathPi S2 trS2 (\(x : S2) -> g2inc x) multTwoSouth north south (meridP S1 y)
+                (<i> g2inc (meridP S1 x @ i))
+                (incSouthPath x) (multTwoMeridMerid x y) @ i
+
+multTwo : S2 -> S2 -> trS2 = split
+  north -> \(x : S2) -> g2inc x
+  south -> multTwoSouth
+  merid x @ i -> \(y : S2) -> multTwoMerid x y @ i
+
+multTwoTilde (x : S2) : trS2 -> trS2 =
+  g2TruncRec S2 trS2 trS2Trunc (multTwo x)
+
+lemPropS2 (P : S2 -> U) (pP : (x : S2) -> prop (P x)) (pN : P north) : (x : S2) -> P x = split
+    north -> pN
+    south -> subst S2 P north south (meridP S1 base) pN
+    merid x @ i -> rem1 @ i
+      where
+      pS (x : S1) : P south = subst S2 P north south (meridP S1 x) pN
+
+      rem (p : P south) : PathS S2 P north south (meridP S1 x) pN p =
+        pathSIntro S2 P north south (meridP S1 x) pN p (pP south (pS x) p)
+
+      rem1 : PathS S2 P north south (meridP S1 x) pN (pS base) = rem (pS base)
+
+-- This needs the elimination principle for 2-groupoid truncation...
+lem3Trunc (A B : U) (hB : twogroupoid B) (g h : g2Trunc A -> B)
+              (H : (a : A) -> Path B (g (inc a)) (h (inc a))) :
+              (x : g2Trunc A) -> Path B (g x) (h x) =
+  g2TruncElim A (\(x : g2Trunc A) -> Path B (g x) (h x))
+             (\(x : g2Trunc A) -> twogroupoidThreeGroupoid B hB (g x) (h x)) H
+
+multTwoTildeEquiv : (x : S2) -> isEquiv trS2 trS2 (multTwoTilde x) =
+  lemPropS2
+    (\(x : S2) -> isEquiv trS2 trS2 (multTwoTilde x))
+    (\(x : S2) -> propIsEquiv trS2 trS2 (multTwoTilde x))
+    multEquivNorth
+  where multNorthEqPath : Path (trS2 -> trS2) (\(x : trS2) -> x) (multTwoTilde north) =
+          <i> \(x : trS2) -> lem3Trunc S2 trS2 (g2TruncTwoGroupoid S2) (idfun trS2)
+                                (multTwoTilde north) (\(a : S2) -> <_> inc a) x @ i
+        multEquivNorth : isEquiv trS2 trS2 (multTwoTilde north) =
+          subst (trS2 -> trS2) (isEquiv trS2 trS2) (idfun trS2)
+                (multTwoTilde north) multNorthEqPath (idIsEquiv trS2)
+
+tHopf3 : S3 -> U = split
+  north -> trS2
+  south -> trS2
+  merid x @ i -> ua trS2 trS2 (multTwoTilde x,multTwoTildeEquiv x) @ i
+
+pi3S3 : (Omega3 S3pt).1 -> (Omega2 (g2Truncpt S2pt)).1 =
+  mapOmegaRefl2 (Omega S3pt) trS2 pi3S3'
+    where
+    pi3S3' (p : (Omega S3pt).1) : trS2 =
+      subst S3 tHopf3 north north p (g2inc north)
+
+
+--------------------------------------------------------------------------------
+-- B.10 Loop space of truncations
+
+-- See https://github.com/simhu/cubical/blob/connections/examples/loopTrunc.cub
+
+truncPath2 (A : ptType) : g2Trunc A.1 -> GROUPOID =
+  g2TruncRec A.1 GROUPOID twogroupoidGROUPOID
+    (\(x : A.1) -> (gTrunc (Path A.1 (pt A) x),gTruncGroupoid (Path A.1 (pt A) x)))
+
+kappaTwo (A : ptType) (p : (Omega (g2Truncpt A)).1) : gTrunc (Omega A).1 =
+  subst (g2Trunc A.1) (\(x : g2Trunc A.1) -> (truncPath2 A x).1)
+        (inc (pt A)) (inc (pt A)) p (inc (<_> pt A))
+
+kappaTwoPt (A : ptType) :
+  Path (gTrunc (Omega A).1)
+    (kappaTwo A (pt (Omega (g2Truncpt A))))
+    (pt (gTruncpt (Omega A))) =
+    <i> transGen (<_> (truncPath2 A (pt (g2Truncpt A))).1) i (inc (<_> pt A))
+
+-- Groupoid set
+setFun (A B : U) (sB : set B) : set (A -> B) =
+ setPi A (\(x : A) -> B) (\(x : A) -> sB)
+
+setPath (A B : U) (sB : set B) : set (Path U A B) =
+ substInv U set (Path U A B) (equiv A B) (corrUniv A B) (rem A B sB)
+  where
+  rem (A B : U) (sB:set B) (t u:equiv A B) : prop (Path (equiv A B) t u)
+    = substInv U prop (Path (equiv A B) t u) (Path (A -> B) t.1 u.1)
+            (eqEquivFst A B t u) (setFun A B sB t.1 u.1)
+
+groupoidSET : groupoid SET = \(A B : SET) ->
+  let rem : set (Path U A.1 B.1) = setPath A.1 B.1 B.2
+      rem1 : Path U (Path SET A B) (Path U A.1 B.1) =
+        lemSigProp U set setIsProp A B
+  in substInv U set (Path SET A B) (Path U A.1 B.1) rem1 rem
+
+truncPath1 (A : ptType) : gTrunc A.1 -> SET =
+  gTruncRec A.1 SET groupoidSET
+    (\(x : A.1) -> (sTrunc (Path A.1 (pt A) x),setTruncSet (Path A.1 (pt A) x)))
+
+kappaOne (A : ptType) (p : (Omega (gTruncpt A)).1) : sTrunc (Omega A).1 =
+  subst (gTrunc A.1) (\(x : gTrunc A.1) -> (truncPath1 A x).1)
+        (inc (pt A)) (inc (pt A)) p (inc (<_> pt A))
+
+
+--------------------------------------------------------------------------------
+-- B.11 Down one more dimension
+
+-- e'_2 from 12
+pi2S2' (p : (Omega2 S2pt).1) : loopS1 =
+  let point : (Omega S2pt).1 = pt (Omega S2pt)
+  in subst (Omega S2pt).1 HopfOne point point p (<_> base)
+
+e2' : sTrunc (Omega2 S2pt).1 -> loopS1 =
+  sTruncRec (Omega2 S2pt).1 loopS1 setLoop pi2S2'
+
+
+--------------------------------------------------------------------------------
+-- B.2 The definition
+
+f1 : loopS1 -> (Omega2 S2pt).1 = (mapOmega S1pt (Omega S2pt) (phi S1pt)).1
+
+f2 : (Omega2 S2pt).1 -> (Omega3 S3pt).1 = (mapOmega2 S2pt (Omega S3pt) (phi S2pt)).1
+
+f3 : (Omega3 S3pt).1 -> (Omega3 (joinpt S1pt S1)).1 = mapOmegaRefl3 S3pt (join S1 S1) e
+
+-- Decompose f3 and test the 3 first submaps separately:
+f31 : (Omega3 S3pt).1 -> (Omega3 (joinpt boolpt S2)).1 =
+  mapOmegaRefl3 S3pt (join bool S2) (psi S2)
+
+f32 : (Omega3 S3pt).1 -> (Omega3 (joinpt boolpt (join bool S1))).1 =
+  mapOmegaRefl3 S3pt (join bool (join bool S1))
+  (\(x : S3) -> mapJoin bool bool S2 (join bool S1) (idfun bool) (psi S1)
+               (psi S2 x))
+
+f33 : (Omega3 S3pt).1 -> (Omega3 (joinpt (joinpt boolpt bool) S1)).1 =
+  mapOmegaRefl3 S3pt (join (join bool bool) S1)
+  (\(x : S3) -> joinassoc1 bool bool S1
+               (mapJoin bool bool S2 (join bool S1) (idfun bool) (psi S1)
+               (psi S2 x)))
+
+f4 : (Omega3 (joinpt S1pt S1)).1 -> (Omega3 S2pt).1 =
+  -- (mapOmega3 (joinpt S1pt S1) S2pt alpha).1
+  mapOmegaRefl3 (joinpt S1pt S1) S2 alpha.1
+
+f5 : (Omega3 S2pt).1 -> (Omega3 (joinpt S1pt S1)).1 = h
+
+f6 : (Omega3 (joinpt S1pt S1)).1 -> (Omega3 S3pt).1 =
+  mapOmegaRefl3 (joinpt S1pt S1) S3 einv
+
+f7 : (Omega3 S3pt).1 -> (Omega2 (g2Truncpt S2pt)).1 = pi3S3
+
+f8 : (Omega2 (g2Truncpt S2pt)).1 -> (Omega (gTruncpt (Omega S2pt))).1 =
+ (mapOmega (Omega (g2Truncpt S2pt)) (gTruncpt (Omega S2pt)) (kappaTwo S2pt, kappaTwoPt S2pt)).1
+
+f9 : (Omega (gTruncpt (Omega S2pt))).1 -> sTrunc (Omega2 S2pt).1 =
+  kappaOne (Omega S2pt)
+
+f10 : sTrunc (Omega2 S2pt).1 -> loopS1 = e2'
+
+f11 : loopS1 -> Z = encode base
+
+-- WORKS
+-- This should be correct
+test0To0 : loopS1 = loopP -- f0 oneZ
+
+-- WORKS
+test0To1 : (Omega2 S2pt).1 = f1 test0To0
+
+-- WORKS
+test0To2 : (Omega3 S3pt).1 = f2 test0To1
+
+-- WORKS
+test0To31 : (Omega3 (joinpt boolpt S2)).1 = f31 test0To2
+
+-- WORKS
+test0To32 : (Omega3 (joinpt boolpt (join bool S1))).1 = f32 test0To2
+
+-- WORKS
+test0To33 : (Omega3 (joinpt (joinpt boolpt bool) S1)).1 = f33 test0To2
+
+-- WORKS
+test0To3 : (Omega3 (joinpt S1pt S1)).1 = f3 test0To2
+
+-- WORKS
+test0To4 : (Omega3 S2pt).1 = f4 test0To3
+
+-- Can we compute the normal form of this?
+testFibContrHopf3 : HopfThree test0To4 = fibContrHopfThree test0To4
+
+testTruncFibOmega1 : inhOrTrunc (fibOmega S2pt Hopf base (<_> north)) two =
+  truncFibOmega two S2pt Hopf base isGroupoidS1 (<_> north)
+
+testTruncFibOmega2 : inhOrTrunc (fibOmega (Omega S2pt) HopfOne (<_> base) (<_ _> north)) one =
+  truncFibOmega one (Omega S2pt) HopfOne (<_> base)
+      (truncFibOmega two S2pt Hopf base isGroupoidS1 (<_> north)) (<_ _> north)
+
+-- ? (not finished)
+test0To5 : (Omega3 (joinpt S1pt S1)).1 = f5 test0To4
+
+-- ? (not finished)
+test0To6 : (Omega3 S3pt).1 = f6 test0To5
+
+-- ? (not finished)
+test0To7 : (Omega2 (g2Truncpt S2pt)).1 = f7 test0To6
+
+-- ? (not finished)
+test0To8 : (Omega (gTruncpt (Omega S2pt))).1 = f8 test0To7
+
+-- ? (not finished)
+test0To9 : sTrunc (Omega2 S2pt).1 = f9 test0To8
+
+-- ? (not finished)
+test0To10 : loopS1 = f10 test0To9
+
+-- This should be "pos (suc (suc zero))"...
+brunerie : Z = f11 test0To10
+
+
+-- Various shortcuts:
+
+-- Works
+-- EVAL: neg zero
+-- Time: 0m0.224s
+testShortcut2To9 : Z = f11 (f10 (shortcut2To9 (f1 test0To0)))
+  where
+  shortcut2To9 (x : (Omega2 S2pt).1) : sTrunc (Omega2 S2pt).1 = inc x
+
+-- Works
+-- EVAL: neg zero
+-- Time: 0m14.399s
+-- With opaque propIsEquiv:
+-- EVAL: neg zero
+-- Time: 0m5.798st
+testShortcut2To8 : Z = f11 (f10 (f9 (shortcut2To8 (f1 test0To0))))
+  where
+  foo (x : (Omega S2pt).1) : (gTrunc (Omega S2pt).1) = inc x
+  shortcut2To8 : (Omega2 S2pt).1 -> (Omega (gTruncpt (Omega S2pt))).1 =
+    mapOmegaRefl (Omega S2pt) (gTrunc (Omega S2pt).1) foo
+
+-- ?
+testShortcut2To7 : Z = f11 (f10 (f9 (f8 (shortcut2To7 (f1 test0To0)))))
+  where
+  shortcut2To7 : (Omega2 S2pt).1 -> (Omega2 (g2Truncpt S2pt)).1 =
+    mapOmegaRefl2 S2pt (g2Trunc S2) (\(x : S2) -> g2inc x)
+
+-- ?
+testShortcut3To6 : Z = f11 (f10 (f9 (f8 (f7 (f2 (f1 test0To0))))))
+
+-- ?
+testShortcut4To5 : Z = f11 (f10 (f9 (f8 (f7 (f6 (f3 (f2 (f1 test0To0))))))))
+
