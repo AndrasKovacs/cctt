@@ -957,35 +957,35 @@ g10 : sTrunc ℤ → ℤ :=
 
 --------------------------------------------------------------------------------
 
-invLooper : S¹ → S¹ := λ[
-  base1. base1;
-	loop1 i. loop1'⁻¹ i
-];
+-- invLooper : S¹ → S¹ := λ[
+--   base1. base1;
+-- 	loop1 i. loop1'⁻¹ i
+-- ];
 
-SuspS¹ToS² : Susp S¹ → S² := λ[
-  north. base2;
-	south. base2;
-	merid x i. ?_
-];
+-- SuspS¹ToS² : Susp S¹ → S² := λ[
+--   north. base2;
+-- 	south. base2;
+-- 	merid x i. ?_
+-- ];
 
--- σ : S² → (Ω (Suspdot S²)).₁ :=
---   λ x. merid' S² x ∙ (merid' S² base2)⁻¹;
-σ₁ (x : S¹) : base2 = base2 := ?_;
+-- -- σ : S² → (Ω (Suspdot S²)).₁ :=
+-- --   λ x. merid' S² x ∙ (merid' S² base2)⁻¹;
+-- σ₁ (x : S¹) : base2 = base2 := ?_;
 
 
-η₁ : join S¹ S¹ → S² := λ[
-  inl x. base2;
-	inr x. base2;
-	push a b i. (σ₁ b ∙ σ₁ a) i
-];
+-- η₁ : join S¹ S¹ → S² := λ[
+--   inl x. base2;
+-- 	inr x. base2;
+-- 	push a b i. (σ₁ b ∙ σ₁ a) i
+-- ];
 
-η₂ : join S¹ S¹ → join S¹ S¹ := λ[
-  inl x. inr (invLooper x);
-	inr x. inr x;
-	push a b i.
-     ((push' S¹ S¹ (rot b (invLooper a)) (invLooper a))⁻¹
-		 ∙ push' S¹ S¹ (rot b (invLooper a)) b) i
-];
+-- η₂ : join S¹ S¹ → join S¹ S¹ := λ[
+--   inl x. inr (invLooper x);
+-- 	inr x. inr x;
+-- 	push a b i.
+--      ((push' S¹ S¹ (rot b (invLooper a)) (invLooper a))⁻¹
+-- 		 ∙ push' S¹ S¹ (rot b (invLooper a)) b) i
+-- ];
 
 --------------------------------------------------------------------------------
 

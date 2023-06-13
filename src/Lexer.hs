@@ -181,16 +181,16 @@ identStartChar = fusedSatisfy
 identChar :: Parser Char
 identChar = fusedSatisfy
   (\c -> isLatinLetter c || FP.isDigit c || c == '\'' || c == '-')
-  (\c -> isGreekLetter c || isLetter c)
-  isLetter
-  isLetter
+  (\c -> isGreekLetter c || isAlphaNum c)
+  isAlphaNum
+  isAlphaNum
 
 inlineIdentChar :: Parser Char
 inlineIdentChar = fusedSatisfy
   (\c -> isLatinLetter c || FP.isDigit c || c == '\'' || c == '-')
-  (\c -> isGreekLetter c || isLetter c)
-  isLetter
-  isLetter
+  (\c -> isGreekLetter c || isAlphaNum c)
+  isAlphaNum
+  isAlphaNum
 {-# inline inlineIdentChar #-}
 
 -- | Parse a non-keyword string, return the `Span` of the symbol.
