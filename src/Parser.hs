@@ -62,10 +62,12 @@ sepBy pa psep = sepBy1 pa psep <|> pure []
 sepBy1 :: Parser a -> Parser sep -> Parser [a]
 sepBy1 pa psep = (:) <$> pa <*> FP.many (psep *> pa)
 
+skippedToVar :: Pos -> Parser Tm
+skippedToVar l = do {manyIdentChars; r <- getPos; ws; pure $ Ident (Span l r)}
+{-# noinline skippedToVar #-}
+
 skipToVar :: Pos -> Parser Tm -> Parser Tm
-skipToVar l k = FP.branch identChar
-  (do {manyIdentChars; r <- getPos; ws; pure $ Ident (Span l r)})
-  (do {r <- getPos; ws; k})
+skipToVar l k = FP.branch identChar (skippedToVar l) (do {r <- getPos; ws; k})
 {-# inline skipToVar #-}
 
 atom :: Parser Tm
@@ -111,18 +113,27 @@ proj' = (goProj =<< atom') `cut` projErr
 proj :: Parser Tm
 proj = goProj =<< atom
 
-int' :: Parser Tm
-int' = (getPos >>= \p -> $(switch [| case _ of
+int :: Parser Tm
+int = getPos >>= \p -> $(switch [| case _ of
   "0" -> do {ws; pure (I0 p)}
   "1" -> do {ws; pure (I1 p)}
   "@" -> do {n <- FP.anyAsciiDecimalWord; p' <- getPos; ws; pure $ ILvl p (coerce n) p'}
   _   -> do {ws; Ident <$> ident}
-  |]))
-  `pcut` Lit "interval expression"
+  |])
+
+int' :: Parser Tm
+int' = int `pcut` Lit "interval expression"
 
 cof' :: Parser Cof
 cof' = do
   i <- int'
+  $(sym "=") `pcut` Lit ("\"=\"")
+  j <- int'
+  pure (CEq i j)
+
+cof :: Parser Cof
+cof = do
+  i <- int
   $(sym "=") `pcut` Lit ("\"=\"")
   j <- int'
   pure (CEq i j)
@@ -134,7 +145,7 @@ goSys1 =
 
 goSys :: Parser Sys
 goSys =
-      (SCons <$> (FP.try cof' <* dot') <*> tm' <*> goSys1)
+      (SCons <$> (cof <* dot') <*> tm' <*> goSys1)
   <|> pure SEmpty
 
 sysBindMaybe :: Parser BindMaybe
@@ -150,7 +161,7 @@ goSysHCom1 =
 
 goSysHCom :: Parser SysHCom
 goSysHCom =
-      (SHCons <$> getPos <*> cof' <*> sysBindMaybe <*> goSysHCom1)
+      (SHCons <$> getPos <*> cof <*> sysBindMaybe <*> goSysHCom1)
   <|> pure SHEmpty
 
 sys :: Parser (Sys, Pos)
@@ -254,10 +265,16 @@ goGlueTy p = do
   (s, p') <- sys'
   goApp (GlueTy p a s p')
 
+skippedToApp :: Pos -> Parser Tm
+skippedToApp l = do
+  manyIdentChars
+  r <- getPos
+  ws
+  goApp =<< goProj (Ident (Span l r))
+{-# noinline skippedToApp #-}
+
 skipToApp :: Pos -> Parser Tm -> Parser Tm
-skipToApp l k = FP.branch identChar
-  (do {manyIdentChars; r <- getPos; ws; goApp =<< goProj (Ident (Span l r))})
-  (do {r <- getPos; ws; k})
+skipToApp l k = FP.branch identChar (skippedToApp l) (do {r <- getPos; ws; k})
 {-# inline skipToApp #-}
 
 appBase :: Parser Tm
@@ -272,14 +289,14 @@ appBase = getPos >>= \p -> $(switch [| case _ of
   "Glue"   -> skipToApp p do {ws; goGlueTy p}
   "glue"   -> skipToApp p do {ws; goGlue p} |])
 
-app :: Parser Tm
-app = appBase <|> (goApp =<< proj)
+-- app :: Parser Tm
+-- app = appBase <|> (goApp =<< proj)
 
 app' :: Parser Tm
 app' = (appBase <|> (goApp =<< proj')) `cut` appErr
 
 trans' :: Parser Tm
-trans' = FP.chainl Trans app ($(sym "∙") *> app')
+trans' = FP.chainl Trans app' ($(sym "∙") *> app')
 
 eq' :: Parser Tm
 eq' = do
@@ -290,7 +307,7 @@ eq' = do
                       (\x -> BMBind x <$> tm')
                       (BMDontBind <$> tm')
               braceR'
-              DepPath a t <$> tm')
+              DepPath a t <$> trans')
           (Path t <$> trans'))
     (pure t)
 
@@ -318,7 +335,8 @@ piBinder = do
   pure (bs, a, p)
 
 pi' :: Parser Tm
-pi' = getPos >>= \p ->
+pi' = do
+  p <- getPos
   FP.withOption (some piBinder)
 
     (\case

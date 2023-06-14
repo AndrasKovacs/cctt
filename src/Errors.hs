@@ -194,7 +194,7 @@ displayErrInCxt (ErrInCxt e) = withPrettyArgs do
          SrcFile path src -> case FP.posLineCols src [p] of
            [(l, c)] -> let f = FP.utf8ToStr src in (path, f, l, c)
            _        -> impossible
-      lnum = show linum
+      lnum = show (linum + 1)
       lpad = map (const ' ') lnum
 
   putStrLn ("\nERROR " ++ path ++ ":" ++ lnum ++ ":" ++ show colnum)
