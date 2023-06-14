@@ -19,11 +19,11 @@ data RecInfo = RI {
   , recInfoRecTy    :: ~Ty
   , recInfoRecTyVal :: ~VTy
   , recInfoName     :: Name
-  , recInfoPos      :: {-# nounpack #-} SourcePos
+  , recInfoPos      :: Pos
   }
 
 instance Show RecInfo where
-  show (RI _ _ _ x _) = x
+  show (RI _ _ _ x _) = show x
 
 data DefInfo = DI {
     defInfoDefId    :: Lvl
@@ -32,11 +32,11 @@ data DefInfo = DI {
   , defInfoDefTy    :: ~Ty
   , defInfoDefTyVal :: ~VTy
   , defInfoName     :: Name
-  , defInfoPos      :: {-# nounpack #-} SourcePos
+  , defInfoPos      :: Pos
   }
 
 instance Show DefInfo where
-  show (DI _ _ _ _ _ x _) = x
+  show (DI _ _ _ _ _ x _) = show x
 
 data TyConInfo = TCI {
     tyConInfoTyId         :: Lvl
@@ -44,22 +44,22 @@ data TyConInfo = TCI {
   , tyConInfoConstructors :: IORef (LM.Map DConInfo)
   , tyConInfoFrozen       :: IORef Bool
   , tyConInfoName         :: Name
-  , tyConInfoPos          :: {-# nounpack #-} SourcePos
+  , tyConInfoPos          :: Pos
   }
 
 instance Show TyConInfo where
-  show (TCI _ _ _ _ x _) = x
+  show (TCI _ _ _ _ x _) = show x
 
 data DConInfo = DCI {
     dConInfoConId      :: Lvl
   , dConInfoFieldTypes :: Tel
   , dConInfoName       :: Name
   , dConInfoTyConInfo  :: {-# nounpack #-} TyConInfo
-  , dConInfoPos        :: {-# nounpack #-} SourcePos
+  , dConInfoPos        :: Pos
   }
 
 instance Show DConInfo where
-  show (DCI _ _ x _ _) = x
+  show (DCI _ _ x _ _) = show x
 
 data HDConInfo = HDCI {
     hDConInfoConId      :: Lvl
@@ -69,11 +69,11 @@ data HDConInfo = HDCI {
   , hDConInfoBoundary   :: Sys
   , hDConInfoName       :: Name
   , hDConInfoTyConInfo  :: {-# nounpack #-} HTyConInfo
-  , hDConInfoPos        :: {-# nounpack #-} SourcePos
+  , hDConInfoPos        :: Pos
   }
 
 instance Show HDConInfo where
-  show (HDCI _ _ _ _ _ x _ _) = x
+  show (HDCI _ _ _ _ _ x _ _) = show x
 
 data HTyConInfo = HTCI {
     hTyConInfoTyId         :: Lvl
@@ -81,11 +81,11 @@ data HTyConInfo = HTCI {
   , hTyConInfoConstructors :: IORef (LM.Map HDConInfo)
   , hTyConInfoFrozen       :: IORef Bool
   , hTyConInfoName         :: Name
-  , hTyConInfoPos          :: {-# nounpack #-} SourcePos
+  , hTyConInfoPos          :: Pos
   }
 
 instance Show HTyConInfo where
-  show (HTCI _ _ _ _ x _) = x
+  show (HTCI _ _ _ _ x _) = show x
 
 --------------------------------------------------------------------------------
 
@@ -173,7 +173,7 @@ data Tm
   deriving Show
 
 data Hole
-  = SrcHole (Maybe Name) (DontShow SourcePos)
+  = SrcHole (Maybe Name) Pos
   | ErrHole String
   deriving Show
 

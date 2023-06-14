@@ -17,6 +17,7 @@ import CoreTypes
 import Cubical hiding (eq)
 import ElabState hiding (bind, bindI, isNameUsed)
 import qualified Data.LvlMap as LM
+import qualified Data.ByteString.Char8 as B
 
 --------------------------------------------------------------------------------
 
@@ -52,13 +53,22 @@ instance Monoid Txt where
   mempty = Txt id; {-# inline mempty #-}
 
 instance IsString Txt where
-  fromString s = Txt (s++); {-# inline fromString #-}
+  fromString s = Txt \acc -> foldr' (:) acc s
 
 instance Show Txt where
   show (Txt s) = s mempty
 
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
+
+utf8 :: B.ByteString -> Txt
+utf8 s = Txt \acc -> B.foldr' (:) acc s
+
+nm :: Name -> Txt
+nm = \case
+  NSpan x    -> utf8 (spanToBs x)
+  NGeneric x -> utf8 x
+  N_         -> Txt ('_':)
 
 data Names = NNil | NBind Names Name | NBindI Names Name deriving Show
 
@@ -89,11 +99,11 @@ pairp  s = par 0 s; {-# inline pairp #-}
 --------------------------------------------------------------------------------
 
 bind :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
-bind x act = let ?names = NBind ?names x; ?dom = ?dom + 1 in act (str x)
+bind x act = let ?names = NBind ?names x; ?dom = ?dom + 1 in act (nm x)
 {-# inline bind #-}
 
 bindI :: Name -> PrettyArgs (Txt -> a) -> PrettyArgs a
-bindI x act = let ?names = NBindI ?names x; ?idom = ?idom + 1 in act (str x)
+bindI x act = let ?names = NBindI ?names x; ?idom = ?idom + 1 in act (nm x)
 {-# inline bindI #-}
 
 wkI :: PrettyArgs a -> PrettyArgs a
@@ -123,10 +133,10 @@ lineBind n = "(" <> n <> " : I)"; {-# inline lineBind #-}
 
 goLinesPis :: PrettyArgs (Tm -> Txt)
 goLinesPis = \case
-  Pi x a b | x /= "_" ->
+  Pi x a b | x /= N_ ->
     let pa = pair a in bind x \x ->
     piBind x pa <> goLinesPis b
-  Line x b | x /= "_" ->
+  Line x b | x /= N_ ->
     bindI x \x -> lineBind x <> goLinesPis b
   t ->
     " → " <> pi t
@@ -204,14 +214,14 @@ hcaseBody xs is t = case xs of
 cases :: PrettyArgs (Cases -> Txt)
 cases = \case
   CSNil               -> mempty
-  CSCons x xs t CSNil -> str x <> caseBody xs t
-  CSCons x xs t cs    -> str x <> caseBody xs t <> "; " <> cases cs
+  CSCons x xs t CSNil -> nm x <> caseBody xs t
+  CSCons x xs t cs    -> nm x <> caseBody xs t <> "; " <> cases cs
 
 hcases :: PrettyArgs (HCases -> Txt)
 hcases = \case
   HCSNil                   -> mempty
-  HCSCons x xs is t HCSNil -> str x <> hcaseBody xs is t
-  HCSCons x xs is t cs     -> str x <> hcaseBody xs is t <> "; " <> hcases cs
+  HCSCons x xs is t HCSNil -> nm x <> hcaseBody xs is t
+  HCSCons x xs is t cs     -> nm x <> hcaseBody xs is t <> "; " <> hcases cs
 
 coeTy :: PrettyArgs (Txt -> Tm -> Txt)
 coeTy i (PApp _ _ t@LocalVar{} (IVar x)) | x == ?idom - 1 = " " <> proj t <> " "
@@ -226,7 +236,7 @@ unProject t x = case t of
 
 ivar :: PrettyArgs (IVar -> Txt)
 ivar i = let
-  go 0 (NBindI _ x)  = x // (x == "_")
+  go 0 (NBindI _ x)  = x // (x == N_)
   go l (NBind ls x)  = case go l ls of
                          (x', sh) -> x' // (sh || x == x')
   go l (NBindI ls x) = case go (l - 1) ls of
@@ -236,7 +246,7 @@ ivar i = let
   in if i < ?idom then
     case go (lvlToIx (coerce ?idom) (coerce i)) ?names of
       (x, True) -> "@" <> str (show i)
-      (x, _   ) -> str x
+      (x, _   ) -> nm x
   else
     "(ERR " <> str (show i) <> ")"
 
@@ -248,7 +258,7 @@ localVar :: NamesArg => DomArg => Ix -> Txt
 localVar i = let
 
   go :: Ix -> Names -> (Name, Bool)
-  go 0 (NBind _ x)   = x // (x == "_")
+  go 0 (NBind _ x)   = x // (x == N_)
   go i (NBind ls x)  = case go (i - 1) ls of
                          (x', sh) -> x' // (sh || x == x')
   go i (NBindI ls x) = case go i ls of
@@ -257,22 +267,22 @@ localVar i = let
 
   in case go i ?names of
     (x, True) -> "@" <> str (show (ixToLvl ?dom i))
-    (x, _   ) -> str x
+    (x, _   ) -> nm x
 
 topName :: PrettyArgs ((t -> Name) -> (t -> Lvl) -> t -> Txt)
 topName name id t = if isNameUsed (name t) ?names
   then "@@" <> str (show (id t))
-  else str (name t)
+  else nm (name t)
 
 dcon :: PrettyArgs (DConInfo -> Txt)
 dcon inf = if isNameUsed (inf^.name) ?names
   then "@@" <> str (show (inf^.tyConInfo.tyId)) <> "#" <> str (show (inf^.conId))
-  else str (inf^.name)
+  else nm (inf^.name)
 
 hdcon :: PrettyArgs (HDConInfo -> Txt)
 hdcon inf = if isNameUsed (inf^.name) ?names
   then "@@" <> str (show (inf^.tyConInfo.tyId)) <> "#" <> str (show (inf^.conId))
-  else str (inf^.name)
+  else nm (inf^.name)
 
 goSub :: PrettyArgs (Sub -> Txt)
 goSub (Sub _ _ is) = go is where
@@ -286,28 +296,28 @@ tm = \case
   LocalVar x         -> localVar x
   Let x a t u        -> let pa = let_ a; pt = let_ t in bind x \x ->
                         letp ("let " <> x <> " : " <> pa <> " := " <> pt <> "; " <> tm u)
-  Pi "_" a b         -> let pa = sigma a in bind "_" \_ ->
+  Pi N_ a b          -> let pa = sigma a in bind N_ \_ ->
                         pip (pa <> " → " <> pi b)
   Pi n a b           -> let pa = pair a in bind n \n ->
                         pip (piBind n pa  <> goLinesPis b)
   App t u            -> appp (app t <> " " <> proj u)
   Lam x t            -> letp (bind x \x -> "λ " <> x <> goLams t)
-  Line "_" a         -> bindI "_" \_ -> pip ("I → " <> pi a)
+  Line N_ a   -> bindI N_ \_ -> pip ("I → " <> pi a)
   Line x a           -> bindI x   \x -> pip (lineBind x <> goLinesPis a)
   LApp t u           -> appp (app t <> " " <> int u)
   LLam x t           -> letp (bindI x \x -> "λ " <> x <> goLams t)
-  Sg "_" a b         -> let pa = eq a in bind "_" \_ ->
+  Sg N_ a b   -> let pa = eq a in bind N_ \_ ->
                         sigmap (pa <> " × " <> sigma b)
   Sg x a b           -> let pa = pair a in bind x \x ->
                         sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
   Pair x t u         -> pairp (let_ t <> ", " <> pair u)
   Proj1 t x          -> case unProject t x of
                           Nothing -> projp (proj t <> ".1")
-                          Just t  -> projp (proj t <> "." <> str x)
+                          Just t  -> projp (proj t <> "." <> nm x)
   Proj2 t x          -> projp (proj t <> ".2")
   U                  -> "U"
-  Path "_" a t u     -> ifVerbose
-                         (let pt = trans t; pu = trans u in bindI "_" \_ ->
+  Path N_ a t u  -> ifVerbose
+                         (let pt = trans t; pu = trans u in bindI N_ \_ ->
                           eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
                          (eqp (trans t <> " = " <> trans u))
   Path x a t u       -> let pt = trans t; pu = trans u in bindI x \x ->
@@ -331,11 +341,11 @@ tm = \case
                           (appp ("glue " <> proj a <> " " <> sys s2))
   Hole h             -> case h of
                           SrcHole i p -> case i of
-                            Just x -> "?" <> str x
+                            Just x -> "?" <> str (show x)
                             _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
-                              True -> pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos)))
+                              True -> pure ("?" <> str (show p))
                               _    -> ifVerbose
-                                (pure ("?" <> str (sourcePosPretty (coerce p :: SourcePos))))
+                                (pure ("?" <> str (show p)))
                                 (pure "?")
                           ErrHole msg ->
                             "(ERR " <> str msg <> ")"
@@ -355,11 +365,11 @@ tm = \case
                          (let pt = proj t; pcs = cases cs in bind x \x ->
                           appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
                          (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
-  Wrap x a           -> "(" <> str x <> " : " <> pair a <> ")"
+  Wrap x a           -> "(" <> nm x <> " : " <> pair a <> ")"
   Pack x t           -> tm t
   Unpack t x         -> case unProject t x of
                           Nothing -> projp (proj t <> ".1")
-                          Just t  -> projp (proj t <> "." <> str x)
+                          Just t  -> projp (proj t <> "." <> nm x)
   Split x b _ cs     -> appp ("λ[" <> cases cs <> "]")
   HTyCon inf SPNil   -> topName (^.name) (^.tyId) inf
   HTyCon inf ts      -> appp (topName (^.name) (^.tyId) inf <> spine ts)
@@ -383,13 +393,13 @@ dataFields = \case
 dataCons :: PrettyArgs ([DConInfo] -> Txt)
 dataCons = \case
   []     -> mempty
-  [inf]  -> str (inf^.name) <> dataFields (inf^.fieldTypes)
-  inf:cs -> str (inf^.name) <> dataFields (inf^.fieldTypes) <> "\n  | " <> dataCons cs
+  [inf]  -> nm (inf^.name) <> dataFields (inf^.fieldTypes)
+  inf:cs -> nm (inf^.name) <> dataFields (inf^.fieldTypes) <> "\n  | " <> dataCons cs
 
 hdataIFields :: PrettyArgs (HDConInfo -> [Name] -> Txt)
 hdataIFields inf = \case
   []   -> ": I)" <> boundary_ (inf^.boundary)
-  i:is -> bindI i \_ -> str i <> " " <> hdataIFields inf is
+  i:is -> bindI i \_ -> nm i <> " " <> hdataIFields inf is
 
 boundary_ :: PrettyArgs (Sys -> Txt)
 boundary_ = \case
@@ -405,7 +415,7 @@ hdataFields inf = \case
                   "(" <> x <> " : " <> pa <> ")" <> hdataFields inf fs
 
 hdataCon :: PrettyArgs (HDConInfo -> Txt)
-hdataCon inf = str (inf^.name) <> hdataFields inf (inf^.fieldTypes)
+hdataCon inf = nm (inf^.name) <> hdataFields inf (inf^.fieldTypes)
 
 hdataCons :: PrettyArgs ([HDConInfo] -> Txt)
 hdataCons = \case
@@ -429,20 +439,20 @@ topEntries :: LM.Map TopEntry -> Txt
 topEntries = LM.foldrWithKey'
   (\l e acc -> case e of
       TEDef inf -> withPrettyArgs0 $
-         "\n" <> str (inf^.name)
+         "\n" <> nm (inf^.name)
           <> " : " <> pair (inf^.defTy)
           <> " :=\n  " <> pair (inf^.def) <> ";\n" <> acc
           -- <> " :=\n  " <> str (show (inf^.def)) <> ";\n" <> acc
       TETyCon inf -> withPrettyArgs0 $ runIO do
         cons <- readIORef (inf^.constructors)
         pure $!
-         "\ninductive " <> str (inf^.name)
+         "\ninductive " <> nm (inf^.name)
          <> inductive (inf^.paramTypes) (LM.elems cons) <> ";\n" <> acc
 
       TEHTyCon inf -> withPrettyArgs0 $ runIO do
         cons <- readIORef (inf^.constructors)
         pure $!
-         "\nhigher inductive " <> str (inf^.name)
+         "\nhigher inductive " <> nm (inf^.name)
          <> hinductive (inf^.paramTypes) (LM.elems cons) <> ";\n" <> acc
 
       TEHDCon{} -> impossible

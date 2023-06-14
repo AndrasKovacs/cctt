@@ -10,7 +10,10 @@ import Common
 import CoreTypes
 import Cubical
 
+import qualified Presyntax as P
+
 import qualified Data.LvlMap as LM
+import qualified Data.ByteString.Char8 as B
 
 data TopEntry
   = TEDef DefInfo
@@ -50,13 +53,12 @@ lookupLocalType x ls = case (x, ls) of
   (x, LCof ls _     ) -> lookupLocalType x ls
   _                   -> impossible
 
-type PosArg     = (?srcPos  :: SourcePos)
+type PosArg     = (?srcPos  :: Box Pos)
 type LocalsArg  = (?locals  :: Locals)
 type Elab a     = LocalsArg => NCofArg => DomArg => EnvArg => PosArg => a
 
 data PrintingOpts = PrintingOpts {
-    printingOptsPrintNf      :: Maybe Name
-  , printingOptsVerbose      :: Bool
+    printingOptsVerbose      :: Bool
   , printingOptsErrPrinting  :: Bool
   , printingOptsShowHoleCxts :: Bool }
   deriving Show
@@ -69,7 +71,7 @@ data LoadState = LoadState {
 
   , loadStateLoadCycle   :: [FilePath]      -- Chain of imports going back to original input file to cctt.
                                             -- We check for import cycles on this.
-  , loadStateCurrentSrc  :: String
+  , loadStateCurrentSrc  :: B.ByteString
   } deriving Show
 
 data HCaseBoundaryCheck where
@@ -78,7 +80,7 @@ data HCaseBoundaryCheck where
   deriving Show via DontShow HCaseBoundaryCheck
 
 data State = State {
-    stateTop                 :: M.Map Name TopEntry
+    stateTop                 :: M.Map B.ByteString TopEntry
   , stateTop'                :: LM.Map TopEntry
   , stateLvl                 :: Lvl
   , stateLoadState           :: LoadState
@@ -93,7 +95,7 @@ makeFields ''State
 makeFields ''PrintingOpts
 
 defaultPrintingOpts :: PrintingOpts
-defaultPrintingOpts = PrintingOpts Nothing False False True
+defaultPrintingOpts = PrintingOpts False False True
 
 newCaseTag :: IO Int
 newCaseTag = do
@@ -128,11 +130,12 @@ resetElabState = putState initState
 withTopElab :: Elab (IO a) -> IO a
 withTopElab act = do
   st <- getState
+  let ls = st^.loadState
   let ?locals = LNil
       ?cof    = emptyNCof
       ?dom    = 0
       ?env    = ENil
-      ?srcPos = initialPos (st^.loadState.currentPath)
+      ?srcPos = Box $! initialPos (SrcFile (ls^.currentPath) (ls^.currentSrc))
   act
 {-# inline withTopElab #-}
 
@@ -157,6 +160,11 @@ define x ~a ~qa ~v act =
   act
 {-# inline define #-}
 
+bindToName :: P.Bind -> Name
+bindToName = \case
+  P.BName x     -> NSpan x
+  P.BDontBind _ -> N_
+
 -- | Bind an ivar.
 bindI :: Name -> Elab (IVar -> a) -> Elab a
 bindI x act =
@@ -173,19 +181,20 @@ bindCof (NeCof' cof c) act =
       ?locals = LCof ?locals c in
   act; {-# inline bindCof #-}
 
-isNameUsed :: Elab (Name -> Bool)
+isNameUsed :: Elab (B.ByteString -> Bool)
 isNameUsed x = go ?locals x where
+  go :: Locals -> B.ByteString -> Bool
   go LNil              _ = False
-  go (LBind ls x' _ _) x = x == x' || go ls x
-  go (LBindI ls x')    x = x == x' || go ls x
+  go (LBind ls x' _ _) x = x == nameToBs x' || go ls x
+  go (LBindI ls x')    x = x == nameToBs x' || go ls x
   go (LCof ls _)       x = go ls x
 
 -- | Try to pick an informative fresh ivar name.
 pickIVarName :: Elab Name
 pickIVarName
-  | not (isNameUsed "i") = "i"
-  | not (isNameUsed "j") = "j"
-  | not (isNameUsed "k") = "k"
-  | not (isNameUsed "l") = "l"
-  | not (isNameUsed "m") = "m"
-  | True                 = "i"
+  | not (isNameUsed "i") = i_
+  | not (isNameUsed "j") = j_
+  | not (isNameUsed "k") = k_
+  | not (isNameUsed "l") = l_
+  | not (isNameUsed "m") = m_
+  | True                 = i_

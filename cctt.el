@@ -69,6 +69,9 @@
     st)
   "Syntax table with Haskell-style comments.")
 
+(defun cctt-indent-line ()
+	"Indent current line."
+	(insert-char ?\s 2))
 
 ;;;###autoload
 (define-derived-mode cctt-mode prog-mode
@@ -83,6 +86,9 @@
 
   ;; Code for syntax highlighting
   (setq font-lock-defaults '(cctt-font-lock-keywords))
+
+	;; Indentation
+	(setq indent-line-function 'cctt-indent-line)
 
   ;; Clear memory
   (setq cctt-keywords-regexp nil)
