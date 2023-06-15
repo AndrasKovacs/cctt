@@ -10,6 +10,8 @@ then run `stack install` in the source directory.
 A small implementation of a cartesian cubical type theory, designed from
 ground-up with performance in mind. WIP.
 
+[Slides from the HoTT 2023 conference](https://andraskovacs.github.io/pdfs/hott23prez.pdf).
+
 There are numerous examples which can't be checked in any existing cubical type
 theory implementation, like the infamous original definition of Brunerie's
 number. The goal of this implementation is to compute more of these. Benchmarks are currently very disorganized
