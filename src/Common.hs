@@ -282,6 +282,19 @@ data Pos = Pos Src FP.Pos
   deriving Show via DontShow Pos
   deriving Eq
 
+data ParsedPos = ParsedPos FilePath String Int Int
+
+parsePos :: Pos -> ParsedPos
+parsePos (Pos src p) = case src of
+  SrcImpossible    -> impossible
+  SrcFile path src -> case FP.posLineCols src [p] of
+    [(l, c)] -> let f = FP.utf8ToStr src in ParsedPos path f l c
+    _        -> impossible
+
+instance Show ParsedPos where
+  show (ParsedPos path _ linum colnum) =
+    path ++ ":"  ++ show (linum  + 1) ++ ":" ++ show colnum
+
 rawPos :: Pos -> FP.Pos
 rawPos (Pos _ p) = p
 

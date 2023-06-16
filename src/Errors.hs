@@ -10,8 +10,6 @@ import ElabState
 import Cubical
 import Pretty
 
-import qualified FlatParse.Stateful as FP
-
 data Error
   = NameNotInScope Span
   | LocalLvlNotInScope
@@ -40,11 +38,14 @@ data Error
   | NonNeutralCofInSystem
   | NoSuchField Name ~Tm
   | CantInferHole
+  | CantInferConParamTy String
   | ImportCycle FilePath [FilePath]
   | CantOpenFile FilePath
   | GenericError String
   | ExpectedInductiveType ~Tm
   | CaseMismatch
+  | UnderAppliedCon String
+  | OverAppliedCon String
   deriving Show
 
 instance Exception Error where
@@ -62,6 +63,12 @@ err e = throwIO $ ErrInCxt e
 
 showError :: PrettyArgs (Error -> String)
 showError = \case
+  UnderAppliedCon nm ->
+    "Constructor " ++ show nm ++ " applied to too few arguments"
+
+  OverAppliedCon nm ->
+    "Constructor " ++ show nm ++ " applied to too many arguments"
+
   CaseMismatch ->
     "Case expressions must cover all constructors of an inductive type in the order of declaration"
 
@@ -111,7 +118,7 @@ showError = \case
 
   TopShadowing pos ->
        "Duplicate top-level name\n"
-    ++ "Previously defined at: " ++ uf
+    ++ "Previously defined at: " ++ show (parsePos pos)
 
   UnexpectedI ->
     "Unexpected interval expression"
@@ -153,6 +160,9 @@ showError = \case
   CantInferPair ->
     "Can't infer type for pair expression"
 
+  CantInferConParamTy nm ->
+    "Can't infer type for data constructor " ++ show nm ++ " which has type parameters"
+
   CantInferGlueTm ->
     "Can't infer type for glue expression"
 
@@ -188,12 +198,8 @@ displayErrInCxt :: ErrInCxt -> IO ()
 displayErrInCxt (ErrInCxt e) = withPrettyArgs do
   modState (printingOpts.errPrinting .~ True)
 
-  let Box (Pos src p) = ?srcPos
-      (path, file, linum, colnum) = case src of
-         SrcImpossible    -> impossible
-         SrcFile path src -> case FP.posLineCols src [p] of
-           [(l, c)] -> let f = FP.utf8ToStr src in (path, f, l, c)
-           _        -> impossible
+  let Box pos = ?srcPos
+      ParsedPos path file linum colnum = parsePos pos
       lnum = show (linum + 1)
       lpad = map (const ' ') lnum
 

@@ -480,9 +480,9 @@ checkSp conname env sp fs = case (sp, fs) of
   ([], TNil) ->
     pure $ SPNil
   (_:_, TNil) ->
-    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too many arguments"
+    err $ OverAppliedCon (show conname)
   ([], TCons{}) ->
-    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too few arguments"
+    err $ UnderAppliedCon (show conname)
 
 checkHSubSp :: Elab (Name -> [P.Tm] -> [Name] -> Sub -> IO Sub)
 checkHSubSp conname ts is acc = case (ts, is) of
@@ -491,9 +491,9 @@ checkHSubSp conname ts is acc = case (ts, is) of
     i <- checkI t
     checkHSubSp conname ts is (acc `ext` i)
   (_:_, []) ->
-    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too many arguments"
+    err $ OverAppliedCon (show conname)
   ([], _:_) ->
-    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too few arguments"
+    err $ UnderAppliedCon (show conname)
 
 checkHSp :: Elab (Name -> Env -> [P.Tm] -> Tel -> [Name] -> IO (Spine, Sub))
 checkHSp conname env sp fs is = case (sp, fs) of
@@ -505,10 +505,10 @@ checkHSp conname env sp fs is = case (sp, fs) of
     sub <- checkHSubSp conname ts is (emptySub (dom ?cof))
     pure (SPNil, sub)
   ([], TCons{}) ->
-    err $ GenericError $ "Constructor " ++ show conname ++ " applied to too few arguments"
+    err $ UnderAppliedCon (show conname)
 
 infer :: Elab (P.Tm -> IO Infer)
-infer t = split t >>= \case
+infer t = setPos t $ split t >>= \case
 
   -- no params + saturated
   DConHead inf sp -> case inf^.tyConInfo.paramTypes of
@@ -516,8 +516,7 @@ infer t = split t >>= \case
       sp <- checkSp (inf^.name) ENil sp (inf^.fieldTypes)
       pure $ Infer (DCon inf sp) (VTyCon (inf^.tyConInfo) ENil)
     _  ->
-      err $ GenericError $ "Can't infer type for data constructor " ++ show (inf^.name) ++ " which has "
-                            ++"type parameters"
+      err $ CantInferConParamTy (show (inf^.name))
 
   -- no params + saturated
   HDConHead inf sp -> case inf^.tyConInfo.paramTypes of
@@ -525,8 +524,7 @@ infer t = split t >>= \case
       (!sp, !sub) <- checkHSp (inf^.name) ENil sp (inf^.fieldTypes) (inf^.ifields)
       pure $ Infer (HDCon inf LSPNil sp sub) (VHTyCon (inf^.tyConInfo) ENil)
     _  ->
-      err $ GenericError $ "Can't infer type for data constructor " ++ show (inf^.name) ++ " which has "
-                            ++"type parameters"
+      err $ CantInferConParamTy (show (inf^.name))
 
   -- saturated
   TyConHead inf sp -> do
@@ -997,7 +995,7 @@ elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
 elabSysHCom a r base = \case
   P.SHEmpty ->
     pure SHEmpty
-  P.SHCons _ cof t sys -> do
+  P.SHCons pos cof t sys -> setPos pos do
     cof <- checkCof cof
     case evalCof cof of
       VCTrue  -> err NonNeutralCofInSystem
@@ -1007,31 +1005,32 @@ elabSysHCom a r base = \case
         bindCof ncof do
 
           -- desugar binders
-          (x, t) <- case t of
-            P.BMBind (bindToName -> x) t -> do
-              t <- bindI x \_ -> check t a -- "a" is weakened under vcof
-              pure (x, t)
-            P.BMDontBind t -> do
-              Infer t tty <- infer t
+          (x, t, raw_t) <- case t of
+            P.BMBind (bindToName -> x) raw_t -> do
+              t <- bindI x \_ -> check raw_t a -- "a" is weakened under vcof
+              pure (x, t, raw_t)
+            P.BMDontBind raw_t -> setPos raw_t do
+              Infer t tty <- infer raw_t
               case frc tty of
                 VPath pty lhs rhs -> do
                   let iname = pickIVarName
                   bindI iname \i -> do
                     conv (pty ∙ IVar i) a
                     t <- pure $ PApp (quote lhs) (quote rhs) (WkI t) (IVar i)
-                    pure (iname, t)
+                    pure (iname, t, raw_t)
                 VLine pty -> do
                   let iname = pickIVarName
                   bindI iname \i -> do
                     conv (pty ∙ IVar i) a
                     t <- pure $ LApp (WkI t) (IVar i)
-                    pure (iname, t)
+                    pure (iname, t, raw_t)
                 a -> do
                   err $! ExpectedPathLine (quote a)
 
-          conv (instantiate t (frc r)) (eval base) -- check compatibility with base
-          sysHComCompat t sys                      -- check compatibility with rest of system
-          pure $ SHCons cof x t sys
+          setPos raw_t do
+            conv (instantiate t (frc r)) (eval base) -- check compatibility with base
+            sysHComCompat t sys                      -- check compatibility with rest of system
+            pure $ SHCons cof x t sys
 
 
 sysCompat :: Elab (Tm -> Sys -> IO ())
@@ -1048,7 +1047,7 @@ elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
 elabGlueTmSys base ts a equivs = case (ts, equivs) of
   (P.SEmpty, NSEmpty) ->
     pure SEmpty
-  (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> do
+  (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> setPos cof do
     cof <- checkCof cof
     case evalCof cof of
       VCTrue  -> err NonNeutralCofInSystem
@@ -1056,7 +1055,7 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
       VCNe ncof _ -> do
         convNeCof (ncof^.extra) cof'
         ts <- elabGlueTmSys base ts a equivs
-        bindCof ncof do
+        setPos t $ bindCof ncof do
           let fequiv = frc equiv
           t <- check t (proj1 ty_ fequiv)
           conv (proj1 f_ (proj2 ty_ fequiv) ∙ eval t) (eval base)
@@ -1069,7 +1068,7 @@ elabSys :: Elab (VTy -> P.Sys -> IO Sys)
 elabSys componentTy = \case
   P.SEmpty ->
     pure SEmpty
-  P.SCons cof t sys -> do
+  P.SCons cof t sys -> setPos cof do
     cof <- checkCof cof
     let vcof = evalCof cof
     case vcof of
@@ -1077,7 +1076,7 @@ elabSys componentTy = \case
       VCFalse -> err NonNeutralCofInSystem
       VCNe ncof _ -> do
         sys <- elabSys componentTy sys
-        bindCof ncof do
+        setPos t $ bindCof ncof do
           t <- check t componentTy
           sysCompat t sys
           pure $ SCons cof t sys
@@ -1085,7 +1084,7 @@ elabSys componentTy = \case
 ----------------------------------------------------------------------------------------------------
 
 guardTopShadowing :: Elab (Span -> IO ())
-guardTopShadowing x = do
+guardTopShadowing x = setPos x do
   st <- getState
   case M.lookup (spanToBs x) (st^.top) of
     Nothing             -> pure ()

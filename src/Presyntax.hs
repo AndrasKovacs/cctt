@@ -202,6 +202,16 @@ instance Spanned a => Spanned [a] where
   rightPos [x]    = rightPos x
   rightPos (_:xs) = rightPos xs
 
+instance Spanned BindMaybe where
+  leftPos  (BMBind x t)   = leftPos x
+  leftPos  (BMDontBind t) = leftPos t
+  rightPos (BMBind x t)   = rightPos t
+  rightPos (BMDontBind t) = rightPos t
+
+instance Spanned Cof where
+  leftPos  (CEq t _) = leftPos t
+  rightPos (CEq _ t) = rightPos t
+
 unParens :: Tm -> Tm
 unParens (Parens _ t _) = unParens t
 unParens t              = t
