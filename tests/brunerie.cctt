@@ -593,6 +593,9 @@ is2Groupoid-hGroupoid : is2Groupoid hGroupoid :=
 
 transport (A : I → U) (x : A 0) : A 1 := coe 0 1 A x;
 
+transportRefl (A : U) (x : A) : transport (λ _. A) x = x :=
+  λ i. coe i 1 (_. A) x;
+
 toPathP (A : I → U)(x : A 0)(y : A 1)(p : transport A x = y) : x ={i. A i} y :=
   λ i. hcom 0 1 [i=0 _. x; i=1 j. p j] (coe 0 i A x);
 
@@ -772,49 +775,169 @@ higher inductive Susp (A : U) :=
   | south
   | merid (a : A)(i : I)[i=0. north; i=1. south];
 
--- -- Type-annotated constructors
--- north' (A : U) : Susp A := north;
--- south' (A : U) : Susp A := south;
--- merid' (A : U)(a : A) : north' A = south' A := λ i. merid a i;
+-- Type-annotated constructors
+north' (A : U) : Susp A := north;
+south' (A : U) : Susp A := south;
+merid' (A : U)(a : A) : north' A = south' A := λ i. merid a i;
 
--- Pointed₀ : U := (X : U) × X;
+Pointed : U := (X : U) × X;
 
--- Booldot   : Pointed₀ := (Bool, true);
--- S¹dot     : Pointed₀ := (S¹, base1);
--- S²dot     : Pointed₀ := (S², base2);
--- SuspS¹dot : Pointed₀ := (Susp S¹, north);
+Booldot   : Pointed := (Bool, true);
+S¹dot     : Pointed := (S¹, base1);
+S²dot     : Pointed := (S², base2);
+SuspS¹dot : Pointed := (Susp S¹, north);
 
--- Booldot S¹dot SuspS¹ S³∙ : Pointed₀ := Bool, true;
--- Bool∙ = (Bool , true)
--- S¹∙ = (S¹ , base)
--- SuspS¹∙ = (SuspS¹ , north)
--- S³∙ = (S³ , base)
+higher inductive gTrunc (A : U) :=
+    ginc A
+  | gtrunc (a b : gTrunc A)(p q : a = b)(r s : p = q)(i j k : I)
+         [i=0. r j k
+         ;i=1. s j k
+         ;j=0. p k
+         ;j=1. q k
+         ;k=0. a
+         ;k=1. b];
+
+gtrunc' (A : U) (a b : gTrunc A)(p q : a = b)(r s : p = q) : r = s :=
+  λ i j k. gtrunc a b p q r s i j k;
+
+rec1 (A B : U)(gB : isGroupoid B)(f : A → B) : gTrunc A → B := λ[
+  ginc x. f x;
+  gtrunc a b p q r s i j k.
+    let hyp := rec1 A B gB f;
+    gB (hyp a) (hyp b)
+       (λ n. hyp (r 0 n))
+       (λ n. hyp (r 1 n))
+       (λ n m. hyp (r n m))
+       (λ m n. hyp (s m n))
+       i j k
+];
+
+gTruncDot : Pointed → Pointed :=
+  λ Aa. (gTrunc Aa.1, ginc Aa.2);
+
+higher inductive g2Trunc (A : U) :=
+    g2inc A
+  | g2trunc (a b : g2Trunc A)
+            (p q : a = b)
+            (r s : p = q)
+            (t u : r = s)
+            (i j k l : I)
+            [i=0. t j k l
+            ;i=1. u j k l
+            ;j=0. r k l
+            ;j=1. s k l
+            ;k=0. p l
+            ;k=1. q l
+            ;l=0. a
+            ;l=1. b];
+
+g2inc' (A : U) (x : A) : g2Trunc A := g2inc x;
+g2trunc' (A   : U)
+         (a b : g2Trunc A)
+         (p q : a = b)
+         (r s : p = q)
+         (t u : r = s) : t = u := λ i j k l. g2trunc a b p q r s t u i j k l;
+
+rec2 (A B : U)(gB : is2Groupoid B)(f : A → B) : g2Trunc A → B := λ[
+  g2inc x. f x;
+  g2trunc a b p q r s t u i j k l.
+    let hyp := rec2 A B gB f;
+    gB (hyp a) (hyp b)
+       (λ o. hyp (p o)) (λ o. hyp (q o))
+       (λ n o. hyp (t 0 n o))
+       (λ n o. hyp (t 1 n o))
+       (λ m n o. hyp (t m n o))
+       (λ m n o. hyp (u m n o))
+       i j k l
+];
+
+elim2 (A : U) (B : g2Trunc A → U)(bG : (x : g2Trunc A) → is2Groupoid (B x))
+      (f : (x : A) → B (g2inc x)) : (x : g2Trunc A) → B x := λ[
+  g2inc x. f x;
+  g2trunc a b p q r s u v i j k l.
+    let hyp := elim2 A B bG f;
+    isOfHLevel-isOfHLevelDep
+       num4 (g2Trunc A) B bG a b
+       (hyp a) (hyp b)
+       p q
+       (λ i. hyp (p i)) (λ i. hyp (q i))
+       (u 0) (u 1)
+       (λ i j. hyp (u 0 i j))(λ i j. hyp (u 1 i j))
+       u v
+       (λ j k l. hyp (u j k l)) (λ j k l. hyp (v j k l))
+       (λ i j k l. g2trunc a b p q r s u v i j k l)
+       i j k l
+];
+
+g2truncDot : Pointed → Pointed :=
+  λ Aa. (g2Trunc Aa.1, g2inc Aa.2);
+
+joinDot : Pointed → U → Pointed :=
+  λ Aa B. (join Aa.1 B, inl Aa.2);
+
+Ω : Pointed → Pointed :=
+  λ Aa. (Aa.2 = Aa.2, refl);
+
+Ω² : Pointed → Pointed :=
+  λ Aa. Ω (Ω Aa);
+
+Ω³ : Pointed → Pointed :=
+  λ Aa. Ω (Ω² Aa);
+
+mapΩrefl : (A : Pointed)(B : U)(f : A.1 → B) → (Ω A).1 → (Ω(B, f A.2)).1 :=
+  λ A B f p i. f (p i);
+
+mapΩ²refl : (A : Pointed)(B : U)(f : A.1 → B) → (Ω² A).1 → (Ω² (B, f A.2)).1 :=
+  λ A B f p i j. f (p i j);
+
+mapΩ³refl : (A : Pointed)(B : U)(f : A.1 → B) → (Ω³ A).1 → (Ω³ (B, f A.2)).1 :=
+  λ A B f p i j k. f (p i j k);
+
+alpha : join S¹ S¹ → Susp S¹ := λ[
+  inl _. north;
+  inr _. north;
+  push x y i. (merid' S¹ x ∙ (merid' S¹ y)⁻¹) i
+];
+
+substMinus (A : U)(x y : A) (B : A → U)(p : x = y) (by : B y) : B x :=
+  coe 1 0 (i. B (p i)) by;
+
+funExt1 (C B : U)(P : C → U)(a b : C)(p : a = b)
+        (f : P a → B)(g : P b → B) (h : (x : P b) → f (coe 1 0 (i. P (p i)) x) = g x)
+      : f ={i. P (p i) → B} g :=
+  toPathP (λ i. P (p i) → B) f g
+          (λ i x. (transportRefl B (f (coe 1 0 (i. P (p i)) x)) ∙ h x) i);
+
+HopfSuspS¹ : Susp S¹ → U := λ[
+  north. ?foo;
+  south. ?bar;
+  merid x j. ?baz
+];
 
 
 
--- alpha : join S1 S1 → S2 := λ[
---   inl _. base2;
---   inr _. base2;
---   push x y i. (merid y ∙ merid x) i
--- ];
+  -- Border : (x : S¹) → (j : I) → Partial (j ∨ ~ j) (Σ Type₀ (λ T → T ≃ S¹))
+  -- Border x j (j = i0) = S¹ , (x ·_) , rotIsEquiv x
+  -- Border x j (j = i1) = S¹ , idEquiv S¹
 
--- ptType : U := (A : U) * A;
--- pt (A : ptType) : A.1 := A.2;
--- joinpt (A : ptType) (B : U) : ptType := (join A.1 B,inl (pt A));
+  -- -- Hopf fibration using SuspS¹
+  -- HopfSuspS¹ : SuspS¹ → Type₀
+  -- HopfSuspS¹ north = S¹
+  -- HopfSuspS¹ south = S¹
+  -- HopfSuspS¹ (merid x j) = Glue S¹ (Border x j)
 
--- S1pt : ptType := (S1,base1);
--- S2pt : ptType := (S2,base2);
--- S3pt : ptType := (S3,base3);
+-- t : (x : Susp S¹) → HopfSuspS¹ x → join S¹ S¹ := ?foo;
 
--- Omega (A : ptType) : ptType := (pt A = pt A, refl);
--- Omega2 (A : ptType) : ptType := Omega (Omega A);
--- Omega3 (A : ptType) : ptType := Omega2 (Omega A);
 
--- mapOmegaRefl (A : ptType) (B : U) (h : A.1 → B) (p : (Omega A).1) :
---   (Omega (B, h (pt A))).1 := λ i. h (p i);
 
--- mapOmegaRefl3 (A : ptType) (B : U) (h : A.1 → B) (p : (Omega3 A).1) :
---   (Omega3 (B, h (pt A))).1 := λ i j k. h (p i j k);
+-- t : (x : SuspS¹) → HopfSuspS¹ x → join S¹ S¹
+-- t north x = inl x
+-- t south x = inr x
+-- t (merid x i) =
+--   funExt1 HopfSuspS¹ (merid x) inl inr
+--           (λ y → push (subst⁻ HopfSuspS¹ (merid x) y) y) i
+
+
 
 -- connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
 --   let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);

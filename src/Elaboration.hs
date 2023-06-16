@@ -814,7 +814,7 @@ elabCases :: Elab (Env -> NamedClosure -> [DConInfo] -> [P.CaseItem] -> IO Cases
 elabCases params b cons cs = case (cons, cs) of
   ([], []) ->
     pure CSNil
-  (dci:cons, (bindToName -> x', map bindToName -> xs, body):cs) | dci^.name == x' -> do
+  (dci:cons, (bnd@(bindToName -> x'), map bindToName -> xs, body):cs) | dci^.name == x' -> setPos bnd do
     t  <- elabCase params dci b (dci^.fieldTypes) xs body
     cs <- elabCases params b cons cs
     pure $ CSCons (dci^.name) xs t cs
@@ -854,7 +854,7 @@ elabHCases' :: Elab (Env -> NamedClosure -> [HDConInfo] -> [P.CaseItem] -> IO HC
 elabHCases' params b cons cs = case (cons, cs) of
   ([], []) ->
     pure HCSNil
-  (dci:cons, (bindToName -> x', map bindToName -> xs, body):cs) | dci^.name == x' -> do
+  (dci:cons, (bnd@(bindToName -> x'), map bindToName -> xs, body):cs) | dci^.name == x' -> setPos bnd do
     (xs, is, t) <- elabHCase params dci (dci^.fieldTypes) (dci^.ifields) xs b body
     cs <- elabHCases' params b cons cs
     pure (HCSCons x' xs is t cs)

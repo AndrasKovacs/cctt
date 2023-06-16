@@ -66,7 +66,11 @@ subst⁻ B p pa = coe1→0 (λ i → B (p i)) pa
 funExt1 : {C B : Type₀} (P : C → Type₀) {a b : C} (p : a ≡ b)
           (f : P a → B) (g : P b → B) (h : (x : P b) → f (subst⁻ P p x) ≡ g x)
         → PathP (λ i → P (p i) → B) f g
-funExt1 {B = B} P p f g h = toPathP (funExt (λ x → transportRefl (f (subst⁻ P p x)) ∙ h x))
+funExt1 {C}{B} P {a}{b} p f g h =
+   toPathP {A = λ i → P (p i) → B}
+           {f}
+           {g}
+           (funExt (λ x → transportRefl {A = B} (f (subst⁻ {A = C}{a}{b} P p x)) ∙ h x))
 
 t : (x : SuspS¹) → HopfSuspS¹ x → join S¹ S¹
 t north x = inl x
