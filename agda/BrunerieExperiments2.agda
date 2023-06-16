@@ -1,7 +1,7 @@
 {- This code is adapted from examples/brunerie.ctt and
    examples/brunerie4.ctt on the pi4s3_nobug branch of cubicaltt -}
-{-# OPTIONS --safe #-}
-module Cubical.Homotopy.Group.Pi4S3.BrunerieExperiments2 where
+{-# OPTIONS --safe --cubical #-}
+module BrunerieExperiments2 where
 
 open import Cubical.Foundations.Prelude
 open import Cubical.Foundations.Function
@@ -238,4 +238,3 @@ g10 = SetTrunc.rec isSetℤ (idfun ℤ)
 
 brunerie : ℤ
 brunerie = g10 (g9 (g8 (f7 (f6 (f5 (f4 (f3 (λ i j k → surf i j k))))))))
-

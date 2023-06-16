@@ -17,7 +17,6 @@ import CoreTypes
 import Cubical hiding (eq)
 import ElabState hiding (bind, bindI, isNameUsed)
 import qualified Data.LvlMap as LM
-import qualified Data.ByteString.Char8 as B
 
 --------------------------------------------------------------------------------
 
@@ -61,13 +60,10 @@ instance Show Txt where
 str    = fromString; {-# inline str #-}
 char c = Txt (c:); {-# inline char #-}
 
-utf8 :: B.ByteString -> Txt
-utf8 s = Txt \acc -> B.foldr' (:) acc s
-
 nm :: Name -> Txt
 nm = \case
-  NSpan x    -> utf8 (spanToBs x)
-  NGeneric x -> utf8 x
+  NSpan x    -> str (show x)
+  NGeneric x -> str (utf8ToStr x)
   N_         -> Txt ('_':)
 
 data Names = NNil | NBind Names Name | NBindI Names Name deriving Show
