@@ -908,26 +908,51 @@ funExt1 (C B : U)(P : C → U)(a b : C)(p : a = b)
   toPathP (λ i. P (p i) → B) f g
           (λ i x. (transportRefl B (f (coe 1 0 (i. P (p i)) x)) ∙ h x) i);
 
+
+connection-both (A : U)(p : I → A)(rhs : A)(q : p 1 = rhs) (i j : I) : A :=
+  let pface (m k : I) : A := hcom 1 m [k=0 _. p 1; k=1. p] (p 1);
+  let qface (m k : I) : A := hcom 0 m [k=0 _. p 1; k=1. q] (p 1);
+  hcom 0 1 [
+    i=0. pface j;
+    i=1. qface j;
+    j=0. pface i;
+    j=1. qface i]
+    (p 1);
+
+rotLoop : (a : S¹) → a = a := λ[
+  base1.   λ i. loop1 i;
+  loop1 i. λ j. connection-both S¹ (λ i. loop1 i) base1 (λ i. loop1 i) i j
+];
+
+rot : S¹ → S¹ → S¹ := λ[
+  base1. λ y. y;
+  loop1 i. λ y. rotLoop y i
+];
+
+isPropFamS¹ (P : S¹ → U)(pP : (x : S¹) → isProp (P x)) (b0 : P base1) : b0 ={i. P (loop1 i)} b0 :=
+  λ i. pP (loop1 i) (coe 0 i (K1. P (loop1 K1)) b0)
+                    (coe 1 i (K2. P (loop1 K2)) b0) i;
+
+rotIsEquiv : (a : S¹) → isEquiv S¹ S¹ (rot a) := λ[
+  base1. (idEquiv S¹).2;
+  loop1 i. isPropFamS¹ (λ x. isEquiv S¹ S¹ (rot x))
+                       (λ x. isPropIsEquiv S¹ S¹ (rot x))
+                       ((idEquiv S¹).2) i
+];
+
 HopfSuspS¹ : Susp S¹ → U := λ[
-  north. ?foo;
-  south. ?bar;
-  merid x j. ?baz
+  north. S¹;
+  south. S¹;
+  merid x j. Glue S¹ [j = 0. (S¹, rot x, rotIsEquiv x)
+                     ;j = 1. (S¹, idEquiv S¹)]
 ];
 
 
-
-  -- Border : (x : S¹) → (j : I) → Partial (j ∨ ~ j) (Σ Type₀ (λ T → T ≃ S¹))
-  -- Border x j (j = i0) = S¹ , (x ·_) , rotIsEquiv x
-  -- Border x j (j = i1) = S¹ , idEquiv S¹
-
-  -- -- Hopf fibration using SuspS¹
-  -- HopfSuspS¹ : SuspS¹ → Type₀
-  -- HopfSuspS¹ north = S¹
-  -- HopfSuspS¹ south = S¹
-  -- HopfSuspS¹ (merid x j) = Glue S¹ (Border x j)
-
--- t : (x : Susp S¹) → HopfSuspS¹ x → join S¹ S¹ := ?foo;
-
+t : (x : Susp S¹) → HopfSuspS¹ x → join S¹ S¹ := λ[
+  north. λ x. inl x;
+  south. λ x. inr x;
+  merid x i. ?_
+];
 
 
 -- t : (x : SuspS¹) → HopfSuspS¹ x → join S¹ S¹
