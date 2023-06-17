@@ -42,8 +42,12 @@ idEquiv (A : U) : equiv A A :=
   (λ x. x, λ x. x, λ x _. x, λ x _. x, λ x _ _. x);
 
 inductive List (A : U) := nil | cons A (List A);
+inductive Bool := true | false;
 
-foo (A B : U)(i : I) := Glue A [1 = 0. (B , idEquiv B)];
+foo : U = (U → U) := ?_;
+foo' : U = (U → U) := ?_;
+
+-- foo (A B : U)(i : I) := Glue A [1 = 0. (B , idEquiv B)];
 
 -- foo (A : U)(x y : A)(i : I) := hcom 0 1 [i = 0 _. x] y;
 

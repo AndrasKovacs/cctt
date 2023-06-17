@@ -168,11 +168,11 @@ check t topA = frcPTm t \case
       _ ->
         err $ ExpectedInductiveType (quote a)
 
-    (P.Lam _ (bindToName -> x) ann t, VPath a l r) -> do
+    (P.Lam _ bnd@(bindToName -> x) ann t, VPath a l r) -> do
       case ann of P.LANone                      -> pure ()
                   P.LAAnn (P.unParens -> P.I _) -> pure ()
                   P.LADesugared{}               -> pure ()
-                  _                             -> err $ GenericError "Expected an interval binder"
+                  _                             -> setPos bnd $ err $ GenericError "Expected an interval binder"
       t <- bindI x \i -> check t (a ∙ IVar i)
       convEndpoints (instantiate t I0) l
       convEndpoints (instantiate t I1) r
@@ -215,11 +215,11 @@ check t topA = frcPTm t \case
       q <- check q (VPath a y z)
       pure $! Trans (quote a) (quote x) (quote y) (quote z) p q
 
-    (P.Lam _ (bindToName -> x) ann t, VLine a) -> do
+    (P.Lam _ bnd@(bindToName -> x) ann t, VLine a) -> do
       case ann of P.LANone                      -> pure ()
                   P.LAAnn (P.unParens -> P.I _) -> pure ()
                   P.LADesugared{}               -> pure ()
-                  _                             -> err $ GenericError "Expected an interval binder"
+                  _                             -> setPos bnd $ err $ GenericError "Expected an interval binder"
       t <- bindI x \r -> check t (a ∙ IVar r)
       pure $ LLam x t
 
@@ -263,41 +263,51 @@ check t topA = frcPTm t \case
         _ ->
           err $ ExpectedInductiveType (quote a)
 
-    (P.Hole pos P.BDontBind{}, a) -> do
-      putStrLn ("HOLE ?" ++ show pos)
-      pure (Hole (SrcHole Nothing pos))
+    (P.Hole pos bnd, a) -> do
 
-    (P.Hole pos (P.BName holename), a) -> do
-      putStrLn ("HOLE ?" ++ show holename)
-      showcxt <- getState <&> (^.printingOpts.showHoleCxts)
-      let qa = quote a
+      let display :: Elab (VTy -> IO ())
+          display a = do
+             showcxt <- getState <&> (^.printingOpts.showHoleCxts)
+             let qa = quote a
 
-      let showBinder :: PrettyArgs (Name -> String)
-          showBinder N_ = '@':show ?dom
-          showBinder x  = show x
+             let showBinder :: PrettyArgs (Name -> String)
+                 showBinder N_ = '@':show ?dom
+                 showBinder x  = show x
 
-      let showIBinder :: PrettyArgs (Name -> String)
-          showIBinder N_  = '@':show ?idom
-          showIBinder x   = show x
+             let showIBinder :: PrettyArgs (Name -> String)
+                 showIBinder N_  = '@':show ?idom
+                 showIBinder x   = show x
 
-      let go :: PrettyArgs (RevLocals -> IO Tm)
-          go = \case
-            RLNil -> do
-              when showcxt $ do
-                putStrLn ("────────────────────────────────────────────────────────────")
-              putStrLn (" : " ++ pretty qa ++ "\n")
-              pure (Hole (SrcHole (Just (NSpan holename)) pos))
-            RLBind x _ a ls -> do
-              when showcxt $ putStrLn (showBinder x ++ " : " ++ pretty a)
-              Pretty.bind x \_ -> go ls
-            RLBindI x ls -> do
-              when showcxt $ putStrLn (showIBinder x ++ " : I")
-              Pretty.bindI x \_ -> go ls
-            RLCof c ls -> do
-              when showcxt $ putStrLn (pretty c)
-              go ls
+             let go :: PrettyArgs (RevLocals -> IO ())
+                 go = \case
+                   RLNil -> do
+                     when showcxt $ do
+                       putStrLn ("────────────────────────────────────────────────────────────")
+                     putStrLn (" : " ++ pretty qa ++ "\n")
+                   RLBind x _ a ls -> do
+                     when showcxt $ putStrLn (showBinder x ++ " : " ++ pretty a)
+                     Pretty.bind x \_ -> go ls
+                   RLBindI x ls -> do
+                     when showcxt $ putStrLn (showIBinder x ++ " : I")
+                     Pretty.bindI x \_ -> go ls
+                   RLCof c ls -> do
+                     when showcxt $ putStrLn (pretty c)
+                     go ls
 
-      withPrettyArgs0 $ go (revLocals ?locals)
+             withPrettyArgs0 $ go (revLocals ?locals)
+
+      case bnd of
+        Nothing             -> do let ppos = parsePos pos
+                                  putStrLn ("HOLE ?"++show ppos)
+                                  display a
+                                  pure (Hole (SrcHole SHUnnamed ppos))
+        Just P.BDontBind{}  -> do let ppos = parsePos pos
+                                  putStrLn ("HOLE ?"++show ppos)
+                                  pure (Hole (SrcHole SHSilent ppos))
+        Just (P.BName name) -> do let ~ppos = parsePos pos
+                                  putStrLn ("HOLE ?"++show name)
+                                  display a
+                                  pure (Hole (SrcHole (SHNamed (NSpan name)) ppos))
 
     (t, VWrap x a) -> do
       t <- check t a

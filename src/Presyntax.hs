@@ -42,7 +42,7 @@ data Tm
   | ProjField Tm Name
 
   | Wrap Pos Bind Ty Pos
-  | Hole Pos Bind
+  | Hole Pos (Maybe Bind)
 
   | Case Pos Tm (Maybe (Bind, Ty)) [CaseItem] Pos
   | Split Pos [CaseItem] Pos
@@ -166,7 +166,7 @@ instance Spanned Tm where
      Proj2 _ r        -> r
      ProjField _ r    -> rightPos r
      Wrap _ _ _ r     -> r
-     Hole _ x         -> rightPos (spanOf x)
+     Hole p x         -> maybe p rightPos x
      Case _ _ _ _ r   -> r
      Split _ _ r      -> r
      U r              -> r

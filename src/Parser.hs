@@ -89,7 +89,7 @@ atom = getPos >>= \p -> $(FP.switch [| case _ of
                 n <- FP.anyAsciiDecimalWord `pcut` Lit "level";
                 p' <- getPos;
                 pure $ LocalLvl p (Lvl n) p'}
-  "?"    -> do {ws; b <- bind `pcut` Lit "hole name"; pure $ Hole p b}
+  "?"    -> do {ws; Hole p <$> optional bind}
   _      -> do {ws; Ident <$> ident}
   |])
 

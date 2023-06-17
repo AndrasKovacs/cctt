@@ -172,8 +172,14 @@ data Tm
   | Ap Tm ~Tm ~Tm Tm
   deriving Show
 
+data SrcHole
+  = SHNamed Name
+  | SHUnnamed
+  | SHSilent
+  deriving Show
+
 data Hole
-  = SrcHole (Maybe Name) Pos
+  = SrcHole SrcHole ~ParsedPos
   | ErrHole String
   deriving Show
 

@@ -337,12 +337,9 @@ tm = \case
                           (appp ("glue " <> proj a <> " " <> sys s2))
   Hole h             -> case h of
                           SrcHole i p -> case i of
-                            Just x -> "?" <> str (show x)
-                            _      -> runIO $ (getState <&> (^.printingOpts.errPrinting)) >>= \case
-                              True -> pure ("?" <> str (show p))
-                              _    -> ifVerbose
-                                (pure ("?" <> str (show p)))
-                                (pure "?")
+                            SHSilent  -> "?_"
+                            SHNamed x -> "?" <> str (show x)
+                            SHUnnamed -> "?" <> str (show p)
                           ErrHole msg ->
                             "(ERR " <> str msg <> ")"
   Com r r' i a t u   -> appp (let pr = int r; pr' = int r'; pt = sysH t; pu = proj u in bindI i \i ->

@@ -83,10 +83,12 @@ topLevel1 := @@1;  -- stands for foo2
 --------------------------------------------------------------------------------
 
 -- If we put ? anywhere, it will get printed as a hole, with its local scope and type.
--- A hole can be named as "?foo", but the naming doesn't do much right now.
 
--- NOTE: if we use "?_", this is a "silent" hole for which we only get a one-line
--- message output.
+-- If we give a name to a hole, like ?foo, the given name will be printed instead of
+-- the source position of the hole.
+
+-- If we use "?_", this is a "silent" hole for which we only get a one-line
+-- message output and no goal.
 
 -- Holes are checkable only. Holes are convertible to any value.
 
