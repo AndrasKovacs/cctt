@@ -76,7 +76,9 @@ t : (x : SuspS¹) → HopfSuspS¹ x → join S¹ S¹
 t north x = inl x
 t south x = inr x
 t (merid x i) =
-  funExt1 HopfSuspS¹ (merid x) inl inr
+  funExt1 {C = SuspS¹}{join S¹ S¹} HopfSuspS¹ {north}{south}
+          (merid x)
+          inl inr
           (λ y → push (subst⁻ HopfSuspS¹ (merid x) y) y) i
 
 fibΩ : {B : Pointed₀} (P : B .fst → Type₀) → P (pt B) → Ω B .fst → Type₀
@@ -91,13 +93,13 @@ fibΩ³ P f = fibΩ² (fibΩ P f) refl
 
 -- The map h from 9.3
 ΩHopf : Ω SuspS¹∙ .fst → Type₀
-ΩHopf = fibΩ HopfSuspS¹ base
+ΩHopf = fibΩ {SuspS¹∙} HopfSuspS¹ base
 
 Ω²Hopf : Ω² SuspS¹∙ .fst → Type₀
-Ω²Hopf = fibΩ² HopfSuspS¹ base
+Ω²Hopf = fibΩ² {SuspS¹∙} HopfSuspS¹ base
 
 Ω³Hopf : Ω³ SuspS¹∙ .fst → Type₀
-Ω³Hopf = fibΩ³ HopfSuspS¹ base
+Ω³Hopf = fibΩ³ {SuspS¹∙} HopfSuspS¹ base
 
 inhOrTrunc : (A : Type₀) → ℕ → Type₀
 inhOrTrunc A zero = A
@@ -106,24 +108,30 @@ inhOrTrunc A (suc n) = (x y : A) → inhOrTrunc (x ≡ y) n
 funDepTr : (A : Type₀) (P : A → Type₀) (a0 a1 : A) (p : a0 ≡ a1) (u0 : P a0) (u1 : P a1)
          → (subst P p u0 ≡ u1) ≡ (PathP (λ i → P (p i)) u0 u1)
 funDepTr A P a0 a1 =
-  J (λ (a1 : A) (p : a0 ≡ a1) → ((u0 : P a0) (u1 : P a1) → (subst P p u0 ≡ u1) ≡ (PathP (λ i → P (p i)) u0 u1)))
-    λ u0 u1 i → transportRefl u0 i ≡ u1
+  J {_}{A}{a0}
+    (λ (a1 : A) (p : a0 ≡ a1) →
+       ((u0 : P a0) (u1 : P a1) → (subst P p u0 ≡ u1) ≡ (PathP (λ i → P (p i)) u0 u1)))
+    (λ u0 u1 i → transportRefl {A = P a0} u0 i ≡ u1)
+    {a1}
 -- With connections: PathP (λ i → P (p (~ j ∨ i))) (transp (λ i → P (p (~ j ∧ i))) j u0) u1
 
 truncFibOmega : (n : ℕ) (B : Pointed₀) (P : B .fst → Type₀) (f : P (snd B))
                 (tr : inhOrTrunc (P (snd B)) (suc n))
                 (p : Ω B .fst)
-              → inhOrTrunc (fibΩ P f p) n
+              → inhOrTrunc (fibΩ {B} P f p) n
 truncFibOmega n B P f tr p =
-  subst (λ x → inhOrTrunc x n)
+  subst {A = Type}
+        {x = subst {A = B .fst}{x = snd B}{snd B} P p f ≡ f}{PathP (λ i → P (p i)) f f}
+        (λ x → inhOrTrunc x n)
         (funDepTr (B .fst) P (snd B) (snd B) p f f)
-        (tr (subst P p f) f)
+        (tr (subst {A = B .fst}{x = snd B}{snd B} P p f) f)
 
 fibContrΩ³Hopf : ∀ p → Ω³Hopf p
 fibContrΩ³Hopf =
   truncFibOmega 0 (Ω² SuspS¹∙) Ω²Hopf (λ _ _ → base)
     (truncFibOmega 1 (Ω SuspS¹∙) ΩHopf (λ _ → base)
-    (truncFibOmega 2 SuspS¹∙ HopfSuspS¹ base isGroupoidS¹ (λ _ → north)) λ i j → north)
+      (truncFibOmega 2 SuspS¹∙ HopfSuspS¹ base isGroupoidS¹ (λ _ → north))
+      (λ i j → north))
 
 h : Ω³ SuspS¹∙ .fst → Ω³ (join∙ S¹∙ S¹) .fst
 h p i j k = t (p i j k) (fibContrΩ³Hopf p i j k)
@@ -137,13 +145,16 @@ setTruncFib : {A : Type₀} (P : A → Type₀) (gP : (x : A) -> isSet (P x))
               (p1 : PathP (λ i → P (p i)) a1 b1)
               (q1 : PathP (λ i → P (q i)) a1 b1) →
               PathP (λ i → PathP (λ j → P (r i j)) a1 b1) p1 q1
-setTruncFib P gP p q r a1 b1 p1 q1 = isOfHLevel→isOfHLevelDep 2 gP a1 b1 p1 q1 r
+setTruncFib {A = A} P gP {a}{b} p q r a1 b1 p1 q1 =
+  isOfHLevel→isOfHLevelDep 2 {A}{P} gP {a}{b} a1 b1 {p}{q} p1 q1 r
 
 multTwoAux : (x : S²) → Path (Path ∥ S² ∥₄ ∣ x ∣₄ ∣ x ∣₄) refl refl
 multTwoAux base i j = ∣ surf i j ∣₄
 multTwoAux (surf k l) =
-  setTruncFib (λ x → Path (Path ∥ S² ∥₄ ∣ x ∣₄ ∣ x ∣₄) refl refl)
-              (λ x → squash₄ ∣ x ∣₄ ∣ x ∣₄ refl refl)
+  setTruncFib {S²}
+              (λ x → Path (Path ∥ S² ∥₄ ∣ x ∣₄ ∣ x ∣₄) refl refl)
+              (λ x → squash₄ {_}{S²} ∣ x ∣₄ ∣ x ∣₄ refl refl)
+              {base}{base}
               refl refl
               surf (λ i j → ∣ surf i j ∣₄) (λ i j → ∣ surf i j ∣₄)
               (λ _ i j → ∣ surf i j ∣₄) (λ _ i j → ∣ surf i j ∣₄) k l
@@ -153,7 +164,7 @@ multTwo base x = ∣ x ∣₄
 multTwo (surf i j) x = multTwoAux x i j
 
 multTwoTilde : S² → ∥ S² ∥₄ → ∥ S² ∥₄
-multTwoTilde x = 2GroupoidTrunc.rec squash₄ (multTwo x)
+multTwoTilde x = 2GroupoidTrunc.rec {A = S²}{∥ S² ∥₄} squash₄ (multTwo x)
 
 lemPropF : {A : Type₀} (P : A → Type₀) (pP : (x : A) → isProp (P x))
            {a0 a1 : A} (p : a0 ≡ a1) (b0 : P a0) (b1 : P a1) → PathP (λ i → P (p i)) b0 b1
