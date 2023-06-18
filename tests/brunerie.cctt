@@ -118,6 +118,7 @@ isEquivCoe (A : I → U)(r r' : I) : isEquiv (A r) (A r') (λ x. coe r r' A x) :
 
 
 -- isPropIsEquiv
+-- TODO: remove redundant lemmas from here
 ----------------------------------------------------------------------------------------------------
 
 lemProp (A : U) (h : A → isProp A) : isProp A
@@ -1074,3 +1075,32 @@ multTwo : S² → S² → g2Trunc S² := λ[
 
 multTwoTilde : S² → g2Trunc S² → g2Trunc S² :=
   λ x. rec2 S² (g2Trunc S²) (g2trunc' S²) (multTwo x);
+
+lemPropS² (P : S² → U) (pP : (x : S²) → isProp (P x)) (pB : P base2)
+        : (x : S²) → P x := λ[
+  base2. pB;
+  loop2 i j.
+    hcom 0 1
+       [i=0 k. isProp-isSet (P base2) (pP base2) pB pB
+                            (lemPropFam S² P pP base2 base2 (loop2' i) pB pB) refl k j ;
+        i=1 k. isProp-isSet (P base2) (pP base2) pB pB
+                            (lemPropFam S² P pP base2 base2 (loop2' i) pB pB) refl k j ;
+        j=0 k. pB;
+        j=1 k. pB]
+       (lemPropFam S² P pP base2 base2 (loop2' i) pB pB j)
+];
+
+multEquivBase : isEquiv (g2Trunc S²) (g2Trunc S²) (multTwoTilde base2) :=
+
+  let rem : (x : g2Trunc S²) → x = multTwoTilde base2 x :=
+       elim2 S² (λ x. x = multTwoTilde base2 x)
+             (λ x. isOfHLevelSuc num4 (g2Trunc S²) (g2trunc' S²) x (multTwoTilde base2 x))
+             (λ _. refl);
+
+  subst (g2Trunc S² → g2Trunc S²) (isEquiv (g2Trunc S²) (g2Trunc S²))
+        (λ x. x) (multTwoTilde base2)
+        (λ i x. rem x i)
+        ((idEquiv (g2Trunc S²)).2);
+
+-- multTwoTildeIsEquiv : (x : S²) → isEquiv (multTwoTilde x)
+-- multTwoTildeIsEquiv = lemPropS² (λ x → isEquiv (multTwoTilde x)) (λ x → isPropIsEquiv (multTwoTilde x)) multEquivBase

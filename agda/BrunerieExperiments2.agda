@@ -173,17 +173,20 @@ lemPropF P pP p b0 b1 i = pP (p i) (coe0→i (λ k → P (p k)) i b0) (coe1→i 
 lemPropS² : (P : S² → Type₀) (pP : (x : S²) → isProp (P x)) (pB : P base) (x : S²) → P x
 lemPropS² P pP pB base = pB
 lemPropS² P pP pB (surf i j) =
-  hcomp (λ k → λ { (i = i0) → isProp→isSet (pP base) pB pB (lemPropF P pP (surf i) pB pB) refl k j
-                 ; (i = i1) → isProp→isSet (pP base) pB pB (lemPropF P pP (surf i) pB pB) refl k j
-                 ; (j = i0) → pB
-                 ; (j = i1) → pB })
-        (lemPropF P pP (surf i) pB pB j)
+  hcomp {A = P (surf i j)}
+     (λ k → λ { (i = i0) → isProp→isSet {A = P base}(pP base) pB pB (lemPropF {S²} P pP {base} {base} (surf i) pB pB) refl k j
+              ; (i = i1) → isProp→isSet {A = P base}(pP base) pB pB (lemPropF {S²} P pP {base} {base} (surf i) pB pB) refl k j
+              ; (j = i0) → pB
+              ; (j = i1) → pB })
+     (lemPropF {S²} P pP {base}{base} (surf i) pB pB j)
 
 multEquivBase : isEquiv (multTwoTilde base)
-multEquivBase = subst isEquiv (funExt rem) (idEquiv ∥ S² ∥₄ .snd)
+multEquivBase = subst {A = ∥ S² ∥₄ → ∥ S² ∥₄}{x = λ x → x}{multTwoTilde base} isEquiv (funExt rem) (idEquiv ∥ S² ∥₄ .snd)
   where
-  rem : (x : ∥ S² ∥₄) → idfun ∥ S² ∥₄ x ≡ multTwoTilde base x
-  rem = 2GroupoidTrunc.elim (λ x → isOfHLevelSuc 4 squash₄ x (multTwoTilde base x)) (λ _ → refl)
+  rem : (x : ∥ S² ∥₄) → x ≡ multTwoTilde base x
+  rem = 2GroupoidTrunc.elim {A = S²}{B = λ x → x ≡ multTwoTilde base x}
+       (λ x → isOfHLevelSuc {A = ∥ S² ∥₄} 4 squash₄ x (multTwoTilde base x))
+       (λ _ → refl)
 
 multTwoTildeIsEquiv : (x : S²) → isEquiv (multTwoTilde x)
 multTwoTildeIsEquiv = lemPropS² (λ x → isEquiv (multTwoTilde x)) (λ x → isPropIsEquiv (multTwoTilde x)) multEquivBase
