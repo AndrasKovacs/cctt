@@ -189,7 +189,11 @@ multEquivBase = subst {A = ∥ S² ∥₄ → ∥ S² ∥₄}{x = λ x → x}{mu
        (λ _ → refl)
 
 multTwoTildeIsEquiv : (x : S²) → isEquiv (multTwoTilde x)
-multTwoTildeIsEquiv = lemPropS² (λ x → isEquiv (multTwoTilde x)) (λ x → isPropIsEquiv (multTwoTilde x)) multEquivBase
+multTwoTildeIsEquiv =
+  lemPropS²
+    (λ x → isEquiv {A = ∥ S² ∥₄}{∥ S² ∥₄} (multTwoTilde x))
+    (λ x → isPropIsEquiv {A = ∥ S² ∥₄}{B = ∥ S² ∥₄} (multTwoTilde x))
+    multEquivBase
 
 multTwoTildeEquiv : (x : S²) → ∥ S² ∥₄ ≃ ∥ S² ∥₄
 multTwoTildeEquiv x = (multTwoTilde x) , (multTwoTildeIsEquiv x)
@@ -210,10 +214,12 @@ tHopf³ (surf i j k) =
 π₃S³ p i j = coe0→1 (λ k → tHopf³ (p j k i)) ∣ base ∣₄
 
 codeS² : S² → hGroupoid _
-codeS² s = ∥ HopfS² s ∥₃ , squash₃
+codeS² s = ∥ HopfS² s ∥₃ , squash₃ {A = HopfS² s}
 
 codeTruncS² : ∥ S² ∥₄ → hGroupoid _
-codeTruncS² = 2GroupoidTrunc.rec (isOfHLevelTypeOfHLevel 3) codeS²
+codeTruncS² = 2GroupoidTrunc.rec {A = S²}{B = hGroupoid _}
+                                 (isOfHLevelTypeOfHLevel 3)
+                                 codeS²
 
 encodeTruncS² : Ω ∥ S²∙ ∥₄∙ .fst → ∥ S¹ ∥₃
 encodeTruncS² p = coe0→1 (λ i → codeTruncS² (p i) .fst) ∣ base ∣₃

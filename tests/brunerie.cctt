@@ -616,6 +616,8 @@ isOfHLevel (l : HLevel)(A : U) : U := case l [
   ]
 ];
 
+TypeOfHLevel : ℕ → U := λ n. (A : U) × isOfHLevel n A;
+
 isProp-isContrPath : (A : U) → isProp A → (x y : A) → isContr (x = y) :=
   λ A h x y. (h x y , isProp-isSet A h x y (h x y));
 
@@ -688,6 +690,28 @@ isPropIsContr (A : U) : isProp (isContr A)
           isPropΣ A T pA pB;
 
      lemProp (isContr A) rem;
+
+isPropHContr : isProp (TypeOfHLevel zero) := ?_;
+
+-- isPropHContr : isProp (TypeOfHLevel ℓ 0)
+-- isPropHContr x y =
+--   Σ≡Prop {A = Type _}{B = λ A → isContr A}
+--      (λ _ → isPropIsContr)
+--      {x}
+--      {y}
+--      (isOfHLevel≡ 0 (x .snd) (y .snd) .fst)
+
+isOfHLevelTypeOfHLevel : (n : ℕ) → isOfHLevel (suc n) (TypeOfHLevel n) := λ[
+  zero. isPropHContr;
+  suc n. λ Xa Yb. ?_
+];
+
+-- isOfHLevelTypeOfHLevel : ∀ n → isOfHLevel (suc n) (TypeOfHLevel ℓ n)
+-- isOfHLevelTypeOfHLevel zero = isPropHContr
+-- isOfHLevelTypeOfHLevel (suc n) (X , a) (Y , b) =
+--   isOfHLevelRetract (suc n) (cong fst) (Σ≡Prop λ _ → isPropIsOfHLevel (suc n))
+--     (section-Σ≡Prop λ _ → isPropIsOfHLevel (suc n))
+--     (isOfHLevel≡ (suc n) a b)
 
 
 -- Brunerie
@@ -793,6 +817,7 @@ Pointed : U := (X : U) × X;
 Booldot   : Pointed := (Bool, true);
 S¹dot     : Pointed := (S¹, base1);
 S²dot     : Pointed := (S², base2);
+S³dot     : Pointed := (S³, base3);
 SuspS¹dot : Pointed := (Susp S¹, north);
 
 higher inductive gTrunc (A : U) :=
@@ -877,7 +902,7 @@ elim2 (A : U) (B : g2Trunc A → U)(bG : (x : g2Trunc A) → is2Groupoid (B x))
        i j k l
 ];
 
-g2truncDot : Pointed → Pointed :=
+g2TruncDot : Pointed → Pointed :=
   λ Aa. (g2Trunc Aa.1, g2inc Aa.2);
 
 joinDot : Pointed → U → Pointed :=
@@ -1102,5 +1127,53 @@ multEquivBase : isEquiv (g2Trunc S²) (g2Trunc S²) (multTwoTilde base2) :=
         (λ i x. rem x i)
         ((idEquiv (g2Trunc S²)).2);
 
--- multTwoTildeIsEquiv : (x : S²) → isEquiv (multTwoTilde x)
--- multTwoTildeIsEquiv = lemPropS² (λ x → isEquiv (multTwoTilde x)) (λ x → isPropIsEquiv (multTwoTilde x)) multEquivBase
+multTwoTildeIsEquiv : (x : S²) → isEquiv (g2Trunc S²) (g2Trunc S²) (multTwoTilde x) :=
+  lemPropS² (λ x. isEquiv (g2Trunc S²) (g2Trunc S²) (multTwoTilde x))
+            (λ x. isPropIsEquiv (g2Trunc S²) (g2Trunc S²) (multTwoTilde x))
+            multEquivBase;
+
+multTwoTildeEquiv : (x : S²) → equiv (g2Trunc S²) (g2Trunc S²) :=
+  λ x. (multTwoTilde x, multTwoTildeIsEquiv x);
+
+tHopf³ : S³ → U := λ[
+  base3. g2Trunc S²;
+  loop3 i j k.
+    Glue (g2Trunc S²)
+      [i=0. (g2Trunc S², multTwoTildeEquiv base2)
+      ;i=1. (g2Trunc S², multTwoTildeEquiv base2)
+      ;j=0. (g2Trunc S², multTwoTildeEquiv base2)
+      ;j=1. (g2Trunc S², multTwoTildeEquiv base2)
+      ;k=0. (g2Trunc S², multTwoTildeEquiv (loop2 i j))
+      ;k=1. (g2Trunc S², multTwoTildeEquiv base2)
+      ]
+];
+
+π₃S³ : (Ω³ S³dot).1 → (Ω² (g2TruncDot S²dot)).1 :=
+  λ p i j. coe 0 1 (k. tHopf³ (p j k i)) (g2inc base2);
+
+HopfS² : S² → U := λ[
+  base2. S¹;
+  loop2 i j. Glue S¹ [i=0. S¹, idEquiv S¹
+                     ;i=1. S¹, idEquiv S¹
+                     ;j=0. S¹, idEquiv S¹
+                     ;j=1. S¹, rot (loop1 i), rotIsEquiv (loop1 i)]
+];
+
+codeS² : S² → hGroupoid :=
+  λ s. (gTrunc (HopfS² s), gtrunc' (HopfS² s));
+
+codeTruncS² : g2Trunc S² → hGroupoid :=
+  rec2 S² hGroupoid
+    (isOfHLevelTypeOfHLevel num3)
+    ?_;
+
+-- codeTruncS² : ∥ S² ∥₄ → hGroupoid _
+-- codeTruncS² = 2GroupoidTrunc.rec {A = S²}{B = hGroupoid _}
+--                                  (isOfHLevelTypeOfHLevel 3)
+--                                  codeS²
+
+-- encodeTruncS² : Ω ∥ S²∙ ∥₄∙ .fst → ∥ S¹ ∥₃
+-- encodeTruncS² p = coe0→1 (λ i → codeTruncS² (p i) .fst) ∣ base ∣₃
+
+-- codeS¹ : S¹ → hSet _
+-- codeS¹ s = ∥ helix s ∥₂ , squash₂
