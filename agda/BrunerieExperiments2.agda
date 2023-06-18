@@ -228,7 +228,7 @@ codeS¹ : S¹ → hSet _
 codeS¹ s = ∥ helix s ∥₂ , squash₂
 
 codeTruncS¹ : ∥ S¹ ∥₃ → hSet _
-codeTruncS¹ = GroupoidTrunc.rec (isOfHLevelTypeOfHLevel 2) codeS¹
+codeTruncS¹ = GroupoidTrunc.rec {A = S¹}{hSet _} (isOfHLevelTypeOfHLevel 2) codeS¹
 
 encodeTruncS¹ : Ω ∥ S¹∙ ∥₃∙ .fst → ∥ ℤ ∥₂
 encodeTruncS¹ p = coe0→1 (λ i → codeTruncS¹ (p i) .fst) ∣ pos zero ∣₂
@@ -237,28 +237,28 @@ encodeTruncS¹ p = coe0→1 (λ i → codeTruncS¹ (p i) .fst) ∣ pos zero ∣�
 -- THE BIG GAME
 
 f3 : Ω³ S³∙ .fst → Ω³ (join∙ S¹∙ S¹) .fst
-f3 = mapΩ³refl S³→joinS¹S¹
+f3 = mapΩ³refl {A = S³∙}{join S¹ S¹} S³→joinS¹S¹
 
 f4 : Ω³ (join∙ S¹∙ S¹) .fst → Ω³ SuspS¹∙ .fst
-f4 = mapΩ³refl alpha
+f4 = mapΩ³refl {A = join∙ S¹∙ S¹}{SuspS¹} alpha
 
 f5 : Ω³ SuspS¹∙ .fst → Ω³ (join∙ S¹∙ S¹) .fst
 f5 = h
 
 f6 : Ω³ (join∙ S¹∙ S¹) .fst → Ω³ S³∙ .fst
-f6 = mapΩ³refl joinS¹S¹→S³
+f6 = mapΩ³refl {join∙ S¹∙ S¹}{S³} joinS¹S¹→S³
 
 f7 : Ω³ S³∙ .fst → Ω² ∥ S²∙ ∥₄∙ .fst
 f7 = π₃S³
 
 g8 : Ω² ∥ S²∙ ∥₄∙ .fst → Ω ∥ S¹∙ ∥₃∙ .fst
-g8 = mapΩrefl encodeTruncS²
+g8 = mapΩrefl {A = Ω ∥ S²∙ ∥₄∙}{∥ S¹ ∥₃} encodeTruncS²
 
 g9 : Ω ∥ S¹∙ ∥₃∙ .fst → ∥ ℤ ∥₂
 g9 = encodeTruncS¹
 
 g10 : ∥ ℤ ∥₂ → ℤ
-g10 = SetTrunc.rec isSetℤ (idfun ℤ)
+g10 = SetTrunc.rec {_}{ℤ}{_}{ℤ} isSetℤ (idfun ℤ)
 
 brunerie : ℤ
 brunerie = g10 (g9 (g8 (f7 (f6 (f5 (f4 (f3 (λ i j k → surf i j k))))))))

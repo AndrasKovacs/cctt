@@ -564,7 +564,7 @@ setPath (A B : U) (sB : isSet B) : isSet (A = B) :=
                   (isPropIsEquiv A B)
                   (λ e1 e2. isSetΠ A (λ _. B) (λ _. sB) e1.fst e2.fst));
 
-isGroupoid-hSet : isGroupoid hSet :=
+isGroupoidHSet : isGroupoid hSet :=
   isGroupoidSndProp U isSet isPropIsSet (λ t u. setPath t.fst u.fst u.2);
 
 isGroupoidΠ (A : U)(B : A → U)(h : (x : A) → isGroupoid (B x)) : isGroupoid ((x : A) → B x) :=
@@ -579,7 +579,7 @@ groupoidPath (A B : U) (sB : isGroupoid B) : isGroupoid (A = B) :=
        (isPropIsEquiv A B)
        (λ e1 e2. isGroupoidΠ A (λ _. B) (λ _. sB) e1.fst e2.fst));
 
-is2Groupoid-hGroupoid : is2Groupoid hGroupoid :=
+is2GroupoidHGroupoid : is2Groupoid hGroupoid :=
   is2GroupoidSndProp U isGroupoid
     isPropIsGroupoid
     (λ t u. groupoidPath t.fst u.fst u.2);
@@ -690,29 +690,6 @@ isPropIsContr (A : U) : isProp (isContr A)
           isPropΣ A T pA pB;
 
      lemProp (isContr A) rem;
-
-isPropHContr : isProp (TypeOfHLevel zero) := ?_;
-
--- isPropHContr : isProp (TypeOfHLevel ℓ 0)
--- isPropHContr x y =
---   Σ≡Prop {A = Type _}{B = λ A → isContr A}
---      (λ _ → isPropIsContr)
---      {x}
---      {y}
---      (isOfHLevel≡ 0 (x .snd) (y .snd) .fst)
-
-isOfHLevelTypeOfHLevel : (n : ℕ) → isOfHLevel (suc n) (TypeOfHLevel n) := λ[
-  zero. isPropHContr;
-  suc n. λ Xa Yb. ?_
-];
-
--- isOfHLevelTypeOfHLevel : ∀ n → isOfHLevel (suc n) (TypeOfHLevel ℓ n)
--- isOfHLevelTypeOfHLevel zero = isPropHContr
--- isOfHLevelTypeOfHLevel (suc n) (X , a) (Y , b) =
---   isOfHLevelRetract (suc n) (cong fst) (Σ≡Prop λ _ → isPropIsOfHLevel (suc n))
---     (section-Σ≡Prop λ _ → isPropIsOfHLevel (suc n))
---     (isOfHLevel≡ (suc n) a b)
-
 
 -- Brunerie
 ----------------------------------------------------------------------------------------------------
@@ -1018,7 +995,7 @@ inhOrTrunc (A : U) : ℕ → U := λ[
   suc n. (x y : A) → inhOrTrunc (x = y) n
 ];
 
--- TODO: 400 lines verbose nf!
+-- TODO: maybe optimize. Now it's 400 lines of verbose nf!
 funDepTr (A : U)(P : A → U) (a0 a1 : A)
        : (p : a0 = a1)(u0 : P a0)(u1 : P a1)
        → (coe 0 1 (i. P (p i)) u0 = u1) = (u0 ={i. P (p i)} u1) :=
@@ -1055,12 +1032,9 @@ prec : (A B : U) → isProp B → (A → B) → pTrunc A → B :=
 
 -- TODO COPY: https://github.com/RedPRL/redtt/blob/master/library/paths/s1.red
 
-isGroupoidS¹ : isGroupoid S¹ := ?_;
+isGroupoidS¹ : isGroupoid S¹ := ?;
 
 --------------------------------------------------------------------------------
-
-joindot : Pointed → U → Pointed :=
-  λ Aa B. (join Aa.1 B , inl Aa.2);
 
 fibContrΩ³Hopf : (p : (Ω³ SuspS¹dot).1) → Ω³Hopf p :=
   truncFibOmega zero (Ω² SuspS¹dot) Ω²Hopf (λ _ _. base1)
@@ -1068,7 +1042,7 @@ fibContrΩ³Hopf : (p : (Ω³ SuspS¹dot).1) → Ω³Hopf p :=
       (truncFibOmega num2 SuspS¹dot HopfSuspS¹ base1 isGroupoidS¹ (λ _. north))
       (λ i j. north));
 
-h : (Ω³ SuspS¹dot).1 → (Ω³ (joindot S¹dot S¹)).1 :=
+h : (Ω³ SuspS¹dot).1 → (Ω³ (joinDot S¹dot S¹)).1 :=
   λ p i j k. t (p i j k) (fibContrΩ³Hopf p i j k);
 
 setTruncFib : (A : U)(P : A → U)(gP : (x : A) → isSet (P x))
@@ -1164,16 +1138,76 @@ codeS² : S² → hGroupoid :=
 
 codeTruncS² : g2Trunc S² → hGroupoid :=
   rec2 S² hGroupoid
-    (isOfHLevelTypeOfHLevel num3)
-    ?_;
+    is2GroupoidHGroupoid
+    codeS²;
 
--- codeTruncS² : ∥ S² ∥₄ → hGroupoid _
--- codeTruncS² = 2GroupoidTrunc.rec {A = S²}{B = hGroupoid _}
---                                  (isOfHLevelTypeOfHLevel 3)
---                                  codeS²
+higher inductive sTrunc (A : U) :=
+    sinc (a : A)
+  | strunc (a b : sTrunc A) (p q : a = b) (i j : I)
+      [i=0. p j
+      ;i=1. q j
+      ;j=0. a
+      ;j=1. b];
 
--- encodeTruncS² : Ω ∥ S²∙ ∥₄∙ .fst → ∥ S¹ ∥₃
--- encodeTruncS² p = coe0→1 (λ i → codeTruncS² (p i) .fst) ∣ base ∣₃
+strunc' (A : U)(a b : sTrunc A) (p q : a = b) : p = q := λ i j. strunc a b p q i j;
 
--- codeS¹ : S¹ → hSet _
--- codeS¹ s = ∥ helix s ∥₂ , squash₂
+rec0 (A B : U) (Bset : isSet B) (f : A → B) : sTrunc A → B := λ[
+  sinc x. f x;
+  strunc x y p q i j.
+    Bset (rec0 A B Bset f x) (rec0 A B Bset f y)
+         (ap (rec0 A B Bset f) p)
+         (ap (rec0 A B Bset f) q)
+         i j
+];
+
+encodeTruncS² : (Ω (g2TruncDot S²dot)).1 → gTrunc S¹ :=
+  λ p. coe 0 1 (i. (codeTruncS² (p i)).1) (ginc base1);
+
+helix : S¹ → U := λ[
+  base1. ℤ;
+  loop1 i. sucPathℤ i
+];
+
+codeS¹ : S¹ → hSet :=
+  λ s. (sTrunc (helix s), strunc' (helix s));
+
+codeTruncS¹ : gTrunc S¹ → hSet :=
+  rec1 S¹ hSet isGroupoidHSet codeS¹;
+
+encodeTruncS¹ : (Ω (gTruncDot S¹dot)).1 → sTrunc ℤ :=
+  λ p. coe 0 1 (i. (codeTruncS¹ (p i)).1) (sinc (pos zero));
+
+----------------------------------------------------------------------------------------------------
+
+-- TODO COPY: https://github.com/RedPRL/redtt/blob/master/library/cool/s3-to-join.red
+S³-joinS¹S¹ : S³ → join S¹ S¹ := ?;
+joinS¹S¹-S³ : join S¹ S¹ → S³ := ?;
+
+----------------------------------------------------------------------------------------------------
+
+f3 : (Ω³ S³dot).1 → (Ω³ (joinDot S¹dot S¹)).1 :=
+  mapΩ³refl S³dot (join S¹ S¹) S³-joinS¹S¹;
+
+f4 : (Ω³ (joinDot S¹dot S¹)).1 → (Ω³ SuspS¹dot).1 :=
+  mapΩ³refl (joinDot S¹dot S¹) (Susp S¹) alpha;
+
+f5 : (Ω³ SuspS¹dot).1 → (Ω³ (joinDot S¹dot S¹)).1 :=
+  h;
+
+f6 : (Ω³ (joinDot S¹dot S¹)).1 → (Ω³ S³dot).1 :=
+  mapΩ³refl (joinDot S¹dot S¹) S³ joinS¹S¹-S³;
+
+f7 : (Ω³ S³dot).1 → (Ω² (g2TruncDot S²dot)).1 :=
+  π₃S³;
+
+g8 : (Ω² (g2TruncDot S²dot)).1 → (Ω (gTruncDot S¹dot)).1 :=
+  mapΩrefl (Ω (g2TruncDot S²dot)) (gTrunc S¹) encodeTruncS²;
+
+g9 : (Ω (gTruncDot S¹dot)).1 → sTrunc ℤ :=
+  encodeTruncS¹;
+
+g10 : sTrunc ℤ → ℤ :=
+  rec0 ℤ ℤ isSetℤ (λ x. x);
+
+brunerie : ℤ :=
+  g10 (g9 (g8 (f7 (f6 (f5 (f4 (f3 (λ i j k. loop3 i j k))))))));
