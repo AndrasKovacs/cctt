@@ -398,9 +398,14 @@ localVar x = go ?env x where
 capp :: NCofArg => DomArg => NamedClosure -> Val -> Val
 capp (NCl _ t) ~u = case t of
 
-  CEval (EC s env rc t) -> let ?env = EDef env u; ?sub = wkSub s; ?recurse = rc in eval t
-  CSplit b tag ecs      -> case_ u b tag ecs
-  CHSplit b tag ecs     -> hcase u b tag ecs
+  CEval (EC s env rc t) ->
+    let ?env = EDef env u; ?sub = wkSub s; ?recurse = rc in eval t
+
+  CEvalLazy (ECL s env rc t) ->
+    let ?env = EDef env u; ?sub = wkSub s; ?recurse = rc in eval t
+
+  CSplit b tag ecs  -> case_ u b tag ecs
+  CHSplit b tag ecs -> hcase u b tag ecs
 
   CCoePi r r' a b t ->
     let ~x = u in
@@ -1466,6 +1471,10 @@ evalClosure :: EvalArgs (Name -> Tm -> NamedClosure)
 evalClosure x a = NCl x (CEval (EC ?sub ?env ?recurse a))
 {-# inline evalClosure #-}
 
+evalClosureLazy :: EvalArgs (Name -> Tm -> NamedClosure)
+evalClosureLazy x ~a = NCl x (CEvalLazy (ECL ?sub ?env ?recurse a))
+{-# inline evalClosureLazy #-}
+
 evalIClosure :: EvalArgs (Name -> Tm -> NamedIClosure)
 evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 {-# inline evalIClosure #-}
@@ -1481,12 +1490,12 @@ eval = \case
   -- Inductives
   TyCon i ts         -> VTyCon i (params ts)
   DCon i sp          -> VDCon i (spine sp)
-  Case t x b tag cs  -> case_ (eval t) (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
-  Split x b tag cs   -> VLam $ NCl x $ CSplit (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
-  HSplit x b tag cs  -> VLam $ NCl x $ CHSplit (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
+  Case t x b tag cs  -> case_ (eval t) (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
+  HCase t x b tag cs -> hcase (eval t) (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
+  Split x b tag cs   -> VLam $ NCl x $ CSplit (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
+  HSplit x b tag cs  -> VLam $ NCl x $ CHSplit (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
   HTyCon i ts        -> VHTyCon i (params ts)
   HDCon i ps fs s    -> hdcon i (lazyParams ps) (spine fs) (sub s)
-  HCase t x b tag cs -> hcase (eval t) (evalClosure x b) tag (EC ?sub ?env ?recurse cs)
 
   -- Pi
   Pi x a b           -> VPi (eval a) (evalClosure x b)

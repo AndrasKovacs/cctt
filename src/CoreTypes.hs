@@ -111,7 +111,7 @@ data Tm
   = TopVar        {-# nounpack #-} DefInfo
   | RecursiveCall {-# nounpack #-} RecInfo
   | LocalVar Ix
-  | Let Name Tm Ty Tm
+  | Let Name ~Ty Tm Tm
 
   | TyCon {-# nounpack #-} TyConInfo Spine
   | DCon  {-# nounpack #-} DConInfo  Spine
@@ -353,10 +353,16 @@ type RecurseArg = (?recurse :: Recurse)
 data EvalClosure a = EC Sub Env Recurse a
   deriving Show
 
+data EvalClosureLazy a = ECL Sub Env Recurse ~a
+  deriving Show
+
 -- | Defunctionalized closures.
 data Closure
   -- ^ Body of vanilla term evaluation.
   = CEval (EvalClosure Tm)
+
+  -- ^ Used for evaluating lazy terms coming from elaboration.
+  | CEvalLazy (EvalClosureLazy Tm)
 
   -- ^ Body of lambdaCase
   | CSplit NamedClosure CaseTag (EvalClosure Cases)
@@ -542,9 +548,14 @@ instance SubAction (EvalClosure a) where
   sub (EC s' env rc t) = EC (sub s') (sub env) rc t
   {-# inline sub #-}
 
+instance SubAction (EvalClosureLazy a) where
+  sub (ECL s' env rc t) = ECL (sub s') (sub env) rc t
+  {-# inline sub #-}
+
 instance SubAction Closure where
   sub cl = case cl of
     CEval     ecl     -> CEval (sub ecl)
+    CEvalLazy ecl     -> CEvalLazy (sub ecl)
     CSplit  b tag ecl -> CSplit (sub b) tag (sub ecl)
     CHSplit b tag ecl -> CHSplit (sub b) tag (sub ecl)
 
