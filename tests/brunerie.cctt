@@ -1054,22 +1054,6 @@ loopn : ℤ  → ΩS¹ := λ[
                                        ; i=1 j. loop1 j]
                                        (loopn (neg n) i) ]
 ];
---   elim [
---   | pos n →
---     elim n [
---     | zero → refl
---     | suc (n → loopn) →
---       -- this is trans, but let's expand the definition
---       λ i → comp 0 1 (loopn i) [ i=0 → refl | i=1 j → loop j ]
---     ]
---   | negsuc n →
---     elim n [
---     | zero →
---       λ i → comp 1 0 base [ i=0 → refl | i=1 j → loop j ]
---     | suc (n → loopn) →
---       λ i → comp 1 0 (loopn i) [ i=0 → refl | i=1 j → loop j ]
---     ]
---   ]
 
 decodeSquare : (n : ℤ) → (loopn (predℤ n)) ={i. base1 = loop1 i} (loopn n) := λ[
   pos n. case n (n. (loopn (predℤ (pos n))) ={i. base1 = loop1 i} (loopn (pos n))) [
@@ -1079,21 +1063,6 @@ decodeSquare : (n : ℤ) → (loopn (predℤ n)) ={i. base1 = loop1 i} (loopn n)
 
   neg n. λ i j. hcom 1 i [ j=0 k. base1 ; j=1 k. loop1 k] (loopn (neg n) j)
 ];
-
--- decode-square : (n : int) → [i j] s1 [ | i=0 → loopn (pred n) j
---     | i=1 → loopn n j
---     | j=0 → base
---     | j=1 → loop i
---     ]
---   =
---   elim [
---   | pos n →
---     elim n [
---     | zero → λ i j → comp 1 i base [ j=0 → refl | j=1 i → loop i ]
---     | suc n → λ i j → comp 0 i (loopn (pos n) j) [ j=0 → refl | j=1 i → loop i ]
---     ]
---   | negsuc n → λ i j → comp 1 i (loopn (negsuc n) j) [ j=0 → refl | j=1 i → loop i ]
---   ]
 
 decode : (x : S¹) → helix x → base1 = x := λ[
   base1. loopn;
@@ -1105,15 +1074,6 @@ decode : (x : S¹) → helix x → base1 = x := λ[
              ; j=1 k. loop1 i]
              (decodeSquare n i j)
 ];
-  -- elim [
-  -- | base → loopn
-  -- | loop i → λ y j →
-  --   let n : int = y .vproj in
-  --   comp 0 1 (decode-square n i j) [
-  --   | ∂[j] | i=1 → refl
-  --   | i=0 k → loopn (pred-isuc y k) j
-  --   ]
-  -- ]
 
 decodeEncode (x : S¹) (p : base1 = x) : decode x (encode x p) = p :=
  J S¹ base1 (λ x p. decode x (encode x p) = p) (λ x. refl) x p;
