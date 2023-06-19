@@ -142,7 +142,7 @@ data Tm
 
   | U
 
-  | Path Name Ty Tm Tm     -- x ={i. a} y
+  | Path Name ~Ty Tm Tm    -- x ={i. a} y
   | PApp ~Tm ~Tm Tm I      -- (x : A 0)(y : A 1)(t : x ={i.A i} y)(j : I)
   | PLam ~Tm ~Tm Name Tm   -- endpoints, body
 
@@ -151,7 +151,7 @@ data Tm
   | LLam Name Tm
 
   | Coe I I Name Ty Tm      -- coe r r' i.A t
-  | HCom I I Ty SysHCom Tm  -- hcom r r' i A [α → t] u
+  | HCom I I ~Ty SysHCom Tm  -- hcom r r' i A [α → t] u
 
   -- we switch the field orders here compared to the papers, because
   -- this one is the sensible "dependency" order
@@ -375,6 +375,7 @@ data Closure
   | CHComPi I I VTy NamedClosure NeSysHCom Val
 
   | CConst Val
+  -- | CConstLazy ~Val
 
   | C'λ'a''a        -- λ a. a
   | C'λ'a'i''a      -- λ a i. a
@@ -568,6 +569,7 @@ instance SubAction Closure where
       CHComPi (sub r) (sub r') (sub a) (sub b) (sub sys) (sub base)
 
     CConst t                  -> CConst (sub t)
+    -- CConstLazy t              -> CConstLazy (sub t)
     CIsEquiv1 a b f           -> CIsEquiv1 (sub a) (sub b) (sub f)
     CIsEquiv2 a b f g         -> CIsEquiv2 (sub a) (sub b) (sub f) (sub g)
     CIsEquiv3 a b f g linv    -> CIsEquiv3 (sub a) (sub b) (sub f) (sub g) (sub linv)
