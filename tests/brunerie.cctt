@@ -903,10 +903,13 @@ mapΩ²refl : (A : Pointed)(B : U)(f : A.1 → B) → (Ω² A).1 → (Ω² (B, f
 mapΩ³refl : (A : Pointed)(B : U)(f : A.1 → B) → (Ω³ A).1 → (Ω³ (B, f A.2)).1 :=
   λ A B f p i j k. f (p i j k);
 
+susp (A : Pointed) (x : A.1) : (Ω (Susp A.1, north)).1 :=
+  (merid' A.1 x ∙ (merid' A.1 A.2)⁻¹);
+
 alpha : join S¹ S¹ → Susp S¹ := λ[
   inl _. north;
   inr _. north;
-  push x y i. (merid' S¹ x ∙ (merid' S¹ y)⁻¹) i
+  push x y i. (susp S¹dot y ∙ susp S¹dot x) i
 ];
 
 substMinus (A : U)(x y : A) (B : A → U)(p : x = y) (by : B y) : B x :=
