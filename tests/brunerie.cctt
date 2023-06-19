@@ -1259,3 +1259,20 @@ g10 : sTrunc ℤ → ℤ :=
 
 brunerie : ℤ :=
   g10 (g9 (g8 (f7 (f6 (f5 (f4 (f3 (λ i j k. loop3 i j k))))))));
+
+
+-- Tests
+
+test0To3 : (Ω³ (joinDot S¹dot S¹)).1 := f3 (λ i j k. loop3 i j k);
+
+test0To4 : (Ω³ SuspS¹dot).1 := f4 test0To3;
+
+test0To5 : (Ω³ (joinDot S¹dot S¹)).1 := f5 test0To4;
+
+test0To6 : (Ω³ S³dot).1 := f6 test0To5;
+
+test0To7 : (Ω² (g2TruncDot S²dot)).1 := f7 test0To6;
+
+test0To8 : (Ω (gTruncDot S¹dot)).1 := g8 test0To7;
+
+test0To9 : sTrunc ℤ := g9 test0To8;
