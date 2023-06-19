@@ -578,6 +578,63 @@ hope : ℤ := writhe (λ i j k. terrible-cheat (ouch i j k));
 
 
 w22thing : Ω³ S² base2 :=
-  λ i j k. hcom 1 0 [i = 1 l. hcom 0 1 [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 k i))] base2; j = 0 l. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 k i))] base2; j = 1 l. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 k i))] base2; i = 0 l. hcom 1 0 [j = 0 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2; j = 1 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2; l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 @1 j)] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] (hcom 0 1 [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2); k = 0 l. hcom 1 i [j = 0 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2; j = 1 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2; l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 @1 j)] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] (hcom 0 1 [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2); k = 1 l. hcom 1 i [j = 0 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2; j = 1 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2; l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 @1 j)] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] (hcom 0 1 [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2)] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 @1 j)] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 k i)));
+  λ i j k. hcom 1 0 [i = 1 l. hcom 0 1 [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0
+  _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0
+  j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1
+  j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 k i))] base2; j = 0
+  l. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom
+  0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2]
+  base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1
+  _. base2] base2] (loop2 k i))] base2; j = 1 l. hcom 0 i [l = 0 _. base2; l = 1
+  i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom
+  0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2;
+  i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 k i))] base2;
+  i = 0 l. hcom 1 0 [j = 0 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0
+  _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0
+  j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1
+  j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] base2; j = 1
+  i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom
+  0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2]
+  base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1
+  _. base2] base2] base2)] base2; l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0
+  _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0
+  j. base2; j = 1 _. base2] base2] (loop2 @1 j)] (hcom 0 1 [i = 0 _. base2; i =
+  1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] (hcom 0 1 [l = 0
+  _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0
+  _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2]
+  (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2]
+  base2] base2)] base2); k = 0 l. hcom 1 i [j = 0 i. hcom 0 i [l = 0 _. base2; l
+  = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1
+  j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0
+  _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)]
+  base2; j = 1 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i
+  = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1
+  _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0
+  j. base2; j = 1 _. base2] base2] base2)] base2; l = 0 _. base2; l = 1 i. hcom
+  0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j =
+  0 j. base2; j = 1 _. base2] base2] (loop2 @1 j)] (hcom 0 1 [i = 0 _. base2; i
+  = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] (hcom 0 1 [l =
+  0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0
+  _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2]
+  (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2]
+  base2] base2)] base2); k = 1 l. hcom 1 i [j = 0 i. hcom 0 i [l = 0 _. base2; l
+  = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1
+  j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2] (hcom 0 1 [i = 0
+  _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)]
+  base2; j = 1 i. hcom 0 i [l = 0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i
+  = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1
+  _. base2] base2] base2] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0
+  j. base2; j = 1 _. base2] base2] base2)] base2; l = 0 _. base2; l = 1 i. hcom
+  0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 _. base2; j = 1 j. hcom 0 1 [j =
+  0 j. base2; j = 1 _. base2] base2] (loop2 @1 j)] (hcom 0 1 [i = 0 _. base2; i
+  = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2)] (hcom 0 1 [l =
+  0 _. base2; l = 1 i. hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0
+  _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] base2]
+  (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2]
+  base2] base2)] base2)] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0
+  _. base2; j = 1 j. hcom 0 1 [j = 0 j. base2; j = 1 _. base2] base2] (loop2 @1
+  j)] (hcom 0 1 [i = 0 _. base2; i = 1 j. hcom 0 1 [j = 0 j. base2; j = 1
+  _. base2] base2] (loop2 k i)));
 
+-- commit: 70122c63115866a32a5d1a6ed72a608a7028d59d
 error : ℤ := writhe w22thing;

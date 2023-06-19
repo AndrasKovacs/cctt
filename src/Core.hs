@@ -1034,8 +1034,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
                                       ∙ hcom r i (proj1 ty_ tf) (frc betasys) gr) alphasys))
             (ungluen gr alphasys)
 
-    in VGlue hcombase alphasys (fib^.body)
-             (insertI r $ insertI r' ((alphasys^.ivars) <> (betasys^.ivars)))
+    in VGlue hcombase alphasys (fib^.body) (alphasys^.ivars)
 
   VLine a ->
         VLLam
@@ -1380,7 +1379,7 @@ vbcons cof v ~sys = case cof of
 
 evalBoundary :: EvalArgs (Sys -> VBoundary)
 evalBoundary = \case
-  SEmpty          -> VBNe mempty
+  SEmpty          -> vbempty
   SCons cof t sys -> vbcons (evalCof cof) (eval t) (evalBoundary sys)
 
 hdcon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Val
@@ -1419,9 +1418,18 @@ hcase t b tag ecs@(EC sub env rc cs) = case frc t of
      --           [α i. coe i r' B* (case (t i) B cs)]
      --           (coe r r' B* (case base B cs))
     let bbind = bindI i_ \i -> b ∙ hcom r i a (frc sys) base in
-    hcomdn r r' (b ∙ t)
-      (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) sys)
+
+    -- TODO BUGFIX: this (frc sys) system forcing should not be necessary here!
+    -- brunerie_james_revised.cctt/error throws an error without the frc!
+    -- in commit: 70122c63115866a32a5d1a6ed72a608a7028d59d
+
+    hcomd r r' (b ∙ t)
+      (mapVSysHCom (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) (frc sys))
       (coed r r' bbind (hcase base b tag ecs))
+
+    -- hcomdn r r' (b ∙ t)
+    --   (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) sys)
+    --   (coed r r' bbind (hcase base b tag ecs))
 
   n@(VNe _ is) -> VNe (NHCase n b tag ecs) is
   v@VHole{}    -> v
