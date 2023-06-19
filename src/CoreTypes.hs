@@ -288,6 +288,11 @@ data Val
   | VNe Ne IS.Set
 
   -- Semineutrals. Not stable under substitution but computation can match on them.
+
+  -- NOTE: VHCom includes all stuck hcom-s, not just the HIT hcom-s.
+  -- Only HIT hcom-s can be scrutinized in computation. The other hcom cases
+  -- have to be handled in all other places as ordinary neutrals.
+
   | VGlueTy VTy NeSys'                                       -- coe can act on it
   | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IS.Set -- case can act on it
   | VHCom I I VTy NeSysHCom' Val IS.Set                      -- coe and case can act on it
@@ -479,6 +484,10 @@ data IClosure
 rebind :: BindI a -> b -> BindI b
 rebind (BindI x i _) b = BindI x i b
 {-# inline rebind #-}
+
+rebindLazy :: BindILazy a -> b -> BindILazy b
+rebindLazy (BindILazy x i _) b = BindILazy x i b
+{-# inline rebindLazy #-}
 
 -- Substitution
 ----------------------------------------------------------------------------------------------------

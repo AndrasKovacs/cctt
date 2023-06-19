@@ -925,7 +925,7 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
       let abind = rebind topA a in
       VHCom i j
         (VHTyCon ti (ps ∙ r'))
-        (mapNeSysHCom' (\k t -> coed r r' abind (t ∙ k)) sys)
+        (mapNeSysHCom' (\k t -> coe r r' abind (t ∙ k)) sys)
         (coed r r' abind b)
         is
 
@@ -994,7 +994,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
       $ ICHComPath r r' a lhs rhs nts base
 
   a@(VNe n is') ->
-    vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
+    VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1007,7 +1007,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
             (\t -> VPair ty_ (t ∙ r') (theCoeEquiv (bindIFromLazy t) r' r))
             nts
 
-    in vgluety base (WIS sys (insertI r $ insertI r' is))
+    in VGlueTy base (WIS sys (insertI r $ insertI r' is))
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -1034,7 +1034,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
                                       ∙ hcom r i (proj1 ty_ tf) (frc betasys) gr) alphasys))
             (ungluen gr alphasys)
 
-    in vglue hcombase alphasys (fib^.body)
+    in VGlue hcombase alphasys (fib^.body)
              (insertI r $ insertI r' ((alphasys^.ivars) <> (betasys^.ivars)))
 
   VLine a ->
@@ -1057,13 +1057,13 @@ hcomdn r r' topA ts@(WIS nts is) base =
         TTPProject prj  ->
           VDCon dci (hcomindsp r r' a (WIS prj (ts^.ivars)) ps (dci^.conId) 0 sp (dci^.fieldTypes))
         TTPNe (WIS sys is) -> -- NOTE: this "is" is extended with the blocking neutral component's ivars
-          vhcom r r' a (WIS sys is) base (insertI r $ insertI r' is)
+          VHCom r r' a (WIS sys is) base (insertI r $ insertI r' is)
 
     base@(VNe n is') ->
-      vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
+      VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
     base@(VHCom _ _ _ _ _ is') ->
-      vhcom r r' a ts base (insertI r $ insertI r' $ is <> is')
+      VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
 
     base@VHole{} -> base
     _            -> impossible
@@ -1071,7 +1071,7 @@ hcomdn r r' topA ts@(WIS nts is) base =
 
   -- "fhcom", hcom on HITs is blocked
   a@(VHTyCon tyinf ps) ->
-    vhcom r r' a ts base (insertI r $ insertI r' is)
+    VHCom r r' a ts base (insertI r $ insertI r' is)
 
   v@VHole{} -> v
 
@@ -1151,34 +1151,16 @@ ghcom r r' ~a ~sys ~b
 
 --------------------------------------------------------------------------------
 
-vhcom :: I -> I -> VTy -> NeSysHCom' -> Val -> IS.Set -> Val
-vhcom = VHCom
-{-# inline vhcom #-}
-
-vgluety :: VTy -> NeSys' -> Val
-vgluety = VGlueTy
-{-# inline vgluety #-}
-
-vglue :: Val -> NeSys' -> NeSys -> IS.Set -> Val
-vglue = VGlue
-{-# inline vglue #-}
-
-nunglue :: Ne -> NeSys -> Ne
-nunglue = NUnglue
-{-# inline nunglue #-}
-
---------------------------------------------------------------------------------
-
 glueTy :: NCofArg => DomArg => Val -> VSys -> Val
 glueTy ~a sys = case sys of
   VSTotal b -> proj1 ty_ b
-  VSNe sys  -> vgluety a sys
+  VSNe sys  -> VGlueTy a sys
 {-# inline glueTy #-}
 
 glue :: Val -> VSys -> VSys -> Val
 glue ~t eqs sys = case (eqs, sys) of
   (VSTotal{}, VSTotal v)         -> v
-  (VSNe eqs , VSNe (WIS sys is)) -> vglue t eqs sys is
+  (VSNe eqs , VSNe (WIS sys is)) -> VGlue t eqs sys is
   _                              -> impossible
 {-# inline glue #-}
 
@@ -1192,7 +1174,7 @@ unglue ~t sys = case sys of
 ungluen :: NCofArg => DomArg => Val -> NeSys' -> Val
 ungluen t (WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
-  VNe n is'               -> VNe (nunglue n sys) (is <> is')
+  VNe n is'               -> VNe (NUnglue n sys) (is <> is')
   v@VHole{}               -> v
   v                       -> impossible
 {-# inline ungluen #-}
@@ -1333,10 +1315,15 @@ projsys conid topSys = \case
             prj
 
       -- NOTE: extend blockers with neutral's ivars BUT DELETE BOUND VAR.
-      VNe n is -> TTPNe (WIS (topSys^.body) (IS.delete (t^.body.binds) is <> topSys^.ivars))
+      VNe _ is ->
+        TTPNe (WIS (topSys^.body) (IS.delete (t^.body.binds) is <> topSys^.ivars))
 
-      VHole{}  -> error "TODO: hole in system projection"
-      _        -> impossible
+      -- likewise
+      VHCom _ _ _ _ _ is ->
+        TTPNe (WIS (topSys^.body) (IS.delete (t^.body.binds) is <> topSys^.ivars))
+
+      VHole{} -> error "TODO: hole in system projection"
+      _       -> impossible
 
 projsys' :: NCofArg => DomArg => Lvl -> NeSysHCom' -> TryToProject
 projsys' conix (WIS sys is) = projsys conix (WIS sys is) sys
