@@ -1043,7 +1043,7 @@ encode : (x : S¹) → base1 = x → helix x :=
 winding : ΩS¹ → ℤ := encode base1;
 
 loopn : ℤ  → ΩS¹ := λ[
-  pos n. case n [ zero. λ i. base1
+  pos n. case n [ zero . λ i. base1
                 ; suc n. λ i. hcom 0 1 [ i=0 j. base1
                                        ; i=1 j. loop1 j]
                                        (loopn (pos n) i) ];
@@ -1071,11 +1071,12 @@ loopn : ℤ  → ΩS¹ := λ[
 --     ]
 --   ]
 
-
 decodeSquare : (n : ℤ) → (loopn (predℤ n)) ={i. base1 = loop1 i} (loopn n) := λ[
-  pos n. case n [ zero. λ i j. hcom 1 i [ j=0 k. base1 ; j=1 k. loop1 k] base1
-                ; suc n. λ i j. hcom 0 i [ j=0 k. base1 ; j=1 k. loop1 k ] (loopn (pos n) j)
-                ];
+  pos n. case n (n. (loopn (predℤ (pos n))) ={i. base1 = loop1 i} (loopn (pos n))) [
+               zero.  λ i j. hcom 1 i [ j=0 k. base1 ; j=1 k. loop1 k] base1
+             ; suc n. λ i j. hcom 0 i [ j=0 k. base1 ; j=1 k. loop1 k ] (loopn (pos n) j)
+             ];
+
   neg n. λ i j. hcom 1 i [ j=0 k. base1 ; j=1 k. loop1 k] (loopn (neg n) j)
 ];
 
