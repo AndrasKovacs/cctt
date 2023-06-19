@@ -1272,14 +1272,8 @@ encodeTruncS¹ : (Ω (gTruncDot S¹dot)).1 → sTrunc ℤ :=
 
 ----------------------------------------------------------------------------------------------------
 
--- TODO COPY: https://github.com/RedPRL/redtt/blob/master/library/cool/s3-to-join.red
-S³-joinS¹S¹ : S³ → join S¹ S¹ := e;
-joinS¹S¹-S³ : join S¹ S¹ → S³ := eInv;
-
-----------------------------------------------------------------------------------------------------
-
 f3 : (Ω³ S³dot).1 → (Ω³ (joinDot S¹dot S¹)).1 :=
-  mapΩ³refl S³dot (join S¹ S¹) S³-joinS¹S¹;
+  mapΩ³refl S³dot (join S¹ S¹) e;
 
 f4 : (Ω³ (joinDot S¹dot S¹)).1 → (Ω³ SuspS¹dot).1 :=
   mapΩ³refl (joinDot S¹dot S¹) (Susp S¹) alpha;
@@ -1288,7 +1282,7 @@ f5 : (Ω³ SuspS¹dot).1 → (Ω³ (joinDot S¹dot S¹)).1 :=
   h;
 
 f6 : (Ω³ (joinDot S¹dot S¹)).1 → (Ω³ S³dot).1 :=
-  mapΩ³refl (joinDot S¹dot S¹) S³ joinS¹S¹-S³;
+  mapΩ³refl (joinDot S¹dot S¹) S³ eInv;
 
 f7 : (Ω³ S³dot).1 → (Ω² (g2TruncDot S²dot)).1 :=
   π₃S³;
