@@ -404,8 +404,8 @@ capp (NCl _ t) ~u = case t of
   CEvalLazy (ECL s env rc t) ->
     let ?env = EDef env u; ?sub = wkSub s; ?recurse = rc in eval t
 
-  CSplit b tag ecs  -> case_ u b tag ecs
-  CHSplit b tag ecs -> hcase u b tag ecs
+  CSplit b ecs  -> case_ u b ecs
+  CHSplit b ecs -> hcase u b ecs
 
   CCoePi r r' a b t ->
     let ~x = u in
@@ -1244,11 +1244,11 @@ lookupCase i sp cs = case i // cs of
   (i, CSCons _ _  _    cs) -> lookupCase (i - 1) sp cs
   _                        -> impossible
 
-case_ :: NCofArg => DomArg => (Val -> NamedClosure -> CaseTag -> EvalClosure Cases -> Val)
-case_ t b tag ecs@(EC sub env rc cs) = case frc t of
+case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
+case_ t b ecs@(EC sub env rc cs) = case frc t of
   VDCon dci sp           -> let ?sub = wkSub sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
-  n@(VNe _ is)           -> VNe (NCase n b tag ecs) is
-  n@(VHCom _ _ _ _ _ is) -> VNe (NCase n b tag ecs) is
+  n@(VNe _ is)           -> VNe (NCase n b ecs) is
+  n@(VHCom _ _ _ _ _ is) -> VNe (NCase n b ecs) is
   v@VHole{}              -> v
   _                      -> impossible
 {-# inline case_ #-}
@@ -1403,8 +1403,8 @@ sysCofs = \case
   NSEmpty -> []
   NSCons t cs -> t^.binds : sysCofs cs
 
-hcase :: Val -> NamedClosure -> CaseTag -> EvalClosure HCases -> NCofArg => DomArg => Val
-hcase t b tag ecs@(EC sub env rc cs) = case frc t of
+hcase :: Val -> NamedClosure -> EvalClosure HCases -> NCofArg => DomArg => Val
+hcase t b ecs@(EC sub env rc cs) = case frc t of
 
   VHDCon i ps fs s _ ->
     let ?sub = wkSub sub; ?env = env; ?recurse = rc in
@@ -1424,14 +1424,14 @@ hcase t b tag ecs@(EC sub env rc cs) = case frc t of
     -- in commit: 70122c63115866a32a5d1a6ed72a608a7028d59d
 
     hcomd r r' (b ∙ t)
-      (mapVSysHCom (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) (frc sys))
-      (coed r r' bbind (hcase base b tag ecs))
+      (mapVSysHCom (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs)) (frc sys))
+      (coed r r' bbind (hcase base b ecs))
 
     -- hcomdn r r' (b ∙ t)
     --   (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) sys)
     --   (coed r r' bbind (hcase base b tag ecs))
 
-  n@(VNe _ is) -> VNe (NHCase n b tag ecs) is
+  n@(VNe _ is) -> VNe (NHCase n b ecs) is
   v@VHole{}    -> v
   v            -> impossible
 
@@ -1485,10 +1485,10 @@ eval = \case
   -- Inductives
   TyCon i ts         -> VTyCon i (params ts)
   DCon i sp          -> VDCon i (spine sp)
-  Case t x b tag cs  -> case_ (eval t) (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
-  HCase t x b tag cs -> hcase (eval t) (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
-  Split x b tag cs   -> VLam $ NCl x $ CSplit (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
-  HSplit x b tag cs  -> VLam $ NCl x $ CHSplit (evalClosureLazy x b) tag (EC ?sub ?env ?recurse cs)
+  Case t x b cs      -> case_ (eval t) (evalClosureLazy x b) (EC ?sub ?env ?recurse cs)
+  HCase t x b cs     -> hcase (eval t) (evalClosureLazy x b) (EC ?sub ?env ?recurse cs)
+  Split x b cs       -> VLam $ NCl x $ CSplit (evalClosureLazy x b) (EC ?sub ?env ?recurse cs)
+  HSplit x b cs      -> VLam $ NCl x $ CHSplit (evalClosureLazy x b) (EC ?sub ?env ?recurse cs)
   HTyCon i ts        -> VHTyCon i (params ts)
   HDCon i ps fs s    -> hdcon i (lazyParams ps) (spine fs) (sub s)
 
@@ -1619,24 +1619,24 @@ instance Force Ne Val where
     NCoe r r' a t     -> frc (coe r r' (frc a) (frc t))
     NUnglue t sys     -> frc (unglue (frc t) (frc sys))
     NLApp t i         -> frc (lapp (frc t) i)
-    NCase t b tag cs  -> frc (case_ (frc t) b tag cs)
-    NHCase t b tag cs -> frc (hcase (frc t) b tag cs)
+    NCase t b cs      -> frc (case_ (frc t) b cs)
+    NHCase t b cs     -> frc (hcase (frc t) b cs)
   {-# noinline frc #-}
 
   frcS = \case
-    t@NLocalVar{}     -> VNe t mempty
-    t@NDontRecurse{}  -> VNe t mempty
-    NSub n s          -> let ?sub = sub s in frcS n
-    NApp t u          -> frc (frcS t ∙ sub u)
-    NPApp l r t i     -> frc (papp (sub l) (sub r) (frcS t) (frcS i))
-    NProj1 t x        -> frc (proj1 x (frcS t))
-    NProj2 t x        -> frc (proj2 x (frcS t))
-    NUnpack t x       -> frc (unpack x (frcS t))
-    NCoe r r' a t     -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
-    NUnglue t sys     -> frc (unglue (frcS t) (frcS sys))
-    NLApp t i         -> frc (lapp (frcS t) (frcS i))
-    NCase t b tag cs  -> frc (case_ (frcS t) (sub b) tag (sub cs))
-    NHCase t b tag cs -> frc (hcase (frcS t) (sub b) tag (sub cs))
+    t@NLocalVar{}    -> VNe t mempty
+    t@NDontRecurse{} -> VNe t mempty
+    NSub n s         -> let ?sub = sub s in frcS n
+    NApp t u         -> frc (frcS t ∙ sub u)
+    NPApp l r t i    -> frc (papp (sub l) (sub r) (frcS t) (frcS i))
+    NProj1 t x       -> frc (proj1 x (frcS t))
+    NProj2 t x       -> frc (proj2 x (frcS t))
+    NUnpack t x      -> frc (unpack x (frcS t))
+    NCoe r r' a t    -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
+    NUnglue t sys    -> frc (unglue (frcS t) (frcS sys))
+    NLApp t i        -> frc (lapp (frcS t) (frcS i))
+    NCase t b cs     -> frc (case_ (frcS t) (sub b) (sub cs))
+    NHCase t b cs    -> frc (hcase (frcS t) (sub b) (sub cs))
 
 instance Force NeSys VSys where
 
@@ -1726,19 +1726,19 @@ unSubNe = \case
 
 unSubNeS :: SubArg => Ne -> Ne
 unSubNeS = \case
-  NSub n s           -> let ?sub = sub s in unSubNeS n
-  NLocalVar x        -> NLocalVar x
-  NDontRecurse x     -> NDontRecurse x
-  NApp t u           -> NApp (sub t) (sub u)
-  NPApp l r p i      -> NPApp (sub l) (sub r) (sub p) (sub i)
-  NProj1 t x         -> NProj1 (sub t) x
-  NProj2 t x         -> NProj2 (sub t) x
-  NUnpack t x        -> NUnpack (sub t) x
-  NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
-  NUnglue a sys      -> NUnglue (sub a) (sub sys)
-  NLApp t i          -> NLApp (sub t) (sub i)
-  NCase t b tag cs   -> NCase (sub t) (sub b) tag (sub cs)
-  NHCase t b tag cs  -> NHCase (sub t) (sub b) tag (sub cs)
+  NSub n s       -> let ?sub = sub s in unSubNeS n
+  NLocalVar x    -> NLocalVar x
+  NDontRecurse x -> NDontRecurse x
+  NApp t u       -> NApp (sub t) (sub u)
+  NPApp l r p i  -> NPApp (sub l) (sub r) (sub p) (sub i)
+  NProj1 t x     -> NProj1 (sub t) x
+  NProj2 t x     -> NProj2 (sub t) x
+  NUnpack t x    -> NUnpack (sub t) x
+  NCoe r r' a t  -> NCoe (sub r) (sub r') (sub a) (sub t)
+  NUnglue a sys  -> NUnglue (sub a) (sub sys)
+  NLApp t i      -> NLApp (sub t) (sub i)
+  NCase t b cs   -> NCase (sub t) (sub b) (sub cs)
+  NHCase t b cs  -> NHCase (sub t) (sub b) (sub cs)
 
 ----------------------------------------------------------------------------------------------------
 -- Definitions

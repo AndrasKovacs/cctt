@@ -170,6 +170,10 @@ infixr 4 //
 a // b = (a, b)
 {-# inline (//) #-}
 
+ptrEq :: a -> a -> Bool
+ptrEq x y = isTrue# (reallyUnsafePtrEquality# x y)
+{-# inline ptrEq #-}
+
 -- De Bruijn indices and levels
 --------------------------------------------------------------------------------
 

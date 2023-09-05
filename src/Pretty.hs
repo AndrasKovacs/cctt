@@ -354,7 +354,7 @@ tm = \case
   TyCon inf ts       -> appp (topName (^.name) (^.tyId) inf <> spine ts)
   DCon inf SPNil     -> dcon inf
   DCon inf sp        -> appp (dcon inf <> spine sp)
-  Case t x b _ cs    -> ifVerbose
+  Case t x b cs      -> ifVerbose
                          (let pt = proj t; pcs = cases cs in bind x \x ->
                           appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
                          (appp ("case " <> proj t <> " [" <> cases cs <> "]"))
@@ -363,17 +363,17 @@ tm = \case
   Unpack t x         -> case unProject t x of
                           Nothing -> projp (proj t <> ".1")
                           Just t  -> projp (proj t <> "." <> nm x)
-  Split x b _ cs     -> appp ("λ[" <> cases cs <> "]")
+  Split x b cs       -> appp ("λ[" <> cases cs <> "]")
   HTyCon inf SPNil   -> topName (^.name) (^.tyId) inf
   HTyCon inf ts      -> appp (topName (^.name) (^.tyId) inf <> spine ts)
   HDCon inf _ fs s   -> case fs of
                           SPNil | cod s == 0 -> hdcon inf
                           _ -> appp (hdcon inf <> spine fs <> goSub s)
-  HCase t x b _ cs   -> ifVerbose
+  HCase t x b cs     -> ifVerbose
                          (let pt = proj t; pcs = hcases cs in bind x \x ->
                           appp ("case " <> pt <> " (" <> x <> ". " <> tm b <> ") [" <> pcs <> "]"))
                          (appp ("case " <> proj t <> " [" <> hcases cs <> "]"))
-  HSplit x b _ cs    -> appp ("λ[" <> hcases cs <> "]")
+  HSplit x b cs      -> appp ("λ[" <> hcases cs <> "]")
 
 ----------------------------------------------------------------------------------------------------
 

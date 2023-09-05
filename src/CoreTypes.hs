@@ -123,11 +123,11 @@ data Tm
   -- Sub is the spine of interval args in a HDCon.
   | HDCon {-# nounpack #-} HDConInfo LazySpine Spine Sub
 
-  | HCase Tm Name ~Ty CaseTag HCases
-  | HSplit Name ~Ty CaseTag HCases
+  | HCase Tm Name ~Ty HCases
+  | HSplit Name ~Ty HCases
 
-  | Case Tm Name ~Ty CaseTag Cases
-  | Split Name ~Ty CaseTag Cases
+  | Case Tm Name ~Ty Cases
+  | Split Name ~Ty Cases
 
   | Pi Name Ty Ty
   | App Tm Tm
@@ -332,8 +332,8 @@ data Ne
   | NUnpack Ne Name
   | NCoe I I (BindI Val) Val
   | NUnglue Ne NeSys
-  | NCase Val NamedClosure CaseTag (EvalClosure Cases)
-  | NHCase Val NamedClosure CaseTag (EvalClosure HCases)
+  | NCase Val NamedClosure (EvalClosure Cases)
+  | NHCase Val NamedClosure (EvalClosure HCases)
   deriving Show
 
 data VDSpine
@@ -372,8 +372,8 @@ data Closure
   | CEvalLazy (EvalClosureLazy Tm)
 
   -- ^ Body of lambdaCase
-  | CSplit NamedClosure CaseTag (EvalClosure Cases)
-  | CHSplit NamedClosure CaseTag (EvalClosure HCases) -- HIT version
+  | CSplit NamedClosure (EvalClosure Cases)
+  | CHSplit NamedClosure (EvalClosure HCases) -- HIT version
 
   -- ^ Body of function coercions.
   | CCoePi I I (BindI VTy) (BindI NamedClosure) Val
@@ -566,10 +566,10 @@ instance SubAction (EvalClosureLazy a) where
 
 instance SubAction Closure where
   sub cl = case cl of
-    CEval     ecl     -> CEval (sub ecl)
-    CEvalLazy ecl     -> CEvalLazy (sub ecl)
-    CSplit  b tag ecl -> CSplit (sub b) tag (sub ecl)
-    CHSplit b tag ecl -> CHSplit (sub b) tag (sub ecl)
+    CEval     ecl -> CEval (sub ecl)
+    CEvalLazy ecl -> CEvalLazy (sub ecl)
+    CSplit  b ecl -> CSplit (sub b) (sub ecl)
+    CHSplit b ecl -> CHSplit (sub b) (sub ecl)
 
     -- note: recursive closure sub below! This is probably
     -- fine, because recursive depth is bounded by Pi type nesting.

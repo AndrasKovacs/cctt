@@ -19,19 +19,19 @@ instance Quote I I where
 instance Quote Ne Tm where
   -- forced input
   quote n = case unSubNe n of
-    NLocalVar x       -> LocalVar (lvlToIx ?dom x)
-    NSub n s          -> impossible
-    NApp t u          -> App (quote t) (quote u)
-    NPApp t l r i     -> PApp (quote t) (quote l) (quote r) (quote i)
-    NProj1 t x        -> Proj1 (quote t) x
-    NProj2 t x        -> Proj2 (quote t) x
-    NUnpack t x       -> Unpack (quote t) x
-    NCoe r r' a t     -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
-    NUnglue t sys     -> Unglue (quote t) (quote sys)
-    NLApp t i         -> LApp (quote t) (quote i)
-    NDontRecurse x    -> RecursiveCall x
-    NCase t b tag cs  -> Case (quote t) (b^.name) (quote b) tag (quoteCases cs)
-    NHCase t b tag cs -> HCase (quote t) (b^.name) (quote b) tag (quoteHCases cs)
+    NLocalVar x     -> LocalVar (lvlToIx ?dom x)
+    NSub n s        -> impossible
+    NApp t u        -> App (quote t) (quote u)
+    NPApp t l r i   -> PApp (quote t) (quote l) (quote r) (quote i)
+    NProj1 t x      -> Proj1 (quote t) x
+    NProj2 t x      -> Proj2 (quote t) x
+    NUnpack t x     -> Unpack (quote t) x
+    NCoe r r' a t   -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+    NUnglue t sys   -> Unglue (quote t) (quote sys)
+    NLApp t i       -> LApp (quote t) (quote i)
+    NDontRecurse x  -> RecursiveCall x
+    NCase t b cs    -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
+    NHCase t b cs   -> HCase (quote t) (b^.name) (quote b) (quoteHCases cs)
 
 instance Quote Val Tm where
   quote t = case frc t of

@@ -43,18 +43,12 @@ instance Conv Val where
     (VHCom r1 r2 a t b _, VHCom r1' r2' a' t' b' _) ->
       conv r1 r1' && conv r2 r2'  && conv a a' && conv t t' && conv b b'
 
+    -- Holes convert to anything
     (VHole{}, _) -> True
     (_, VHole{}) -> True
 
-    -- -- We keep track of evaluation contexts for holes.
-    -- -- This prevents spurious conversions between holes.
+    -- Alternative: track hole evaluation context
     -- (VHole _ p s e  , VHole _ p' s' e'  ) -> p == p' && conv s s' && conv e e'
-
-    -- -- Glue eta
-    -- -- A bit ugly that we put "mempty"-s there, and potentially dodgy, but the only
-    -- -- way conversion checking can succeed here is when the VNe-s are immediately consumed.
-    -- (NGlue b sys fib  , t'                   ) -> conv b (VNe (NUnglue t' sys) mempty)
-    -- (t                , NGlue b' sys' fib'   ) -> conv (VNe (NUnglue t sys') mempty) b'
 
     -- eta
     (VLam t           , t'                  ) -> fresh \x -> conv (t ∙ x) (t' ∙ x)
@@ -96,12 +90,12 @@ instance Conv Ne where
     -- why we first convert sys-es. Neutrals of different types can
     -- be converted, and then the type equality is part of the output,
     -- but the "a" here aren't neutrals!
-    (NUnglue a sys    , NUnglue a' sys'      ) -> conv sys sys' && conv a a'
+    (NUnglue a sys, NUnglue a' sys' ) -> conv sys sys' && conv a a'
 
-    (NCase t b tag cs , NCase t' b' tag' cs' ) -> conv t t' && conv b b' && convCases tag cs tag' cs'
-    (NHCase t b tag cs, NHCase t' b' tag' cs') -> conv t t' && conv b b' && convHCases tag cs tag' cs'
+    (NCase t b cs , NCase t' b' cs' ) -> conv t t' && conv b b' && convCases cs cs'
+    (NHCase t b cs, NHCase t' b' cs') -> conv t t' && conv b b' && convHCases cs cs'
 
-    (NUnpack n _      , NUnpack n' _         ) -> conv n n'
+    (NUnpack n _  , NUnpack n' _    ) -> conv n n'
 
     (NSub{} , _      ) -> impossible
     (t      , NSub{} ) -> impossible
@@ -142,18 +136,20 @@ convHCases' sub env cs sub' env' cs' = case (cs, cs') of
   _ ->
     impossible
 
-convCases :: NCofArg => DomArg => CaseTag -> EvalClosure Cases -> CaseTag -> EvalClosure Cases -> Bool
-convCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') = case (wkSub sub, wkSub sub') of
+convCases :: NCofArg => DomArg => EvalClosure Cases -> EvalClosure Cases -> Bool
+convCases (EC sub env _ cs) (EC sub' env' _ cs') = case (wkSub sub, wkSub sub') of
   (!sub, !sub') ->
-    (tag == tag' && conv sub sub' && conv env env')
+    -- approximate conversion, based on case body
+    (ptrEq cs cs' && conv sub sub' && conv env env')
     ||
     (let ?recurse = DontRecurse
      in convCases' sub env cs sub' env' cs')
 
-convHCases :: NCofArg => DomArg => CaseTag -> EvalClosure HCases -> CaseTag -> EvalClosure HCases -> Bool
-convHCases tag (EC sub env _ cs) tag' (EC sub' env' _ cs') = case (wkSub sub, wkSub sub') of
+convHCases :: NCofArg => DomArg => EvalClosure HCases -> EvalClosure HCases -> Bool
+convHCases (EC sub env _ cs) (EC sub' env' _ cs') = case (wkSub sub, wkSub sub') of
   (!sub, !sub') ->
-    (tag == tag' && conv sub sub' && conv env env')
+    -- approximate conversion, based on case body
+    (ptrEq cs cs' && conv sub sub' && conv env env')
     ||
     (let ?recurse = DontRecurse
      in convHCases' sub env cs sub' env' cs')
