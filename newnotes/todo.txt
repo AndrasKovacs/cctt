@@ -1,0 +1,5 @@
+
+  - Fix outstanding bug
+  - Get rid of case body tags in conversion, simply use pointer equality instead
+    (I see no reason why this wouldn't work)
+  - Perhaps experiment with pointer equality shortcutting in other closures

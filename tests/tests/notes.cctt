@@ -1,0 +1,81 @@
+
+{-
+- Homotopy type theory 2023 conference
+- kollab: - Anders Mörtberg
+          - Evan Cavallo
+          + Tom Jack
+
+
+Mi a téma?
+
+- Cubical type theory (sok féle Cubical TT)
+  - implementációja HoTT-nak
+
+- Cél: implementáció gyorsabb legyen
+
+- Mit szeretnénk gyorsítani:
+
+  - fő felh terület:
+     - matematikai formalizálás
+     - homotópia-elmélet:
+        - "gyengébb" topológia, folytonosan transzformálható dolgok
+           azonosnak vannak véve (fánk = bögre/csésze)
+
+        - N-dimenziós gömbök tulajdonságai
+           - loop space: veszünk egy pontot és a hurkokat azon a ponton
+           - hurkok körön ~ egész számok halmaza
+                          0   egy helyben állunk
+                          +1  óramutatóval megegyező kör
+                          -1  másik irányba kör
+             (bijekció a kettő között)
+           - N-edik loop space:
+             - 2-ik loop space: hurkok közötti transzformációk
+             - 3-ik loop space: ...
+
+           - példa: 3d gömb felület, azon veszünk egy pontot
+                - 2-ik loop space: triviális (1 elemű halmaz)
+
+   - Halmazelmélet:
+      - primitív objektum: halmaz ("well-founded" fák)
+           tartalmazás reláció nem mehet végtelenül lefelé
+
+   - HoTT:
+      - primitív objektum:
+          tér, ahol folytonos transzformáció alatt minden invariáns
+      - speciális eset: diszkrét tér ~ halmaz
+
+   - Kör mint tér HoTT-ban:
+
+   - Agda szintaxis:
+
+     data Circle : Type where
+        base : Circle                -- "bázis" pont
+        loop : base = base           -- út ami base és base között van
+
+     Kör := a "legkisebb" tér, amiben van egy pont és egy hurok a ponton
+            ("legkisebb": csak az van, amit specifikáltunk, és semmi más)
+
+     "higher inductive" definíció
+
+     induktív definíció:
+     data Nat : Set where
+        zero : Nat
+        suc : Nat → Nat
+
+     Nat := szabadon generált halmaz, amiben van egy elem (zero), és
+            egy endofüggvény (rákövetkezés)
+
+     n, m : Nat
+     n = m
+
+
+   CTT-ben formalizálták: π₄(S³)      -- (4D gömbfelület 4-edik loop space-je)
+
+     - klasszikus homotópia elmélet: nem konstruktív
+
+     - létezik egy egész szám B, amire igaz, hogy π₄(S³) ≈ ℤ/B
+       B definíciója konstruktív, ha futtatjuk, akkor azt szeretnénk, hogy
+       B = 2
+
+
+-}

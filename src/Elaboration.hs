@@ -196,7 +196,7 @@ check t topA = frcPTm t \case
     (P.Sym p _, VPath a y x) -> do
       constantICl a
       p <- check p (VPath a x y)
-      pure $! Sym (quote a) (quote x) (quote y) p
+      pure $! Sym (quote (a ∙ I0)) (quote x) (quote y) p
 
     (P.Ap _ f p, VPath b fx fy) -> do
       constantICl b

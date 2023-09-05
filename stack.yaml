@@ -10,7 +10,10 @@
 #      --ghci-options="-fprof-auto-calls"
 #   5. reload ghci
 
-resolver: nightly-2023-05-17
+#   NOTE: compiled cctt doesn't work in backtrace mode! It segfaults for
+#         who knows what reason.
+
+resolver: lts-21.9
 
 packages:
 - .
@@ -24,6 +27,6 @@ ghc-options:
 
 extra-deps:
 - git: https://github.com/AndrasKovacs/ghc-strict-implicit-params.git
-  commit: 215e0353374a61c0f8790371e4826b247c69580f
+  commit: fdef75e73c3354bd39b641e6b452b7087839e09b
 - git: https://github.com/AndrasKovacs/primdata
-  commit: 46b257c41a9eb0ad99ac1cd8c5dda029601089f5
+  commit: efcd652414b67057fea9673d0ba464ef5ff1e4ec

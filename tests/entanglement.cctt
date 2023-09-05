@@ -1,0 +1,149 @@
+-- "square induction" to derive splitting below in a braindead way
+isContr (A : U) : U := (fst : A) × ((y : A) → fst = y);
+
+sigPath (A : U) (B : A -> U) (u v : (x : A) * B x)
+  (p : u.1 = v.1) (q : u.2 ={i. B (p i)} v.2)
+  : u = v
+  := λ i. (p i, q i);
+
+higher inductive interval := seg (i : I) [];
+
+intervalContr : isContr interval
+  := (seg 0, λ [ seg i. λ j. hcom 1 i [j=0 _. seg 0; j=1 k. seg k] (seg j) ]);
+
+sqq : U := interval × interval;
+
+sqqContr : isContr sqq
+  := ((seg 0, seg 0), λ x. sigPath interval (λ _. interval) (seg 0, seg 0) x (intervalContr.2 x.1) (intervalContr.2 x.2));
+
+toSqq (A : U) (f : I → I → A) (x : sqq) : A :=
+  case x.1 [ seg i. case x.2 [ seg j. f i j ] ];
+
+ofSqq (A : U) (f : sqq → A) (i j : I) : A :=
+  f (seg i, seg j);
+
+lemSqq (A : U) (f : sqq → A) : (λ _. f (seg 0, seg 0)) ={_. sqq → A} f
+  := λ t x. f (sqqContr.2 x t);
+
+sqInd (A : U) (P : (I → I → A) → U)
+  (p : I → I → A) (h : P (λ _ _. p 0 0)) : P p
+  := coe 0 1 (t. P (ofSqq A (lemSqq A (toSqq A p) t))) h;
+
+
+
+-- Now, we will split a square along the main diagonal into 'left' and
+-- 'right' halves
+
+-- I apologize, but I think of squares like this:
+--
+--     ---> i
+--     |
+--     v
+--     j
+
+left (A : U) (p : I → I → A) : p 0 0 = p 0 1 := λ j. p 0 j;
+leftInv (A : U) (p : I → I → A) : p 0 1 = p 0 0 := (left A p)⁻¹;
+down (A : U) (p : I → I → A) : p 0 1 = p 1 1 := λ i. p i 1;
+
+up (A : U) (p : I → I → A) : p 0 0 = p 1 0 := λ i. p i 0;
+right (A : U) (p : I → I → A) : p 1 0 = p 1 1 := λ j. p 1 j;
+rightInv (A : U) (p : I → I → A) : p 1 1 = p 1 0 := (right A p)⁻¹;
+
+diag (A : U) (p : I → I → A) : p 0 0 = p 1 1 := λ j. p j j;
+
+splitLeft (A : U) (p : I → I → A) : refl ={i. leftInv A p i = down A p i} diag A p :=
+  sqInd A (λ p. refl ={i. leftInv A p i = down A p i} diag A p)
+    p
+    (λ i j. hcom j 1 [i=0 _. p 0 0; i=1 _. p 0 0] (p 0 0));
+
+splitRight (A : U) (p : I → I → A) : diag A p ={i. up A p i = rightInv A p i} refl :=
+  sqInd A (λ p. diag A p ={i. up A p i = rightInv A p i} refl)
+    p
+    (λ i j. hcom 0 j [i=0 _. p 0 0; i=1 _. p 0 0] (p 0 0));
+
+
+
+-- Now, a weird example using S²
+
+higher inductive S² :=
+  base2
+| loop2 (i j : I) [i=0. base2
+                  ;i=1. base2
+                  ;j=0. base2
+                  ;j=1. base2];
+
+ΩS² : U := base2 = base2;
+
+Ω²S² : U := refl ={_. ΩS²} refl;
+
+symRefl : ΩS² := (λ _. base2) ⁻¹;
+
+tweakRight : symRefl ={_. ΩS²} refl :=
+  λ i j. hcom i 1 [j=0 _. base2; j=1 _. base2] base2;
+
+tweakLeft : refl ={_. ΩS²} symRefl :=
+  λ i j. hcom 0 i [j=0 _. base2; j=1 _. base2] base2;
+
+weird1 : Ω²S² :=
+  λ i j.
+    hcom 0 1
+      [ i=0 k. base2
+      ; i=1 k. base2
+      ; j=0 k. base2
+      ; j=1 k. loop2 i k
+      ; i=j k. base2
+      ]
+      base2;
+
+weird1Left : symRefl ={_. ΩS²} refl :=
+  λ i j. splitLeft S² (λ i j. weird1 i j) j i;
+
+weird1Right : refl ={_. ΩS²} symRefl :=
+  λ i j. splitRight S² (λ i j. weird1 i j) j i;
+
+-- I've computed the elements below to integers elsewhere; todo
+-- compute them here
+
+-- this is +/- 1
+uhoh1Left : Ω²S² := tweakLeft ∙ weird1Left;
+-- this is 0
+uhoh1Right : Ω²S² := weird1Right ∙ tweakRight;
+
+loop2Inv : Ω²S² := (λ i j. loop2 i j) ⁻¹;
+
+-- this is propositionally equal to weird1 (todo, but I confirmed by
+-- computations elsewhere in cctt, and also in redtt)
+weird2 : Ω²S² :=
+  λ i j.
+    hcom 0 1
+      [ i=0 k. base2
+      ; i=1 k. base2
+      ; j=0 k. loop2Inv i k
+      ; j=1 k. base2
+      ; i=j k. base2
+      ]
+      base2;
+
+weird2Left : symRefl ={_. ΩS²} refl :=
+  λ i j. splitLeft S² (λ i j. weird2 i j) j i;
+
+weird2Right : refl ={_. ΩS²} symRefl :=
+  λ i j. splitRight S² (λ i j. weird2 i j) j i;
+
+-- this is 0
+uhoh2Left : Ω²S² := tweakLeft ∙ weird2Left;
+-- this is +/- 1
+uhoh2Right : Ω²S² := weird2Right ∙ tweakRight;
+
+-- So, that's weird! We have weird1 = weird2, yet we were able to
+-- distinguish them in some sense, determining which side of the
+-- diagonal the loop2 is on. For weird1, we can see it's on the
+-- "left", because uhoh1Left is nontrivial, but for weird2, it's on
+-- the "right", because uhoh1Right is nontrivial.
+
+-- But, it seems this does not lead to a contradiction, because we are
+-- not able to define a splitting map Ω²S² → Ω²S² × Ω²S² which would
+-- fail to be continuous -- we relied on the fact that the diagonals
+-- of the weird elements of Ω²S² are _judgmentally_ equal to refl...
+
+-- But... what if we had extension types?

@@ -612,7 +612,7 @@ icapp (NICl _ t) arg = case t of
     rinvfill a r r' (ffill a r r' x) k
 
 -- | sym (A : U)(x y : A) -> x = y : y = x
---     := λ i*. hcom 0 1 [i=0 j. p j; i=1 j. x] x;
+--     := λ {y}{x} i*. hcom 0 1 A [i=0 j. p j; i=1 j. x] x;
   ICSym a x y p ->
     let i = frc arg in
     hcomd I0 I1 a
@@ -1758,12 +1758,12 @@ path a t u = VPath (NICl N_ (ICConst a)) t u
 refl :: Val -> Val
 refl ~t = VPLam t t $ NICl N_ $ ICConst t
 
--- | sym (A : U)(x y : A) -> x = y : y = x
---     := λ i. hcom 0 1 A [i=0. p; i=1 _. x] x;
+-- | sym (A : U)(x y : A) (p : x = y) : y = x
+--     := λ i. hcom 0 1 A [i=0 j. p j; i=1 j. x] x;
 sym :: Val -> Val -> Val -> Val -> Val
-sym a ~x ~y p = VPLam x y $ NICl i_ (ICSym a x y p)
+sym a ~x ~y p = VPLam y x $ NICl i_ (ICSym a x y p)
 
--- | comp (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
+-- | trans (A : U)(x y z : A) (p : x = y) (q : y = z) : x = z
 --    := λ i. hcom 0 1 A [i=0 j. x; i=1 j. q j] (p i);
 trans :: Val -> Val -> Val -> Val -> Val -> Val -> Val
 trans a ~x ~y ~z p q = VPLam x z $ NICl i_ $ ICTrans a x y z p q

@@ -2,7 +2,8 @@ module Common (
     module Common
   , module Control.Monad
   , module Data.Bits
-  , module Lens.Micro.Platform
+  , module Lens.Micro
+  , module Lens.Micro.TH
   , module Data.IORef
   , module GHC.Exts
   , module GHC.Word
@@ -21,7 +22,8 @@ import Data.Bits
 import Data.List
 import Data.Time.Clock
 import GHC.Exts hiding (lazy, fromList, toList)
-import Lens.Micro.Platform
+import Lens.Micro
+import Lens.Micro.TH
 import Data.IORef
 import Data.Foldable
 import Debug.Trace (trace, traceM, traceShow, traceShowM)

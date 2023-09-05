@@ -120,7 +120,9 @@ data Tm
 
   -- LazySpine is for params which are usually quoted from syntax and we want
   -- to avoid computing them.
+  -- Sub is the spine of interval args in a HDCon.
   | HDCon {-# nounpack #-} HDConInfo LazySpine Spine Sub
+
   | HCase Tm Name ~Ty CaseTag HCases
   | HSplit Name ~Ty CaseTag HCases
 

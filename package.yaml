@@ -96,7 +96,7 @@ ghc-options:
 - -fworker-wrapper-cbv
 - -rtsopts
 - -threaded
-- -with-rtsopts= "-A64M -N4"
+- -with-rtsopts= "-N4 -A8M -qb0"
 - -Wall
 - -Wno-name-shadowing
 - -Wno-missing-signatures
@@ -114,7 +114,8 @@ dependencies:
 - filepath
 - flatparse
 - ghc-prim
-- microlens-platform
+- microlens
+- microlens-th
 - primdata
 - split
 - strict-impl-params
