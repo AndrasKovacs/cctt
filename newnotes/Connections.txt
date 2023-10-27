@@ -1,3 +1,59 @@
 
 Adding Connections
 ------------------------------------------------------------
+
+
+- Should I-s be normalized?
+  - e.g. DNF, and then we get clause decomposition more compactly
+    (but we need *both* DNF and CNF for efficient decomposition!)
+    (That looks kinda ugly)
+  - what about irredundancy?
+
+- Cof :=
+    Empty
+  | extend with ivar
+  | extend with clause
+
+- Clause := (ivarset, ivarset)
+
+    ∧ᵢ xᵢ ≤ ∨ᵢ yᵢ
+
+- Conversion for r and r'
+
+  We need the following for decomposition:
+
+    DNF <= CNF
+    ∨ᵢ conjᵢ <= ∧ᵢ disjᵢ
+           ->
+    ∀ i.  conjᵢ <= ∧ⱼ disjⱼ
+           ->
+    ∀ i j. conjᵢ <= disjⱼ   (quadratic obv)
+
+- Pairing DNF and CNF together all the time?
+- Compressing I-s and only normalize on conversion/testing?
+
+- DNF-ify on the left and CNF-ify on the right on the fly?
+
+Anyway, assuming that we have a clause
+
+  ∧ᵢ xᵢ ≤ ∨ᵢ yᵢ          ∨ᵢⱼ ¬xᵢ ∨ yⱼ as SAT
+
+We want to test for true/false/neutral in Γ
+
+  - if Γ,¬C is unsat -> true
+         (set xᵢ to 1 and yᵢ to 0, then check unsat)
+
+  - else if Γ,C is unsat -> false
+         (add the clause to Γ then check unsat)
+
+  - else neutral, and we can hold on to C (to potentially add it to context)
+
+- Converting I-s to DNF/CNF can be exponential
+- A decomposition yields quadratic clauses
+- For each clause in a decomposition, we do 2 SAT queries.
+
+
+------------------------------------------------------------
+-- Can we non-naively convert r = r' to CNF Boolean formula?
+
+See: Tseytin conversion

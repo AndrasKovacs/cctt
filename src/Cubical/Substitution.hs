@@ -11,10 +11,9 @@ import Cubical.Interval
 ----------------------------------------------------------------------------------------------------
 
 data IList = ILNil | ILDef IList I
-  deriving (Eq, Show)
+  deriving (Show)
 
 data Sub = Sub# Word32 Word32 IList
-  deriving Eq
 
 instance Show Sub where
   show (Sub d c is) = show (d, c, subToList (Sub d c is))
@@ -82,9 +81,10 @@ extError i d = error $ "ext: " ++ show i ++ " " ++ show d
 
 -- | Extend a sub with an expression. Domain doesn't change.
 ext :: Sub -> I -> Sub
-ext (Sub d c is) i =
-  let i' = matchIVar i (\case i | i < d -> IVar i; i -> extError (IVar i) d) i
-  in Sub d (c + 1) (ILDef is i')
+ext (Sub d c is) i
+  | isInScope d i =               -- SANITY, comment out for perf
+    Sub d (c + 1) (ILDef is i)
+  | otherwise     = extError i d
 {-# inline ext #-}
 
 instance Lift Sub where
@@ -110,7 +110,11 @@ appSub s a = let ?sub = s in sub a
 {-# inline appSub #-}
 
 instance SubAction I where
-  sub i = matchIVar i (\i -> lookupSub i ?sub) i
+  sub = \case
+    IVar i   -> lookupSub i ?sub
+    IAnd i j -> iand (sub i) (sub j)
+    IOr i j  -> ior (sub i) (sub j)
+    i        -> i
   {-# inline sub #-}
 
 -- | Substitution composition.

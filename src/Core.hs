@@ -1552,11 +1552,6 @@ class Force a b | a -> b where
   frcS :: SubArg => NCofArg => DomArg => a -> b -- apply a substitution and then force. It's always
                                                 -- an *error* to apply it multiple times.
 
-
-instance Force I I where
-  frc  i = appNCof ?cof i; {-# inline frc #-}
-  frcS i = appNCof ?cof (sub i); {-# inline frcS #-}
-
 instance Force Sub Sub where
   frc  s = appNCofToSub ?cof s; {-# inline frc #-}
   frcS s = appNCofToSub ?cof (sub s); {-# inline frcS #-}

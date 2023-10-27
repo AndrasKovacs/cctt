@@ -18,28 +18,38 @@ instance Monoid Set where
   mempty = Set 0
   {-# inline mempty #-}
 
+size :: Set -> Int
+size (Set w) = popCount w
+{-# inline size #-}
+
 intersect :: Set -> Set -> Set
 intersect (Set w) (Set w') = Set (w .&. w')
 {-# inline intersect #-}
 
 singleton :: IVar -> Set
-singleton x = insert x mempty
+singleton x = insertIVar x mempty
 {-# inline singleton #-}
 
--- | Insert an unforced I.
-insert :: IVar -> Set -> Set
-insert (IVar# x) (Set s) = Set (unsafeShiftL 1 (w2i x) .|. s)
-{-# inline insert #-}
+-- | Insert an IVar.
+insertIVar :: IVar -> Set -> Set
+insertIVar i@(IVar# x) (Set s)
+  | i <= maxIVar = Set (unsafeShiftL 1 (w2i x) .|. s)
+  | otherwise    = insertError
+{-# inline insertIVar #-}
 
 insertError :: a
 insertError = error "RAN OUT OF INTERVAL VARIABLES"
 {-# noinline insertError #-}
 
+-- | Insert all variables contained in an `I` into a set. This is a rough
+--   approximation!  In principle, `I`-s may have much smaller minimal forms,
+--   but it's very expensive to try to minimize.
 insertI :: I -> Set -> Set
-insertI i s = matchIVar i
-  (\i -> if i <= maxIVar then insert i s else insertError)
-  s
-{-# inline insertI #-}
+insertI i s = case i of
+  IVar x   -> insertIVar x s
+  IAnd i j -> insertI i $ insertI j s
+  IOr i j  -> insertI i $ insertI j s
+  _        -> s
 
 null :: Set -> Bool
 null (Set 0) = True
@@ -58,7 +68,7 @@ toList :: Set -> [IVar]
 toList = Data.IVarSet.foldr (:) []
 
 fromList :: [IVar] -> Set
-fromList = foldl' (flip insert) mempty
+fromList = foldl' (flip insertIVar) mempty
 
 popSmallest :: Set -> (Set -> IVar -> a) -> a -> a
 popSmallest (Set s) success ~fail = case s of
@@ -88,10 +98,8 @@ foldrAccum f acc r s = go s acc where
 {-# inline foldrAccum #-}
 
 instance SubAction Set where
-  sub is =
-    snd $ Data.IVarSet.foldl
-      (\(!sub, !acc) i ->
-         sub // matchIVar (lookupSub i sub) (\i -> insert i acc) acc)
-      (?sub :: Sub, mempty)
-      is
+  sub is = snd $ Data.IVarSet.foldl
+    (\(!sub, !acc) i -> sub // insertI (lookupSub i sub) acc)
+    (?sub :: Sub, mempty)
+    is
   {-# noinline sub #-}

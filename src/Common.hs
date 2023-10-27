@@ -126,6 +126,40 @@ rinv_ = NGeneric "rinv"
 coh_ = NGeneric "coh"
 ty_ = NGeneric "Ty_"
 
+-- State monad
+----------------------------------------------------------------------------------------------------
+
+data Pair a b = Pair a b deriving (Eq, Show)
+
+newtype State s a = State {runState :: s -> Pair a s}
+
+instance Functor (State s) where
+  fmap f (State g) = State \s -> case g s of Pair a s -> Pair (f a) s
+  {-# inline fmap #-}
+
+instance Applicative (State s) where
+  pure a = State \s -> Pair a s
+  {-# inline pure #-}
+  (<*>) (State f) (State g) = State \s -> case f s of
+    Pair f s -> case g s of
+      Pair a s -> Pair (f a) s
+  {-# inline (<*>) #-}
+
+instance Monad (State s) where
+  return = pure; {-# inline return #-}
+  State f >>= g = State \s -> case f s of
+    Pair a s -> runState (g a) s
+  {-# inline (>>=) #-}
+
+get :: State s s
+get = State \s -> Pair s s; {-# inline get #-}
+
+put :: s -> State s ()
+put s = State \_ -> Pair () s; {-# inline put #-}
+
+modify :: (s -> s) -> State s ()
+modify f = State \s -> Pair () (f s); {-# inline modify #-}
+
 ----------------------------------------------------------------------------------------------------
 
 uf :: Dbg => a

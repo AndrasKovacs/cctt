@@ -129,4 +129,4 @@ executables:
     main: Main.hs
     when:
     - condition: false
-      other-modules: Paths_cubeval
+      other-modules: Paths_cctt
