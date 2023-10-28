@@ -379,7 +379,7 @@ splitIdent x ix ls sp = case ls of
     st <- getState
     case M.lookup (spanToBs x) (st^.top) of
       Nothing                 -> err $ NameNotInScope x
-      Just (TEDef inf)        -> SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
+      Just (TEDef inf)        -> SplitInfer <$!> inferSp (TopVar inf DontPrintTrace) (inf^.defTyVal) sp
       Just (TETyCon inf)      -> pure $ TyConHead inf sp
       Just (TERec Nothing)    -> err $ GenericError $
                                        "Can't infer type for recursive call. "++
@@ -416,7 +416,7 @@ goSplit t sp topT = frcPTm t \case
       Just (TERec (Just inf)) ->
         SplitInfer <$!> inferSp (RecursiveCall inf) (inf^.recTyVal) sp
       Just (TEDef inf) ->
-        SplitInfer <$!> inferSp (TopVar inf) (inf^.defTyVal) sp
+        SplitInfer <$!> inferSp (TopVar inf DontPrintTrace) (inf^.defTyVal) sp
       Just (TETyCon inf) ->
         pure $ TyConHead inf sp
       Just (TEHTyCon inf) ->
@@ -1198,7 +1198,8 @@ elabTop = \case
     let ~tv = (let ?sub = idSub (dom ?cof); ?recurse = Recurse (coerce tv)
                in Core.eval t)
 
-    let defEntry = TEDef $ DI l t tv a va xn (coerce pos)
+    unfold <- getState <&> (^.unfolding)
+    let defEntry = TEDef $ DI l t tv a va xn (coerce pos) unfold
 
     modState $
         (top  %~ M.insert (spanToBs x) defEntry)

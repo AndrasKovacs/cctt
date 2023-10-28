@@ -29,4 +29,4 @@ extra-deps:
 - git: https://github.com/AndrasKovacs/ghc-strict-implicit-params.git
   commit: fdef75e73c3354bd39b641e6b452b7087839e09b
 - git: https://github.com/AndrasKovacs/primdata
-  commit: efcd652414b67057fea9673d0ba464ef5ff1e4ec
+  commit: 488d38201d0845a0e4e9e80ce78126ebae77350f

@@ -287,7 +287,9 @@ goSub (Sub _ _ is) = go is where
 
 tm :: Prec => PrettyArgs (Tm -> Txt)
 tm = \case
-  TopVar inf         -> topName (^.name) (^.defId) inf
+  TopVar inf trc     -> case trc of
+                          PrintTrace     -> "{-■-}" <> topName (^.name) (^.defId) inf <> "{-■-}"
+                          DontPrintTrace -> topName (^.name) (^.defId) inf
   RecursiveCall inf  -> topName (^.name) (^.recId) inf
   LocalVar x         -> localVar x
   Let x a t u        -> let pa = let_ a; pt = let_ t in bind x \x ->
@@ -298,11 +300,11 @@ tm = \case
                         pip (piBind n pa  <> goLinesPis b)
   App t u            -> appp (app t <> " " <> proj u)
   Lam x t            -> letp (bind x \x -> "λ " <> x <> goLams t)
-  Line N_ a   -> bindI N_ \_ -> pip ("I → " <> pi a)
+  Line N_ a          -> bindI N_ \_ -> pip ("I → " <> pi a)
   Line x a           -> bindI x   \x -> pip (lineBind x <> goLinesPis a)
   LApp t u           -> appp (app t <> " " <> int u)
   LLam x t           -> letp (bindI x \x -> "λ " <> x <> goLams t)
-  Sg N_ a b   -> let pa = eq a in bind N_ \_ ->
+  Sg N_ a b          -> let pa = eq a in bind N_ \_ ->
                         sigmap (pa <> " × " <> sigma b)
   Sg x a b           -> let pa = pair a in bind x \x ->
                         sigmap ("(" <> x <> " : " <> pa <> ") × " <> sigma b)
@@ -312,7 +314,7 @@ tm = \case
                           Just t  -> projp (proj t <> "." <> nm x)
   Proj2 t x          -> projp (proj t <> ".2")
   U                  -> "U"
-  Path N_ a t u  -> ifVerbose
+  Path N_ a t u      -> ifVerbose
                          (let pt = trans t; pu = trans u in bindI N_ \_ ->
                           eqp (pt <> " ={" <> "_" <> ". " <> pair a <> "} " <> pu))
                          (eqp (trans t <> " = " <> trans u))

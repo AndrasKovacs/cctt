@@ -1509,20 +1509,16 @@ evalIClosure :: EvalArgs (Name -> Tm -> NamedIClosure)
 evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 {-# inline evalIClosure #-}
 
-defInfo :: DefInfo -> Val
-defInfo inf = case inf of
-  DI _ _ v _ _ _ _ -> VUnf inf (FTopVar inf) v
-{-# inline defInfo #-}
-
--- defInfo :: DefInfo -> Val
--- defInfo inf = case inf of
---   DI _ _ v _ _ _ _ -> v
--- {-# inline defInfo #-}
+topVar :: DefInfo -> Val
+topVar inf = case inf of
+  DI _ _ v _ _ _ _ True -> v
+  DI _ _ v _ _ _ _ _    -> let f = FTopVar inf in VUnf f f v
+{-# inline topVar #-}
 
 eval :: EvalArgs (Tm -> Val)
 eval = \case
 
-  TopVar inf         -> defInfo inf
+  TopVar inf _       -> topVar inf
   RecursiveCall inf  -> recursiveCall inf
   LocalVar x         -> localVar x
   Let x _ t u        -> define (eval t) (eval u)

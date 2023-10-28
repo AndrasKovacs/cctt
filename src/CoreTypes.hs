@@ -26,17 +26,18 @@ instance Show RecInfo where
   show (RI _ _ _ x _) = show x
 
 data DefInfo = DI {
-    defInfoDefId    :: Lvl
-  , defInfoDef      :: Tm
-  , defInfoDefVal   :: ~Val
-  , defInfoDefTy    :: ~Ty
-  , defInfoDefTyVal :: ~VTy
-  , defInfoName     :: Name
-  , defInfoPos      :: Pos
+    defInfoDefId     :: Lvl
+  , defInfoDef       :: Tm
+  , defInfoDefVal    :: ~Val
+  , defInfoDefTy     :: ~Ty
+  , defInfoDefTyVal  :: ~VTy
+  , defInfoName      :: Name
+  , defInfoPos       :: Pos
+  , defInfoUnfolding :: Bool
   }
 
 instance Show DefInfo where
-  show (DI _ _ _ _ _ x _) = show x
+  show (DI _ _ _ _ _ x _ _) = show x
 
 data TyConInfo = TCI {
     tyConInfoTyId         :: Lvl
@@ -107,8 +108,11 @@ data LazySpine
   | LSPCons ~Tm LazySpine
   deriving Show
 
+data PrintTrace = PrintTrace | DontPrintTrace
+  deriving Show
+
 data Tm
-  = TopVar        {-# nounpack #-} DefInfo
+  = TopVar        {-# nounpack #-} DefInfo PrintTrace
   | RecursiveCall {-# nounpack #-} RecInfo
   | LocalVar Ix
   | Let Name ~Ty Tm Tm
@@ -290,7 +294,7 @@ data Val
   -- the second is the unfolded one. Unlike in MLTT, it's not easy to use neutrals
   -- to represent blocked unfoldings, because it is very much possible to compute
   -- away blocked unfoldings via cubical reductions.
-  | VUnf {-# nounpack #-} DefInfo Frozen ~Val
+  | VUnf Frozen Frozen ~Val
 
   -- Neutrals. Not stable under substitution, no computation can ever match on them.
   | VNe Ne IS.Set

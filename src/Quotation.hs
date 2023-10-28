@@ -10,17 +10,19 @@ import Core
 --       other things are not!
 ----------------------------------------------------------------------------------------------------
 
-type Unfold = (?unfold :: Bool)
+data QOpt = QUnfold | QDontUnfold | QTrace Frozen
+
+type QuoteOpt = (?opt :: QOpt)
 
 class Quote a b | a -> b where
-  quote :: NCofArg => DomArg => Unfold => a -> b
+  quote :: NCofArg => DomArg => QuoteOpt => a -> b
 
 quoteNoUnfold :: Quote a b => NCofArg => DomArg => a -> b
-quoteNoUnfold = let ?unfold = False in quote
+quoteNoUnfold = let ?opt = QDontUnfold in quote
 {-# inline quoteNoUnfold #-}
 
 quoteUnfold :: Quote a b => NCofArg => DomArg => a -> b
-quoteUnfold = let ?unfold = True in quote
+quoteUnfold = let ?opt = QUnfold in quote
 {-# inline quoteUnfold #-}
 
 instance Quote I I where
@@ -45,7 +47,9 @@ instance Quote Ne Tm where
 
 instance Quote Frozen Tm where
   quote t = case unSubFrozen t of
-    FTopVar inf           -> TopVar inf
+    f@(FTopVar inf)       -> case ?opt of
+                               QTrace f' | ptrEq f f' -> TopVar inf PrintTrace
+                               _                      -> TopVar inf DontPrintTrace
     FSub f s              -> impossible
     FApp t u              -> App (quote t) (quote u)
     FPApp l r t i         -> PApp (quote t) (quote l) (quote r) (quote i)
@@ -53,15 +57,21 @@ instance Quote Frozen Tm where
     FProj1 x t            -> Proj1 (quote t) x
     FProj2 x t            -> Proj2 (quote t) x
     FUnpack t x           -> Unpack (quote t) x
-    FCoeTy r r' a t       -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
-    FCoeVal r r' a t      -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+
+    FCoeTy r r' a t | quote r == quote r' -> quote t
+    FCoeTy r r' a t -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+
+    FCoeVal r r' a t | quote r == quote r' -> quote t
+    FCoeVal r r' a t -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
 
     -- we have to handle system forcing, because the the rest of cctt can
     -- only handle systems containing neutral cofibrations!
+    FHComTy r r' a sys t  | quote r == quote r' -> quote t
     FHComTy r r' a sys t  -> case frc sys of
                                VSHTotal t' -> quote (t' ∙ r')
                                VSHNe sys   -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
 
+    FHComVal r r' a sys t | quote r == quote r' -> quote t
     FHComVal r r' a sys t -> case frc sys of
                                VSHTotal t' -> quote (t' ∙ r')
                                VSHNe sys   -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
@@ -76,7 +86,8 @@ instance Quote Frozen Tm where
 instance Quote Val Tm where
   quote t = case frc t of
     VSub{}               -> impossible
-    VUnf _ v v'          -> if ?unfold then quote v' else quote v
+    VUnf _ v v'          -> case ?opt of QUnfold -> quote v'
+                                         _       -> quote v
     VNe n _              -> quote n
     VGlueTy a sys        -> GlueTy (quote a) (quote sys)
     VGlue t eqs sys _    -> Glue (quote t) (quote eqs) (quote sys)
@@ -100,7 +111,7 @@ instance Quote Val Tm where
 
 --------------------------------------------------------------------------------
 
-quoteCases' :: Unfold => EvalArgs (Cases -> Cases)
+quoteCases' :: QuoteOpt => EvalArgs (Cases -> Cases)
 quoteCases' = \case
   CSNil               -> CSNil
   CSCons x xs body cs ->
@@ -111,12 +122,12 @@ quoteCases' = \case
       (quoteCases' cs)
 
 -- We don't do recursive unfolding under Case binders
-quoteCases :: NCofArg => DomArg => Unfold => EvalClosure Cases -> Cases
+quoteCases :: NCofArg => DomArg => QuoteOpt => EvalClosure Cases -> Cases
 quoteCases (EC sub env _ cs) =
   let ?sub = wkSub sub; ?env = env; ?recurse = DontRecurse in quoteCases' cs
 {-# inline quoteCases #-}
 
-quoteHCases' :: Unfold => EvalArgs (HCases -> HCases)
+quoteHCases' :: QuoteOpt => EvalArgs (HCases -> HCases)
 quoteHCases' = \case
   HCSNil                  -> HCSNil
   HCSCons x xs is body cs ->
@@ -127,16 +138,16 @@ quoteHCases' = \case
       (quoteHCases' cs)
 
 -- We don't do recursive unfolding under Case binders
-quoteHCases :: NCofArg => DomArg => Unfold => EvalClosure HCases -> HCases
+quoteHCases :: NCofArg => DomArg => QuoteOpt => EvalClosure HCases -> HCases
 quoteHCases (EC sub env _ cs) =
   let ?sub = wkSub sub; ?env = env; ?recurse = DontRecurse in quoteHCases' cs
 {-# inline quoteHCases #-}
 
 quoteParamsNoUnfold :: NCofArg => DomArg => Env -> LazySpine
-quoteParamsNoUnfold = let ?unfold = False in quoteParams
+quoteParamsNoUnfold = let ?opt = QDontUnfold in quoteParams
 {-# inline quoteParamsNoUnfold #-}
 
-quoteParams :: NCofArg => DomArg => Unfold => Env -> LazySpine
+quoteParams :: NCofArg => DomArg => QuoteOpt => Env -> LazySpine
 quoteParams = go LSPNil where
   go acc = \case
     ENil       -> acc

@@ -6,6 +6,7 @@ import System.Environment
 import System.Exit
 import qualified FlatParse.Stateful as FP
 import Text.Read (readMaybe)
+import Data.Maybe
 
 import Common
 import CoreTypes
@@ -18,16 +19,19 @@ import Quotation
 import Statistics
 
 helpMsg = unlines [
-   "usage: cctt <file> [nf <topdef>] [trace <topdef>] [trace-to-end <topdef>] [ty <topdef>] [elab] [verbose] [no-hole-cxts]"
+   "usage: cctt <file> [nf <topdef>] [trace <topdef>] [trace-to-end <topdef>] [ty <topdef>] [elab] [verbose] [unfold] [no-hole-cxts]"
   ,""
   ,"Checks <file>. Options:"
-  ,"  nf <topdef>           prints the normal form of top-level definition <topdef>"
-  ,"  trace <topdef>        hit ENTER to interactively step through head unfoldings of a value"
-  ,"  trace-to-end <topdef> print all intermediate head unfoldings for a value"
-  ,"  ty <topdef>           prints the type of the top-level definition <topdef>"
-  ,"  elab                  prints the elaboration output"
-  ,"  verbose               prints path endpoints, hcom types and hole source positions explicitly"
-  ,"  no-hole-cxt           turn off printing local contexts of holes"
+  ,"  nf <topdef>           Prints the normal form of top-level definition <topdef>."
+  ,"                        Implies the \"unfold\" option."
+  ,"  trace <topdef>        Interactively steps through head unfoldings of a value."
+  ,"  ty <topdef>           Prints the type of the top-level definition <topdef>."
+  ,"  elab                  Prints the elaboration output."
+  ,"  verbose               Prints path endpoints, hcom types and hole source positions explicitly."
+  ,"                        Verbose output can be always re-checked by cctt."
+  ,"  unfold                Option to immediately unfold all top definitions during evaluation."
+  ,"                        May increase performance significantly."
+  ,"  no-hole-cxt           Turns off printing local contexts of holes."
   ]
 
 elabPath :: FilePath -> String -> IO ()
@@ -40,54 +44,67 @@ frc0 :: Val -> Val
 frc0 = let ?cof = emptyNCof; ?dom = 0 in frc
 {-# inline frc0 #-}
 
+quote0Trace :: Quote a b => Frozen -> a -> b
+quote0Trace f = let ?cof = emptyNCof; ?dom = 0; ?opt = QTrace f in quote
+{-# inline quote0Trace #-}
+
 quote0 :: Quote a b => a -> b
-quote0 = let ?cof = emptyNCof; ?dom = 0 in quoteNoUnfold
+quote0 = let ?cof = emptyNCof; ?dom = 0; ?opt = QDontUnfold in quote
 {-# inline quote0 #-}
+
+tracingCommands :: IO ()
+tracingCommands = do
+  putStrLn "Tracing commands:"
+  putStrLn "  ENTER                  proceed one step"
+  putStrLn "  skip ENTER             print final value"
+  putStrLn "  skip <number> ENTER    skip given number of steps"
+  putStrLn "  trace ENTER            print all steps until final value"
+  putStrLn "  trace <number> ENTER   proceed given number of steps"
+  putStrLn "  help ENTER             print this message"
 
 traceUnfold :: Val -> Int -> Int -> Bool -> IO ()
 traceUnfold v batch i silent = case frc0 v of
-  VUnf inf v v' -> do
+  VUnf f v v' -> do
     if batch <= 0 then do
-      putStrLn $ pretty0 $ quote0 v
-      putStrLn $ "STEP " ++ show (i + 1) ++ ": unfolding " ++ show (inf^.name)
+      putStrLn $ pretty0 $ quote0Trace f v
+      putStrLn $ "STEP " ++ show (i + 1)
       let getCommand = do
              l <- words <$> getLine
+             let retry = do
+                   putStrLn "Invalid input"
+                   tracingCommands
+                   getCommand
              case l of
-               []   -> traceUnfold v' 0 (i + 1) False
-               [n] -> do
-                 let batch = maybe 0 id $ readMaybe n
-                 traceUnfold v' (batch - 1) (i + 1) False
-               [n, "silent"] -> do
-                 let batch = maybe 0 id $ readMaybe n
-                 traceUnfold v' (batch - 1) (i + 1) True
-               _ -> do
-                 putStrLn "invalid input"
-                 putStrLn "  - Press ENTER to proceed one step"
-                 putStrLn "  - Type \"<number>\" and hit ENTER to proceed forward by that many steps"
-                 putStrLn "  - Type \"<number> silent\" to proceed forward without printing"
+               [] ->
+                 traceUnfold v' 0 (i + 1) False
+               ["trace"] ->
+                 traceUnfold v' maxBound (i + 1) False
+               ["trace", n] -> case readMaybe n of
+                 Just n  | n > 0 -> traceUnfold v' (n - 1) (i + 1) False
+                 _               -> retry
+               ["skip"] -> do
+                 traceUnfold v' maxBound (i + 1) True
+               ["skip", n] -> case readMaybe n of
+                 Just n | n > 0 -> traceUnfold v' (n - 1) (i + 1) True
+                 _              -> retry
+               ["help"] -> do
+                 tracingCommands
                  getCommand
+               _ ->
+                 retry
       getCommand
     else do
       unless silent $ do
-        putStrLn $ pretty0 $ quote0 v
-        putStrLn $ "STEP " ++ show (i + 1) ++ ": unfolding " ++ show (inf^.name)
+        putStrLn $ pretty0 $ quote0Trace f v
+        putStrLn $ "STEP " ++ show (i + 1)
         putStrLn ""
       traceUnfold v' (batch - 1) (i + 1) silent
   v -> do
     putStrLn $ pretty0 $ quote0 v
-    putStrLn $ "FINISHED AT STEP " ++ show i
+    putStrLn $ "FINISHED AT STEP " ++ show (i + 1)
 
-traceToEnd :: Val -> Int -> IO ()
-traceToEnd v i = case frc0 v of
-  VUnf inf v v' -> do
-    putStrLn $ pretty0 $ quote0 v
-    putStrLn $ "STEP " ++ show (i + 1) ++ ": unfolding " ++ show (inf^.name)
-    traceToEnd v' (i + 1)
-  v -> do
-    putStrLn $ pretty0 $ quote0 v
-    putStrLn $ "STEP " ++ show i
-
-parseArgs :: [String] -> IO (FilePath, Maybe String, Maybe String, Maybe String, Maybe String, Bool, Bool, Bool)
+parseArgs :: [String]
+       -> IO (FilePath, Maybe String, Maybe String, Maybe String, Bool, Bool, Bool, Bool)
 parseArgs args = do
   let exit = putStrLn helpMsg >> exitSuccess
   (path, args) <- case args of
@@ -99,9 +116,6 @@ parseArgs args = do
   (trace, args) <- case args of
     "trace":def:args -> pure (Just def, args)
     args             -> pure (Nothing, args)
-  (traceToEnd, args) <- case args of
-    "trace-to-end":def:args -> pure (Just def, args)
-    args                    -> pure (Nothing, args)
   (printty, args) <- case args of
     "ty":def:args -> pure (Just def, args)
     args          -> pure (Nothing, args)
@@ -111,21 +125,28 @@ parseArgs args = do
   (verbose, args) <- case args of
     "verbose":args -> pure (True, args)
     args           -> pure (False, args)
+  (unfold, args) <- case args of
+    "unfold":args -> pure (True, args)
+    args          -> pure (False, args)
   holeCxts <- case args of
     "no-hole-cxts":[] -> pure False
     []                -> pure True
     _                 -> exit
-  pure (path, printnf, trace, traceToEnd, printty, elab, verbose, holeCxts)
+  pure (path, printnf, trace, printty, elab, verbose, unfold, holeCxts)
 
 mainWith :: IO [String] -> IO ()
 mainWith getArgs = do
   resetElabState
   resetStats
-  (path, printnf, trace, tracetoend, printty, printelab, verbosity, holeCxts) <- parseArgs =<< getArgs
+  (path, printnf, trace, printty, printelab, verbosity, unfold, holeCxts) <- parseArgs =<< getArgs
 
-  modState $ printingOpts %~
-      (verbose .~ verbosity)
-    . (showHoleCxts .~ holeCxts)
+  unfold <- pure $ isJust printnf || unfold
+
+  modState $
+      (printingOpts %~ (verbose      .~ verbosity)
+                     . (showHoleCxts .~ holeCxts))
+    . (unfolding .~ unfold)
+
 
   (_, !totaltime) <- timed (elaborate path)
   st <- getState
@@ -166,24 +187,9 @@ mainWith getArgs = do
           putStrLn $ "No top-level definition with name: " ++ show x
           exitSuccess
       putStrLn ""
-      putStrLn "TRACING:"
-      putStrLn "  - Press ENTER to proceed one step"
-      putStrLn "  - Type \"<number>\" and hit ENTER to proceed forward by that many steps"
-      putStrLn "  - Type \"<number> silent\" to proceed forward without printing"
+      tracingCommands
       putStrLn ""
       traceUnfold v 0 0 False
-    Nothing ->
-      pure ()
-
-  case tracetoend of
-    Just x -> do
-      v <- case M.lookup (FP.strToUtf8 x) (st^.top) of
-        Just (TEDef i) ->
-          pure $! i^.defVal
-        _ -> do
-          putStrLn $ "No top-level definition with name: " ++ show x
-          exitSuccess
-      traceToEnd v 0
     Nothing ->
       pure ()
 

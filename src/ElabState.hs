@@ -11,7 +11,6 @@ import CoreTypes
 import Cubical
 
 import qualified Presyntax as P
-
 import qualified Data.LvlMap as LM
 import qualified Data.ByteString.Char8 as B
 
@@ -58,9 +57,10 @@ type LocalsArg  = (?locals  :: Locals)
 type Elab a     = LocalsArg => NCofArg => DomArg => EnvArg => PosArg => a
 
 data PrintingOpts = PrintingOpts {
-    printingOptsVerbose      :: Bool
-  , printingOptsErrPrinting  :: Bool
-  , printingOptsShowHoleCxts :: Bool }
+    printingOptsVerbose            :: Bool
+  , printingOptsErrPrinting        :: Bool
+  , printingOptsPrintNextUnfolding :: Bool
+  , printingOptsShowHoleCxts       :: Bool }
   deriving Show
 
 data LoadState = LoadState {
@@ -87,6 +87,7 @@ data State = State {
   , stateParsingTime         :: NominalDiffTime
   , statePrintingOpts        :: PrintingOpts
   , stateHCaseBoundaryChecks :: [HCaseBoundaryCheck]
+  , stateUnfolding           :: Bool
   } deriving Show
 
 makeFields ''LoadState
@@ -94,13 +95,13 @@ makeFields ''State
 makeFields ''PrintingOpts
 
 defaultPrintingOpts :: PrintingOpts
-defaultPrintingOpts = PrintingOpts False False True
+defaultPrintingOpts = PrintingOpts False False False True
 
 initLoadState :: LoadState
 initLoadState = LoadState mempty mempty mempty mempty mempty
 
 initState :: State
-initState = State mempty mempty 0 initLoadState 0 defaultPrintingOpts []
+initState = State mempty mempty 0 initLoadState 0 defaultPrintingOpts [] False
 
 stateRef :: IORef State
 stateRef = runIO $ newIORef initState
