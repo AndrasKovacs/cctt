@@ -286,6 +286,12 @@ type VTy = Val
 data Val
   = VSub Val Sub
 
+  -- Delayed definition unfolding; the first value is the non-unfolded version,
+  -- the second is the unfolded one. Unlike in MLTT, it's not easy to use neutrals
+  -- to represent blocked unfoldings, because it is very much possible to compute
+  -- away blocked unfoldings via cubical reductions.
+  | VUnf {-# nounpack #-} DefInfo Frozen ~Val
+
   -- Neutrals. Not stable under substitution, no computation can ever match on them.
   | VNe Ne IS.Set
 
@@ -334,6 +340,24 @@ data Ne
   | NUnglue Ne NeSys
   | NCase Val NamedClosure (EvalClosure Cases)
   | NHCase Val NamedClosure (EvalClosure HCases)
+  deriving Show
+
+data Frozen
+  = FTopVar {-# nounpack #-} DefInfo
+  | FSub Frozen Sub
+  | FApp Frozen ~Val
+  | FPApp ~Val ~Val Frozen I
+  | FLApp Frozen I
+  | FProj1 Name Frozen
+  | FProj2 Name Frozen
+  | FUnpack Frozen Name
+  | FCoeTy I I (BindI Frozen) ~Val
+  | FCoeVal I I ~(BindI Val) Frozen
+  | FHComTy I I Frozen NeSysHCom ~Val
+  | FHComVal I I Val NeSysHCom Frozen
+  | FUnglue Frozen NeSys
+  | FCase_ Frozen NamedClosure (EvalClosure Cases)
+  | FHCase_ Frozen NamedClosure (EvalClosure HCases)
   deriving Show
 
 data VDSpine
@@ -514,6 +538,10 @@ instance SubAction Ne where
   sub = \case
     NSub n s' -> NSub n (sub s')
     n         -> NSub n ?sub
+  {-# inline sub #-}
+
+instance SubAction Frozen where
+  sub t = FSub t ?sub
   {-# inline sub #-}
 
 instance SubAction NeSys where

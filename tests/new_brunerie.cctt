@@ -982,10 +982,10 @@ g10 : sTrunc ℤ → ℤ :=
 ];
 
 -- Actual Brunerie numbers
-β₃' : ℤ :=
+beta3' : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃' (push (loop1 i) (loop1 j) k)))));
 
-β₃ : ℤ :=
+beta3 : ℤ :=
   g10 (g9 (g8 (λ i j. f7 (λ k. η₃ (push (loop1 i) (loop1 j) k)))));
 
 

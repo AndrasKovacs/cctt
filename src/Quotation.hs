@@ -10,8 +10,18 @@ import Core
 --       other things are not!
 ----------------------------------------------------------------------------------------------------
 
+type Unfold = (?unfold :: Bool)
+
 class Quote a b | a -> b where
-  quote :: NCofArg => DomArg => a -> b
+  quote :: NCofArg => DomArg => Unfold => a -> b
+
+quoteNoUnfold :: Quote a b => NCofArg => DomArg => a -> b
+quoteNoUnfold = let ?unfold = False in quote
+{-# inline quoteNoUnfold #-}
+
+quoteUnfold :: Quote a b => NCofArg => DomArg => a -> b
+quoteUnfold = let ?unfold = True in quote
+{-# inline quoteUnfold #-}
 
 instance Quote I I where
   quote i = frc i; {-# inline quote #-}
@@ -33,9 +43,40 @@ instance Quote Ne Tm where
     NCase t b cs    -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
     NHCase t b cs   -> HCase (quote t) (b^.name) (quote b) (quoteHCases cs)
 
+instance Quote Frozen Tm where
+  quote t = case unSubFrozen t of
+    FTopVar inf           -> TopVar inf
+    FSub f s              -> impossible
+    FApp t u              -> App (quote t) (quote u)
+    FPApp l r t i         -> PApp (quote t) (quote l) (quote r) (quote i)
+    FLApp l i             -> LApp (quote t) (quote i)
+    FProj1 x t            -> Proj1 (quote t) x
+    FProj2 x t            -> Proj2 (quote t) x
+    FUnpack t x           -> Unpack (quote t) x
+    FCoeTy r r' a t       -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+    FCoeVal r r' a t      -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+
+    -- we have to handle system forcing, because the the rest of cctt can
+    -- only handle systems containing neutral cofibrations!
+    FHComTy r r' a sys t  -> case frc sys of
+                               VSHTotal t' -> quote (t' ∙ r')
+                               VSHNe sys   -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
+
+    FHComVal r r' a sys t -> case frc sys of
+                               VSHTotal t' -> quote (t' ∙ r')
+                               VSHNe sys   -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
+
+    FUnglue t sys         -> case frc sys of
+                               VSTotal teqv -> App (Proj1 (Proj2 (quote teqv) ty_) f_) (quote t)
+                               VSNe sys     -> Unglue (quote t) (quote sys)
+
+    FCase_ t b cs         -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
+    FHCase_ t b cs        -> HCase (quote t) (b^.name) (quote b) (quoteHCases cs)
+
 instance Quote Val Tm where
   quote t = case frc t of
     VSub{}               -> impossible
+    VUnf _ v v'          -> if ?unfold then quote v' else quote v
     VNe n _              -> quote n
     VGlueTy a sys        -> GlueTy (quote a) (quote sys)
     VGlue t eqs sys _    -> Glue (quote t) (quote eqs) (quote sys)
@@ -59,7 +100,7 @@ instance Quote Val Tm where
 
 --------------------------------------------------------------------------------
 
-quoteCases' :: EvalArgs (Cases -> Cases)
+quoteCases' :: Unfold => EvalArgs (Cases -> Cases)
 quoteCases' = \case
   CSNil               -> CSNil
   CSCons x xs body cs ->
@@ -70,12 +111,12 @@ quoteCases' = \case
       (quoteCases' cs)
 
 -- We don't do recursive unfolding under Case binders
-quoteCases :: NCofArg => DomArg => EvalClosure Cases -> Cases
+quoteCases :: NCofArg => DomArg => Unfold => EvalClosure Cases -> Cases
 quoteCases (EC sub env _ cs) =
   let ?sub = wkSub sub; ?env = env; ?recurse = DontRecurse in quoteCases' cs
 {-# inline quoteCases #-}
 
-quoteHCases' :: EvalArgs (HCases -> HCases)
+quoteHCases' :: Unfold => EvalArgs (HCases -> HCases)
 quoteHCases' = \case
   HCSNil                  -> HCSNil
   HCSCons x xs is body cs ->
@@ -86,18 +127,26 @@ quoteHCases' = \case
       (quoteHCases' cs)
 
 -- We don't do recursive unfolding under Case binders
-quoteHCases :: NCofArg => DomArg => EvalClosure HCases -> HCases
+quoteHCases :: NCofArg => DomArg => Unfold => EvalClosure HCases -> HCases
 quoteHCases (EC sub env _ cs) =
   let ?sub = wkSub sub; ?env = env; ?recurse = DontRecurse in quoteHCases' cs
 {-# inline quoteHCases #-}
 
-quoteParams :: NCofArg => DomArg => Env -> LazySpine
+quoteParamsNoUnfold :: NCofArg => DomArg => Env -> LazySpine
+quoteParamsNoUnfold = let ?unfold = False in quoteParams
+{-# inline quoteParamsNoUnfold #-}
+
+quoteParams :: NCofArg => DomArg => Unfold => Env -> LazySpine
 quoteParams = go LSPNil where
   go acc = \case
     ENil       -> acc
     EDef env v -> go (LSPCons (quote v) acc) env
 
 --------------------------------------------------------------------------------
+
+-- instance Quote VSys Sys where
+--   quote = \case
+--     VSTo
 
 instance Quote VDSpine Spine where
   quote = \case
