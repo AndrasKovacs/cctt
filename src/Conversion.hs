@@ -15,7 +15,7 @@ class Conv a where
   conv :: NCofArg => DomArg => a -> a -> Bool
 
 instance Conv Val where
-  conv t t' = case frc t // frc t' of
+  conv t t' = case frcFull t // frcFull t' of
 
     -- rigid match
     (VNe n _          , VNe n' _            ) -> conv n n'
@@ -66,6 +66,8 @@ instance Conv Val where
 
     (VSub{}, _     ) -> impossible
     (_     , VSub{}) -> impossible
+    (VUnf{}, _     ) -> impossible
+    (_     , VUnf{}) -> impossible
     _                -> False
 
 instance Conv a => Conv (WithIS a) where

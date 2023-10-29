@@ -354,11 +354,12 @@ instance Apply NamedClosure Val Val NCofArg DomArg where
 
 instance Apply Val Val Val NCofArg DomArg where
   (∙) t u = case frc t of
-    VLam t    -> t ∙ u
-    VNe t is  -> VNe (NApp t u) is
-    v@VHole{} -> v
-    _         -> impossible
-  {-# inline (∙) #-}
+    VLam t             -> t ∙ u
+    VNe t is           -> VNe (NApp t u) is
+    v@VHole{}          -> v
+    VUnf inf v v'      -> VUnf inf (FApp v u) (v' ∙ u)
+    _                  -> impossible
+--  {-# inline (∙) #-}
 
 instance Apply (BindI a) I a (SubAction a) NCofArg where
   (∙) (BindI x i a) j
@@ -378,10 +379,11 @@ instance Apply NamedIClosure I Val NCofArg DomArg where
 infixl 8 ∙~
 (∙~) :: NCofArg => DomArg => Val -> Val -> Val
 (∙~) t ~u = case frc t of
-  VLam t    -> t ∙ u
-  VNe t is  -> VNe (NApp t u) is
-  v@VHole{} -> v
-  _         -> impossible
+  VLam t      -> t ∙ u
+  VNe t is    -> VNe (NApp t u) is
+  v@VHole{}   -> v
+  VUnf x v v' -> VUnf x (FApp v u) (v' ∙ u)
+  _           -> impossible
 {-# inline (∙~) #-}
 
 ----------------------------------------------------------------------------------------------------
@@ -644,44 +646,49 @@ proj1 x t = case frc t of
   VPair _ t _ -> t
   VNe t is    -> VNe (NProj1 t x) is
   v@VHole{}   -> v
+  VUnf t v v' -> VUnf t (FProj1 x v) (proj1 x v')
   _           -> impossible
-{-# inline proj1 #-}
+-- {-# inline proj1 #-}
 
 proj2 :: NCofArg => DomArg => Name -> Val -> Val
 proj2 x t = case frc t of
   VPair _ _ u -> u
   VNe t is    -> VNe (NProj2 t x) is
   v@VHole{}   -> v
+  VUnf i v v' -> VUnf i (FProj2 x v) (proj2 x v')
   _           -> impossible
-{-# inline proj2 #-}
+-- {-# inline proj2 #-}
 
 unpack :: NCofArg => DomArg => Name -> Val -> Val
 unpack x t = case frc t of
-  VPack _ t -> t
-  VNe t is  -> VNe (NUnpack t x) is
-  v@VHole{} -> v
-  _         -> impossible
-{-# inline unpack #-}
+  VPack _ t   -> t
+  VNe t is    -> VNe (NUnpack t x) is
+  v@VHole{}   -> v
+  VUnf i v v' -> VUnf i (FUnpack v x) (unpack x v')
+  _           -> impossible
+-- {-# inline unpack #-}
 
 -- | Apply a path.
 papp :: NCofArg => DomArg => Val -> Val -> Val -> I -> Val
 papp ~l ~r ~t i = case frc i of
   I0     -> l
   I1     -> r
-  IVar x -> case frc t of
-    VPLam _ _ t -> t ∙ IVar x
-    VNe t is    -> VNe (NPApp l r t (IVar x)) (IS.insert x is)
-    v@VHole{}   -> v
-    _           -> impossible
-{-# inline papp #-}
+  i@(IVar x) -> case frc t of
+    VPLam _ _ t   -> t ∙ IVar x
+    VNe t is      -> VNe (NPApp l r t i) (IS.insert x is)
+    v@VHole{}     -> v
+    VUnf inf t t' -> VUnf inf (FPApp l r t i) (papp l r t' i)
+    _             -> impossible
+-- {-# inline papp #-}
 
 lapp :: NCofArg => DomArg => Val -> I -> Val
 lapp t i = case frc t of
-  VLLam t   -> t ∙ i
-  VNe t is  -> VNe (NLApp t i) is
-  v@VHole{} -> v
-  _         -> impossible
-{-# inline lapp #-}
+  VLLam t       -> t ∙ i
+  VNe t is      -> VNe (NLApp t i) is
+  v@VHole{}     -> v
+  VUnf inf t t' -> VUnf inf (FLApp t i) (lapp t' i)
+  _             -> impossible
+-- {-# inline lapp #-}
 
 coed :: I -> I -> BindI Val -> Val -> NCofArg => DomArg => Val
 coed r r' topA t = case (frc topA) ^. body of
@@ -721,6 +728,9 @@ coed r r' topA t = case (frc topA) ^. body of
       VDCon dci (coeindsp r r' ps sp (dci^.fieldTypes))
     t@(VNe _ is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
+    VUnf inf t t' ->
+      let abind = rebind topA a
+      in VUnf inf (FCoeVal r r' abind t) (coed r r' abind t')
     t@(VHCom _ _ _ _ _ is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
     v@VHole{} ->
@@ -732,6 +742,9 @@ coed r r' topA t = case (frc topA) ^. body of
   a@(VNe _ is) ->
     VNe (NCoe r r' (rebind topA a) t)
         (insertI r $ insertI r' $ IS.delete (topA^.binds) is)
+
+  VUnf inf (rebind topA -> a) (rebind topA -> a') ->
+    VUnf inf (FCoeTy r r' a t) (coed r r' a' t)
 
 
 {-
@@ -932,6 +945,10 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     t@(VNe n is) ->
       VNe (NCoe r r' (rebind topA a) t) (insertI r $ insertI r' is)
 
+    VUnf inf t t' ->
+      let abind = rebind topA a in
+      VUnf inf (FCoeVal r r' abind t) (coed r r' abind t')
+
     t@VHole{} ->
       t
 
@@ -995,6 +1012,9 @@ hcomdn r r' topA ts@(WIS nts is) base =
 
   a@(VNe n is') ->
     VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
+
+  VUnf inf a a' ->
+    VUnf inf (FHComTy r r' a nts base) (hcomdn r r' a' ts base)
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1060,6 +1080,9 @@ hcomdn r r' topA ts@(WIS nts is) base =
 
     base@(VNe n is') ->
       VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
+
+    VUnf inf base base' ->
+      VUnf inf (FHComVal r r' a nts base) (hcomdn r r' a ts base')
 
     base@(VHCom _ _ _ _ _ is') ->
       VHCom r r' a ts base (insertI r $ insertI r' $ is <> is')
@@ -1171,12 +1194,13 @@ unglue ~t sys = case sys of
 
 -- | Unglue with neutral system arg.
 ungluen :: NCofArg => DomArg => Val -> NeSys' -> Val
-ungluen t (WIS sys is) = case frc t of
+ungluen t nsys@(WIS sys is) = case frc t of
   VGlue base _ _ _        -> base
   VNe n is'               -> VNe (NUnglue n sys) (is <> is')
+  VUnf inf t t'           -> VUnf inf (FUnglue t sys) (ungluen t' nsys)
   v@VHole{}               -> v
-  v                       -> impossible
-{-# inline ungluen #-}
+  v                       -> error $ take 1000 $ show v
+-- {-# inline ungluen #-}
 
 
 -- Strict inductive types
@@ -1244,14 +1268,16 @@ lookupCase i sp cs = case i // cs of
   (i, CSCons _ _  _    cs) -> lookupCase (i - 1) sp cs
   _                        -> impossible
 
-case_ :: NCofArg => DomArg => (Val -> NamedClosure -> EvalClosure Cases -> Val)
+case_ :: NCofArg => DomArg => Val -> NamedClosure -> EvalClosure Cases -> Val
 case_ t b ecs@(EC sub env rc cs) = case frc t of
-  VDCon dci sp           -> let ?sub = wkSub sub; ?env = env; ?recurse = rc in lookupCase (dci^.conId) sp cs
+  VDCon dci sp           -> let ?sub = wkSub sub; ?env = env; ?recurse = rc
+                            in lookupCase (dci^.conId) sp cs
   n@(VNe _ is)           -> VNe (NCase n b ecs) is
+  VUnf inf t t'          -> VUnf inf (FCase_ t b ecs) (case_ t' b ecs)
   n@(VHCom _ _ _ _ _ is) -> VNe (NCase n b ecs) is
   v@VHole{}              -> v
   _                      -> impossible
-{-# inline case_ #-}
+-- {-# inline case_ #-}
 
 projVDSpine :: Lvl -> VDSpine -> Val
 projVDSpine x sp = case (x, sp) of
@@ -1262,8 +1288,12 @@ projVDSpine x sp = case (x, sp) of
 lazyprojfield :: NCofArg => DomArg => Lvl -> Lvl -> Val -> Val
 lazyprojfield conid fieldid v = case frc v of
   VDCon dci sp | conid == (dci^.conId) -> projVDSpine fieldid sp
+
+  -- we drop the Unf here because there's no simple syntactic representation of
+  -- lazy field projection that could be Frozen.
+  VUnf _ _ v'                          -> lazyprojfield conid fieldid v'
   _                                    -> impossible
-{-# inline lazyprojfield #-}
+-- {-# inline lazyprojfield #-}
 
 lazyprojsys :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom -> NeSysHCom
 lazyprojsys conid fieldid = \case
@@ -1275,7 +1305,8 @@ lazyprojsys' :: NCofArg => DomArg => Lvl -> Lvl -> NeSysHCom' -> NeSysHCom'
 lazyprojsys' conid fieldid (WIS sys is) = WIS (lazyprojsys conid fieldid sys) is
 {-# inline lazyprojsys' #-}
 
-hcomind0sp :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom' -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> VDSpine
+hcomind0sp :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom'
+           -> Env -> Lvl -> Lvl -> VDSpine -> Tel -> VDSpine
 hcomind0sp r r' a sys params conid fieldid sp fieldtypes = case (sp, fieldtypes) of
   (VDNil, TNil) ->
     VDNil
@@ -1316,6 +1347,9 @@ projsys conid topSys = \case
       -- NOTE: extend blockers with neutral's ivars BUT DELETE BOUND VAR.
       VNe _ is ->
         TTPNe (WIS (topSys^.body) (IS.delete (t^.body.binds) is <> topSys^.ivars))
+
+      VUnf _ _ _ ->
+        error "TODO: unfolding in system projection"
 
       -- likewise
       VHCom _ _ _ _ _ is ->
@@ -1432,7 +1466,8 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
     --   (coed r r' bbind (hcase base b tag ecs))
 
   n@(VNe _ is) -> VNe (NHCase n b ecs) is
-  v@VHole{}    -> v
+  VUnf inf t t' -> VUnf inf (FHCase_ t b ecs) (hcase t' b ecs)
+  v@VHole{}     -> v
   v            -> impossible
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
@@ -1474,10 +1509,16 @@ evalIClosure :: EvalArgs (Name -> Tm -> NamedIClosure)
 evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 {-# inline evalIClosure #-}
 
+topVar :: DefInfo -> Val
+topVar inf = case inf of
+  DI _ _ v _ _ _ _ True -> v
+  DI _ _ v _ _ _ _ _    -> let f = FTopVar inf in VUnf f f v
+{-# inline topVar #-}
+
 eval :: EvalArgs (Tm -> Val)
 eval = \case
 
-  TopVar inf         -> inf^.defVal
+  TopVar inf _       -> topVar inf
   RecursiveCall inf  -> recursiveCall inf
   LocalVar x         -> localVar x
   Let x _ t u        -> define (eval t) (eval u)
@@ -1552,6 +1593,11 @@ class Force a b | a -> b where
   frcS :: SubArg => NCofArg => DomArg => a -> b -- apply a substitution and then force. It's always
                                                 -- an *error* to apply it multiple times.
 
+-- | Force all cofs, subs *and* unfoldings away.
+frcFull :: NCofArg => DomArg => Val -> Val
+frcFull v = case frc v of
+  VUnf _ _ v' -> frcFull v'
+  v           -> v
 
 instance Force I I where
   frc  i = appNCof ?cof i; {-# inline frc #-}
@@ -1568,6 +1614,7 @@ instance Force NeCof VCof where
 instance Force Val Val where
   frc = \case
     VSub v s                                -> let ?sub = wkSub s in frcS v
+    v@VUnf{}                                -> v
     VNe t is               | isUnblocked is -> frc t
     VGlueTy a (WIS sys is) | isUnblocked is -> frc (glueTy a (frc sys))
     VHDCon i ps fs s is    | isUnblocked is -> frc (hdcon i ps fs s)
@@ -1577,6 +1624,7 @@ instance Force Val Val where
 
   frcS = \case
     VSub v s                                 -> let ?sub = sub s in frcS v
+    VUnf inf v v'                            -> VUnf inf (sub v) (sub v')
     VNe t is               | isUnblockedS is -> frcS t
     VGlueTy a (WIS sys is) | isUnblockedS is -> frc (glueTy (sub a) (frcS sys))
     VHDCon i ps fs s is    | isUnblockedS is -> frc (hdcon i (sub ps) (sub fs) (sub s))
@@ -1608,35 +1656,35 @@ instance Force Val Val where
 
 instance Force Ne Val where
   frc = \case
-    t@NLocalVar{}     -> VNe t mempty
-    t@NDontRecurse{}  -> VNe t mempty
-    NSub n s          -> let ?sub = wkSub s in frcS n
-    NApp t u          -> frc (frc t ∙ u)
-    NPApp l r t i     -> frc (papp l r (frc t) i)
-    NProj1 t x        -> frc (proj1 x (frc t))
-    NProj2 t x        -> frc (proj2 x (frc t))
-    NUnpack t x       -> frc (unpack x (frc t))
-    NCoe r r' a t     -> frc (coe r r' (frc a) (frc t))
-    NUnglue t sys     -> frc (unglue (frc t) (frc sys))
-    NLApp t i         -> frc (lapp (frc t) i)
-    NCase t b cs      -> frc (case_ (frc t) b cs)
-    NHCase t b cs     -> frc (hcase (frc t) b cs)
+    t@NLocalVar{}      -> VNe t mempty
+    t@NDontRecurse{}   -> VNe t mempty
+    NSub n s           -> let ?sub = wkSub s in frcS n
+    NApp t u           -> frc (frc t ∙ u)
+    NPApp l r t i      -> frc (papp l r (frc t) i)
+    NProj1 t x         -> frc (proj1 x (frc t))
+    NProj2 t x         -> frc (proj2 x (frc t))
+    NUnpack t x        -> frc (unpack x (frc t))
+    NCoe r r' a t      -> frc (coe r r' (frc a) (frc t))
+    NUnglue t sys      -> frc (unglue (frc t) (frc sys))
+    NLApp t i          -> frc (lapp (frc t) i)
+    NCase t b cs       -> frc (case_ (frc t) b cs)
+    NHCase t b cs      -> frc (hcase (frc t) b cs)
   {-# noinline frc #-}
 
   frcS = \case
-    t@NLocalVar{}    -> VNe t mempty
-    t@NDontRecurse{} -> VNe t mempty
-    NSub n s         -> let ?sub = sub s in frcS n
-    NApp t u         -> frc (frcS t ∙ sub u)
-    NPApp l r t i    -> frc (papp (sub l) (sub r) (frcS t) (frcS i))
-    NProj1 t x       -> frc (proj1 x (frcS t))
-    NProj2 t x       -> frc (proj2 x (frcS t))
-    NUnpack t x      -> frc (unpack x (frcS t))
-    NCoe r r' a t    -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
-    NUnglue t sys    -> frc (unglue (frcS t) (frcS sys))
-    NLApp t i        -> frc (lapp (frcS t) (frcS i))
-    NCase t b cs     -> frc (case_ (frcS t) (sub b) (sub cs))
-    NHCase t b cs    -> frc (hcase (frcS t) (sub b) (sub cs))
+    t@NLocalVar{}      -> VNe t mempty
+    t@NDontRecurse{}   -> VNe t mempty
+    NSub n s           -> let ?sub = sub s in frcS n
+    NApp t u           -> frc (frcS t ∙ sub u)
+    NPApp l r t i      -> frc (papp (sub l) (sub r) (frcS t) (frcS i))
+    NProj1 t x         -> frc (proj1 x (frcS t))
+    NProj2 t x         -> frc (proj2 x (frcS t))
+    NUnpack t x        -> frc (unpack x (frcS t))
+    NCoe r r' a t      -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
+    NUnglue t sys      -> frc (unglue (frcS t) (frcS sys))
+    NLApp t i          -> frc (lapp (frcS t) (frcS i))
+    NCase t b cs       -> frc (case_ (frcS t) (sub b) (sub cs))
+    NHCase t b cs      -> frc (hcase (frcS t) (sub b) (sub cs))
 
 instance Force NeSys VSys where
 
@@ -1716,7 +1764,7 @@ instance Force a fa => Force (BindILazy a) (BindILazy fa) where
   {-# inline frcS #-}
 
 ----------------------------------------------------------------------------------------------------
--- Pushing neutral substitutions
+-- Pushing neutral & frozen substitutions
 ----------------------------------------------------------------------------------------------------
 
 unSubNe :: Ne -> Ne
@@ -1726,19 +1774,42 @@ unSubNe = \case
 
 unSubNeS :: SubArg => Ne -> Ne
 unSubNeS = \case
-  NSub n s       -> let ?sub = sub s in unSubNeS n
-  NLocalVar x    -> NLocalVar x
-  NDontRecurse x -> NDontRecurse x
-  NApp t u       -> NApp (sub t) (sub u)
-  NPApp l r p i  -> NPApp (sub l) (sub r) (sub p) (sub i)
-  NProj1 t x     -> NProj1 (sub t) x
-  NProj2 t x     -> NProj2 (sub t) x
-  NUnpack t x    -> NUnpack (sub t) x
-  NCoe r r' a t  -> NCoe (sub r) (sub r') (sub a) (sub t)
-  NUnglue a sys  -> NUnglue (sub a) (sub sys)
-  NLApp t i      -> NLApp (sub t) (sub i)
-  NCase t b cs   -> NCase (sub t) (sub b) (sub cs)
-  NHCase t b cs  -> NHCase (sub t) (sub b) (sub cs)
+  NSub n s           -> let ?sub = sub s in unSubNeS n
+  NLocalVar x        -> NLocalVar x
+  NDontRecurse x     -> NDontRecurse x
+  NApp t u           -> NApp (sub t) (sub u)
+  NPApp l r p i      -> NPApp (sub l) (sub r) (sub p) (sub i)
+  NProj1 t x         -> NProj1 (sub t) x
+  NProj2 t x         -> NProj2 (sub t) x
+  NUnpack t x        -> NUnpack (sub t) x
+  NCoe r r' a t      -> NCoe (sub r) (sub r') (sub a) (sub t)
+  NUnglue a sys      -> NUnglue (sub a) (sub sys)
+  NLApp t i          -> NLApp (sub t) (sub i)
+  NCase t b cs       -> NCase (sub t) (sub b) (sub cs)
+  NHCase t b cs      -> NHCase (sub t) (sub b) (sub cs)
+
+unSubFrozen :: Frozen -> Frozen
+unSubFrozen = \case
+  FSub n s -> let ?sub = s in unSubFrozenS n
+  n        -> n
+
+unSubFrozenS :: SubArg => Frozen -> Frozen
+unSubFrozenS = \case
+  f@FTopVar{}           -> f
+  FSub f s              -> let ?sub = sub s in unSubFrozenS f
+  FApp t u              -> FApp (sub t) (sub u)
+  FPApp l r t i         -> FPApp (sub l) (sub r) (sub t) (sub i)
+  FLApp l i             -> FLApp (sub l) (sub i)
+  FProj1 x t            -> FProj1 x (sub t)
+  FProj2 x t            -> FProj2 x (sub t)
+  FUnpack t x           -> FUnpack (sub t) x
+  FCoeTy r r' a t       -> FCoeTy (sub r) (sub r') (sub a) (sub t)
+  FCoeVal r r' a t      -> FCoeVal (sub r) (sub r') (sub a) (sub t)
+  FHComTy r r' a sys t  -> FHComTy (sub r) (sub r') (sub a) (sub sys) (sub t)
+  FHComVal r r' a sys t -> FHComVal (sub r) (sub r') (sub a) (sub sys) (sub t)
+  FUnglue t sys         -> FUnglue (sub t) (sub sys)
+  FCase_ t ncs cs       -> FCase_ (sub t) (sub ncs) (sub cs)
+  FHCase_ t ncs cs      -> FHCase_ (sub t) (sub ncs) (sub cs)
 
 ----------------------------------------------------------------------------------------------------
 -- Definitions

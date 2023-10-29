@@ -104,7 +104,7 @@ conjNeCof = \case
     (IVar i, IVar j)          -> case orient (i, j) of (i, j) -> solve ?cof j (IVar i)
     (IVar i, j     )          -> solve ?cof i j
     (i     , IVar j)          -> solve ?cof j i
-    _                         -> impossible
+    (i, j)                    -> impossible
 
 assumeNeCof :: NeCof -> (NCofArg => a) -> (NCofArg => a)
 assumeNeCof nc act = let ?cof = conjNeCof nc in act

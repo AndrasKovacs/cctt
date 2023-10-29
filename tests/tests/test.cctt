@@ -1,10 +1,10 @@
 
 -- bug
 
-higher inductive example := ex;
+-- higher inductive example := ex;
 
-test : (p : refl ={_. ex = ex} refl) → refl ={_. ex = ex} refl :=
-  λ p.
-  p⁻¹;
+-- test : (p : refl ={_. ex = ex} refl) → refl ={_. ex = ex} refl :=
+--   λ p.
+--   p⁻¹;
 
   -- λ i. hcom 0 1 (ex = ex) [i = 0 j. p j; i = 1 _. refl] refl;
