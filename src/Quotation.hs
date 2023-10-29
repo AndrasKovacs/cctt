@@ -52,8 +52,8 @@ instance Quote Frozen Tm where
                                _                      -> TopVar inf DontPrintTrace
     FSub f s              -> impossible
     FApp t u              -> App (quote t) (quote u)
-    FPApp l r t i         -> PApp (quote t) (quote l) (quote r) (quote i)
-    FLApp l i             -> LApp (quote t) (quote i)
+    FPApp l r t i         -> PApp (quote l) (quote r) (quote t) (quote i)
+    FLApp l i             -> LApp (quote l) (quote i)
     FProj1 x t            -> Proj1 (quote t) x
     FProj2 x t            -> Proj2 (quote t) x
     FUnpack t x           -> Unpack (quote t) x
