@@ -106,6 +106,14 @@ makeNCl x t = NCl x $ CEval $ EC (idSub (dom ?cof)) ?env DontRecurse t
 
 data Infer = Infer Tm ~VTy deriving Show
 
+data G = G {g1 :: Val, g2 :: Val} deriving Show
+type GTy = G
+
+gj :: Val -> G
+gj v = G v v
+
+gU = gj VU
+
 -- TODO OPT: unbox
 data Split
   = DConHead DConInfo [P.Tm]
@@ -115,8 +123,8 @@ data Split
   | SplitInfer {-# unpack #-} Infer
   deriving Show
 
-check :: Elab (P.Tm -> VTy -> IO Tm)
-check t topA = frcPTm t \case
+check :: Elab (P.Tm -> GTy -> IO Tm)
+check t gtopA@(G topA ftopA) = frcPTm t \case
 
   P.Let _ (NSpan -> x) ma t u -> do
     (a, va, t) <- case ma of
@@ -124,31 +132,31 @@ check t topA = frcPTm t \case
         Infer t va <- infer t
         pure (quoteNoUnfold va, va, t)
       Just a -> do
-        a <- check a VU
+        a <- check a gU
         let ~va = eval a
-        t <- check t va
+        t <- check t (gj va)
         pure (a, va, t)
     let ~vt = eval t
-    u <- define x va a vt $ check u topA
+    u <- define x va a vt $ check u gtopA
     pure $! Let x a t u
 
   P.HCom _ r r' Nothing sys t -> do
     r  <- checkI r
     r' <- checkI r'
-    t  <- check t topA
+    t  <- check t gtopA
     sys <- elabSysHCom topA r t sys
     pure $! HCom r r' (quoteNoUnfold topA) sys t
 
-  t -> case (t, frcFull topA) of
+  t -> case (t, frcFull ftopA) of
 
     (P.Lam _ (bindToName -> x) ann t, VPi a b) -> do
       ~qa <- case ann of
         P.LANone         -> pure (quoteNoUnfold a)
-        P.LAAnn a'       -> do a' <- check a' VU
+        P.LAAnn a'       -> do a' <- check a' gU
                                conv (eval a') a
                                pure a'
-        P.LADesugared a' -> check a' VU
-      Lam x <$!> bind x a qa (\v -> check t (b ∙ v))
+        P.LADesugared a' -> check a' gU
+      Lam x <$!> bind x a qa (\v -> check t (gj (b ∙ v)))
 
     (P.Split _ cs _, VPi a b) -> case frcFull a of
       VTyCon tyinfo params -> do
@@ -171,17 +179,17 @@ check t topA = frcPTm t \case
                   P.LAAnn (P.unParens -> P.I _) -> pure ()
                   P.LADesugared{}               -> pure ()
                   _                             -> setPos bnd $ err $ GenericError "Expected an interval binder"
-      t <- bindI x \i -> check t (a ∙ IVar i)
+      t <- bindI x \i -> check t (gj (a ∙ IVar i))
       convEndpoints (instantiate t I0) l
       convEndpoints (instantiate t I1) r
       pure $! PLam (quoteNoUnfold l) (quoteNoUnfold r) x t
 
     (P.PLam _ l r (bindToName -> x) t, VPath a l' r') -> do
-      t <- bindI x \i -> check t (a ∙ IVar i)
+      t <- bindI x \i -> check t (gj (a ∙ IVar i))
       convEndpoints (instantiate t I0) l'
       convEndpoints (instantiate t I1) r'
-      l <- check l (a ∙ I0)
-      r <- check r (a ∙ I1)
+      l <- check l (gj (a ∙ I0))
+      r <- check r (gj (a ∙ I1))
       convEndpoints (eval l) l'
       convEndpoints (eval r) r'
       pure $! PLam l r x t
@@ -193,14 +201,14 @@ check t topA = frcPTm t \case
 
     (P.Sym p _, VPath a y x) -> do
       constantICl a
-      p <- check p (VPath a x y)
+      p <- check p (gj (VPath a x y))
       pure $! Sym (quoteNoUnfold (a ∙ I0)) (quoteNoUnfold x) (quoteNoUnfold y) p
 
     (P.Ap _ f p, VPath b fx fy) -> do
       constantICl b
       Infer p pty <- infer p
       (a, x, y) <- nonDepPath pty
-      f <- check f (fun (a ∙ I0) (b ∙ I0))
+      f <- check f (gj (fun (a ∙ I0) (b ∙ I0)))
       conv fx (eval f ∙ x)
       conv fy (eval f ∙ y)
       pure $! Ap f (quoteNoUnfold x) (quoteNoUnfold y) p
@@ -210,7 +218,7 @@ check t topA = frcPTm t \case
       (a', x', y) <- nonDepPath axy
       convICl a' a
       conv x' x
-      q <- check q (VPath a y z)
+      q <- check q (gj (VPath a y z))
       pure $! Trans (quoteNoUnfold a) (quoteNoUnfold x) (quoteNoUnfold y) (quoteNoUnfold z) p q
 
     (P.Lam _ bnd@(bindToName -> x) ann t, VLine a) -> do
@@ -218,12 +226,12 @@ check t topA = frcPTm t \case
                   P.LAAnn (P.unParens -> P.I _) -> pure ()
                   P.LADesugared{}               -> pure ()
                   _                             -> setPos bnd $ err $ GenericError "Expected an interval binder"
-      t <- bindI x \r -> check t (a ∙ IVar r)
+      t <- bindI x \r -> check t (gj (a ∙ IVar r))
       pure $ LLam x t
 
     (P.Pair t u, VSg a b) -> do
-      t <- check t a
-      u <- check u (b ∙ eval t)
+      t <- check t (gj a)
+      u <- check u (gj (b ∙ eval t))
       pure $! Pair (b^.name) t u
 
     (P.GlueTm _ base eqs ts _, VGlueTy a equivs) -> do
@@ -232,7 +240,7 @@ check t topA = frcPTm t \case
         Just eqs -> do
           eqs <- elabSys (equivInto a) eqs
           pure eqs
-      base <- check base a
+      base <- check base (gj a)
       ts   <- elabGlueTmSys base ts a (equivs^.body)
       pure $ Glue base eqs ts
 
@@ -259,7 +267,7 @@ check t topA = frcPTm t \case
         _ ->
           err $ ExpectedInductiveType (quoteNoUnfold a)
 
-    (P.Hole pos bnd, a) -> do
+    (P.Hole pos bnd, _) -> do
 
       let display :: Elab (VTy -> IO ())
           display a = do
@@ -280,8 +288,9 @@ check t topA = frcPTm t \case
                      when showcxt $ do
                        putStrLn ("────────────────────────────────────────────────────────────")
                      putStrLn (" : " ++ pretty qa ++ "\n")
-                   RLBind x _ a ls -> do
-                     when showcxt $ putStrLn (showBinder x ++ " : " ++ pretty a)
+                   RLBind x va a ls -> do
+                     let qa = quoteNoUnfold va
+                     when showcxt $ putStrLn (showBinder x ++ " : " ++ pretty qa)
                      Pretty.bind x \_ -> go ls
                    RLBindI x ls -> do
                      when showcxt $ putStrLn (showIBinder x ++ " : I")
@@ -295,18 +304,18 @@ check t topA = frcPTm t \case
       case bnd of
         Nothing             -> do let ppos = parsePos pos
                                   putStrLn ("HOLE ?"++show ppos)
-                                  display a
+                                  display topA
                                   pure (Hole (SrcHole SHUnnamed ppos))
         Just P.BDontBind{}  -> do let ppos = parsePos pos
                                   putStrLn ("HOLE ?"++show ppos)
                                   pure (Hole (SrcHole SHSilent ppos))
         Just (P.BName name) -> do let ~ppos = parsePos pos
                                   putStrLn ("HOLE ?"++show name)
-                                  display a
+                                  display topA
                                   pure (Hole (SrcHole (SHNamed (NSpan name)) ppos))
 
     (t, VWrap x a) -> do
-      t <- check t a
+      t <- check t (gj a)
       pure $! Pack x t
 
     (t, VTyCon tyinf ps) -> do
@@ -367,7 +376,7 @@ check t topA = frcPTm t \case
           convExInf a topA
           pure t
 
-    (t, topA) -> do
+    (t, _) -> do
       Infer t a <- infer t
       convExInf a topA
       pure t
@@ -466,7 +475,7 @@ inferSp t a sp = case sp of
   []   -> pure $ Infer t a
   u:sp -> case frcFull a of
     VPi a b -> do
-      u <- check u a
+      u <- check u (gj a)
       inferSp (App t u) (b ∙ eval u) sp
     VPath a l r -> do
       u <- checkI u
@@ -474,13 +483,13 @@ inferSp t a sp = case sp of
     VLine a -> do
       u <- checkI u
       inferSp (LApp t u) (a ∙ evalI u) sp
-    a ->
+    _ ->
       err $! ExpectedPiPathLine (quoteNoUnfold a)
 
 checkSp :: Elab (Name -> Env -> [P.Tm] -> Tel -> IO Spine)
 checkSp conname env sp fs = case (sp, fs) of
   (t:sp, TCons x a fs) -> do
-    t  <- check t (evalIn env a)
+    t  <- check t (gj (evalIn env a))
     sp <- checkSp conname (EDef env (eval t)) sp fs
     pure $ SPCons t sp
   ([], TNil) ->
@@ -504,7 +513,7 @@ checkHSubSp conname ts is acc = case (ts, is) of
 checkHSp :: Elab (Name -> Env -> [P.Tm] -> Tel -> [Name] -> IO (Spine, Sub))
 checkHSp conname env sp fs is = case (sp, fs) of
   (t:sp, TCons x a fs) -> do
-    t  <- check t (evalIn env a)
+    t  <- check t (gj (evalIn env a))
     (sp, is) <- checkHSp conname (EDef env (eval t)) sp fs is
     pure (SPCons t sp, is)
   (ts, TNil) -> do
@@ -565,8 +574,8 @@ inferNonSplit t = frcPTm t \case
 
   P.DepPath a t u -> do
     (x, a, _, src, tgt) <- elabBindMaybe a I0 I1
-    t <- check t src
-    u <- check u tgt
+    t <- check t (gj src)
+    u <- check u (gj tgt)
     pure $! Infer (Path x a t u) VU
 
   P.Let _ (NSpan -> x) ma t u -> do
@@ -575,21 +584,21 @@ inferNonSplit t = frcPTm t \case
         Infer t va <- infer t
         pure (quoteNoUnfold va, va, t)
       Just a -> do
-        a <- check a VU
+        a <- check a gU
         let ~va = eval a
-        t <- check t va
+        t <- check t (gj va)
         pure (a, va, t)
     let ~vt = eval t
     Infer u b <- define x va a vt $ infer u
     pure $! Infer (Let x a t u) b
 
   P.Pi _ (bindToName -> x) (P.unParens -> P.I _) b -> do
-    b <- bindI x \_ -> check b VU
+    b <- bindI x \_ -> check b gU
     pure $ Infer (Line x b) VU
 
   P.Pi _ (bindToName -> x) a b -> do
-    a <- check a VU
-    b <- bind x (eval a) a \_ -> check b VU
+    a <- check a gU
+    b <- bind x (eval a) a \_ -> check b gU
     pure $ Infer (Pi x a b) VU
 
   P.PApp _ l r t u -> do
@@ -597,12 +606,12 @@ inferNonSplit t = frcPTm t \case
     case frcFull a of
       VPath a l' r' -> do
         u <- checkI u
-        l <- check l (a ∙ I0)
-        r <- check r (a ∙ I1)
+        l <- check l (gj (a ∙I0))
+        r <- check r (gj (a ∙ I1))
         convEndpoints l' (eval l)
         convEndpoints r' (eval r)
         pure $! Infer (PApp l r t u) (a ∙ evalI u)
-      a ->
+      _ ->
         err $! ExpectedPath (quoteNoUnfold a)
 
   P.Lam _ x P.LANone t ->
@@ -618,7 +627,7 @@ inferNonSplit t = frcPTm t \case
       pure $! Infer (LLam x t) (VLine $ NICl x $ ICBindI (BindI x i a))
 
     a -> do
-      a <- eval <$!> check a VU
+      a <- eval <$!> check a gU
       (t, b, qb) <- bind x a (quoteNoUnfold a) \_ -> do
         Infer t b <- infer t
         let qb = quoteNoUnfold b
@@ -628,8 +637,8 @@ inferNonSplit t = frcPTm t \case
   -- we infer non-dependent path types to explicit path lambdas.
   P.PLam _ l r (bindToName -> x) t -> do
     Infer l a <- infer l
-    r <- check r a
-    t <- bindI x \i -> check t a
+    r <- check r (gj a)
+    t <- bindI x \i -> check t (gj a)
     let vl = eval l
         vr = eval r
     convEndpoints vl (instantiate t I0)
@@ -637,8 +646,8 @@ inferNonSplit t = frcPTm t \case
     pure $! Infer (PLam l r x t) (VPath (NICl x (ICConst a)) vl vr)
 
   P.Sg _ (bindToName -> x) a b -> do
-    a <- check a VU
-    b <- bind x (eval a) a \_ -> check b VU
+    a <- check a gU
+    b <- bind x (eval a) a \_ -> check b gU
     pure $ Infer (Sg x a b) VU
 
   P.Pair{} ->
@@ -648,16 +657,16 @@ inferNonSplit t = frcPTm t \case
     Infer t a <- infer pt
     case frcFull a of
       VSg a b -> pure $ Infer (Proj1 t (b^.name)) a
-      a       -> setPos pt $ err $! ExpectedSg (quoteNoUnfold a)
+      _       -> setPos pt $ err $! ExpectedSg (quoteNoUnfold a)
 
   P.Proj2 pt _ -> do
     Infer t a <- infer pt
     case frcFull a of
       VSg a b -> pure $! Infer (Proj2 t (b^.name)) (b ∙ proj1 (b^.name) (eval t))
-      a       -> setPos pt $ err $! ExpectedSg (quoteNoUnfold a)
+      _       -> setPos pt $ err $! ExpectedSg (quoteNoUnfold a)
 
   P.Wrap p (bindToName -> x) a _ -> do
-    a <- check a VU
+    a <- check a gU
     pure $! Infer (Wrap x a) VU
 
   P.ProjField t (NSpan -> x) -> do
@@ -669,14 +678,14 @@ inferNonSplit t = frcPTm t \case
 
   P.Path t u -> do
     Infer t a <- infer t
-    u <- check u a
+    u <- check u (gj a)
     pure $! Infer (Path N_ (Core.freshI \_ -> quoteNoUnfold a) t u) VU
 
   P.Coe _ r r' a t -> do
     r  <- checkI r
     r' <- checkI r'
     (x, a, va, src, tgt) <- elabBindMaybe a (evalI r) (evalI r')
-    t <- check t src
+    t <- check t (gj src)
     pure $! Infer (Coe r r' x a t) tgt
 
   P.HCom _ r r' Nothing sys t -> do
@@ -689,14 +698,14 @@ inferNonSplit t = frcPTm t \case
   P.HCom _ r r' (Just a) sys t -> do
     r   <- checkI r
     r'  <- checkI r'
-    a   <- check a VU
+    a   <- check a gU
     let va = eval a
-    t   <- check t va
+    t   <- check t (gj va)
     sys <- elabSysHCom va r t sys
     pure $! Infer (HCom r r' a sys t) va
 
   P.GlueTy _ a sys _ -> do
-    a   <- check a VU
+    a   <- check a gU
     sys <- elabSys (equivInto (eval a)) sys
     pure $! Infer (GlueTy a sys) VU
 
@@ -717,14 +726,14 @@ inferNonSplit t = frcPTm t \case
     case frcFull a of
       VGlueTy a sys -> do
         pure $! Infer (Unglue t (quoteNoUnfold sys)) a
-      a ->
+      _ ->
         err $! ExpectedGlueTy (quoteNoUnfold a)
 
   P.Com _ r r' a sys t -> do
     r  <- checkI r
     r' <- checkI r'
     (i, a, va, src, tgt) <- elabBindMaybe a (evalI r) (evalI r')
-    t <- check t src
+    t <- check t (gj src)
     -- NOTE: elabSysHCom happens to be correct for "com" as well. In the "hcom"
     -- case, the "a" type gets implicitly weakened under both a cof and an ivar
     -- binder when checking components. In the "com" case, "a" is already under
@@ -765,7 +774,7 @@ inferNonSplit t = frcPTm t \case
     Infer t a <- infer t
     case frcFull a of
       VTyCon tyinfo params -> do
-        b <- bind x a (quoteNoUnfold a) \_ -> check b VU
+        b <- bind x a (quoteNoUnfold a) \_ -> check b gU
         let bv = makeNCl x b
         frz <- readIORef (tyinfo^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
@@ -774,14 +783,14 @@ inferNonSplit t = frcPTm t \case
         pure $! Infer (Case t x b cs) (bv ∙ eval t)
       VHTyCon inf params -> do
 
-        b <- bind x a (quoteNoUnfold a) \_ -> check b VU
+        b <- bind x a (quoteNoUnfold a) \_ -> check b gU
         let bv = makeNCl x b
         frz <- readIORef (inf^.frozen)
         unless frz $ err $ GenericError "Can't case split on the type that's being defined"
         cons <- LM.elems <$!> readIORef (inf^.constructors)
         cs <- elabHCases params bv cons cs
         pure $! Infer (HCase t x b cs) (bv ∙ eval t)
-      a ->
+      _ ->
         err $ ExpectedInductiveType (quoteNoUnfold a)
 
   P.Case p _ Nothing _ _ -> setPos p $
@@ -806,7 +815,7 @@ elabCase :: Elab (Env -> DConInfo -> NamedClosure -> Tel -> [Name] -> P.Tm -> IO
 elabCase params inf retty fieldtypes xs body = case (fieldtypes, xs) of
   (TNil, []) -> do
     let lhsval = VDCon inf (lhsSpine (inf^.fieldTypes))
-    check body (retty ∙ lhsval)
+    check body (gj (retty ∙ lhsval))
   (TCons _ a fieldtypes, x:xs) -> do
     let ~va = evalIn params a
     bind x va (quoteNoUnfold va) \x ->
@@ -834,7 +843,7 @@ elabHCase' params ~inf typarams sub ifields_ xs ~casety body = case (ifields_, x
   ([], []) -> do
     let lhsval = hdcon inf typarams (lhsSpine (inf^.fieldTypes)) sub
     let rhsty  = casety ∙ lhsval
-    check body rhsty
+    check body (gj rhsty)
   (_:ifields, x:xs) -> do
     bindI x \_ ->
       elabHCase' params inf typarams (lift sub) ifields xs casety body
@@ -885,7 +894,7 @@ elabProjField x t ~tv a = case frcFull a of
                   pure (Infer (Unpack t x) a)
                 else
                   err $ NoSuchField x (quoteNoUnfold (VWrap x' a))
-  a          -> err $ NoSuchField x (quoteNoUnfold a)
+  _          -> err $ NoSuchField x (quoteNoUnfold a)
 
 -- | Ensure that an IClosure is constant.
 constantICl :: Elab (NamedIClosure -> IO ())
@@ -899,7 +908,7 @@ constantCl a cl = bind x_ a (quoteNoUnfold a) \x -> bind y_ a (quoteNoUnfold a) 
 nonDepFun :: Elab (Val -> IO (Val, NamedClosure))
 nonDepFun a = case frcFull a of
   VPi a b -> constantCl a b >> pure (a, b)
-  a       -> err $! ExpectedNonDepFun (quoteNoUnfold a)
+  _       -> err $! ExpectedNonDepFun (quoteNoUnfold a)
 
 -- | Ensure that a type is a non-dependent path type.
 nonDepPath :: Elab (Val -> IO (NamedIClosure, Val, Val))
@@ -932,11 +941,11 @@ elabBindMaybe b r r' = case b of
         bindI iname \i -> do
           a <- pure $ LApp (WkI a) (IVar i)
           pure (iname, a, eval a, src, tgt)
-      a -> do
-        err $! ExpectedPathLine (quoteNoUnfold a)
+      _ -> do
+        err $! ExpectedPathLine (quoteNoUnfold aty)
 
   P.BMBind (bindToName -> x) a -> do
-    (a, va) <- bindI x \_ -> do {a <- check a VU; pure (a, eval a)}
+    (a, va) <- bindI x \_ -> do {a <- check a gU; pure (a, eval a)}
     let src = instantiate a r
         tgt = instantiate a r'
     pure (x, a, va, src, tgt)
@@ -973,9 +982,11 @@ checkI t = frcPTm t \case
     err ExpectedI
 
 isConstantU :: Elab (NamedIClosure -> IO ())
-isConstantU t = bindI i_ \i -> case frcFull (t ∙ IVar i) of
+isConstantU t = bindI i_ \i ->
+  let ty = t ∙ IVar i in
+  case frcFull ty of
   VU -> pure ()
-  a  -> err $ ExpectedPathULineU (quoteNoUnfold a)
+  _  -> err $ ExpectedPathULineU (quoteNoUnfold ty)
 
 --------------------------------------------------------------------------------
 
@@ -1011,7 +1022,7 @@ elabSysHCom a r base = \case
           -- desugar binders
           (x, t, raw_t) <- case t of
             P.BMBind (bindToName -> x) raw_t -> do
-              t <- bindI x \_ -> check raw_t a -- "a" is weakened under vcof
+              t <- bindI x \_ -> check raw_t (gj a) -- "a" is weakened under vcof
               pure (x, t, raw_t)
             P.BMDontBind raw_t -> setPos raw_t do
               Infer t tty <- infer raw_t
@@ -1028,8 +1039,8 @@ elabSysHCom a r base = \case
                     conv (pty ∙ IVar i) a
                     t <- pure $ LApp (WkI t) (IVar i)
                     pure (iname, t, raw_t)
-                a -> do
-                  err $! ExpectedPathLine (quoteNoUnfold a)
+                _ -> do
+                  err $! ExpectedPathLine (quoteNoUnfold tty)
 
           setPos raw_t do
             conv (instantiate t (frc r)) (eval base) -- check compatibility with base
@@ -1061,7 +1072,7 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
         ts <- elabGlueTmSys base ts a equivs
         setPos t $ bindCof ncof do
           let fequiv = frcFull equiv
-          t <- check t (proj1 ty_ fequiv)
+          t <- check t (gj (proj1 ty_ fequiv))
           conv (proj1 f_ (proj2 ty_ fequiv) ∙ eval t) (eval base)
           sysCompat t ts
           pure $ SCons cof t ts
@@ -1081,7 +1092,7 @@ elabSys componentTy = \case
       VCNe ncof _ -> do
         sys <- elabSys componentTy sys
         setPos t $ bindCof ncof do
-          t <- check t componentTy
+          t <- check t (gj componentTy)
           sysCompat t sys
           pure $ SCons cof t sys
 
@@ -1178,7 +1189,7 @@ elabTop = \case
       Nothing ->
         pure Nothing
       Just a  -> do
-        a <- check a VU
+        a <- check a gU
         let ~va = eval a
         pure $ Just $ RI l a va xn (coerce pos)
 
@@ -1191,7 +1202,7 @@ elabTop = \case
 
     (t, a, va) <- case recInf of
       Nothing  -> do {Infer t a <- infer t; pure (t, quoteNoUnfold a, a)}
-      Just inf -> do {t <- check t (inf^.recTyVal);
+      Just inf -> do {t <- check t (gj (inf^.recTyVal));
                       pure (t, inf^.recTy, inf^.recTyVal)}
 
     -- recursive evaluation
@@ -1392,7 +1403,7 @@ elabHTelescope = \case
       is <- elabHConIVars ps
       pure (TNil, x:is)
     a -> do
-      a <- check a VU
+      a <- check a gU
       bind x (eval a) a \_ -> do
         (ps, is) <- elabHTelescope ps
         pure (TCons x a ps, is)
@@ -1401,7 +1412,7 @@ elabTelescope :: Elab ([(P.Bind, P.Ty)] -> IO Tel)
 elabTelescope = \case
   [] -> pure TNil
   (bindToName -> x, a):ps -> do
-    a <- check a VU
+    a <- check a gU
     bind x (eval a) a \_ -> do
       ps <- elabTelescope ps
       pure $ TCons x a ps
