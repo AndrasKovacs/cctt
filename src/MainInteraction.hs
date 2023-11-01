@@ -44,9 +44,10 @@ frc0 :: Val -> Val
 frc0 = let ?cof = emptyNCof; ?dom = 0 in frc
 {-# inline frc0 #-}
 
-quote0Trace :: Quote a b => Frozen -> a -> b
-quote0Trace f = let ?cof = emptyNCof; ?dom = 0; ?opt = QTrace f in quote
-{-# inline quote0Trace #-}
+quote0Frozen :: Frozen -> Tm
+quote0Frozen f =
+  let ?cof = emptyNCof; ?dom = 0; ?trace = True; ?opt = QDontUnfold in quoteFrozen f
+{-# inline quote0Frozen #-}
 
 quote0 :: Quote a b => a -> b
 quote0 = let ?cof = emptyNCof; ?dom = 0; ?opt = QDontUnfold in quote
@@ -66,8 +67,8 @@ traceUnfold :: Val -> Int -> Int -> Bool -> IO ()
 traceUnfold v batch i silent = case frc0 v of
   VUnf f v v' -> do
     if batch <= 0 then do
-      putStrLn $ pretty0 $ quote0Trace f v
-      putStrLn $ "STEP " ++ show (i + 1)
+      putStrLn $ pretty0 $ quote0Frozen v
+      putStrLn $ "STEP " ++ show (i + 1) ++ ", NEXT UNFOLDING: " ++ show (f^.name)
       let getCommand = do
              l <- words <$> getLine
              let retry = do
@@ -95,7 +96,7 @@ traceUnfold v batch i silent = case frc0 v of
       getCommand
     else do
       unless silent $ do
-        putStrLn $ pretty0 $ quote0Trace f v
+        putStrLn $ pretty0 $ quote0Frozen v
         putStrLn $ "STEP " ++ show (i + 1)
         putStrLn ""
       traceUnfold v' (batch - 1) (i + 1) silent

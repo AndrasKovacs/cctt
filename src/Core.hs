@@ -1512,7 +1512,7 @@ evalIClosure x a = NICl x (ICEval ?sub ?env ?recurse a)
 topVar :: DefInfo -> Val
 topVar inf = case inf of
   DI _ _ v _ _ _ _ True -> v
-  DI _ _ v _ _ _ _ _    -> let f = FTopVar inf in VUnf f f v
+  DI _ _ v _ _ _ _ _    -> VUnf inf (FTopVar inf) v
 {-# inline topVar #-}
 
 eval :: EvalArgs (Tm -> Val)

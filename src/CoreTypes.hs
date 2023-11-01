@@ -294,7 +294,7 @@ data Val
   -- the second is the unfolded one. Unlike in MLTT, it's not easy to use neutrals
   -- to represent blocked unfoldings, because it is very much possible to compute
   -- away blocked unfoldings via cubical reductions.
-  | VUnf Frozen Frozen ~Val
+  | VUnf {-# nounpack #-} DefInfo Frozen ~Val
 
   -- Neutrals. Not stable under substitution, no computation can ever match on them.
   | VNe Ne IS.Set

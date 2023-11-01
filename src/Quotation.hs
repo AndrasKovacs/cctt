@@ -10,7 +10,7 @@ import Core
 --       other things are not!
 ----------------------------------------------------------------------------------------------------
 
-data QOpt = QUnfold | QDontUnfold | QTrace Frozen
+data QOpt = QUnfold | QDontUnfold
 
 type QuoteOpt = (?opt :: QOpt)
 
@@ -45,43 +45,48 @@ instance Quote Ne Tm where
     NCase t b cs    -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
     NHCase t b cs   -> HCase (quote t) (b^.name) (quote b) (quoteHCases cs)
 
-instance Quote Frozen Tm where
-  quote t = case unSubFrozen t of
-    f@(FTopVar inf)       -> case ?opt of
-                               QTrace f' | ptrEq f f' -> TopVar inf PrintTrace
-                               _                      -> TopVar inf DontPrintTrace
+quoteFrozen :: NCofArg => DomArg => QuoteOpt => (?trace :: Bool) => Frozen -> Tm
+quoteFrozen = go where
+  go :: NCofArg => DomArg => QuoteOpt => (?trace :: Bool) => Frozen -> Tm
+  go t = case unSubFrozen t of
+    f@(FTopVar inf)       -> case ?trace of
+                               True -> TopVar inf PrintTrace
+                               _    -> TopVar inf DontPrintTrace
     FSub f s              -> impossible
-    FApp t u              -> App (quote t) (quote u)
-    FPApp l r t i         -> PApp (quote l) (quote r) (quote t) (quote i)
-    FLApp l i             -> LApp (quote l) (quote i)
-    FProj1 x t            -> Proj1 (quote t) x
-    FProj2 x t            -> Proj2 (quote t) x
-    FUnpack t x           -> Unpack (quote t) x
+    FApp t u              -> App (go t) (quote u)
+    FPApp l r t i         -> PApp (quote l) (quote r) (go t) (quote i)
+    FLApp l i             -> LApp (go l) (quote i)
+    FProj1 x t            -> Proj1 (go t) x
+    FProj2 x t            -> Proj2 (go t) x
+    FUnpack t x           -> Unpack (go t) x
 
     FCoeTy r r' a t | quote r == quote r' -> quote t
-    FCoeTy r r' a t -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+    FCoeTy r r' a t -> Coe (quote r) (quote r') (a^.name) (freshI \i -> go (a ∙ i)) (quote t)
 
-    FCoeVal r r' a t | quote r == quote r' -> quote t
-    FCoeVal r r' a t -> Coe (quote r) (quote r') (a^.name) (quote a) (quote t)
+    FCoeVal r r' a t | quote r == quote r' -> go t
+    FCoeVal r r' a t -> Coe (quote r) (quote r') (a^.name) (quote a) (go t)
 
     -- we have to handle system forcing, because the the rest of cctt can
     -- only handle systems containing neutral cofibrations!
     FHComTy r r' a sys t  | quote r == quote r' -> quote t
     FHComTy r r' a sys t  -> case frc sys of
                                VSHTotal t' -> quote (t' ∙ r')
-                               VSHNe sys   -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
+                               VSHNe sys   -> HCom (quote r) (quote r') (go a) (quote sys) (quote t)
 
-    FHComVal r r' a sys t | quote r == quote r' -> quote t
+    FHComVal r r' a sys t | quote r == quote r' -> go t
     FHComVal r r' a sys t -> case frc sys of
                                VSHTotal t' -> quote (t' ∙ r')
-                               VSHNe sys   -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
+                               VSHNe sys   -> HCom (quote r) (quote r') (quote a) (quote sys) (go t)
 
     FUnglue t sys         -> case frc sys of
-                               VSTotal teqv -> App (Proj1 (Proj2 (quote teqv) ty_) f_) (quote t)
-                               VSNe sys     -> Unglue (quote t) (quote sys)
+                               VSTotal teqv -> App (Proj1 (Proj2 (quote teqv) ty_) f_) (go t)
+                               VSNe sys     -> Unglue (go t) (quote sys)
 
-    FCase_ t b cs         -> Case (quote t) (b^.name) (quote b) (quoteCases cs)
-    FHCase_ t b cs        -> HCase (quote t) (b^.name) (quote b) (quoteHCases cs)
+    FCase_ t b cs         -> Case (go t) (b^.name) (quote b) (quoteCases cs)
+    FHCase_ t b cs        -> HCase (go t) (b^.name) (quote b) (quoteHCases cs)
+
+instance Quote Frozen Tm where
+  quote t = let ?trace = False in quoteFrozen t
 
 instance Quote Val Tm where
   quote t = case frc t of
