@@ -112,11 +112,6 @@ dummy :: Parser ()
 dummy = pure ()
 {-# inline dummy #-}
 
--- | Consume whitespace. We track the number of whitespace characters read since the start of the
---   current line. We don't need to track column numbers precisely! Relevant indentation consists of
---   only whitespace at the start of a line. For simplicity, whitespace parsing counts characters
---   all the time, although it would be a possible optimization to only count characters after the
---   start of a newline.
 ws :: Parser ()
 ws = $(switch [| case _ of
   " "  -> dummy >> ws
