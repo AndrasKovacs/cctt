@@ -992,10 +992,10 @@ beta3 : ℤ :=
 ------------------------------------------------------------
 
 -- -- Computes in Agda:
--- β₃'-spec     : β₃'     = neg (suc zero)       := refl;   -- 0.56 ms
+-- βeta3'-spec : beta3' = neg (suc zero) := refl;   -- 0.56 ms
 
 -- -- Doesn't:
--- β₃-spec : β₃ = pos (suc (suc zero)) := refl;   -- 21 ms
+-- beta3-spec : beta3 = pos (suc (suc zero)) := refl;   -- 21 ms
 
 -- -- Having one sym also works
 -- left-sym : ℤ :=

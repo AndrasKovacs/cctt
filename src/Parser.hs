@@ -329,7 +329,7 @@ piBinder :: Parser ([Bind], Ty, Pos)
 piBinder = do
   parL
   bs <- some bind
-  colon'
+  colon
   a <- tm'
   p <- rightPos <$> parR'
   pure (bs, a, p)
