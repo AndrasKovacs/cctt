@@ -140,15 +140,9 @@ multilineComment = go (1 :: Int) where
     "{-" -> dummy >> go (n + 1)
     _    -> FP.branch anyChar (go n) (pure ()) |])
 
--- | We check indentation first, then read the token, then read trailing whitespace.
 token :: Parser a -> Parser a
 token p = p <* ws
 {-# inline token #-}
-
--- | `token`, but indentation failure is an error.
-token' :: Parser a -> Parser a
-token' p = p <* ws
-{-# inline token' #-}
 
 spanOfToken :: Parser a -> Parser Span
 spanOfToken p = do
@@ -156,13 +150,6 @@ spanOfToken p = do
   FP.Span x y <- FP.spanOf p <* ws
   pure $ Span# src x y
 {-# inline spanOfToken #-}
-
-spanOfToken' :: Parser a -> Parser Span
-spanOfToken' p = do
-  src <- ask
-  FP.Span x y <- FP.spanOf p <* ws
-  pure $ Span# src x y
-{-# inline spanOfToken' #-}
 
 -- | Read a starting character of an identifier.
 identStartChar :: Parser Char
@@ -195,7 +182,7 @@ sym str = [| spanOfToken $(FP.string str) |]
 -- | Parse a non-keyword string, throw precise error on failure, return the `Span` of the symbol
 sym' :: String -> Q Exp
 sym' str =
-  [| spanOfToken' ($(FP.string str) `pcut` Lit str) |]
+  [| spanOfToken ($(FP.string str) `pcut` Lit str) |]
 
 -- | Parse a keyword string, return the `Span`.
 kw :: String -> Q Exp
@@ -205,7 +192,7 @@ kw str =
 -- | Parse a keyword string, throw precise error on failure, return the `Span`.
 kw' :: String -> Q Exp
 kw' str =
-  [| spanOfToken' (($(FP.string str) `notFollowedBy` identChar) `pcut` Lit str) |]
+  [| spanOfToken (($(FP.string str) `notFollowedBy` identChar) `pcut` Lit str) |]
 
 -- | Raw non-token parser that reads any keyword.
 anyKw :: Parser ()

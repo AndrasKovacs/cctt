@@ -34,7 +34,7 @@ appErr    = "application expression" : projErr
 
 assign'   = $(sym' ":=")
 colon     = token  ($(FP.string ":") `notFollowedBy` $(FP.string "="))
-colon'    = token' ($(FP.string ":") `notFollowedBy` $(FP.string "="))
+colon'    = colon `pcut` Lit ":"
 semi      = $(sym  ";")
 semi'     = $(sym' ";")
 comma     = $(sym  ",")
@@ -45,7 +45,7 @@ parR'     = $(sym' ")")
 dot       = $(sym  ".")
 dot'      = $(sym'  ".")
 arrow     = token  $(switch [| case _ of "->" -> pure (); "→" -> pure () |])
-arrow'    = token' $(switch [| case _ of "->" -> pure (); "→" -> pure () |])
+arrow'    = arrow `pcut` Lit "-> or →"
 prod      = token  $(switch [| case _ of "*"  -> pure (); "×" -> pure () |])
 braceR'   = $(sym' "}")
 sqL       = $(sym  "[")
@@ -53,7 +53,7 @@ sqL'      = $(sym' "[")
 sqR'      = $(sym' "]")
 bind      = (BName <$> ident) <|> do {p <- getPos; $(sym "_"); pure $ BDontBind p}
 bind'     = bind `pcut` Lit "binder"
-decimal'  = token' FP.anyAsciiDecimalWord
+decimal'  = token FP.anyAsciiDecimalWord `pcut` Lit "positive number"
 hash      = $(sym "#")
 
 sepBy :: Parser a -> Parser sep -> Parser [a]
