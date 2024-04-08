@@ -1,3 +1,4 @@
+{-# options_ghc -Wno-x-partial #-} -- usage of head in prettyError
 
 module Lexer where
 
