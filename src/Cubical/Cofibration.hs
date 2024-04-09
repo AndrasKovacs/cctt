@@ -27,7 +27,7 @@ data NeCof' = NeCof' {
 data VCof
   = VCTrue
   | VCFalse
-  | VCNe {-# unpack #-} NeCof' IS.Set
+  | VCNe {-# unpack #-} NeCof'
 
 makeFields ''NeCof'
 
@@ -79,9 +79,8 @@ eq# i j = case (i, j) of
   (i, j) | i == j  -> VCTrue
   (IVar i, IVar j) -> case orient (i, j) of
                         (i', j') -> VCNe (NeCof' (solve ?cof j' (IVar i')) (NCEq (IVar i) (IVar j)))
-                                         (IS.insert i $ IS.insert j mempty)
-  (IVar i, j     ) -> VCNe (NeCof' (solve ?cof i j) (NCEq (IVar i) j)) (IS.insert i mempty)
-  (i     , IVar j) -> VCNe (NeCof' (solve ?cof j i) (NCEq (IVar j) i)) (IS.insert j mempty)
+  (IVar i, j     ) -> VCNe (NeCof' (solve ?cof i j) (NCEq (IVar i) j))
+  (i     , IVar j) -> VCNe (NeCof' (solve ?cof j i) (NCEq (IVar j) i))
   _                -> VCFalse
 
 eq :: NCofArg => I -> I -> VCof

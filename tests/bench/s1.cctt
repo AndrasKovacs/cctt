@@ -39,7 +39,7 @@ toℕ : ℤ → ℕ := λ[
   neg n. n
 ];
 
-test0 := forceℤ (winding (intLoop' (pos n1k)));
-test1 := forceℤ (winding (intLoop' (pos n1m)));
-test2 := forceℤ (winding (intLoop' (neg n100k)));
-test3 := winding (intLoop (pos n100k) ∙ intLoop (neg n100k));
+test0 := forceℤ (winding (intLoop' (pos n1k))); -- 0.018
+test1 := forceℤ (winding (intLoop' (pos n1m))); -- 6.3
+test2 := forceℤ (winding (intLoop' (neg n100k))); -- 0.8
+test3 := winding (intLoop (pos n100k) ∙ intLoop (neg n100k)); --1.7

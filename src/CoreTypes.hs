@@ -6,13 +6,9 @@ import Common
 import Cubical
 
 import qualified Data.LvlMap as LM
-import qualified Data.IVarSet as IS
 
 -- Syntax
 --------------------------------------------------------------------------------
-
-data WithIS a = WIS {withISBody :: a, withISIvars :: IS.Set}
-  deriving (Show)
 
 data RecInfo = RI {
     recInfoRecId    :: Lvl
@@ -260,8 +256,6 @@ data NeSys
   | NSCons (BindCofLazy Val) NeSys
   deriving Show
 
-type NeSys' = WithIS NeSys
-
 data NeSysHCom
   = NSHEmpty
   | NSHCons (BindCof (BindILazy Val)) NeSysHCom
@@ -271,18 +265,14 @@ isEmptyNSH :: NeSysHCom -> Bool
 isEmptyNSH = \case NSHEmpty -> True; _ -> False
 {-# inline isEmptyNSH #-}
 
-type NeSysHCom' = WithIS NeSysHCom
-
--- TODO: unbox
 data VSys
   = VSTotal Val
-  | VSNe NeSys'
+  | VSNe NeSys
   deriving Show
 
--- TODO: unbox
 data VSysHCom
   = VSHTotal (BindILazy Val)
-  | VSHNe NeSysHCom'
+  | VSHNe NeSysHCom
   deriving Show
 
 type VTy = Val
@@ -297,7 +287,7 @@ data Val
   | VUnf {-# nounpack #-} DefInfo Frozen ~Val
 
   -- Neutrals. Not stable under substitution, no computation can ever match on them.
-  | VNe Ne IS.Set
+  | VNe Ne
 
   -- Semineutrals. Not stable under substitution but computation can match on them.
 
@@ -305,10 +295,10 @@ data Val
   -- Only HIT hcom-s can be scrutinized in computation. The other hcom cases
   -- have to be handled in all other places as ordinary neutrals.
 
-  | VGlueTy VTy NeSys'                                       -- coe can act on it
-  | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub IS.Set -- case can act on it
-  | VHCom I I VTy NeSysHCom' Val IS.Set                      -- coe and case can act on it
-  | VGlue Val ~NeSys' NeSys IS.Set                           -- unglue can act on it
+  | VGlueTy VTy NeSys                                        -- coe can act on it
+  | VHDCon {-# nounpack #-} HDConInfo Env VDSpine Sub        -- case can act on it
+  | VHCom I I VTy NeSysHCom Val                              -- coe and case can act on it
+  | VGlue Val ~NeSys NeSys                                   -- unglue can act on it
 
   -- Canonicals. Stable under substitution.
   | VPi VTy NamedClosure
@@ -372,7 +362,7 @@ data VDSpine
 --------------------------------------------------------------------------------
 
 vVar :: Lvl -> Val
-vVar x = VNe (NLocalVar x) mempty
+vVar x = VNe (NLocalVar x)
 {-# inline vVar #-}
 
 type DomArg  = (?dom  :: Lvl)    -- fresh LocalVar
@@ -660,10 +650,6 @@ instance SubAction VDSpine where
     VDNil       -> VDNil
     VDCons v vs -> VDCons (sub v) (sub vs)
 
-instance SubAction a => SubAction (WithIS a) where
-  sub (WIS a is) = WIS (sub a) (sub is)
-  {-# inline sub #-}
-
 --------------------------------------------------------------------------------
 
 makeFields ''BindCof
@@ -678,4 +664,3 @@ makeFields ''NamedClosure
 makeFields ''NamedIClosure
 makeFields ''RecInfo
 makeFields ''TyConInfo
-makeFields ''WithIS
