@@ -18,7 +18,7 @@ instance Conv Val where
   conv t t' = case frcFull t // frcFull t' of
 
     -- rigid match
-    (VNe n _          , VNe n' _            ) -> conv n n'
+    (VNe n            , VNe n'              ) -> conv n n'
     (VGlueTy a sys    , VGlueTy a' sys'     ) -> conv a a' && conv sys sys'
     (VPi a b          , VPi a' b'           ) -> conv a a' && conv b b'
     (VLam t           , VLam t'             ) -> conv t t'
@@ -35,12 +35,12 @@ instance Conv Val where
     (VTyCon inf ts    , VTyCon inf' ts'     ) -> inf^.tyId == inf'^.tyId && conv ts ts'
     (VHTyCon inf ts   , VHTyCon inf' ts'    ) -> inf^.tyId == inf'^.tyId && conv ts ts'
     (VDCon inf sp     , VDCon inf' sp'      ) -> inf^.conId == inf'^.conId && conv sp sp'
-    (VGlue t eqs sys _, VGlue t' eqs' sys' _) -> conv t t' && conv eqs eqs' && conv sys sys'
+    (VGlue t eqs sys  , VGlue t' eqs' sys'  ) -> conv t t' && conv eqs eqs' && conv sys sys'
 
-    (VHDCon i _ fs s _, VHDCon i' _ fs' s' _) ->
+    (VHDCon i _ fs s  , VHDCon i' _ fs' s'  ) ->
       i^.conId == i'^.conId && conv fs fs' && conv s s'
 
-    (VHCom r1 r2 a t b _, VHCom r1' r2' a' t' b' _) ->
+    (VHCom r1 r2 a t b , VHCom r1' r2' a' t' b') ->
       conv r1 r1' && conv r2 r2'  && conv a a' && conv t t' && conv b b'
 
     -- Holes convert to anything
@@ -61,18 +61,14 @@ instance Conv Val where
     (t                , VLLam t'            ) -> freshI \i -> conv (lapp t i) (t' ∙ i)
     (VPack x t        , t'                  ) -> conv t (unpack x t')
     (t                , VPack x t'          ) -> conv (unpack x t) t'
-    (VGlue b sys fib _, t'                  ) -> conv b (ungluen t' sys)
-    (t                , VGlue b' sys' fib' _) -> conv (ungluen t sys') b'
+    (VGlue b sys fib  , t'                  ) -> conv b (ungluen t' sys)
+    (t                , VGlue b' sys' fib'  ) -> conv (ungluen t sys') b'
 
     (VSub{}, _     ) -> impossible
     (_     , VSub{}) -> impossible
     (VUnf{}, _     ) -> impossible
     (_     , VUnf{}) -> impossible
     _                -> False
-
-instance Conv a => Conv (WithIS a) where
-  conv (WIS a _) (WIS a' _) = conv a a'
-  {-# inline conv #-}
 
 instance Conv Ne where
 

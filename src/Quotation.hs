@@ -93,11 +93,11 @@ instance Quote Val Tm where
     VSub{}               -> impossible
     VUnf _ v v'          -> case ?opt of QUnfold -> quote v'
                                          _       -> quote v
-    VNe n _              -> quote n
+    VNe n                -> quote n
     VGlueTy a sys        -> GlueTy (quote a) (quote sys)
-    VGlue t eqs sys _    -> Glue (quote t) (quote eqs) (quote sys)
+    VGlue t eqs sys      -> Glue (quote t) (quote eqs) (quote sys)
     VPi a b              -> Pi (b^.name) (quote a) (quote b)
-    VLam t               -> Lam (t^.name) (quote t)
+    VLam t               -> trace "QLAM" $ Lam (t^.name) (quote t)
     VPath a lhs rhs      -> Path (a^.name) (quote a) (quote lhs) (quote rhs)
     VPLam lhs rhs t      -> PLam (quote lhs) (quote rhs) (t^.name) (quote t)
     VSg a b              -> Sg (b^.name) (quote a) (quote b)
@@ -111,8 +111,8 @@ instance Quote Val Tm where
     VTyCon x ts          -> TyCon x (quote ts)
     VDCon ci sp          -> DCon ci (quote sp)
     VHTyCon i ts         -> HTyCon i (quote ts)
-    VHDCon i ps fs s _   -> HDCon i (quoteParams ps) (quote fs) s
-    VHCom r r' a sys t _ -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
+    VHDCon i ps fs s     -> HDCon i (quoteParams ps) (quote fs) s
+    VHCom r r' a sys t   -> HCom (quote r) (quote r') (quote a) (quote sys) (quote t)
 
 --------------------------------------------------------------------------------
 
@@ -180,10 +180,6 @@ instance Quote a b => Quote [a] [b] where
 
 instance Quote a b => Quote (BindCof a) b where
   quote t = assumeCof (t^.binds) (quote (t^.body)); {-# inline quote #-}
-
-instance Quote a b => Quote (WithIS a) b where
-  quote (WIS a _) = quote a
-  {-# inline quote #-}
 
 instance Quote NeCof Cof where
   quote (NCEq i j) = CEq (quote i) (quote j)

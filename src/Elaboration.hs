@@ -241,7 +241,7 @@ check t gtopA@(G topA ftopA) = frcPTm t \case
           eqs <- elabSys (equivInto a) eqs
           pure eqs
       base <- check base (gj a)
-      ts   <- elabGlueTmSys base ts a (equivs^.body)
+      ts   <- elabGlueTmSys base ts a equivs
       pure $ Glue base eqs ts
 
     -- inferring non-dependent motive for case
@@ -715,7 +715,7 @@ inferNonSplit t = frcPTm t \case
     case evalSys eqs of
       VSTotal _ -> impossible
       VSNe veqs -> do
-        sys <- elabGlueTmSys base sys a (veqs^.body)
+        sys <- elabGlueTmSys base sys a veqs
         pure $! Infer (Glue base eqs sys) (VGlueTy a veqs)
 
   P.GlueTm _ _ Nothing _ _ ->
@@ -1001,9 +1001,9 @@ sysHComCompat t = \case
   SHEmpty              -> pure ()
   SHCons cof' x t' sys -> do
     case evalCof cof' of
-      VCFalse     -> pure ()
-      VCTrue      -> bindI x \_ -> conv (eval t) (eval t')
-      VCNe cof' _ -> bindCof cof' (bindI x \_ -> conv (eval t) (eval t'))
+      VCFalse   -> pure ()
+      VCTrue    -> bindI x \_ -> conv (eval t) (eval t')
+      VCNe cof' -> bindCof cof' (bindI x \_ -> conv (eval t) (eval t'))
     sysHComCompat t sys
 
 elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
@@ -1013,9 +1013,9 @@ elabSysHCom a r base = \case
   P.SHCons pos cof t sys -> setPos pos do
     cof <- checkCof cof
     case evalCof cof of
-      VCTrue  -> err NonNeutralCofInSystem
-      VCFalse -> err NonNeutralCofInSystem
-      VCNe ncof _ -> do
+      VCTrue    -> err NonNeutralCofInSystem
+      VCFalse   -> err NonNeutralCofInSystem
+      VCNe ncof -> do
         sys <- elabSysHCom a r base sys
         bindCof ncof do
 
@@ -1053,9 +1053,9 @@ sysCompat t = \case
   SEmpty            -> pure ()
   SCons cof' t' sys -> do
     case evalCof cof' of
-      VCTrue      -> conv (eval t) (eval t')
-      VCFalse     -> pure ()
-      VCNe cof' _ -> bindCof cof' $ conv (eval t) (eval t')
+      VCTrue    -> conv (eval t) (eval t')
+      VCFalse   -> pure ()
+      VCNe cof' -> bindCof cof' $ conv (eval t) (eval t')
     sysCompat t sys
 
 elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
@@ -1067,7 +1067,7 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
     case evalCof cof of
       VCTrue  -> err NonNeutralCofInSystem
       VCFalse -> err NonNeutralCofInSystem
-      VCNe ncof _ -> do
+      VCNe ncof -> do
         convNeCof (ncof^.extra) cof'
         ts <- elabGlueTmSys base ts a equivs
         setPos t $ bindCof ncof do
@@ -1089,7 +1089,7 @@ elabSys componentTy = \case
     case vcof of
       VCTrue  -> err NonNeutralCofInSystem
       VCFalse -> err NonNeutralCofInSystem
-      VCNe ncof _ -> do
+      VCNe ncof -> do
         sys <- elabSys componentTy sys
         setPos t $ bindCof ncof do
           t <- check t (gj componentTy)
@@ -1138,8 +1138,8 @@ checkHCaseBoundary' ~inf rc params sub is body casety casecl = case is of
                 in evalHCaseBoundary (inf^.boundary) casety casecl)
 
     case vbnd of
-      VSTotal v        -> conv (eval body) v
-      VSNe (WIS sys _) -> neSysCompat rc body sys
+      VSTotal v  -> conv (eval body) v
+      VSNe sys   -> neSysCompat rc body sys
 
   x:is ->
     bindI x \_ -> checkHCaseBoundary' inf rc params (lift sub) is body casety casecl
@@ -1364,8 +1364,8 @@ elabHConstructors tyinf tyConVal conid = \case
         Just sys -> do
           sys <- elabSys tyConVal sys
           case evalSys sys of
-            VSTotal _         -> impossible
-            VSNe (WIS nsys _) -> do
+            VSTotal _ -> impossible
+            VSNe nsys -> do
               let coh = isCoh (quoteNoUnfold nsys)
               pure (sys, coh)
 
