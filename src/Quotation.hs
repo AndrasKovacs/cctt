@@ -97,7 +97,7 @@ instance Quote Val Tm where
     VGlueTy a sys        -> GlueTy (quote a) (quote sys)
     VGlue t eqs sys      -> Glue (quote t) (quote eqs) (quote sys)
     VPi a b              -> Pi (b^.name) (quote a) (quote b)
-    VLam t               -> trace "QLAM" $ Lam (t^.name) (quote t)
+    VLam t               -> Lam (t^.name) (quote t)
     VPath a lhs rhs      -> Path (a^.name) (quote a) (quote lhs) (quote rhs)
     VPLam lhs rhs t      -> PLam (quote lhs) (quote rhs) (t^.name) (quote t)
     VSg a b              -> Sg (b^.name) (quote a) (quote b)
