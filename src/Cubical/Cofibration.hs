@@ -6,7 +6,7 @@ import Cubical.Interval
 import Cubical.Substitution
 import Statistics (bumpMaxIVar)
 
-import qualified Data.IVarSet as IS
+-- import qualified Data.IVarSet as IS
 
 ----------------------------------------------------------------------------------------------------
 
@@ -117,8 +117,6 @@ idNCof i = NCof i (go 0 ILNil) where
 emptyNCof :: NCof
 emptyNCof = NCof 0 ILNil
 
-----------------------------------------------------------------------------------------------------
-
 appNCofToSub :: NCof -> Sub -> Sub
 appNCofToSub nc (Sub d c is) = Sub d c (go nc is) where
   go nc ILNil        = ILNil
@@ -128,41 +126,6 @@ wkSub :: NCofArg => Sub -> Sub
 wkSub s = setDom (dom ?cof) s
 {-# inline wkSub #-}
 
-----------------------------------------------------------------------------------------------------
-
 evalCof :: NCofArg => SubArg => Cof -> VCof
 evalCof (CEq i j) = eqS i j
 {-# inline evalCof #-}
-
-----------------------------------------------------------------------------------------------------
-
-isUnblocked :: NCofArg => IS.Set -> Bool
-isUnblocked is =
-  IS.foldrAccum
-    (\x hyp (!varset, !cof) ->
-       matchIVar (lookupNCof x cof)
-         (\x -> IS.member x varset || hyp (IS.insert x varset // cof))
-         True)
-    (mempty, ?cof)
-    False
-    is
-
-isUnblockedS :: SubArg => NCofArg => IS.Set -> Bool
-isUnblockedS is = IS.foldrAccum
-  (\x hyp (!varset, !sub, !cof) ->
-     matchIVar (lookupSub x sub)
-       (\x -> matchIVar (lookupNCof x cof)
-         (\x -> IS.member x varset || hyp ((,,) $$! IS.insert x varset $$! sub $$! cof))
-         True)
-       True)
-  (mempty, ?sub, ?cof)
-  False
-  is
-
-insertI :: NCofArg => I -> IS.Set -> IS.Set
-insertI i s = IS.insertI (appNCof ?cof i) s
-{-# inline insertI #-}
-
-neCofVars :: NeCof -> IS.Set
-neCofVars (NCEq i j) = IS.insertI i $ IS.insertI j mempty
-{-# inline neCofVars #-}
