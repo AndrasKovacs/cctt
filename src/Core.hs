@@ -23,10 +23,10 @@ TODO:
     If we have connections, there is no action of cofs that could be applied, and it seems
     that it does not work anymore to remember sets of ivars.
 
-
-  - solution:
-
-
+  - solution 1:
+    - Every semantic function that's involved in frc returns an extra flag as output,
+      which indicates whether the call "progressed" or "blocked".
+    - A helper function for all of these which immediately discards the flag.
 
 - ensure that closed eval does not need to go under cofs
   - problem:
@@ -198,40 +198,40 @@ occursInNeCof cof i' = case cof of
 -- comes from the syntax.
 ----------------------------------------------------------------------------------------------------
 
-data VSysHCom' = VSHTotal' Name Tm | VSHNe' NeSysHCom deriving Show
+data VSysHComSC = VSHTotalSC Name Tm | VSHNeSC NeSysHCom deriving Show
 
-vshempty' :: VSysHCom'
-vshempty' = VSHNe' NSHEmpty
+vshemptySC :: VSysHComSC
+vshemptySC = VSHNeSC NSHEmpty
 
-vshconsS' :: EvalArgs (VCof -> Name -> Tm -> VSysHCom' -> VSysHCom')
-vshconsS' cof i t ~sys = case cof of
-  VCTrue   -> VSHTotal' i t
+vshconsSSC :: EvalArgs (VCof -> Name -> Tm -> VSysHComSC -> VSysHComSC)
+vshconsSSC cof i t ~sys = case cof of
+  VCTrue   -> VSHTotalSC i t
   VCFalse  -> sys
   VCNe cof -> case sys of
-    VSHTotal' x t -> VSHTotal' x t
-    VSHNe' sys    -> VSHNe' (NSHCons (bindCof cof (bindILazyS i \_ -> eval t)) sys)
-{-# inline vshconsS' #-}
+    VSHTotalSC x t -> VSHTotalSC x t
+    VSHNeSC sys    -> VSHNeSC (NSHCons (bindCof cof (bindILazyS i \_ -> eval t)) sys)
+{-# inline vshconsSSC #-}
 
-evalSysHCom' :: EvalArgs (SysHCom -> VSysHCom')
-evalSysHCom' = \case
-  SHEmpty            -> vshempty'
-  SHCons cof x t sys -> vshconsS' (evalCof cof) x t (evalSysHCom' sys)
+evalSysHComSC :: EvalArgs (SysHCom -> VSysHComSC)
+evalSysHComSC = \case
+  SHEmpty            -> vshemptySC
+  SHCons cof x t sys -> vshconsSSC (evalCof cof) x t (evalSysHComSC sys)
 
-hcom' :: EvalArgs (I -> I -> Val -> VSysHCom' -> Val -> Val)
-hcom' r r' ~a ~t ~b
+hcomSC :: EvalArgs (I -> I -> Val -> VSysHComSC -> Val -> Val)
+hcomSC r r' ~a ~t ~b
   | r == r'             = b
-  | VSHTotal' x t <- t = let ?sub = ?sub `ext` r' in eval t
-  | VSHNe' nsys   <- t = hcomdn r r' a nsys b
-{-# inline hcom' #-}
+  | VSHTotalSC x t <- t = let ?sub = ?sub `ext` r' in eval t
+  | VSHNeSC nsys   <- t = hcomdn r r' a nsys b
+{-# inline hcomSC #-}
 
-com' :: EvalArgs (I -> I -> BindI Val -> VSysHCom' -> Val -> Val)
-com' r r' ~a ~sys ~b
+comSC :: EvalArgs (I -> I -> BindI Val -> VSysHComSC -> Val -> Val)
+comSC r r' ~a ~sys ~b
   | r == r'               = b
-  | VSHTotal' x t <- sys = let ?sub = ?sub `ext` r' in eval t
-  | VSHNe' nsys   <- sys = hcomdn r r' (a ∙ r')
+  | VSHTotalSC x t <- sys = let ?sub = ?sub `ext` r' in eval t
+  | VSHNeSC nsys   <- sys = hcomdn r r' (a ∙ r')
                               (mapNeSysHCom (\i t -> coe i r' a (t ∙ i)) nsys)
                               (coed r r' a b)
-{-# inline com' #-}
+{-# inline comSC #-}
 
 ----------------------------------------------------------------------------------------------------
 -- Mapping
@@ -353,13 +353,17 @@ class Apply a b c a1 a2 | a -> b c a1 a2 where
 instance Apply NamedClosure Val Val NCofArg DomArg where
   (∙) = capp; {-# inline (∙) #-}
 
+app' :: NCofArg => DomArg => Val -> Val -> Res
+app' t u = case frc t of
+  VLam t             -> progress (t ∙ u)
+  VNe t              -> block $ VNe (NApp t u)
+  v@VHole{}          -> block $ v
+  VUnf inf v v'      -> block $ VUnf inf (FApp v u) (v' ∙ u)
+  _                  -> impossible
+
 instance Apply Val Val Val NCofArg DomArg where
-  (∙) t u = case frc t of
-    VLam t             -> t ∙ u
-    VNe t              -> VNe (NApp t u)
-    v@VHole{}          -> v
-    VUnf inf v v'      -> VUnf inf (FApp v u) (v' ∙ u)
-    _                  -> impossible
+  (∙) t u = (app' t u)^.val
+  {-# inline (∙) #-}
 
 instance Apply (BindI a) I a (SubAction a) NCofArg where
   (∙) (BindI x i a) j
@@ -641,54 +645,70 @@ icapp (NICl _ t) arg = case t of
   ICBindI a ->
     a ∙ arg
 
+proj1' :: NCofArg => DomArg => Name -> Val -> Res
+proj1' x t = case frc t of
+  VPair _ t _ -> progress t
+  VNe t       -> block $ VNe (NProj1 t x)
+  v@VHole{}   -> block $ v
+  VUnf t v v' -> block $ VUnf t (FProj1 x v) (proj1 x v')
+  _           -> impossible
+
 proj1 :: NCofArg => DomArg => Name -> Val -> Val
-proj1 x t = case frc t of
-  VPair _ t _ -> t
-  VNe t       -> VNe (NProj1 t x)
-  v@VHole{}   -> v
-  VUnf t v v' -> VUnf t (FProj1 x v) (proj1 x v')
+proj1 x t = (proj1' x t)^.val
+
+proj2' :: NCofArg => DomArg => Name -> Val -> Res
+proj2' x t = case frc t of
+  VPair _ _ u -> progress u
+  VNe t       -> block $ VNe (NProj2 t x)
+  v@VHole{}   -> block $ v
+  VUnf i v v' -> block $ VUnf i (FProj2 x v) (proj2 x v')
   _           -> impossible
 
 proj2 :: NCofArg => DomArg => Name -> Val -> Val
-proj2 x t = case frc t of
-  VPair _ _ u -> u
-  VNe t       -> VNe (NProj2 t x)
-  v@VHole{}   -> v
-  VUnf i v v' -> VUnf i (FProj2 x v) (proj2 x v')
+proj2 x t = (proj2' x t)^.val
+
+unpack' :: NCofArg => DomArg => Name -> Val -> Res
+unpack' x t = case frc t of
+  VPack _ t   -> progress t
+  VNe t       -> block $ VNe (NUnpack t x)
+  v@VHole{}   -> block $ v
+  VUnf i v v' -> block $ VUnf i (FUnpack v x) (unpack x v')
   _           -> impossible
 
 unpack :: NCofArg => DomArg => Name -> Val -> Val
-unpack x t = case frc t of
-  VPack _ t   -> t
-  VNe t       -> VNe (NUnpack t x)
-  v@VHole{}   -> v
-  VUnf i v v' -> VUnf i (FUnpack v x) (unpack x v')
-  _           -> impossible
+unpack x v = (unpack' x v)^.val
 
 -- | Path application.
-papp :: NCofArg => DomArg => Val -> Val -> Val -> I -> Val
-papp ~l ~r ~t i = case frc i of
-  I0     -> l
-  I1     -> r
+papp' :: NCofArg => DomArg => Val -> Val -> Val -> I -> Res
+papp' ~l ~r ~t i = case frc i of
+  I0     -> progress l
+  I1     -> progress r
   i@(IVar x) -> case frc t of
-    VPLam _ _ t   -> t ∙ IVar x
-    VNe t         -> VNe (NPApp l r t i)
-    v@VHole{}     -> v
-    VUnf inf t t' -> VUnf inf (FPApp l r t i) (papp l r t' i)
+    VPLam _ _ t   -> progress (t ∙ IVar x)
+    VNe t         -> block $ VNe (NPApp l r t i)
+    v@VHole{}     -> block $ v
+    VUnf inf t t' -> block $ VUnf inf (FPApp l r t i) (papp l r t' i)
     _             -> impossible
 
-lapp :: NCofArg => DomArg => Val -> I -> Val
-lapp t i = case frc t of
-  VLLam t       -> t ∙ i
-  VNe t         -> VNe (NLApp t i)
-  v@VHole{}     -> v
-  VUnf inf t t' -> VUnf inf (FLApp t i) (lapp t' i)
+papp :: NCofArg => DomArg => Val -> Val -> Val -> I -> Val
+papp ~l ~r ~t i = (papp' l r t i)^.val
+
+lapp' :: NCofArg => DomArg => Val -> I -> Res
+lapp' t i = case frc t of
+  VLLam t       -> progress $ t ∙ i
+  VNe t         -> block $ VNe (NLApp t i)
+  v@VHole{}     -> block $ v
+  VUnf inf t t' -> block $ VUnf inf (FLApp t i) (lapp t' i)
   _             -> impossible
 
-coed :: I -> I -> BindI Val -> Val -> NCofArg => DomArg => Val
-coed r r' topA t = case (frc topA) ^. body of
+lapp :: NCofArg => DomArg => Val -> I -> Val
+lapp t i = (lapp' t i)^.val
+
+coed' :: I -> I -> BindI Val -> Val -> NCofArg => DomArg => Res
+coed' r r' topA t = case (frc topA) ^. body of
 
   VPi (rebind topA -> a) (rebind topA -> b) ->
+    progress $
     VLam $ NCl (b^.body.name) $ CCoePi r r' a b t
 
   -- coe r r' (i. (x : A i) × B i x) t =
@@ -697,47 +717,50 @@ coed r r' topA t = case (frc topA) ^. body of
     let t1 = proj1 (b^.body.name) t
         t2 = proj2 (b^.body.name) t
 
-    in VPair (b^.body.name)
+    in progress $
+      VPair (b^.body.name)
              (coed r r' a t1)
              (coed r r' (bindI j_ \j -> b ∙ j ∙ coe r j a t1) t2)
 
   VPath (rebind topA -> a) (rebind topA -> lhs) (rebind topA -> rhs) ->
+    progress $
         VPLam (lhs ∙ r') (rhs ∙ r')
       $ NICl (a^.body.name)
       $ ICCoePath r r' a lhs rhs t
 
   VLine (rebind topA -> a) ->
+    progress $
         VLLam
       $ NICl (a^.body.name)
       $ ICCoeLine r r' a t
 
   VU ->
-    t
+    progress t
 
   -- closed inductives
   VTyCon x ENil ->
-    t
+    progress t
 
   a@(VTyCon x (rebind topA -> ps)) -> case frc t of
     VDCon dci sp ->
-      VDCon dci (coeindsp r r' ps sp (dci^.fieldTypes))
+      progress $ VDCon dci (coeindsp r r' ps sp (dci^.fieldTypes))
     t@(VNe _) ->
-      VNe (NCoe r r' (rebind topA a) t)
+      block $ VNe (NCoe r r' (rebind topA a) t)
     VUnf inf t t' ->
       let abind = rebind topA a
-      in VUnf inf (FCoeVal r r' abind t) (coed r r' abind t')
+      in block $ VUnf inf (FCoeVal r r' abind t) (coed r r' abind t')
     t@(VHCom _ _ _ _ _) ->
-      VNe (NCoe r r' (rebind topA a) t)
+      block $ VNe (NCoe r r' (rebind topA a) t)
     v@VHole{} ->
-      v
+      block v
     _ ->
       impossible
 
   a@(VNe _) ->
-    VNe (NCoe r r' (rebind topA a) t)
+    block $ VNe (NCoe r r' (rebind topA a) t)
 
   VUnf inf (rebind topA -> a) (rebind topA -> a') ->
-    VUnf inf (FCoeTy r r' a t) (coed r r' a' t)
+    block $ VUnf inf (FCoeTy r r' a t) (coed r r' a' t)
 
 
 {-
@@ -899,27 +922,28 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
 
     -- glue (hcom 1 0 Ar' [r=r' j. unglue gr sysr; αr' j. fibpath* j] ar')
     --      [αr'. fibval*]
-    in glue
+    in progress $
+        glue
          (hcomd I1 I0 _Ar' (vshcons (eq r r') i_ (\i -> unglue gr (frc topSysr)) fibpaths) ar')
          topSysr'f
          fibvals
 
   -- coe r r' (i. Wrap x (a i)) t = pack (coe r r' (i. a i) (t.unpackₓ))
   VWrap x (rebind topA -> a) ->
-    VPack x $ coed r r' a (unpack x t)
+    progress $ VPack x $ coed r r' a (unpack x t)
 
   VHTyCon _ ENil ->
-    t
+    progress t
 
   a@(VHTyCon ti (rebind topA -> ps)) -> case frc t of
 
     t@(VHDCon di _ fs s) ->
       let psr' = ps ∙ r' in
       if di^.isCoherent then
-        VHDCon di psr' (coeindsp r r' ps fs (di^.fieldTypes)) s
+        progress $ VHDCon di psr' (coeindsp r r' ps fs (di^.fieldTypes)) s
       else
         case coehindsp r r' (rebind topA a) ps fs (di^.fieldTypes) s (di^.boundary) of
-          (!sp, !sys) ->
+          (!sp, !sys) -> progress $
             VHCom r' r (VHTyCon ti psr')
               sys
               (VHDCon di psr' sp s)
@@ -928,43 +952,50 @@ coe r r' (i. Glue (A i) [(α i). (T i, f i)]) gr =
     -- fhcom i j (a r') [α k. coe r r' a (t k)] (coe r r' a b)
     t@(VHCom i j _ sys b) ->
       let abind = rebind topA a in
-      VHCom i j
+      progress $ VHCom i j
         (VHTyCon ti (ps ∙ r'))
         (mapNeSysHCom (\k t -> coe r r' abind (t ∙ k)) sys)
         (coed r r' abind b)
 
     t@(VNe n) ->
-      VNe (NCoe r r' (rebind topA a) t)
+      block $ VNe (NCoe r r' (rebind topA a) t)
 
     VUnf inf t t' ->
       let abind = rebind topA a in
-      VUnf inf (FCoeVal r r' abind t) (coed r r' abind t')
+      block $ VUnf inf (FCoeVal r r' abind t) (coed r r' abind t')
 
     t@VHole{} ->
-      t
+      block t
 
     v -> impossible
 
-  v@VHole{} -> v
+  v@VHole{} -> block v
 
   v ->
     impossible
 
+coed :: I -> I -> BindI Val -> Val -> NCofArg => DomArg => Val
+coed r r' topA t = (coed' r r' topA t)^.val
 
-coe :: NCofArg => DomArg => I -> I -> BindI Val -> Val -> Val
-coe r r' ~a t
-  | frc r == frc r' = t
-  | True            = coed r r' a t
+coe' :: NCofArg => DomArg => I -> I -> BindI Val -> Val -> Res
+coe' r r' ~a t
+  | frc r == frc r' = progress t
+  | True            = coed' r r' a t
 {-# inline coe #-}
 
+coe :: NCofArg => DomArg => I -> I -> BindI Val -> Val -> Val
+coe r r' ~a t = (coe' r r' a t)^.val
+
 -- | HCom with off-diagonal I args ("d") and neutral system arg ("n").
-hcomdn :: I -> I -> Val -> NeSysHCom -> Val -> NCofArg => DomArg => Val
-hcomdn r r' topA nts base =
+hcomdn' :: I -> I -> Val -> NeSysHCom -> Val -> NCofArg => DomArg => Res
+hcomdn' r r' topA nts base =
  case runIO (do{bumpHCom' (isEmptyNSH nts); pure $! frc topA}) of
   VPi a b ->
+    progress $
     VLam $ NCl (b^.name) $ CHComPi r r' a b nts base
 
   VSg a b ->
+    progress $
     VPair
       (b^.name)
       (hcomdn r r' a
@@ -997,15 +1028,16 @@ hcomdn r r' topA nts base =
   --  , com r r' (i. B (hcom r i A [α j. (t j).1] b.1)) [α i. (t i).2] b.2)
 
   VPath a lhs rhs ->
+    progress $
         VPLam lhs rhs
       $ NICl (a^.name)
       $ ICHComPath r r' a lhs rhs nts base
 
   a@(VNe n) ->
-    VHCom r r' a nts base
+    block $ VHCom r r' a nts base
 
   VUnf inf a a' ->
-    VUnf inf (FHComTy r r' a nts base) (hcomdn r r' a' nts base)
+    block $ VUnf inf (FHComTy r r' a nts base) (hcomdn r r' a' nts base)
 
   -- hcom r r' U [α i. t i] b =
   --   Glue b [r=r'. (b, idEquiv); α. (t r', (coe r' r (i. t i), coeIsEquiv))]
@@ -1018,7 +1050,7 @@ hcomdn r r' topA nts base =
             (\t -> VPair ty_ (t ∙ r') (theCoeEquiv (bindIFromLazy t) r' r))
             nts
 
-    in VGlueTy base sys
+    in progress $ VGlueTy base sys
 
 -- hcom for Glue
 --------------------------------------------------------------------------------
@@ -1045,9 +1077,10 @@ hcomdn r r' topA nts base =
                                       ∙ hcom r i (proj1 ty_ tf) (frc betasys) gr) alphasys))
             (ungluen gr alphasys)
 
-    in VGlue hcombase alphasys fib
+    in progress $ VGlue hcombase alphasys fib
 
   VLine a ->
+    progress $
         VLLam
       $ NICl (a^.name)
       $ ICHComLine r r' a nts base
@@ -1055,53 +1088,60 @@ hcomdn r r' topA nts base =
   -- hcom r r' (x : A) [β i. t i] base =
   --   pack (hcom r r' A [β i. (t i).unpackₓ] (base.unpackₓ))
   VWrap x a ->
+    progress $
     VPack x $ hcomdn r r' a
       (mapNeSysHCom (\i t -> unpack x (t ∙ i)) nts)
       (unpack x base)
 
   a@(VTyCon _ ps) -> case frc base of
     base@(VDCon dci sp) -> case ?dom of
-      0 ->
+      0 -> progress $
         VDCon dci (hcomind0sp r r' a nts ps (dci^.conId) 0 sp (dci^.fieldTypes))
       _ -> case projsys' (dci^.conId) nts of
         TTPProject prj  ->
+          progress $
           VDCon dci (hcomindsp r r' a prj ps (dci^.conId) 0 sp (dci^.fieldTypes))
         TTPNe sys ->
-          VHCom r r' a sys base
+          block $ VHCom r r' a sys base
 
     base@(VNe n) ->
-      VHCom r r' a nts base
+      block $ VHCom r r' a nts base
 
     VUnf inf base base' ->
-      VUnf inf (FHComVal r r' a nts base) (hcomdn r r' a nts base')
+      block $ VUnf inf (FHComVal r r' a nts base) (hcomdn r r' a nts base')
 
     base@(VHCom _ _ _ _ _) ->
-      VHCom r r' a nts base
+      block $ VHCom r r' a nts base
 
-    base@VHole{} -> base
+    base@VHole{} -> block base
     _            -> impossible
 
 
   -- "fhcom", hcom on HITs is blocked
   a@(VHTyCon tyinf ps) ->
-    VHCom r r' a nts base
+    block $ VHCom r r' a nts base
 
-  v@VHole{} -> v
+  v@VHole{} -> block v
 
   _ ->
     impossible
 
+hcomdn :: I -> I -> Val -> NeSysHCom -> Val -> NCofArg => DomArg => Val
+hcomdn r r' topA nts base = (hcomdn' r r' topA nts base)^.val
 
 ----------------------------------------------------------------------------------------------------
 
 -- | HCom with nothing known about semantic arguments.
-hcom :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
-hcom r r' ~a ~t ~b
-  | frc r == frc r' = runIO (bumpHCom >> pure b)
+hcom' :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Res
+hcom' r r' ~a ~t ~b
+  | frc r == frc r' = runIO (bumpHCom >> (pure $! progress b))
   | True = case t of
-      VSHTotal v -> runIO (bumpHCom >> (pure $! v ∙ r'))
-      VSHNe sys  -> hcomdn r r' a sys b
+      VSHTotal v -> runIO (bumpHCom >> (pure $! progress $ v ∙ r'))
+      VSHNe sys  -> hcomdn' r r' a sys b
 {-# inline hcom #-}
+
+hcom :: NCofArg => DomArg => I -> I -> Val -> VSysHCom -> Val -> Val
+hcom r r' ~a ~t ~b = (hcom' r r' a t b)^.val
 
 -- | HCom with neutral system input.
 hcomn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom -> Val -> Val
@@ -1164,33 +1204,45 @@ ghcom r r' ~a ~sys ~b
 
 --------------------------------------------------------------------------------
 
-glueTy :: NCofArg => DomArg => Val -> VSys -> Val
-glueTy ~a sys = case sys of
-  VSTotal b -> proj1 ty_ b
-  VSNe sys  -> VGlueTy a sys
+glueTy' :: NCofArg => DomArg => Val -> VSys -> Res
+glueTy' ~a sys = case sys of
+  VSTotal b -> progress $ proj1 ty_ b
+  VSNe sys  -> block    $ VGlueTy a sys
 {-# inline glueTy #-}
 
-glue :: Val -> VSys -> VSys -> Val
-glue ~t eqs sys = case (eqs, sys) of
-  (VSTotal{}, VSTotal v) -> v
-  (VSNe eqs , VSNe sys)  -> VGlue t eqs sys
+glueTy :: NCofArg => DomArg => Val -> VSys -> Val
+glueTy ~a sys = (glueTy' a sys)^.val
+
+glue' :: Val -> VSys -> VSys -> Res
+glue' ~t eqs sys = case (eqs, sys) of
+  (VSTotal{}, VSTotal v) -> progress v
+  (VSNe eqs , VSNe sys)  -> block $ VGlue t eqs sys
   _                      -> impossible
 {-# inline glue #-}
 
-unglue :: NCofArg => DomArg => Val -> VSys -> Val
-unglue ~t sys = case sys of
-  VSTotal teqv -> proj1 f_ (proj2 ty_ teqv) ∙ t
-  VSNe sys     -> ungluen t sys
+glue :: Val -> VSys -> VSys -> Val
+glue ~t eqs sys = (glue' t eqs sys)^.val
+
+unglue' :: NCofArg => DomArg => Val -> VSys -> Res
+unglue' ~t sys = case sys of
+  VSTotal teqv -> progress $ proj1 f_ (proj2 ty_ teqv) ∙ t
+  VSNe sys     -> ungluen' t sys
 {-# inline unglue #-}
 
+unglue :: NCofArg => DomArg => Val -> VSys -> Val
+unglue ~t sys = (unglue' t sys)^.val
+
 -- | Unglue with neutral system arg.
-ungluen :: NCofArg => DomArg => Val -> NeSys -> Val
-ungluen t sys = case frc t of
-  VGlue base _ _          -> base
-  VNe n                   -> VNe (NUnglue n sys)
-  VUnf inf t t'           -> VUnf inf (FUnglue t sys) (ungluen t' sys)
-  v@VHole{}               -> v
+ungluen' :: NCofArg => DomArg => Val -> NeSys -> Res
+ungluen' t sys = case frc t of
+  VGlue base _ _          -> progress base
+  VNe n                   -> block $ VNe (NUnglue n sys)
+  VUnf inf t t'           -> block $ VUnf inf (FUnglue t sys) (ungluen t' sys)
+  v@VHole{}               -> block $ v
   _                       -> impossible
+
+ungluen :: NCofArg => DomArg => Val -> NeSys -> Val
+ungluen t sys = (ungluen' t sys)^.val
 
 
 -- Strict inductive types
@@ -1252,22 +1304,24 @@ pushSp env = \case
   VDNil       -> env
   VDCons v sp -> pushSp (EDef env v) sp
 
-lookupCase :: EvalArgs (Lvl -> VDSpine -> Cases -> Val)
+lookupCase :: EvalArgs (Lvl -> VDSpine -> Cases -> Res)
 lookupCase i sp cs = case i // cs of
-  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp in eval body
+  (0, CSCons _ _  body cs) -> let ?env = pushSp ?env sp in progress $ eval body
   (i, CSCons _ _  _    cs) -> lookupCase (i - 1) sp cs
   _                        -> impossible
 
-case_ :: NCofArg => DomArg => Val -> NamedClosure -> EvalClosure Cases -> Val
-case_ t b ecs@(EC sub env rc cs) = case frc t of
+case_' :: NCofArg => DomArg => Val -> NamedClosure -> EvalClosure Cases -> Res
+case_' t b ecs@(EC sub env rc cs) = case frc t of
   VDCon dci sp         -> let ?sub = wkSub sub; ?env = env; ?recurse = rc
                           in lookupCase (dci^.conId) sp cs
-  n@(VNe _)            -> VNe (NCase n b ecs)
-  VUnf inf t t'        -> VUnf inf (FCase_ t b ecs) (case_ t' b ecs)
-  n@(VHCom _ _ _ _ _ ) -> VNe (NCase n b ecs)
-  v@VHole{}            -> v
+  n@(VNe _)            -> block $ VNe (NCase n b ecs)
+  VUnf inf t t'        -> block $ VUnf inf (FCase_ t b ecs) (case_ t' b ecs)
+  n@(VHCom _ _ _ _ _ ) -> block $ VNe (NCase n b ecs)
+  v@VHole{}            -> block $ v
   _                    -> impossible
--- {-# inline case_ #-}
+
+case_ :: NCofArg => DomArg => Val -> NamedClosure -> EvalClosure Cases -> Val
+case_ t b ecs = (case_' t b ecs)^.val
 
 projVDSpine :: Lvl -> VDSpine -> Val
 projVDSpine x sp = case (x, sp) of
@@ -1394,19 +1448,22 @@ evalBoundary = \case
   SEmpty          -> vbempty
   SCons cof t sys -> vbcons (evalCof cof) (eval t) (evalBoundary sys)
 
-hdcon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Val
-hdcon inf ps fs s = case inf^.boundary of
-  SEmpty -> VHDCon inf ps fs s
+hdcon' :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Res
+hdcon' inf ps fs s = case inf^.boundary of
+  SEmpty -> block $ VHDCon inf ps fs s
   bnd    -> let ?sub = s; ?env = pushSp ps fs; ?recurse = DontRecurse in
             case evalBoundary bnd of
-              VBTotal v -> v
-              VBNe      -> VHDCon inf ps fs s
+              VBTotal v -> progress v
+              VBNe      -> block $ VHDCon inf ps fs s
 {-# inline hdcon #-}
 
-lookupHCase :: EvalArgs (Lvl -> VDSpine -> Sub -> HCases -> Val)
+hdcon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Val
+hdcon inf ps fs s = (hdcon' inf ps fs s)^.val
+
+lookupHCase :: EvalArgs (Lvl -> VDSpine -> Sub -> HCases -> Res)
 lookupHCase i sp s cs = case i // cs of
   (0, HCSCons _ _ _ body cs) -> let ?env = pushSp ?env sp; ?sub = pushSub ?sub s in
-                                eval body
+                                progress $ eval body
   (i, HCSCons _ _ _ _    cs) -> lookupHCase (i - 1) sp s cs
   _                          -> impossible
 
@@ -1415,8 +1472,8 @@ sysCofs = \case
   NSEmpty -> []
   NSCons t cs -> t^.binds : sysCofs cs
 
-hcase :: Val -> NamedClosure -> EvalClosure HCases -> NCofArg => DomArg => Val
-hcase t b ecs@(EC sub env rc cs) = case frc t of
+hcase' :: Val -> NamedClosure -> EvalClosure HCases -> NCofArg => DomArg => Res
+hcase' t b ecs@(EC sub env rc cs) = case frc t of
 
   VHDCon i ps fs s ->
     let ?sub = wkSub sub; ?env = env; ?recurse = rc in
@@ -1435,6 +1492,7 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
     -- brunerie_james_revised.cctt/error throws an error without the frc!
     -- in commit: 70122c63115866a32a5d1a6ed72a608a7028d59d
 
+    progress $
     hcomd r r' (b ∙ t)
       (mapVSysHCom (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs)) (frc sys))
       (coed r r' bbind (hcase base b ecs))
@@ -1443,10 +1501,13 @@ hcase t b ecs@(EC sub env rc cs) = case frc t of
     --   (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) sys)
     --   (coed r r' bbind (hcase base b tag ecs))
 
-  n@(VNe _) -> VNe (NHCase n b ecs)
-  VUnf inf t t' -> VUnf inf (FHCase_ t b ecs) (hcase t' b ecs)
-  v@VHole{}     -> v
-  v            -> impossible
+  n@(VNe _)     -> block $ VNe (NHCase n b ecs)
+  VUnf inf t t' -> block $ VUnf inf (FHCase_ t b ecs) (hcase t' b ecs)
+  v@VHole{}     -> block $ v
+  v             -> impossible
+
+hcase :: Val -> NamedClosure -> EvalClosure HCases -> NCofArg => DomArg => Val
+hcase t b ecs = (hcase' t b ecs)^.val
 
 evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
@@ -1537,7 +1598,7 @@ eval = \case
 
   -- Kan
   Coe r r' x a t     -> coe   (evalI r) (evalI r') (bindIS x \_ -> eval a) (eval t)
-  HCom r r' a t b    -> hcom' (evalI r) (evalI r') (eval a) (evalSysHCom' t) (eval b)
+  HCom r r' a t b    -> hcomSC (evalI r) (evalI r') (eval a) (evalSysHComSC t) (eval b)
 
   -- Glue
   GlueTy a sys       -> glueTy (eval a) (evalSys sys)
@@ -1558,7 +1619,7 @@ eval = \case
   Sym a x y p        -> sym (eval a) (eval x) (eval y) (eval p)
   Trans a x y z p q  -> trans (eval a) (eval x) (eval y) (eval z) (eval p) (eval q)
   Ap f x y p         -> ap_ (eval f) (eval x) (eval y) (eval p)
-  Com r r' i a t b   -> com' (evalI r) (evalI r') (bindIS i \_ -> eval a) (evalSysHCom' t) (eval b)
+  Com r r' i a t b   -> comSC (evalI r) (evalI r') (bindIS i \_ -> eval a) (evalSysHComSC t) (eval b)
 
 
 ----------------------------------------------------------------------------------------------------
@@ -1589,25 +1650,34 @@ instance Force NeCof VCof where
   frc  (NCEq i j) = eq i j
   frcS (NCEq i j) = eqS i j
 
+instance Force Res Val where
+  frc  (Res v True) = frc v
+  frc  (Res v _   ) = v
+  frcS (Res v True) = frcS v
+  frcS (Res v _   ) = v
+  {-# inline frc  #-}
+  {-# inline frcS #-}
+
 instance Force Val Val where
   frc = \case
     VSub v s           -> let ?sub = wkSub s in frcS v
     v@VUnf{}           -> v
     VNe t              -> frc t
-    VGlueTy a sys      -> frc (glueTy a (frc sys))
-    VHDCon i ps fs s   -> frc (hdcon i ps fs s)
-    VHCom r r' a sys t -> frc (hcom r r' a (frc sys) t)
-    VGlue t eqs sys    -> frc (glue t (frc eqs) (frc sys))
+    VGlueTy a sys      -> frc (glueTy' a (frc sys))
+    VHDCon i ps fs s   -> frc (hdcon' i ps fs s)
+    VHCom r r' a sys t -> frc (hcom' r r' a (frc sys) t)
+    VGlue t eqs sys    -> frc (glue' t (frc eqs) (frc sys))
     v                  -> v
 
   frcS = \case
     VSub v s           -> let ?sub = sub s in frcS v
     VUnf inf v v'      -> VUnf inf (sub v) (sub v')
     VNe t              -> frcS t
-    VGlueTy a sys      -> frc (glueTy (sub a) (frcS sys))
-    VHDCon i ps fs s   -> frc (hdcon i (sub ps) (sub fs) (sub s))
-    VHCom r r' a sys t -> frc (hcom (sub r) (sub r') (sub a) (frcS sys) (sub t))
-    VGlue t eqs sys    -> frc (glue (sub t) (frcS eqs) (frcS sys))
+    VGlueTy a sys      -> frc (glueTy' (sub a) (frcS sys))
+    VHDCon i ps fs s   -> frc (hdcon' i (sub ps) (sub fs) (sub s))
+    VHCom r r' a sys t -> frc (hcom' (sub r) (sub r') (sub a) (frcS sys) (sub t))
+    VGlue t eqs sys    -> frc (glue' (sub t) (frcS eqs) (frcS sys))
+
     VPi a b            -> VPi (sub a) (sub b)
     VLam t             -> VLam (sub t)
     VPath a t u        -> VPath (sub a) (sub t) (sub u)
@@ -1630,32 +1700,33 @@ instance Force Ne Val where
     t@NLocalVar{}      -> VNe t
     t@NDontRecurse{}   -> VNe t
     NSub n s           -> let ?sub = wkSub s in frcS n
-    NApp t u           -> frc (frc t ∙ u)
-    NPApp l r t i      -> frc (papp l r (frc t) i)
-    NProj1 t x         -> frc (proj1 x (frc t))
-    NProj2 t x         -> frc (proj2 x (frc t))
-    NUnpack t x        -> frc (unpack x (frc t))
-    NCoe r r' a t      -> frc (coe r r' (frc a) (frc t))
-    NUnglue t sys      -> frc (unglue (frc t) (frc sys))
-    NLApp t i          -> frc (lapp (frc t) i)
-    NCase t b cs       -> frc (case_ (frc t) b cs)
-    NHCase t b cs      -> frc (hcase (frc t) b cs)
+    NApp t u           -> frc (app' (frc t) u)
+    NPApp l r t i      -> frc (papp' l r (frc t) i)
+    NProj1 t x         -> frc (proj1' x (frc t))
+    NProj2 t x         -> frc (proj2' x (frc t))
+    NUnpack t x        -> frc (unpack' x (frc t))
+    NCoe r r' a t      -> frc (coe' r r' (frc a) (frc t))
+    NUnglue t sys      -> frc (unglue' (frc t) (frc sys))
+    NLApp t i          -> frc (lapp' (frc t) i)
+    NCase t b cs       -> frc (case_' (frc t) b cs)
+    NHCase t b cs      -> frc (hcase' (frc t) b cs)
   {-# noinline frc #-}
 
   frcS = \case
     t@NLocalVar{}      -> VNe t
     t@NDontRecurse{}   -> VNe t
     NSub n s           -> let ?sub = sub s in frcS n
-    NApp t u           -> frc (frcS t ∙ sub u)
-    NPApp l r t i      -> frc (papp (sub l) (sub r) (frcS t) (frcS i))
-    NProj1 t x         -> frc (proj1 x (frcS t))
-    NProj2 t x         -> frc (proj2 x (frcS t))
-    NUnpack t x        -> frc (unpack x (frcS t))
-    NCoe r r' a t      -> frc (coe (frcS r) (frcS r') (frcS a) (frcS t))
-    NUnglue t sys      -> frc (unglue (frcS t) (frcS sys))
-    NLApp t i          -> frc (lapp (frcS t) (frcS i))
-    NCase t b cs       -> frc (case_ (frcS t) (sub b) (sub cs))
-    NHCase t b cs      -> frc (hcase (frcS t) (sub b) (sub cs))
+    NApp t u           -> frc (app' (frcS t) (sub u))
+    NPApp l r t i      -> frc (papp' (sub l) (sub r) (frcS t) (frcS i))
+    NProj1 t x         -> frc (proj1' x (frcS t))
+    NProj2 t x         -> frc (proj2' x (frcS t))
+    NUnpack t x        -> frc (unpack' x (frcS t))
+    NCoe r r' a t      -> frc (coe' (frcS r) (frcS r') (frcS a) (frcS t))
+    NUnglue t sys      -> frc (unglue' (frcS t) (frcS sys))
+    NLApp t i          -> frc (lapp' (frcS t) (frcS i))
+    NCase t b cs       -> frc (case_' (frcS t) (sub b) (sub cs))
+    NHCase t b cs      -> frc (hcase' (frcS t) (sub b) (sub cs))
+  {-# noinline frcS #-}
 
 instance Force NeSys VSys where
 
