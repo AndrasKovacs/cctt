@@ -652,6 +652,19 @@ instance SubAction VDSpine where
 
 --------------------------------------------------------------------------------
 
+data Res = Res {resVal :: Val, resProgressed :: Bool}
+  deriving Show
+
+block :: Val -> Res
+block v = Res v False
+{-# inline block #-}
+
+progress :: Val -> Res
+progress v = Res v True
+{-# inline progress #-}
+
+--------------------------------------------------------------------------------
+
 makeFields ''BindCof
 makeFields ''BindCofLazy
 makeFields ''BindI
@@ -664,3 +677,4 @@ makeFields ''NamedClosure
 makeFields ''NamedIClosure
 makeFields ''RecInfo
 makeFields ''TyConInfo
+makeFields ''Res
