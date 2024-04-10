@@ -1488,18 +1488,10 @@ hcase' t b ecs@(EC sub env rc cs) = case frc t of
      --           (coe r r' B* (case base B cs))
     let bbind = bindI i_ \i -> b ∙ hcom r i a (frc sys) base in
 
-    -- TODO BUGFIX: this (frc sys) system forcing should not be necessary here!
-    -- brunerie_james_revised.cctt/error throws an error without the frc!
-    -- in commit: 70122c63115866a32a5d1a6ed72a608a7028d59d
-
     progress $
-    hcomd r r' (b ∙ t)
-      (mapVSysHCom (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs)) (frc sys))
+    hcomdn r r' (b ∙ t)
+      (mapNeSysHCom (\i t -> coe i r' bbind (hcase (t ∙ i) b ecs)) sys)
       (coed r r' bbind (hcase base b ecs))
-
-    -- hcomdn r r' (b ∙ t)
-    --   (mapNeSysHCom' (\i t -> coe i r' bbind (hcase (t ∙ i) b tag ecs)) sys)
-    --   (coed r r' bbind (hcase base b tag ecs))
 
   n@(VNe _)     -> block $ VNe (NHCase n b ecs)
   VUnf inf t t' -> block $ VUnf inf (FHCase_ t b ecs) (hcase t' b ecs)

@@ -650,6 +650,9 @@ instance SubAction VDSpine where
     VDNil       -> VDNil
     VDCons v vs -> VDCons (sub v) (sub vs)
 
+
+-- Semantics functions indicate in result whether they made progress This is
+-- needed in forcing where we need to stop recursing when no progress was made.
 --------------------------------------------------------------------------------
 
 data Res = Res {resVal :: Val, resProgressed :: Bool}
