@@ -1,0 +1,19 @@
+
+inductive Empty := ;
+
+inductive SET := set (X : U) (f : X → SET);
+
+regular : SET → U := λ[
+  set X f. (x : X) → f x = set X f → Empty ];
+
+R : SET :=
+  set ((S : SET) × regular S) (λ p. p.1);
+
+R-nonreg : regular R → Empty :=
+  λ reg. reg (R , reg) (λ _. R);
+
+R-reg : regular R :=
+  λ x p. coe 0 1 (i. regular (p i)) x.2 x p;
+
+false : Empty
+  := R-nonreg R-reg;
