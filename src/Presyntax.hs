@@ -68,13 +68,13 @@ data Tm
 data Cof = CEq Tm Tm
   deriving Show
 
-data Sys = SEmpty | SCons Cof Tm Sys
+data Sys = SEmpty | SCons [Cof] Tm Sys
   deriving Show
 
 data BindMaybe = BMBind Bind Tm | BMDontBind Tm
   deriving Show
 
-data SysHCom = SHEmpty | SHCons Pos Cof BindMaybe SysHCom
+data SysHCom = SHEmpty | SHCons Pos [Cof] BindMaybe SysHCom
   deriving Show
 
 type Constructor = (Name, [(Bind, Ty)])

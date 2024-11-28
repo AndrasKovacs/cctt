@@ -77,8 +77,10 @@ instantiate :: NCofArg => DomArg => EnvArg => Tm -> I -> Val
 instantiate t i = let ?sub = idSub (dom ?cof) `ext` i; ?recurse = DontRecurse
                   in Core.eval t
 
-evalCof :: NCofArg => Cof -> VCof
-evalCof cof = let ?sub = idSub (dom ?cof) in Cubical.evalCof cof
+evalCof :: NCofArg => [Cof] -> VCof
+evalCof [] = error "imposible"
+evalCof cofEqs@(cof:_) = let ?sub = idSub (dom ?cof) in Cubical.evalCof cofEqs
+
 
 evalI :: NCofArg => I -> I
 evalI i = let ?sub = idSub (dom ?cof) in Cubical.evalI i
@@ -990,8 +992,12 @@ isConstantU t = bindI i_ \i ->
 
 --------------------------------------------------------------------------------
 
-checkCof :: Elab (P.Cof -> IO Cof)
-checkCof (P.CEq i j) = CEq <$!> checkI i <*!> checkI j
+checkCof' :: Elab (P.Cof -> IO Cof)
+checkCof' (P.CEq i j) = CEq <$!> checkI i <*!> checkI j
+
+checkCof :: Elab ([P.Cof] -> IO [Cof])
+checkCof xs = traverse checkCof' xs
+
 
 -- Systems
 ----------------------------------------------------------------------------------------------------

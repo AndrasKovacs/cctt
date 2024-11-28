@@ -199,10 +199,10 @@ data HCases
   | HCSCons Name [Name] [Name] Tm HCases
   deriving Show
 
-data Sys = SEmpty | SCons Cof Tm Sys
+data Sys = SEmpty | SCons [Cof] Tm Sys
   deriving Show
 
-data SysHCom = SHEmpty | SHCons Cof Name Tm SysHCom
+data SysHCom = SHEmpty | SHCons [Cof] Name Tm SysHCom
   deriving Show
 
 -- Values

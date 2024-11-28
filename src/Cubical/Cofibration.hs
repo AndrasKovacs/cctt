@@ -23,11 +23,15 @@ data NeCof' = NeCof' {
     neCof'Extended :: NCof
   , neCof'Extra    :: {-# unpack #-} NeCof}
 
+
+
 -- TODO: unbox
 data VCof
   = VCTrue
   | VCFalse
-  | VCNe {-# unpack #-} NeCof' IS.Set
+  | VCNes {-# unpack #-} NeCof' [NeCof'] IS.Set
+
+pattern VCNe x y = VCNes x [] y
 
 makeFields ''NeCof'
 
@@ -131,9 +135,23 @@ wkSub s = setDom (dom ?cof) s
 
 ----------------------------------------------------------------------------------------------------
 
-evalCof :: NCofArg => SubArg => Cof -> VCof
-evalCof (CEq i j) = eqS i j
-{-# inline evalCof #-}
+-- evalCof :: NCofArg => SubArg => Cof -> VCof
+-- evalCof (CEq i j) = eqS i j
+-- {-# inline evalCof #-}
+
+
+
+vOr :: VCof -> VCof -> VCof
+vOr _ VCTrue = VCTrue
+vOr VCTrue _ = VCTrue
+vOr VCFalse x = x
+vOr x VCFalse = x
+vOr (VCNes x xs xv) (VCNes y ys yv) =
+  (VCNes x (xs ++ y : ys) (xv <> yv))
+
+evalCof :: NCofArg => SubArg => [Cof] -> VCof
+evalCof [] = VCFalse
+evalCof ((CEq i j):xs) = vOr (eqS i j) (evalCof xs)
 
 ----------------------------------------------------------------------------------------------------
 

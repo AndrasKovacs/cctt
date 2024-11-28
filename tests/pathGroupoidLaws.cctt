@@ -1,0 +1,9 @@
+dcpf (A : U) (a0 a1 a2 a3 : A)
+               (p : a0 = a1) (q : a1 = a2)
+               (r : a2 = a3) : I → I → A  
+ := λ i j.
+       hcom 0 1 [
+          i = 0 j. (p j);
+	  i=1 , j=0 _. a0
+	  ] (a0);
+

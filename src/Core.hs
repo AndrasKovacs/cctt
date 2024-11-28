@@ -125,6 +125,8 @@ vscons cof v ~sys = case cof of
   VCNe cof is -> case sys of
     VSTotal v'         -> VSTotal v'
     VSNe (WIS sys is') -> VSNe (WIS (NSCons (bindCofLazy cof v) sys) (is <> is'))
+-- vscons _ _ _ = error "todo"
+
 {-# inline vscons #-}
 
 -- | Extend a *neutral* system with a *non-true* cof.
@@ -159,6 +161,7 @@ vshconsS cof i v ~sys = case cof of
   VCNe cof is -> case sys of
     VSHTotal v'         -> VSHTotal v'
     VSHNe (WIS sys is') -> VSHNe $ WIS (NSHCons (bindCof cof (bindILazyS i v)) sys) (is <> is')
+
 {-# inline vshconsS #-}
 
 evalSysHCom :: EvalArgs (SysHCom -> VSysHCom)
@@ -1409,6 +1412,7 @@ vbcons cof v ~sys = case cof of
   VCNe cof is -> case sys of
     VBTotal v'  -> VBTotal v'
     VBNe is'    -> VBNe (is <> is')
+-- vbcons _ _ _ = error "todo"
 {-# inline vbcons #-}
 
 evalBoundary :: EvalArgs (Sys -> VBoundary)

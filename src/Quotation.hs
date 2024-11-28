@@ -197,12 +197,12 @@ instance (SubAction a, Quote a b) => Quote (BindILazy a) b where
 instance Quote NeSys Sys where
   quote = \case
     NSEmpty      -> SEmpty
-    NSCons t sys -> SCons (quote (t^.binds)) (quote t) (quote sys)
+    NSCons t sys -> SCons [(quote (t^.binds))] (quote t) (quote sys)
 
 instance Quote NeSysHCom SysHCom where
   quote = \case
     NSHEmpty      -> SHEmpty
-    NSHCons t sys -> SHCons (quote (t^.binds)) (t^.body.name) (quote t) (quote sys)
+    NSHCons t sys -> SHCons [(quote (t^.binds))] (t^.body.name) (quote t) (quote sys)
 
 instance Quote NamedClosure Tm where
   quote t = fresh \x -> quote (t ∙ x); {-# inline quote #-}
