@@ -118,13 +118,15 @@ bindILazyS x act = freshIVarS \i -> BindILazy x i (act (IVar i))
 vsempty :: VSys
 vsempty = VSNe (WIS NSEmpty mempty)
 
-vscons :: NCofArg => VCof -> (NCofArg => Val) -> VSys -> VSys
-vscons cof v ~sys = case cof of
+vscons :: NCofArg => [VCof] -> (NCofArg => Val) -> VSys -> VSys
+vscons [cof] v ~sys = case cof of
   VCTrue      -> VSTotal v
   VCFalse     -> sys
   VCNe cof is -> case sys of
     VSTotal v'         -> VSTotal v'
     VSNe (WIS sys is') -> VSNe (WIS (NSCons (bindCofLazy cof v) sys) (is <> is'))
+vscons _ _ _ = error "todo"
+
 {-# inline vscons #-}
 
 -- | Extend a *neutral* system with a *non-true* cof.
@@ -138,7 +140,7 @@ nscons cof v ~sys = case cof of
 evalSys :: EvalArgs (Sys -> VSys)
 evalSys = \case
   SEmpty          -> vsempty
-  SCons cof t sys -> vscons (evalCof cof) (eval t) (evalSys sys)
+  SCons cof t sys -> vscons (evalCofs cof) (eval t) (evalSys sys)
 
 vshempty :: VSysHCom
 vshempty = VSHNe (WIS NSHEmpty mempty)
@@ -152,19 +154,20 @@ vshcons cof i v ~sys = case cof of
     VSHNe (WIS sys is') -> VSHNe (WIS (NSHCons (bindCof cof (bindILazy i v)) sys) (is <> is'))
 {-# inline vshcons #-}
 
-vshconsS :: SubArg => NCofArg => VCof -> Name -> (SubArg => NCofArg => I -> Val) -> VSysHCom -> VSysHCom
-vshconsS cof i v ~sys = case cof of
+vshconsS :: SubArg => NCofArg => [VCof] -> Name -> (SubArg => NCofArg => I -> Val) -> VSysHCom -> VSysHCom
+vshconsS [cof] i v ~sys = case cof of
   VCTrue      -> VSHTotal (bindILazyS i v)
   VCFalse     -> sys
   VCNe cof is -> case sys of
     VSHTotal v'         -> VSHTotal v'
     VSHNe (WIS sys is') -> VSHNe $ WIS (NSHCons (bindCof cof (bindILazyS i v)) sys) (is <> is')
+vshconsS _ _ _ _ = error "todo"
 {-# inline vshconsS #-}
 
 evalSysHCom :: EvalArgs (SysHCom -> VSysHCom)
 evalSysHCom = \case
   SHEmpty            -> vshempty
-  SHCons cof x t sys -> vshconsS (evalCof cof) x (\_ -> eval t) (evalSysHCom sys)
+  SHCons cof x t sys -> vshconsS (evalCofs cof) x (\_ -> eval t) (evalSysHCom sys)
 
 occursInNeCof :: NeCof -> IVar -> Bool
 occursInNeCof cof i' = case cof of
@@ -180,20 +183,21 @@ data VSysHCom' = VSHTotal' Name Tm | VSHNe' NeSysHCom IS.Set deriving Show
 vshempty' :: VSysHCom'
 vshempty' = VSHNe' NSHEmpty mempty
 
-vshconsS' :: EvalArgs (VCof -> Name -> Tm -> VSysHCom' -> VSysHCom')
-vshconsS' cof i t ~sys = case cof of
+vshconsS' :: EvalArgs ([VCof] -> Name -> Tm -> VSysHCom' -> VSysHCom')
+vshconsS' [cof] i t ~sys = case cof of
   VCTrue      -> VSHTotal' i t
   VCFalse     -> sys
   VCNe cof is -> case sys of
     VSHTotal' x t  -> VSHTotal' x t
     VSHNe' sys is' -> VSHNe' (NSHCons (bindCof cof (bindILazyS i \_ -> eval t)) sys)
                              (is <> is')
+vshconsS' _ _ _ _ = error "todo"                        
 {-# inline vshconsS' #-}
 
 evalSysHCom' :: EvalArgs (SysHCom -> VSysHCom')
 evalSysHCom' = \case
   SHEmpty            -> vshempty'
-  SHCons cof x t sys -> vshconsS' (evalCof cof) x t (evalSysHCom' sys)
+  SHCons cof x t sys -> vshconsS' (evalCofs cof) x t (evalSysHCom' sys)
 
 hcom' :: EvalArgs (I -> I -> Val -> VSysHCom' -> Val -> Val)
 hcom' r r' ~a ~t ~b
@@ -1402,19 +1406,20 @@ data VBoundary = VBTotal Val | VBNe IS.Set deriving Show
 vbempty :: VBoundary
 vbempty = VBNe mempty
 
-vbcons :: NCofArg => VCof -> (NCofArg => Val) -> VBoundary -> VBoundary
-vbcons cof v ~sys = case cof of
+vbcons :: NCofArg => [VCof] -> (NCofArg => Val) -> VBoundary -> VBoundary
+vbcons [cof] v ~sys = case cof of
   VCTrue      -> VBTotal v
   VCFalse     -> sys
   VCNe cof is -> case sys of
     VBTotal v'  -> VBTotal v'
     VBNe is'    -> VBNe (is <> is')
+vbcons _ _ _ = error "todo"
 {-# inline vbcons #-}
 
 evalBoundary :: EvalArgs (Sys -> VBoundary)
 evalBoundary = \case
   SEmpty          -> vbempty
-  SCons cof t sys -> vbcons (evalCof cof) (eval t) (evalBoundary sys)
+  SCons cof t sys -> vbcons (evalCofs cof) (eval t) (evalBoundary sys)
 
 hdcon :: NCofArg => DomArg => HDConInfo -> Env -> VDSpine -> Sub -> Val
 hdcon inf ps fs s = case inf^.boundary of
@@ -1474,10 +1479,10 @@ evalCoeBoundary :: EvalArgs (I -> IVar -> BindI VTy -> Sys -> NeSysHCom)
 evalCoeBoundary r' i a = \case
   SEmpty ->
     NSHEmpty
-  SCons cof t bnd -> case evalCof cof of
-    VCTrue     -> impossible
-    VCFalse    -> evalCoeBoundary r' i a bnd
-    VCNe cof _ -> NSHCons (bindCof cof (BindILazy (a^.name) i (coe (IVar i) r' a (eval t))))
+  SCons cof t bnd -> case evalCofs cof of
+    [VCTrue]     -> impossible
+    [VCFalse]    -> evalCoeBoundary r' i a bnd
+    [VCNe cof _] -> NSHCons (bindCof cof (BindILazy (a^.name) i (coe (IVar i) r' a (eval t))))
                           (evalCoeBoundary r' i a bnd)
 
 coehindsp ::
@@ -1694,11 +1699,11 @@ instance Force NeSys VSys where
   -- computation duplication if we don't. Neither looks very bad.
   frc = \case
     NSEmpty      -> vsempty
-    NSCons t sys -> vscons (frc (t^.binds)) (frc (t^.body)) (frc sys)
+    NSCons t sys -> vscons [(frc (t^.binds))] (frc (t^.body)) (frc sys)
 
   frcS = \case
     NSEmpty      -> vsempty
-    NSCons t sys -> vscons (frcS (t^.binds)) (frcS (t^.body)) (frcS sys)
+    NSCons t sys -> vscons [(frcS (t^.binds))] (frcS (t^.body)) (frcS sys)
 
 instance Force NeSysHCom VSysHCom where
   -- Definitions are more unrolled and optimized here. The semantic vshcons

@@ -140,12 +140,12 @@ cof = do
 
 goSys1 :: Parser Sys
 goSys1 =
-      (SCons <$> (semi *> cof' <* dot') <*> tm' <*> goSys1)
+      (SCons <$> (semi *> (sepBy1 cof' comma) <* dot') <*> tm' <*> goSys1)
   <|> pure SEmpty
 
 goSys :: Parser Sys
 goSys =
-      (SCons <$> (cof <* dot') <*> tm' <*> goSys1)
+      (SCons <$> ((sepBy1 cof comma) <* dot') <*> tm' <*> goSys1)
   <|> pure SEmpty
 
 sysBindMaybe :: Parser BindMaybe
@@ -156,12 +156,12 @@ sysBindMaybe = getPos >>= \p ->
 
 goSysHCom1 :: Parser SysHCom
 goSysHCom1 =
-      (SHCons <$> getPos <*> (semi *> cof') <*> sysBindMaybe <*> goSysHCom1)
+      (SHCons <$> getPos <*> (semi *> (sepBy1 cof' comma)) <*> sysBindMaybe <*> goSysHCom1)
   <|> pure SHEmpty
 
 goSysHCom :: Parser SysHCom
 goSysHCom =
-      (SHCons <$> getPos <*> cof <*> sysBindMaybe <*> goSysHCom1)
+      (SHCons <$> getPos <*> (sepBy1 cof comma) <*> sysBindMaybe <*> goSysHCom1)
   <|> pure SHEmpty
 
 sys :: Parser (Sys, Pos)

@@ -990,8 +990,12 @@ isConstantU t = bindI i_ \i ->
 
 --------------------------------------------------------------------------------
 
-checkCof :: Elab (P.Cof -> IO Cof)
-checkCof (P.CEq i j) = CEq <$!> checkI i <*!> checkI j
+checkCof' :: Elab (P.Cof -> IO Cof)
+checkCof' (P.CEq i j) = CEq <$!> checkI i <*!> checkI j
+
+checkCof :: Elab ([P.Cof] -> IO [Cof])
+checkCof xs = traverse checkCof' xs
+
 
 -- Systems
 ----------------------------------------------------------------------------------------------------
@@ -1000,10 +1004,10 @@ sysHComCompat :: Elab (Tm -> SysHCom -> IO ())
 sysHComCompat t = \case
   SHEmpty              -> pure ()
   SHCons cof' x t' sys -> do
-    case evalCof cof' of
-      VCFalse     -> pure ()
-      VCTrue      -> bindI x \_ -> conv (eval t) (eval t')
-      VCNe cof' _ -> bindCof cof' (bindI x \_ -> conv (eval t) (eval t'))
+    case fmap evalCof cof' of
+      [VCFalse]     -> pure ()
+      [VCTrue]      -> bindI x \_ -> conv (eval t) (eval t')
+      [VCNe cof' _] -> bindCof cof' (bindI x \_ -> conv (eval t) (eval t'))
     sysHComCompat t sys
 
 elabSysHCom :: Elab (VTy -> I -> Tm ->  P.SysHCom -> IO SysHCom)
@@ -1012,10 +1016,10 @@ elabSysHCom a r base = \case
     pure SHEmpty
   P.SHCons pos cof t sys -> setPos pos do
     cof <- checkCof cof
-    case evalCof cof of
-      VCTrue  -> err NonNeutralCofInSystem
-      VCFalse -> err NonNeutralCofInSystem
-      VCNe ncof _ -> do
+    case fmap evalCof cof of
+      [VCTrue]  -> err NonNeutralCofInSystem
+      [VCFalse] -> err NonNeutralCofInSystem
+      [VCNe ncof _] -> do
         sys <- elabSysHCom a r base sys
         bindCof ncof do
 
@@ -1052,10 +1056,10 @@ sysCompat :: Elab (Tm -> Sys -> IO ())
 sysCompat t = \case
   SEmpty            -> pure ()
   SCons cof' t' sys -> do
-    case evalCof cof' of
-      VCTrue      -> conv (eval t) (eval t')
-      VCFalse     -> pure ()
-      VCNe cof' _ -> bindCof cof' $ conv (eval t) (eval t')
+    case fmap evalCof cof' of
+      [VCTrue]      -> conv (eval t) (eval t')
+      [VCFalse]     -> pure ()
+      [VCNe cof' _] -> bindCof cof' $ conv (eval t) (eval t')
     sysCompat t sys
 
 elabGlueTmSys :: Elab (Tm -> P.Sys -> VTy -> NeSys -> IO Sys)
@@ -1064,10 +1068,10 @@ elabGlueTmSys base ts a equivs = case (ts, equivs) of
     pure SEmpty
   (P.SCons cof t ts, NSCons (BindCofLazy cof' equiv) equivs) -> setPos cof do
     cof <- checkCof cof
-    case evalCof cof of
-      VCTrue  -> err NonNeutralCofInSystem
-      VCFalse -> err NonNeutralCofInSystem
-      VCNe ncof _ -> do
+    case fmap evalCof cof of
+      [VCTrue]  -> err NonNeutralCofInSystem
+      [VCFalse] -> err NonNeutralCofInSystem
+      [VCNe ncof _] -> do
         convNeCof (ncof^.extra) cof'
         ts <- elabGlueTmSys base ts a equivs
         setPos t $ bindCof ncof do
@@ -1085,11 +1089,11 @@ elabSys componentTy = \case
     pure SEmpty
   P.SCons cof t sys -> setPos cof do
     cof <- checkCof cof
-    let vcof = evalCof cof
+    let vcof = fmap evalCof cof
     case vcof of
-      VCTrue  -> err NonNeutralCofInSystem
-      VCFalse -> err NonNeutralCofInSystem
-      VCNe ncof _ -> do
+      [VCTrue]  -> err NonNeutralCofInSystem
+      [VCFalse] -> err NonNeutralCofInSystem
+      [VCNe ncof _] -> do
         sys <- elabSys componentTy sys
         setPos t $ bindCof ncof do
           t <- check t (gj componentTy)
@@ -1117,7 +1121,7 @@ guardTopShadowing x = setPos x do
 evalHCaseBoundary :: EvalArgs (Sys -> NamedClosure -> EvalClosure HCases -> VSys)
 evalHCaseBoundary bnd casety casecl = case bnd of
   SEmpty          -> vsempty
-  SCons cof t bnd -> vscons (Cubical.evalCof cof) (hcase (eval t) casety casecl)
+  SCons cof t bnd -> vscons (Cubical.evalCofs cof) (hcase (eval t) casety casecl)
                             (evalHCaseBoundary bnd casety casecl)
 
 neSysCompat :: Elab (Recurse -> Tm -> NeSys -> IO ())

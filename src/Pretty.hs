@@ -164,12 +164,22 @@ cof :: PrettyArgs (Cof -> Txt)
 cof = \case
   CEq i j -> cofEq i j
 
+
+cofs :: PrettyArgs ([Cof] -> Txt)
+cofs = \case
+ [] -> ""
+ [x] -> cof x
+ x:xs -> cof x <> " , " <> cofs xs
+  
+   
+
+
 goSysH :: PrettyArgs (SysHCom -> Txt)
 goSysH = \case
   SHEmpty              -> mempty
-  SHCons c x t SHEmpty -> let pc = cof c in bindI x \x ->
+  SHCons c x t SHEmpty -> let pc = cofs c in bindI x \x ->
                           pc <> " " <> x <> ". " <> pair t
-  SHCons c x t sys     -> let pc = cof c; psys = goSysH sys in bindI x \x ->
+  SHCons c x t sys     -> let pc = cofs c; psys = goSysH sys in bindI x \x ->
                           pc <> " " <> x <> ". " <> pair t <> "; " <> psys
 
 sysH :: PrettyArgs (SysHCom -> Txt)
@@ -178,8 +188,8 @@ sysH s = "[" <> goSysH s <> "]"
 goSys :: PrettyArgs (Sys -> Txt)
 goSys = \case
   SEmpty           -> mempty
-  SCons c t SEmpty -> cof c <> ". " <> pair t
-  SCons c t sys    -> cof c <> ". " <> pair t <> "; " <> goSys sys
+  SCons c t SEmpty -> cofs c <> ". " <> pair t
+  SCons c t sys    -> cofs c <> ". " <> pair t <> "; " <> goSys sys
 
 sys :: PrettyArgs (Sys -> Txt)
 sys s = "[" <> goSys s <> "]"
@@ -475,6 +485,11 @@ instance Pretty (NamesArg, DomArg, IDomArg) Tm where
 instance Pretty (NamesArg, DomArg, IDomArg) Cof where
   pretty    t = runTxt (cof t)
   pretty0   t = withPrettyArgs0 $ runTxt (cof t)
+
+-- instance Pretty (NamesArg, DomArg, IDomArg) [Cof] where
+--   pretty    t = runTxt (cof t)
+--   pretty0   t = withPrettyArgs0 $ runTxt (cof t)
+
 
 instance Pretty (NamesArg, DomArg, IDomArg) NeCof where
   pretty    t = runTxt (necof t)

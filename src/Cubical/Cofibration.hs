@@ -135,6 +135,8 @@ evalCof :: NCofArg => SubArg => Cof -> VCof
 evalCof (CEq i j) = eqS i j
 {-# inline evalCof #-}
 
+evalCofs :: NCofArg => SubArg => [Cof] -> [VCof]
+evalCofs = fmap evalCof 
 ----------------------------------------------------------------------------------------------------
 
 isUnblocked :: NCofArg => IS.Set -> Bool
