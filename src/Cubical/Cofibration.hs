@@ -29,9 +29,9 @@ data NeCof' = NeCof' {
 data VCof
   = VCTrue
   | VCFalse
-  | VCNes {-# unpack #-} (NeCof' , IS.Set) [(NeCof' , IS.Set)]
+  | VCNes {-# unpack #-} NeCof' [NeCof'] IS.Set
 
-pattern VCNe x y = VCNes (x , y) []
+pattern VCNe x y = VCNes x [] y
 
 makeFields ''NeCof'
 
@@ -146,8 +146,8 @@ vOr _ VCTrue = VCTrue
 vOr VCTrue _ = VCTrue
 vOr VCFalse x = x
 vOr x VCFalse = x
-vOr (VCNes x xs) (VCNes y ys) =
-  (VCNes x (xs ++ y : ys))
+vOr (VCNes x xs xv) (VCNes y ys yv) =
+  (VCNes x (xs ++ y : ys) (xv <> yv))
 
 evalCof :: NCofArg => SubArg => [Cof] -> VCof
 evalCof [] = VCFalse
