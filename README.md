@@ -186,21 +186,28 @@ expressions under the forcing cofibration.
 
 #### Stability annotations
 
-We don't want to always recompute neutral values on every forcing. Instead, we
-add small annotations to neutral values. These annotations can be cheaply
-forced, and they tell us if the neutral value would change under the current
-forcing. If it wouldn't, we just delay the forcing.
+In open evaluation forcing can be arbitrarily expensive on neutral values.  That
+looks concerning on the face of it, so in a previous version of `cctt` I used a
+mechanism for skipping forcing. I put *stability annotations* on every neutral,
+which was a set of free interval variables occurring in the neutral in
+computationally relevant positions. When forcing a neutral, we would first do a
+quick check, to see if the action of a substitution/cofibration is an injective
+renaming on the free variables. If so, then the forcing doesn't have action on
+the neutral. This is inspired by the paper "Normalization for Cubical Type
+Theory", where each neutral is annotated by the cofibration which is true when
+the neutral can be further computed. In my implementation, the annotation was
+not precise, it was just an approximation, but much smaller and faster to
+compute.
 
-This is inspired by the paper "Normalization for Cubical Type Theory", where
-each neutral is annotated by the cofibration which is true when the neutral can
-be further computed. A false annotation signifies a neutral which can not be
-further computed under any cofibration or interval substitution.
+However, I got rid of these annotations. The reason is that in closed
+evaluation, forcing doesn't have arbitrary cost, instead, we can always
+determine in constant time if there's non-trivial action. Since heavy
+computations usually happen in closed evaluation, it makes sense to optimize for
+that case. Also, even in open evaluation, forcing efficiency should degrade
+gracefully; the "more open" some computation is, the more expensive forcing can
+be. In addition, the "more open" a computation is, the more likely that it gets
+stuck on free variables, which works as counterbalance.
 
-In my implementation, annotations are *not precise*, they are not cofibrations
-but simple sets (bitmasks) of interval variables which occur in relevant
-positions in a neutral. When forcing, I check whether relevant interval vars
-are mapped to distinct vars by forcing. If so, then forcing has no action on
-the neutral. This is a sound approximation of the precise stability predicate.
 
 #### Closures vs. transparent binders
 
