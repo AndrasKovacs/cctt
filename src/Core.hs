@@ -1162,7 +1162,7 @@ hcomd r r' ~a sys ~b = case sys of
 ----------------------------------------------------------------------------------------------------
 
 -- | Off-diagonal ghcom with neutral system input.
---   See: https://www.cs.cmu.edu/~cangiuli/thesis/thesis.pdf  Figure 4.2
+--   See: https://carloangiuli.com/papers/thesis.pdf  Figure 4.2
 ghcomdn :: NCofArg => DomArg => I -> I -> Val -> NeSysHCom -> Val -> Val
 ghcomdn r r' a topSys base = case topSys of
 
