@@ -30,13 +30,16 @@ unpackI# (I (W# x)) = case x of
 
 pattern I0 :: I
 pattern I0 <- (unpackI# -> (# (# #) | | #)) where I0 = I 0
+{-# inline I0 #-}
 
 pattern I1 :: I
 pattern I1 <- (unpackI# -> (# | (# #) | #)) where I1 = I 1
+{-# inline I1 #-}
 
 pattern IVar :: IVar -> I
 pattern IVar x <- (unpackI# -> (# | | (W# -> (IVar# -> x)) #)) where
   IVar (IVar# x) = I (x + 2)
+{-# inline IVar #-}
 {-# complete I0, I1, IVar #-}
 
 matchIVar :: I -> (IVar -> a) -> a -> a
