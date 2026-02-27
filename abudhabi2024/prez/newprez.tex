@@ -1,0 +1,521 @@
+%% build: latexmk -pdf -pvc prez.tex
+
+\documentclass[dvipsnames]{beamer}
+\usetheme{Madrid}
+
+%% kill footline
+\setbeamertemplate{footline}[frame number]{}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{}
+
+%% bibliography
+\bibliographystyle{alpha}
+\setbeamerfont{bibliography item}{size=\footnotesize}
+\setbeamerfont{bibliography entry author}{size=\footnotesize}
+\setbeamerfont{bibliography entry title}{size=\footnotesize}
+\setbeamerfont{bibliography entry location}{size=\footnotesize}
+\setbeamerfont{bibliography entry note}{size=\footnotesize}
+\setbeamertemplate{bibliography item}{}
+
+%% kill ball enumeration
+\setbeamertemplate{enumerate items}[circle]
+\setbeamertemplate{section in toc}[circle]
+
+%% kill block shadows
+\setbeamertemplate{blocks}[rounded][shadow=false]
+\setbeamertemplate{title page}[default][colsep=-4bp,rounded=true]
+
+%% kill ball itemize
+\setbeamertemplate{itemize items}[circle]
+
+%% --------------------------------------------------------------------------------
+
+\usepackage[utf8]{inputenc}
+%% \usepackage[hidelinks]{hyperref}
+\usepackage{amsmath}
+\usepackage{cite}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{mathpartir}
+\usepackage{scalerel}
+\usepackage{stmaryrd}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{fontspec}
+
+\setmonofont[Scale=0.8]{DejaVu Sans Mono}
+
+%% --------------------------------------------------------------------------------
+
+%% HoTT style composition
+\makeatletter
+\DeclareRobustCommand{\sqcdot}{\mathbin{\mathpalette\morphic@sqcdot\relax}}
+\newcommand{\morphic@sqcdot}[2]{%
+  \sbox\z@{$\m@th#1\centerdot$}%
+  \ht\z@=.33333\ht\z@
+  \vcenter{\box\z@}%
+}
+\makeatother
+
+\newcommand{\vsp}{\vspace{1em}}
+\newcommand{\mi}[1]{\mathit{#1}}
+\newcommand{\ms}[1]{\mathsf{#1}}
+\newcommand{\mbb}[1]{\mathbb{#1}}
+\newcommand{\mbf}[1]{\mathbf{#1}}
+\newcommand{\bs}[1]{\boldsymbol{#1}}
+\newcommand{\ap}{\ms{ap}}
+\newcommand{\apd}{\ms{apd}}
+\newcommand{\tr}{\ms{tr}}
+\newcommand{\happly}{\ms{happly}}
+\newcommand{\funext}{\ms{funext}}
+\newcommand{\toind}{\to^{\ms{int}}}
+\newcommand{\ttrue}{\ms{true}}
+\newcommand{\ffalse}{\ms{false}}
+
+\newcommand{\Tys}{\ms{Ty_{sig}}}
+\newcommand{\Tms}{\ms{Tm_{sig}}}
+\newcommand{\Us}{\ms{U_{sig}}}
+\newcommand{\Els}{\ms{El_{sig}}}
+
+\newcommand{\Ix}{\mi{Ix}}
+
+\newcommand{\zero}{\ms{zero}}
+\newcommand{\suc}{\ms{suc}}
+\newcommand{\J}{\ms{J}}
+\newcommand{\UIP}{\ms{UIP}}
+
+\newcommand{\refl}{\mathsf{refl}}
+\newcommand{\reflect}{\mathsf{reflect}}
+\newcommand{\Reflect}{\mathsf{Reflect}}
+\newcommand{\id}{\mathsf{id}}
+\newcommand{\Con}{\mathsf{Con}}
+\newcommand{\Sub}{\mathsf{Sub}}
+\newcommand{\Tm}{\mathsf{Tm}}
+\newcommand{\Ty}{\mathsf{Ty}}
+\newcommand{\U}{\mathsf{U}}
+\newcommand{\El}{\mathsf{El}}
+\newcommand{\Id}{\mathsf{Id}}
+\newcommand{\ID}{\mathsf{ID}}
+\newcommand{\proj}{\mathsf{proj}}
+\renewcommand{\tt}{\mathsf{tt}}
+\newcommand{\blank}{\mathord{\hspace{1pt}\text{--}\hspace{1pt}}}
+\newcommand{\ra}{\rightarrow}
+\newcommand{\Set}{\mathsf{Set}}
+\newcommand{\Sort}{\mathsf{Sort}}
+
+\newcommand{\Lift}{\Uparrow}
+\newcommand{\ToS}{\mathsf{ToS}}
+\newcommand{\ext}{\triangleright}
+\newcommand{\emptycon}{\scaleobj{.75}\bullet}
+
+\newcommand{\Pii}{\Pi}
+\newcommand{\funi}{\Rightarrow}
+\newcommand{\appi}{\mathsf{app}}
+\newcommand{\lami}{\mathsf{lam}}
+
+\newcommand{\fune}{\Rightarrow^{\ms{Ext}}}
+\newcommand{\Pie}{\Pi^{\mathsf{Ext}}}
+\newcommand{\appe}{\mathsf{app^{Ext}}}
+\newcommand{\lame}{\mathsf{lam^{Ext}}}
+\newcommand{\toe}{\to^{\ms{Ext}}}
+\newcommand{\arre}{\Rightarrow^{\mathsf{Ext}}}
+\newcommand{\lambdae}{\lambda^{\ms{Ext}}}
+
+\newcommand{\Piinf}{\Pi^{\mathsf{ext}}}
+\newcommand{\appinf}{\mathsf{app^{ext}}}
+\newcommand{\laminf}{\mathsf{lam^{ext}}}
+\newcommand{\laminfprime}{\mathsf{lam^{ext'}}}
+\newcommand{\toinf}{\to^{\ms{ext}}}
+\newcommand{\lambdainf}{\lambda^{\ms{ext}}}
+\newcommand{\arrinf}{\Rightarrow^{\mathsf{ext}}}
+\newcommand{\bPiinf}{\bs{\Piinf}}
+
+\newcommand{\appitt}{\mathop{{\scriptstyle @}}}
+\newcommand{\Refl}{\mathsf{Refl}}
+\newcommand{\IdU}{\mathsf{IdU}}
+\newcommand{\ReflU}{\mathsf{ReflU}}
+\newcommand{\Sig}{\mathsf{Sig}}
+\newcommand{\ToSSig}{\mathsf{ToSSig}}
+\newcommand{\Subtype}{\mathsf{Subtype}}
+\newcommand{\subtype}{\mathsf{subtype}}
+\newcommand{\NatSig}{\mathsf{NatSig}}
+\newcommand{\Sg}{\Sigma}
+\newcommand{\flcwf}{\mathsf{flcwf}}
+\newcommand{\SigTy}{\mathsf{SigTy}}
+\newcommand{\SigTm}{\mathsf{SigTm}}
+\newcommand{\SigU}{\mathsf{SigU}}
+\newcommand{\tm}{\ms{tm}}
+\newcommand{\ty}{\ms{ty}}
+
+\newcommand{\Kfam}{\mathsf{K}}
+\newcommand{\lamK}{\mathsf{lam}_{\K}}
+\newcommand{\appK}{\mathsf{app}_{\K}}
+
+\newcommand{\p}{\mathsf{p}}
+\newcommand{\q}{\mathsf{q}}
+\newcommand{\K}{\mathsf{K}}
+\newcommand{\A}{\mathsf{A}}
+\newcommand{\D}{\mathsf{D}}
+\renewcommand{\S}{\mathsf{S}}
+\newcommand{\arri}{\Rightarrow}
+\newcommand{\syn}{\mathsf{syn}}
+\newcommand{\SynSig}{\mathsf{SynSig}}
+\newcommand{\bCon}{\bs{\Con}}
+\newcommand{\bTy}{\bs{\Ty}}
+\newcommand{\bSub}{\bs{\Sub}}
+\newcommand{\bTm}{\bs{\Tm}}
+\newcommand{\bGamma}{\bs{\Gamma}}
+\newcommand{\bDelta}{\bs{\Delta}}
+\newcommand{\bsigma}{\bs{\sigma}}
+\newcommand{\bdelta}{\bs{\delta}}
+\newcommand{\bepsilon}{\bs{\epsilon}}
+\newcommand{\bt}{\bs{t}}
+\newcommand{\bu}{\bs{u}}
+\newcommand{\bA}{\bs{A}}
+\newcommand{\ba}{\bs{a}}
+\newcommand{\bb}{\bs{b}}
+\newcommand{\bB}{\bs{B}}
+\newcommand{\bid}{\bs{\id}}
+\newcommand{\bemptycon}{\scaleobj{.75}{\bs{\bullet}}}
+\newcommand{\bSet}{\bs{\Set}}
+\newcommand{\bU}{\bs{\U}}
+\newcommand{\bEl}{\bs{\El}}
+\newcommand{\bPii}{\bs{\Pi}}
+\newcommand{\bPie}{\bs{\Pie}}
+\newcommand{\bappi}{\bs{\mathsf{app}}}
+\newcommand{\blami}{\bs{\mathsf{lam}}}
+\newcommand{\bId}{\bs{\Id}}
+\newcommand{\bM}{\bs{\mathsf{M}}}
+\newcommand{\bT}{\bs{\mathsf{T}}}
+\newcommand{\bS}{\bs{\mathsf{S}}}
+\newcommand{\bP}{\bs{\mathsf{P}}}
+\newcommand{\bD}{\bs{\mathsf{D}}}
+\newcommand{\bI}{\bs{\mathsf{I}}}
+\newcommand{\bK}{\bs{\mathsf{K}}}
+
+\newcommand{\ul}[1]{\underline{#1}}
+\newcommand{\ulGamma}{\ul{\Gamma}}
+\newcommand{\ulDelta}{\ul{\Delta}}
+\newcommand{\ulgamma}{\ul{\gamma}}
+\newcommand{\ulOmega}{\ul{\Omega}}
+\newcommand{\uldelta}{\ul{\delta}}
+\newcommand{\ulsigma}{\ul{\sigma}}
+\newcommand{\ulnu}{\ul{\nu}}
+\newcommand{\ulepsilon}{\ul{\epsilon}}
+\newcommand{\ulemptycon}{\ul{\emptycon}}
+\newcommand{\ult}{\ul{t}}
+\newcommand{\ulu}{\ul{u}}
+\newcommand{\ulA}{\ul{A}}
+\newcommand{\ula}{\ul{a}}
+\newcommand{\ulB}{\ul{B}}
+\newcommand{\tos}{\mathsf{tos}}
+\newcommand{\coe}{\mathsf{coe}}
+\newcommand{\coh}{\mathsf{coh}}
+\newcommand{\llb}{\llbracket}
+\newcommand{\rrb}{\rrbracket}
+\newcommand{\sem}[1]{\llb#1\rrb}
+
+\newcommand{\Var}{\ms{Var}}
+\newcommand{\var}{\ms{var}}
+\newcommand{\app}{\ms{app}}
+\newcommand{\vz}{\ms{vz}}
+\newcommand{\vs}{\ms{vs}}
+\newcommand{\Alg}{\ms{Alg}}
+\newcommand{\Mor}{\ms{Mor}}
+\newcommand{\DispAlg}{\ms{DispAlg}}
+\newcommand{\Section}{\ms{Section}}
+\newcommand{\Initial}{\ms{Initial}}
+\newcommand{\Inductive}{\ms{Inductive}}
+\newcommand{\TmAlg}{\ms{TmAlg}}
+\newcommand{\Rec}{\ms{Rec}}
+\newcommand{\Ind}{\ms{Ind}}
+\newcommand{\Obj}{\ms{Obj}}
+\newcommand{\Nat}{\ms{Nat}}
+\newcommand{\Bool}{\ms{Bool}}
+\newcommand{\mbbC}{\mbb{C}}
+\newcommand{\hmbbC}{\hat{\mbb{C}}}
+\newcommand{\mbbD}{\mbb{D}}
+\newcommand{\lam}{\ms{lam}}
+
+\newcommand{\true}{\ms{true}}
+\newcommand{\false}{\ms{false}}
+\newcommand{\up}{\uparrow}
+\newcommand{\down}{\downarrow}
+
+\newcommand{\lab}{\langle}
+\newcommand{\rab}{\rangle}
+\newcommand{\defn}{:\equiv}
+\newcommand{\yon}{\ms{y}}
+\newcommand{\lub}{\,\sqcup\,}
+\newcommand{\bmsA}{\bs{\ms{A}}}
+
+\newcommand{\Env}{\ms{Env}}
+\newcommand{\Val}{\ms{Val}}
+\newcommand{\eval}{\ms{eval}}
+\newcommand{\qt}{\ms{quote}}
+\newcommand{\Closure}{\ms{Closure}}
+\newcommand{\ICon}{\ms{ICon}}
+\newcommand{\ISub}{\ms{ISub}}
+\newcommand{\Cof}{\ms{Cof}}
+\newcommand{\I}{\ms{I}}
+
+\newcommand{\hcom}{\ms{hcom}}
+\newcommand{\Glue}{\ms{Glue}}
+\newcommand{\glue}{\ms{glue}}
+\newcommand{\unglue}{\ms{unglue}}
+\newcommand{\force}{\ms{force}}
+\newcommand{\ghcom}{\ms{ghcom}}
+
+%% --------------------------------------------------------------------------------
+
+\title{Efficient Evaluation for Cubical Type Theories}
+\author{András Kovács\inst{1} \\ \vspace{0.5em}{\small j.w.w. Evan Cavallo, Tom Jack, Anders Mörtberg} \\}
+\institute{
+  \inst{1}%
+       {University of Gothenburg}
+}
+\date{21 April 2024, Conference on Homotopy Type Theory and Computing, Abu Dhabi}
+\begin{document}
+
+\frame{\titlepage}
+
+
+\begin{frame}{Overview}
+
+\textbf{We'd like to speed up cubical type theories.}
+\begin{itemize}
+\item There are computations that we'd like to do but can't, e.g.\ Brunerie numbers.
+\item Speed is important for just plain user experience and scalability.
+\end{itemize}
+\pause
+\vspace{1em}
+
+\textbf{In this talk}:
+\begin{itemize}
+  \item A demo of a fast new CTT implementation.
+  \item An overview of important ingredients:
+    \begin{enumerate}
+      \item Environment machines
+      \item Explicit interval substitution
+      \item Defunctionalization
+      \item Shortcuts in closed cubical evaluation
+      \item Avoiding empty compositions
+    \end{enumerate}
+    If we skip any of these, we get blow-ups!
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Computation in CTTs}
+
+Based on \textbf{substitution}.
+\vsp
+
+In plain MLTT:
+\begin{verbatim}
+    (λ x. t) u ≡ t[x ↦ u]
+\end{verbatim}
+
+Naive implementation: traverse \texttt{t}, replace \texttt{x}'s occurrences, build new term.
+\vspace{0.5em}
+
+Rarely used in practice!
+\begin{verbatim}
+    (λ x y. big) t u ≡ (big[x ↦ t])[y ↦ u]
+\end{verbatim}
+\end{frame}
+
+%% ------------------------------------------------------------
+
+\begin{frame}[fragile]{Environment machines}
+
+Evaluation takes an \textbf{environment} and a \textbf{term} as input, and
+returns a \textbf{value}.
+\begin{verbatim}
+    eval []                    ((λ x y. (x, y)) true false) ≡
+    eval []                    ((λ x y. (x, y)) true false) ≡
+    eval [x ↦ true]            (λ y. (x, y)) false          ≡
+    eval [x ↦ true, y ↦ false] (x, y)                       ≡
+
+  (eval [x ↦ true, y ↦ false] x, eval [x ↦ true, y ↦ false] y) ≡
+  (x, y)
+\end{verbatim}
+
+Substitution is only ever performed on \emph{variables}, as environment lookup.
+\vsp
+\pause
+
+\alert{\small NB: this is another view on \emph{normalization-by-evaluation}. I'll
+focus on the operational perspective, not the formally-nice perspective.}
+\end{frame}
+
+\begin{frame}[fragile]{Closures}
+
+How to handle $\lambda$-s?
+\begin{verbatim}
+    eval [] (let x = true in let f = λ y. x in f false)   ≡
+    eval [x ↦ true] (let f = λ y. x in f false)           ≡
+    eval [x ↦ true, f ↦ <[x ↦ true], y. x>] (f false)     ≡
+    eval [x ↦ true, y ↦ false] x                          ≡
+    true
+\end{verbatim}
+
+The \textbf{closure} \texttt{<[x ↦ true], y. x>} stores the current environment
+and the function body. Evaluation of the body resumes when the closure is
+applied.
+\end{frame}
+
+\begin{frame}[fragile]{Interval substitution in CTT (1)}
+
+\alert{The same thing doesn't work for interval substitution!}
+\vsp
+
+Problem: coercion looks under an interval binder and substitutes
+it.
+\begin{verbatim}
+    coe r r' (i. A → B)          t ≡ ...
+    coe r r' (i. Glue A [α ↦ f]) t ≡ ...   (using [i ↦ r'])
+\end{verbatim}
+
+More complicated setup:
+\begin{itemize}
+  \item Evaluates takes an extra \textbf{interval environment} as input.
+  \item Closures store both environments.
+  \item We use closures everywhere except in coercion.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Interval substitution in CTT (2)}
+
+We still need interval substitution.
+\vsp
+
+But its action is delayed as much as possible.
+\begin{itemize}
+  \item Interval substitution computes nothing, just stores an \emph{explicit substitution}.
+  \item There is a \emph{weak head forcing} operation which computes substitutions
+        until we get to a neutral or a head form.
+\end{itemize}
+
+\begin{verbatim}
+   eval γ (t u) ≡ case (force t) of
+     <γ', x. t'> → eval [γ', x ↦ eval γ u] t'
+     t'(neutral) → t' (eval γ u)
+\end{verbatim}
+
+Forcing pushes substitutions inside closure environments:
+\begin{verbatim}
+   force (<γ, x. t>[σ]) ≡ <γ[σ], x.t>
+\end{verbatim}
+\end{frame}
+
+\begin{frame}[fragile]{Defunctionalization}
+
+How to implement?
+\begin{verbatim}
+  coe r r' (i. A → B) f ≡
+    λ x. coe r r' (i. B) (f (coe r' r (i. A) x))
+\end{verbatim}
+The right hand side should be a suspended computation, resumed when we apply it
+to an argument.
+\vsp
+
+It's a new kind of closure that stores \texttt{r}, \texttt{r'}, \texttt{A}, \texttt{B} and \texttt{f}!
+\vsp
+
+Every semantic binder becomes a closure.
+
+\begin{verbatim}
+  apply (EvalLam γ x t)     u ≡ eval [γ, x ↦ u] t
+  apply (CoeFun r r' A B f) u ≡ coe r r' (i. B)
+                                    (f (coe r' r (i. A) u))
+  ...
+\end{verbatim}
+Annoying: we have 30+ closures in the implementation!
+
+\end{frame}
+
+\begin{frame}[fragile]{Exploiting canonicity}
+
+Problem: composition for non-higher inductive types.
+
+\begin{verbatim}
+ hcom r r' [α ↦ i. suc t] (suc b) ≡ suc (hcom r r' [α ↦ i. t] b)
+\end{verbatim}
+
+We need to force all components of the system to check for ``\texttt{suc t}''-s!
+\vsp
+
+\textbf{Canonicity}: in a purely cubical context, every $\mathbb{N}$ term
+is \texttt{zero} or \texttt{suc}.
+\vsp
+
+In a purely cubical context, if the base of a \texttt{hcom} is \texttt{suc}, all
+components of the system must be also \texttt{suc}. Hence, we can admit:\footnote{see also in Simon Huber's thesis.}
+\begin{verbatim}
+ hcom r r' [α ↦ i. t] (suc b) ≡ suc (hcom r r' [α ↦ i. pred t] b)
+\end{verbatim}
+where \texttt{pred} is a metatheoretic function that peels off a \texttt{suc}.
+Importantly, we can compute a \texttt{pred}-ed value lazily.
+
+\end{frame}
+
+\begin{frame}[fragile]{Exploiting canonicity}
+
+Generalizing this shortcut to all non-higher inductive types, we get:
+\begin{block}{}
+\emph{Closed evaluation computes at most one component of each system.}
+\end{block}
+\vsp
+
+Moreover:
+\begin{block}{}
+\emph{Closed evaluation only depends on evaluation in cubical atomic contexts.}
+\end{block}
+\vsp
+
+(Cubical atomic context: only contains interval variables)
+
+\end{frame}
+
+\begin{frame}[fragile]{Avoiding empty compositions}
+
+HIT-s have \emph{formal compositions} as canonical inhabitants.
+\vsp
+
+We can compose values with nothing:
+\begin{verbatim}
+  hcom 0 1 [] (loop i)
+\end{verbatim}
+is a canonical element of S¹ that's path equal to \texttt{loop i}.
+\vsp
+
+Early CTT implementations suffered from an explosion of empty compositions.
+\vsp
+
+We borrow a simple ``naive'' solution from Carlo Angiuli's thesis.
+We don't need fancy versions because of our optimized closed evaluation.
+
+\end{frame}
+
+\begin{frame}{Prospects, Agda}
+
+\texttt{cctt} implements a Cartesian CTT that can be interpreted
+into classical homotopy theory. Recent work by Christian Sattler
+suggests that an extension with $\land$ and $\lor$ still works out.
+
+\vsp
+
+Agda implements the CHM\footnote{Coquand-Huber-Mörtberg.} theory,
+which currently has no such interpretation.
+\vsp
+
+We don't know \emph{for sure} that Agda's CTT is wrong.
+\vsp
+
+Agda would benefit from a major cubical overhaul, but changing the core
+theory and not changing it could both turn out to be mistakes!
+\end{frame}
+
+\end{document}

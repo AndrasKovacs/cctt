@@ -1,0 +1,154 @@
+% This is a template for submissions to HoTT 2023.
+% The file was created on the basis of easychair.tex,v 3.5 2017/03/15
+%
+% Before submitting, rename the resulting pdf file to "yourname.pdf"
+%
+\documentclass[letterpaper]{easychair}
+\usepackage{doc}
+\usepackage{amsfonts}
+\usepackage{bm}
+
+\newcommand{\easychair}{\textsf{easychair}}
+\newcommand{\miktex}{MiK{\TeX}}
+\newcommand{\texniccenter}{{\TeX}nicCenter}
+\newcommand{\makefile}{\texttt{Makefile}}
+\newcommand{\latexeditor}{LEd}
+
+\newcommand{\msf}[1]{\mathsf{#1}}
+\renewcommand{\mit}[1]{\mathit{#1}}
+\newcommand{\mbb}[1]{\mathbb{#1}}
+\newcommand{\mbf}[1]{\mathbf{#1}}
+\newcommand{\bs}[1]{\boldsymbol{#1}}
+\newcommand{\Nat}{\mbb{N}}
+\newcommand{\suc}{\msf{suc}}
+
+\bibliographystyle{alphaurl}
+
+%  \authorrunning{} has to be set for the shorter version of the authors' names;
+% otherwise a warning will be rendered in the running heads. When processed by
+% EasyChair, this command is mandatory: a document without \authorrunning
+% will be rejected by EasyChair
+\authorrunning{}
+
+% \titlerunning{} has to be set to either the main title or its shorter
+% version for the running heads. When processed by
+% EasyChair, this command is mandatory: a document without \titlerunning
+% will be rejected by EasyChair
+\titlerunning{}
+
+%
+\title{Efficient Evaluation for Cubical Type Theories
+% \thanks{Your acknowledgements.}
+}
+
+\author{
+András Kovács
+}
+
+\institute{
+  Eötvös Loránd University\\
+  \email{kovacsandras@inf.elte.hu}
+}
+
+\begin{document}
+\maketitle
+
+Currently, cubical type theories are the only known systems which support
+computational univalence. We can use computation in these systems to shortcut
+some proofs, by appealing to definitional equality of sides of
+equations. However, efficiency issues in existing implementations often preclude
+such computational proofs, or it takes a large amount of effort to find
+definitions which are feasible to compute. In this abstract we investigate the
+efficiency of the ABCFHL \cite{abcfhl} Cartesian cubical type theory with
+separate homogeneous composition ($\msf{hcom}$) and coercion ($\msf{coe}$),
+although most of our findings transfer to other systems.
+
+\subsubsection*{Cubical normalization-by-evaluation}
+
+In variants of non-cubical Martin-Löf type theory, definitional equalities are
+specified by reference to a substitution operation on terms. However, well-known
+efficient implementations do not actually use term substitution. Instead,
+\emph{normalization-by-evaluation} (NbE) is used, which corresponds to certain
+\emph{environment machines} from a more operational point of view. In these
+setups, there is a distinction between syntactic terms and semantic
+values. Terms are viewed as immutable program code that supports evaluation into
+the semantic domain but no other operations.
+
+In contrast, in cubical type theories interval substitution is an essential
+component of computation which seemingly cannot be removed from the
+semantics. Most existing implementations use NbE for ordinary non-cubical
+computation, but also include interval substitution as an operation that acts on
+semantic values. Unfortunately, a naive combination of NbE and interval
+substitution performs poorly, as it destroys the implicit sharing of work
+and structure which underlies the efficiency of NbE in the first place. We
+propose a restructured cubical NbE which handles interval substitution more
+gracefully. The basic operations are the following.
+
+\begin{enumerate}
+\item \emph{Evaluation} maps from syntax to semantics like before, but it
+  additionally takes as input an interval environment and a cofibration.
+\item \emph{Interval substitution} acts on values, but it has trivial cost by itself;
+  it only shallowly stores an explicit substitution.
+\item \emph{Forcing} computes a value to weak head form by sufficiently computing
+  previously stored delayed substitutions.
+\end{enumerate}
+
+
+On canonical values, forcing simply pushes substitutions further down, incurring
+minimal cost. But on neutral values, since neutrals are not stable under
+substitution, forcing has to potentially perform arbitrary computation. Here we
+take a hint from the formal cubical NbE by Sterling and Angiuli
+\cite{ctt-normalization}, by annotating neutral values with stability
+information. This allows us to quickly determine whether a neutral value is
+stable under a given substitution. When it is stable, forcing does not have to
+look inside it.
+
+It turns out that there is only a single computation rule in the ABCFHL theory
+which can trigger interval substitution with significant cost: the coercion rule
+for the $\msf{Glue}$ type former. In every other case, only a \emph{weakening}
+substitution may be created, but all neutral values are stable under weakening,
+so forcing by weakening always has a trivial cost.
+
+\subsubsection*{Using canonicity in closed evaluation}
+
+In non-cubical type theories, evaluation of closed terms can be more efficient
+than that of open terms. For instance, when we evaluate an
+$\msf{if\!-\!then\!-\!else}$ expression, we know that exactly one branch will be
+taken. In open evaluation, the $\msf{Bool}$ scrutinee may be neutral, in which
+case both branches may have to be evaluated.
+
+In the cubical setting, \emph{systems of partial values} can be viewed as
+branching structures which make case distinctions on cofibrations. Importantly,
+there are computation rules which scrutinize \emph{all} components of a cubical
+system. These are precisely the homogeneous composition rules ($\msf{hcom}$) for
+strict inductive types. For example:
+\[ \msf{hcom}^{r\to r'}_{\mbb{N}}\,[\psi \mapsto i.\,\suc\,t]\,(\suc\,b) =
+\suc\,(\msf{hcom}^{r\to r'}_{\mbb{N}}\,[\psi \mapsto i.\,t]\,b) \]
+When we only have interval variables and a cofibration in the context, we do not
+have to compute every system component to check for $\suc$. In this case, which
+we may call ``closed cubical'', we can use the canonicity property of the
+theory. Here $\suc\,b$ in the $\msf{hcom}$ base implies that every system
+component is headed by $\suc$ as well. Hence, we can use the following rule
+instead:
+\[ \msf{hcom}^{r\to r'}_{\mbb{N}}\,[\psi \mapsto i.\,t]\,(\suc\,b) =
+   \suc\,(\msf{hcom}^{r\to r'}_{\mbb{N}}\,[\psi \mapsto i.\,\msf{pred}\,t]\,b) \]
+Here, $\msf{pred}$ is a metatheoretic function which takes the predecessor of a
+value which is already known to be definitionally $\suc$. The revised rule
+assumes nothing about the shape of $t$ on the left hand side, so we can compute
+$\msf{pred}$ lazily in the output. These lazy projections work analogously for
+all non-higher inductive types. For higher-inductive types, $\msf{hcom}$ is a
+canonical value, so there is no efficiency issue to begin with.
+
+\subsubsection*{Summary}
+
+\begin{itemize}
+  \item Costly interval substitution can only arise from computing with $\msf{Glue}$ types.
+  \item In closed cubical evaluation, no computation rule forces all components of a system.
+\end{itemize}
+We are optimistic that an implementation with these properties would yield significant
+performance improvements. We are currently in the process of developing this system
+and adapting existing benchmarks to it.
+
+\bibliography{references}
+
+\end{document}

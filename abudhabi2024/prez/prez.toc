@@ -1,0 +1,4 @@
+\beamer@sectionintoc {1}{Normalization-by-evaluation for MLTT}{9}{0}{1}
+\beamer@sectionintoc {2}{NbE for CTT}{19}{0}{2}
+\beamer@sectionintoc {3}{Implementation \& benchmarks}{67}{0}{3}
+\beamer@sectionintoc {4}{Conclusions}{88}{0}{4}

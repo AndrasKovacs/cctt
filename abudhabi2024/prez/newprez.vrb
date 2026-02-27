@@ -1,0 +1,18 @@
+\frametitle{Avoiding empty compositions}
+
+HIT-s have \emph{formal compositions} as canonical inhabitants.
+\vsp
+
+We can compose values with nothing:
+\begin{verbatim}
+  hcom 0 1 [] (loop i)
+\end{verbatim}
+is a canonical element of S¹ that's path equal to \texttt{loop i}.
+\vsp
+
+Early CTT implementations suffered from an explosion of empty compositions.
+\vsp
+
+We borrow a simple ``naive'' solution from Carlo Angiuli's thesis.
+We don't need fancy versions because of our optimized closed evaluation.
+

@@ -1,0 +1,21 @@
+\newcommand{\etalchar}[1]{$^{#1}$}
+\begin{thebibliography}{ABC{\etalchar{+}}21}
+
+\bibitem[ABC{\etalchar{+}}21]{abcfhl}
+Carlo Angiuli, Guillaume Brunerie, Thierry Coquand, Robert Harper,
+  Kuen{-}Bang~Hou (Favonia), and Daniel~R. Licata.
+\newblock Syntax and models of cartesian cubical type theory.
+\newblock {\em Math. Struct. Comput. Sci.}, 31(4):424--468, 2021.
+\newblock \href {https://doi.org/10.1017/S0960129521000347}
+  {\path{doi:10.1017/S0960129521000347}}.
+
+\bibitem[SA21]{ctt-normalization}
+Jonathan Sterling and Carlo Angiuli.
+\newblock Normalization for cubical type theory.
+\newblock In {\em 36th Annual {ACM/IEEE} Symposium on Logic in Computer
+  Science, {LICS} 2021, Rome, Italy, June 29 - July 2, 2021}, pages 1--15.
+  {IEEE}, 2021.
+\newblock \href {https://doi.org/10.1109/LICS52264.2021.9470719}
+  {\path{doi:10.1109/LICS52264.2021.9470719}}.
+
+\end{thebibliography}

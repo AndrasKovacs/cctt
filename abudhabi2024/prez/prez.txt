@@ -1,0 +1,163 @@
+
+──────────────────────────────────────────────────────────────────────
+─────────── EFFICIENT EVALUATION FOR CUBICAL TYPE THEORIES ───────────
+──────────────────────────────────────────────────────────────────────
+
+             Andás Kovács (University of Gothenburg)
+         j.w.w. Evan Cavallo, Anders Mörtberg, Tom Jack
+
+   21 April, 2024 Conference on Homotopy Type Theory and Computing
+----------------------------------------------------------------------
+
+We want to speed up CTT-s
+  - We can't do some interesting computations; e.g. Brunerie numbers.
+  - Speed is good for user experience and scaling
+
+In this talk
+  1. Demo of a fast new CTT
+  2. Overview of essential optimizations
+     1 Environment machines
+     2 Explicit interval substitution
+     3 Defunctionalization
+     4 Exploiting canonicity
+     5 Avoiding empty compositions ("ghcom")
+     Skipping any of these can cause blow-ups!
+
+
+What kind of computation is there in CTT?
+----------------------------------------------------------------------
+
+Substitution! For intervals & fibrant binders.
+
+Already in MLTT:
+  (λ x. t) u ≡ t[x ↦ u]
+
+Naive approach:
+  - substitute by traversing "t" and building a new term
+  - normalize by iterate β-reduction by substitution
+
+Rarely used in practical systems!
+
+  (λ x y. big)[x ↦ t][y ↦ u] ≡ big[x ↦ t][y ↦ u]
+
+
+-- Environment machines
+----------------------------------------------------------------------
+
+Evaluation takes an *environment* and a *term* as input, and returns
+a *value*.
+
+  eval [] ((λ x y. (x, y)) true false)                          ≡
+  eval [x ↦ true] ((λ y. (x, y)) false)                         ≡
+  eval [x ↦ true, y ↦ false] (x, y)                             ≡
+  (eval [x ↦ true, y ↦ false] x , eval [x ↦ true, y ↦ false] y) ≡
+  (x[x ↦ true, y ↦ false], y[x ↦ true, y ↦ false])              ≡
+  (true, false)
+
+Substitution is only ever performed on *variables*, as environment lookup!
+
+
+-- Closures
+----------------------------------------------------------------------
+
+How to evaluate λ-s?
+
+  eval [] (let x = true in let f = λ y. x in f false)   ≡
+  eval [x ↦ true] (let f = λ y. x in f false)           ≡
+  eval [x ↦ true, f ↦ <[x ↦ true], y. x>] (f false)     ≡
+  eval [x ↦ true, y ↦ false] x                          ≡
+  x[x ↦ true, y ↦ false]                                ≡
+  true
+
+The *closure* <[x ↦ true], y. x> stores the current environment and the function
+body. When the function is applied, we *resume* evaluation.
+
+  if (f ↦ <γ', x.t>) ∈ env, then
+  eval γ (f u) ≡ eval [γ', x ↦ eval γ u] t
+
+Values contain closures but no binders.
+
+
+-- Interval substitution in CTT
+----------------------------------------------------------------------
+
+- The same setup doesn't work for interval substitution!
+- We can't convert all interval binders to closures.
+- Instead: try to mitigate the awfulness
+
+Problem: coercion pulls things out from under binders and performs substitution
+on them:
+
+    coe r r' (i. Glue A sys) t ≡ ...
+    coe r r' (i. A → B) t ≡ ...
+
+Setup:
+
+- Evaluation takes an extra *interval environment* as input
+- Closures save & restore both environments
+- We use closures everywhere except in coercion
+- Any value can be wrapped in a suspended interval substitution
+
+  <[i ↦ 0, j ↦ 1], true> is now a value!
+
+- Interval substitution computes nothing! It only
+  stores a delayed substitution.
+- We do *weak-head forcing* when we need to match on the
+  outermost form of a value
+
+    if <[i ↦ 0, j ↦ 1], true> then false else true ≡
+    if true then false else true
+
+- Forcing for closures pushes interval substitution inside:
+
+    force <[i ↦ 0], <γ, x. t>> ≡ <γ[i ↦ 0], x. t>
+
+
+-- Defunctionalization
+----------------------------------------------------------------------
+
+  coe r r' (i. A → B) t ≡ *λ x*. coe r r' (i. B) (f (coe r' r (i. A) x))
+
+The right hand side should be a suspended computation which resumes when we
+apply it to an argument.
+
+It has to be a *different* kind of closure than what we've seen before! It
+needs to store r, r', A, B and t.
+
+Defunctionalization:
+  - Converting all higher-order functions appearing in a program to a disjoint
+    sum of closures and a first-order "generic application" function.
+
+Annoying: we have 50+ different closures.
+
+
+-- Exploiting canonicity
+----------------------------------------------------------------------
+
+Canonicity: every CTT term that only depends on interval vars is convertible to
+a constructor.
+
+We can exploit this for a big boost in composition for non-higher inductive
+types:
+
+    hcom r r' [α → i. suc t] (suc b) ≡ suc (hcom r r' [α → i. t] b)
+
+The general implementation has to force all components in the system
+to check if they're suc! This is *bad*.
+
+In closed cubical evaluation, we can do
+
+    hcom r r' [α → j. t] (suc b) ≡ suc (hcom r r' [α → j. pred t] b)
+
+where pred builds a *closure* that forces "t" and peels off a "suc"
+from it.
+
+- In closed evaluation, we evaluate at most a single component of
+  every system.
+
+- Thus: system components can be closures.
+
+- Moreover: closed evaluation never has to go under cofibrations!
+  It only works under an *atomic cubical context*.
+
+----------------------------------------------------------------------
