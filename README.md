@@ -8,7 +8,7 @@ then run `stack install` in the source directory.
   to the emacs configuration.
 
 A small implementation of a cartesian cubical type theory, designed from
-ground-up with performance in mind. WIP.
+ground-up with performance in mind.
 
 [Slides from the HoTT 2023 conference](https://andraskovacs.github.io/pdfs/hott23prez.pdf).
 
