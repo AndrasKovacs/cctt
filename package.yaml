@@ -93,6 +93,9 @@ ghc-options:
 - -fspecialise-aggressively
 - -fexpose-all-unfoldings
 - -fplugin StrictImplParams
+- -fstg-lift-lams
+- -fstg-lift-lams-non-rec-args=10
+- -fstg-lift-lams-rec-args=10
 - -fworker-wrapper-cbv
 - -rtsopts
 - -threaded

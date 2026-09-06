@@ -333,6 +333,7 @@ pattern Span x y <- ((\(Span# src x y) -> (Pos src x, Pos src y)) -> (x, y)) whe
     | src == src' && x <= y = Span# src x y
     | otherwise             = impossible
 {-# complete Span #-}
+{-# inline Span #-}
 
 spanToBs :: Span -> B.ByteString
 spanToBs (Span (Pos src i) (Pos _ j)) =

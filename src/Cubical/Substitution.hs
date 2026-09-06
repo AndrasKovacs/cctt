@@ -23,6 +23,7 @@ pattern Sub :: IVar -> IVar -> IList -> Sub
 pattern Sub d c is <- Sub# (fromIntegral -> d) (fromIntegral -> c) is where
   Sub d c is = Sub# (fromIntegral d) (fromIntegral c) is
 {-# complete Sub #-}
+{-# inline Sub #-}
 
 instance HasDom Sub where
   dom (Sub d c s) = d; {-# inline dom #-}

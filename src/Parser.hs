@@ -1,3 +1,4 @@
+{-# options_ghc -O1 #-} -- O2 tends to blow up the code
 
 module Parser (parseString, parseByteString, parseStdin) where
 

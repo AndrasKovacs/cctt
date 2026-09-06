@@ -13,7 +13,7 @@
 #   NOTE: compiled cctt doesn't work in backtrace mode! It segfaults for
 #         who knows what reason.
 
-resolver: nightly-2024-04-08
+resolver: lts-21.25
 
 packages:
 - .
@@ -27,6 +27,6 @@ ghc-options:
 
 extra-deps:
 - git: https://github.com/AndrasKovacs/ghc-strict-implicit-params.git
-  commit: fdef75e73c3354bd39b641e6b452b7087839e09b
+  commit: 65598611a2abce440802a0e1063a011ce5deac33
 - git: https://github.com/AndrasKovacs/primdata
-  commit: cfd5a67cc6448c862590e901f3843e782c83fde7
+  commit: 42d55e4a3800c0d74768520e1393ab9f4f4f1399

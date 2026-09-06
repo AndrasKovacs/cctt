@@ -651,7 +651,7 @@ instance SubAction VDSpine where
     VDCons v vs -> VDCons (sub v) (sub vs)
 
 
--- Semantics functions indicate in result whether they made progress This is
+-- Semantic functions indicate in result whether they made progress. This is
 -- needed in forcing where we need to stop recursing when no progress was made.
 --------------------------------------------------------------------------------
 

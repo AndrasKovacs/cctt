@@ -1,4 +1,3 @@
-{-# options_ghc -Wno-x-partial #-} -- usage of head in prettyError
 
 module Lexer where
 
@@ -50,7 +49,9 @@ prettyError src (Error pos e)  =
 
   let bstr   = srcToBs src
       ls     = FP.linesUtf8 bstr
-      (l, c) = head $ posLineCols bstr [rawPos pos]
+      (l, c) = case posLineCols bstr [rawPos pos] of
+                 [x] -> x
+                 _   -> impossible
       line   = if 0 <= l && l < length ls then ls !! l else ""
       linum  = show (l+1)
       lpad   = map (const ' ') linum
