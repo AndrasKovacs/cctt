@@ -10,39 +10,21 @@ import Statistics (bumpHCom, bumpHCom')
 ----------------------------------------------------------------------------------------------------
 {-
 TODO:
-- purge stability annotations
-  - problem: we need some way to actually terminate in forcing
-    It was rather delicate that the previous varset forcing terminated. We
-    relied on:
-      - A freshly forced value always has an annotation which immediately block more
-        forcing.
-
-    This was true because forcing applied the action of the current cof to all critical
-    ivars. After forcing, the action of the same cof becomes identity on the ivar set.
-
-    If we have connections, there is no action of cofs that could be applied, and it seems
-    that it does not work anymore to remember sets of ivars.
-
-  - solution 1:
-    - Every semantic function that's involved in frc returns an extra flag as output,
-      which indicates whether the call "progressed" or "blocked".
-    - A helper function for all of these which immediately discards the flag.
-
 - ensure that closed eval does not need to go under cofs
   - problem:
     - closed hcomind applies a projection under a cof, which
       means that eval does need to happen under there
   - solution:
-    defunctionalize hcom components as well
+    defunctionalize hcom components as well. Projection under
+    a cof just builds a new closure
 
 - implement connections
 - add hcomU
+- have native fixpoints + case trees, drop top-level recursion
 
 Not priority
 - have neutral type annotation instead of path annotation only?
   (not super important if we don't want unit eta)
-- have native fixpoints + case trees, drop top-level recursion
-
 -}
 
 type EvalArgs a = SubArg => NCofArg => DomArg => EnvArg => RecurseArg => a
